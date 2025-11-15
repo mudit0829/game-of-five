@@ -5,12 +5,12 @@ import random
 import time
 from datetime import datetime, timedelta
 import threading
-import eventlet
+import queue
 
 app = Flask(__name__)
 app.config['SECRET_KEY'] = 'your-secret-key-here'
 CORS(app)
-socketio = SocketIO(app, cors_allowed_origins="*", async_mode='eventlet')
+socketio = SocketIO(app, cors_allowed_origins="*")
 
 # Game configurations
 GAME_CONFIGS = {
@@ -153,79 +153,89 @@ class GameRound:
 def game_timer_thread(game_type):
     """Manages game round lifecycle"""
     while True:
-        if game_rounds[game_type] is None:
-            # Create new round
-            game_rounds[game_type] = GameRound(game_type)
-            socketio.emit('new_round', {
+        try:
+            if game_rounds[game_type] is None:
+                # Create new round
+                game_rounds[game_type] = GameRound(game_type)
+                socketio.emit('new_round', {
+                    'game_type': game_type,
+                    'round_data': get_round_data(game_type)
+                }, room=game_type)
+            
+            current_round = game_rounds[game_type]
+            now = datetime.now()
+            
+            # Check if we need to add bots (after 4 minutes, if only 1 real user)
+            time_elapsed = (now - current_round.start_time).total_seconds()
+            
+            if (time_elapsed >= 240 and 
+                len(current_round.real_users) == 1 and 
+                not current_round.bot_addition_started):
+                current_round.bot_addition_started = True
+                threading.Thread(target=add_bots_gradually, args=(game_type,), daemon=True).start()
+            
+            # Close betting at 4:45
+            if now >= current_round.betting_close_time and not current_round.is_betting_closed:
+                current_round.is_betting_closed = True
+                socketio.emit('betting_closed', {
+                    'game_type': game_type
+                }, room=game_type)
+            
+            # Calculate and announce result at 5:00
+            if now >= current_round.end_time and not current_round.is_finished:
+                current_round.is_finished = True
+                result = current_round.calculate_result()
+                winners = current_round.get_winners()
+                
+                # Update winner wallets
+                for winner in winners:
+                    if winner['user_id'] in user_wallets:
+                        user_wallets[winner['user_id']] += winner['payout']
+                
+                socketio.emit('round_result', {
+                    'game_type': game_type,
+                    'result': result,
+                    'winners': winners,
+                    'all_bets': current_round.bets
+                }, room=game_type)
+                
+                # Wait 10 seconds before starting new round
+                time.sleep(10)
+                game_rounds[game_type] = None
+            
+            # Update timer every second
+            socketio.emit('timer_update', {
                 'game_type': game_type,
-                'round_data': get_round_data(game_type)
-            }, room=game_type)
-        
-        current_round = game_rounds[game_type]
-        now = datetime.now()
-        
-        # Check if we need to add bots (after 4 minutes, if only 1 real user)
-        time_elapsed = (now - current_round.start_time).total_seconds()
-        
-        if (time_elapsed >= 240 and 
-            len(current_round.real_users) == 1 and 
-            not current_round.bot_addition_started):
-            current_round.bot_addition_started = True
-            threading.Thread(target=add_bots_gradually, args=(game_type,)).start()
-        
-        # Close betting at 4:45
-        if now >= current_round.betting_close_time and not current_round.is_betting_closed:
-            current_round.is_betting_closed = True
-            socketio.emit('betting_closed', {
-                'game_type': game_type
-            }, room=game_type)
-        
-        # Calculate and announce result at 5:00
-        if now >= current_round.end_time and not current_round.is_finished:
-            current_round.is_finished = True
-            result = current_round.calculate_result()
-            winners = current_round.get_winners()
-            
-            # Update winner wallets
-            for winner in winners:
-                if winner['user_id'] in user_wallets:
-                    user_wallets[winner['user_id']] += winner['payout']
-            
-            socketio.emit('round_result', {
-                'game_type': game_type,
-                'result': result,
-                'winners': winners,
-                'all_bets': current_round.bets
+                'time_remaining': current_round.get_time_remaining(),
+                'betting_time_remaining': current_round.get_betting_time_remaining()
             }, room=game_type)
             
-            # Wait 10 seconds before starting new round
-            eventlet.sleep(10)
-            game_rounds[game_type] = None
-        
-        # Update timer every second
-        socketio.emit('timer_update', {
-            'game_type': game_type,
-            'time_remaining': current_round.get_time_remaining(),
-            'betting_time_remaining': current_round.get_betting_time_remaining()
-        }, room=game_type)
-        
-        eventlet.sleep(1)
+            time.sleep(1)
+        except Exception as e:
+            print(f"Error in game timer thread for {game_type}: {e}")
+            time.sleep(1)
 
 def add_bots_gradually(game_type):
     """Add bots every 5-7 seconds"""
-    current_round = game_rounds[game_type]
-    
-    while (current_round and 
-           not current_round.is_betting_closed and 
-           len(current_round.bets) < 6):
-        
-        eventlet.sleep(random.uniform(5, 7))
-        
-        if current_round.add_bot_bet():
-            socketio.emit('bet_placed', {
-                'game_type': game_type,
-                'round_data': get_round_data(game_type)
-            }, room=game_type)
+    try:
+        while True:
+            current_round = game_rounds.get(game_type)
+            
+            if (current_round and 
+                not current_round.is_betting_closed and 
+                len(current_round.bets) < 6):
+                
+                time.sleep(random.uniform(5, 7))
+                
+                if current_round.add_bot_bet():
+                    socketio.emit('bet_placed', {
+                        'game_type': game_type,
+                        'round_data': get_round_data(game_type)
+                    }, room=game_type)
+            else:
+                break
+    except Exception as e:
+        print(f"Error in add_bots_gradually for {game_type}: {e}")
 
 def get_round_data(game_type):
     """Get current round data"""
@@ -328,8 +338,8 @@ def handle_place_bet(data):
 # Start game timers in background
 def start_game_timers():
     for game_type in GAME_CONFIGS.keys():
-        eventlet.spawn(game_timer_thread, game_type)
+        threading.Thread(target=game_timer_thread, args=(game_type,), daemon=True).start()
 
 if __name__ == '__main__':
     start_game_timers()
-    socketio.run(app, host='0.0.0.0', port=5000, debug=False)
+    socketio.run(app, host='0.0.0.0', port=int(os.environ.get('PORT', 10000)), debug=False)
