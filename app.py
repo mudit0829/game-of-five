@@ -1,753 +1,333 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Betting Game - Demo</title>
-    <script src="https://cdn.socket.io/4.5.4/socket.io.min.js"></script>
-    <style>
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-        }
-        
-        body {
-            font-family: Arial, sans-serif;
-            background: #1a1a2e;
-            color: #eee;
-            padding: 20px;
-        }
-        
-        .container {
-            max-width: 1400px;
-            margin: 0 auto;
-        }
-        
-        h1 {
-            text-align: center;
-            margin-bottom: 30px;
-            color: #ffd700;
-        }
-        
-        .user-info {
-            background: #16213e;
-            padding: 15px;
-            border-radius: 8px;
-            margin-bottom: 20px;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-        }
-        
-        .balance {
-            font-size: 20px;
-            font-weight: bold;
-            color: #4ecca3;
-        }
-        
-        .games-container {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
-            gap: 20px;
-        }
-        
-        .game-card {
-            background: #16213e;
-            border-radius: 10px;
-            padding: 20px;
-            border: 2px solid #4ecca3;
-            position: relative;
-        }
-        
-        .game-card.silver { border-color: #c0c0c0; }
-        .game-card.gold { border-color: #ffd700; }
-        .game-card.diamond { border-color: #b9f2ff; }
-        .game-card.platinum { border-color: #e5e4e2; }
-        
-        .game-header {
-            text-align: center;
-            margin-bottom: 15px;
-        }
-        
-        .game-title {
-            font-size: 24px;
-            font-weight: bold;
-            margin-bottom: 5px;
-        }
-        
-        .game-info {
-            font-size: 14px;
-            color: #aaa;
-        }
-        
-        .timer-section {
-            background: #0f3460;
-            padding: 15px;
-            border-radius: 5px;
-            text-align: center;
-            margin-bottom: 15px;
-        }
-        
-        .timer {
-            font-size: 28px;
-            font-weight: bold;
-            color: #4ecca3;
-        }
-        
-        .timer.result-time {
-            color: #ffd700;
-        }
-        
-        .round-info {
-            font-size: 12px;
-            color: #aaa;
-            margin-top: 5px;
-        }
-        
-        .winning-number {
-            background: #4ecca3;
-            color: #000;
-            padding: 15px;
-            border-radius: 5px;
-            text-align: center;
-            font-size: 24px;
-            font-weight: bold;
-            margin-bottom: 15px;
-            display: none;
-        }
-        
-        .winning-number.show {
-            display: block;
-            animation: highlight 0.5s;
-        }
-        
-        @keyframes highlight {
-            0% { transform: scale(1); }
-            50% { transform: scale(1.1); }
-            100% { transform: scale(1); }
-        }
-        
-        .number-grid {
-            display: grid;
-            grid-template-columns: repeat(5, 1fr);
-            gap: 10px;
-            margin-bottom: 15px;
-        }
-        
-        .number-btn {
-            padding: 15px;
-            border: 2px solid #4ecca3;
-            background: #0f3460;
-            color: #fff;
-            font-size: 18px;
-            font-weight: bold;
-            border-radius: 5px;
-            cursor: pointer;
-            transition: all 0.3s;
-        }
-        
-        .number-btn:hover:not(:disabled) {
-            background: #4ecca3;
-            color: #000;
-            transform: scale(1.05);
-        }
-        
-        .number-btn:disabled {
-            opacity: 0.5;
-            cursor: not-allowed;
-        }
-        
-        .number-btn.selected {
-            background: #ffd700;
-            color: #000;
-            border-color: #ffd700;
-        }
-        
-        .your-bets {
-            background: #0f3460;
-            padding: 12px;
-            border-radius: 5px;
-            margin-bottom: 15px;
-            min-height: 40px;
-        }
-        
-        .bets-label {
-            font-size: 14px;
-            font-weight: bold;
-            margin-bottom: 8px;
-            color: #4ecca3;
-        }
-        
-        .bet-numbers {
-            display: flex;
-            flex-wrap: wrap;
-            gap: 8px;
-        }
-        
-        .bet-badge {
-            background: #ffd700;
-            color: #000;
-            padding: 5px 10px;
-            border-radius: 20px;
-            font-size: 14px;
-            font-weight: bold;
-        }
-        
-        .all-bets-list {
-            background: #0f3460;
-            padding: 10px;
-            border-radius: 5px;
-            margin-bottom: 15px;
-            max-height: 120px;
-            overflow-y: auto;
-            font-size: 13px;
-        }
-        
-        .bet-item {
-            padding: 5px;
-            margin-bottom: 3px;
-            background: #16213e;
-            border-radius: 3px;
-            display: flex;
-            justify-content: space-between;
-        }
-        
-        .bet-item.bot-bet {
-            opacity: 0.6;
-            font-style: italic;
-        }
-        
-        .bet-item.winning {
-            background: #4ecca3;
-            color: #000;
-            opacity: 1;
-        }
-        
-        .slots-info {
-            text-align: center;
-            margin-bottom: 12px;
-            font-size: 13px;
-            color: #aaa;
-        }
-        
-        .message {
-            padding: 10px;
-            border-radius: 5px;
-            margin-bottom: 10px;
-            text-align: center;
-            font-size: 13px;
-        }
-        
-        .error {
-            background: #c41e3a;
-            display: none;
-        }
-        
-        .success {
-            background: #4ecca3;
-            color: #000;
-            display: none;
-        }
-        
-        .modal {
-            display: none;
-            position: fixed;
-            z-index: 1000;
-            left: 0;
-            top: 0;
-            width: 100%;
-            height: 100%;
-            background-color: rgba(0, 0, 0, 0.7);
-        }
-        
-        .modal.show {
-            display: flex;
-            align-items: center;
-            justify-content: center;
-        }
-        
-        .modal-content {
-            background: #16213e;
-            padding: 30px;
-            border-radius: 10px;
-            text-align: center;
-            border: 2px solid #c41e3a;
-            max-width: 300px;
-        }
-        
-        .modal-content h2 {
-            color: #c41e3a;
-            margin-bottom: 15px;
-        }
-        
-        .modal-content p {
-            margin-bottom: 20px;
-            font-size: 16px;
-        }
-        
-        .modal-btn {
-            background: #4ecca3;
-            color: #000;
-            padding: 10px 20px;
-            border: none;
-            border-radius: 5px;
-            font-weight: bold;
-            cursor: pointer;
-            font-size: 14px;
-        }
-        
-        .modal-btn:hover {
-            background: #3db599;
-        }
-    </style>
-</head>
-<body>
-    <div class="modal" id="maxBetsModal">
-        <div class="modal-content">
-            <h2>⚠️ Maximum Bets Reached</h2>
-            <p>Maximum 4 bets are allowed per user</p>
-            <button class="modal-btn" onclick="closeModal()">OK</button>
-        </div>
-    </div>
+from flask import Flask, render_template, request, jsonify
+from flask_socketio import SocketIO, emit, join_room
+from flask_cors import CORS
+import random
+import time
+from datetime import datetime, timedelta
+import threading
+import os
 
-    <div class="container">
-        <h1>🎮 Betting Game - Live Demo</h1>
+app = Flask(__name__)
+app.config['SECRET_KEY'] = 'your-secret-key-here'
+CORS(app)
+socketio = SocketIO(app, cors_allowed_origins="*")
+
+# Game configurations
+GAME_CONFIGS = {
+    'silver': {'bet_amount': 10, 'payout': 50, 'name': 'Silver Game'},
+    'gold': {'bet_amount': 50, 'payout': 200, 'name': 'Gold Game'},
+    'diamond': {'bet_amount': 100, 'payout': 500, 'name': 'Diamond Game'},
+    'platinum': {'bet_amount': 200, 'payout': 1000, 'name': 'Platinum Game'}
+}
+
+# Game states
+game_rounds = {
+    'silver': None,
+    'gold': None,
+    'diamond': None,
+    'platinum': None
+}
+
+# User wallets
+user_wallets = {}
+
+def generate_bot_name():
+    prefixes = ['Player', 'User', 'Gamer', 'Pro', 'King', 'Boss']
+    return f"{random.choice(prefixes)}{random.randint(1000, 9999)}"
+
+class GameRound:
+    def __init__(self, game_type, round_number):
+        self.game_type = game_type
+        self.round_number = round_number
+        self.config = GAME_CONFIGS[game_type]
+        self.start_time = datetime.now()
+        self.end_time = self.start_time + timedelta(minutes=5)
+        self.betting_close_time = self.start_time + timedelta(minutes=4, seconds=45)
+        self.bets = []
+        self.result = None
+        self.is_betting_closed = False
+        self.is_finished = False
+        self.real_users = set()
+        self.bot_addition_started = False
         
-        <div class="user-info">
-            <div>
-                <strong>User:</strong> <span id="username">Player</span>
-            </div>
-            <div class="balance">
-                💰 Balance: <span id="balance">0</span> Coins
-            </div>
-        </div>
+    def add_bet(self, user_id, username, number, is_bot=False):
+        user_bets = [b for b in self.bets if b['user_id'] == user_id]
+        if len(user_bets) >= 4:
+            return False, "Maximum 4 bets per user"
         
-        <div class="games-container">
-            <div class="game-card silver" data-game="silver">
-                <div class="game-header">
-                    <div class="game-title">🥈 Silver Game</div>
-                    <div class="game-info">Bet: 10 | Win: 50</div>
-                </div>
-                
-                <div class="timer-section">
-                    <div class="timer" data-timer="silver">5:00</div>
-                    <div class="round-info">Round: <span data-round="silver">1</span></div>
-                </div>
-                
-                <div class="winning-number" data-result="silver"></div>
-                
-                <div class="slots-info">Slots: <span data-slots="silver">0/6</span></div>
-                
-                <div class="your-bets">
-                    <div class="bets-label">Your Bets:</div>
-                    <div class="bet-numbers" data-mybets="silver">
-                        <span style="color: #aaa; font-size: 13px;">No bets yet</span>
-                    </div>
-                </div>
-                
-                <div class="number-grid" data-grid="silver">
-                    <button class="number-btn" data-number="0">0</button>
-                    <button class="number-btn" data-number="1">1</button>
-                    <button class="number-btn" data-number="2">2</button>
-                    <button class="number-btn" data-number="3">3</button>
-                    <button class="number-btn" data-number="4">4</button>
-                    <button class="number-btn" data-number="5">5</button>
-                    <button class="number-btn" data-number="6">6</button>
-                    <button class="number-btn" data-number="7">7</button>
-                    <button class="number-btn" data-number="8">8</button>
-                    <button class="number-btn" data-number="9">9</button>
-                </div>
-                
-                <div class="all-bets-list" data-bets="silver">
-                    <div style="text-align: center; color: #aaa; padding: 10px;">No bets yet</div>
-                </div>
-                
-                <div data-message="silver"></div>
-            </div>
-            
-            <div class="game-card gold" data-game="gold">
-                <div class="game-header">
-                    <div class="game-title">🥇 Gold Game</div>
-                    <div class="game-info">Bet: 50 | Win: 200</div>
-                </div>
-                
-                <div class="timer-section">
-                    <div class="timer" data-timer="gold">5:00</div>
-                    <div class="round-info">Round: <span data-round="gold">1</span></div>
-                </div>
-                
-                <div class="winning-number" data-result="gold"></div>
-                
-                <div class="slots-info">Slots: <span data-slots="gold">0/6</span></div>
-                
-                <div class="your-bets">
-                    <div class="bets-label">Your Bets:</div>
-                    <div class="bet-numbers" data-mybets="gold">
-                        <span style="color: #aaa; font-size: 13px;">No bets yet</span>
-                    </div>
-                </div>
-                
-                <div class="number-grid" data-grid="gold">
-                    <button class="number-btn" data-number="0">0</button>
-                    <button class="number-btn" data-number="1">1</button>
-                    <button class="number-btn" data-number="2">2</button>
-                    <button class="number-btn" data-number="3">3</button>
-                    <button class="number-btn" data-number="4">4</button>
-                    <button class="number-btn" data-number="5">5</button>
-                    <button class="number-btn" data-number="6">6</button>
-                    <button class="number-btn" data-number="7">7</button>
-                    <button class="number-btn" data-number="8">8</button>
-                    <button class="number-btn" data-number="9">9</button>
-                </div>
-                
-                <div class="all-bets-list" data-bets="gold">
-                    <div style="text-align: center; color: #aaa; padding: 10px;">No bets yet</div>
-                </div>
-                
-                <div data-message="gold"></div>
-            </div>
-            
-            <div class="game-card diamond" data-game="diamond">
-                <div class="game-header">
-                    <div class="game-title">💎 Diamond Game</div>
-                    <div class="game-info">Bet: 100 | Win: 500</div>
-                </div>
-                
-                <div class="timer-section">
-                    <div class="timer" data-timer="diamond">5:00</div>
-                    <div class="round-info">Round: <span data-round="diamond">1</span></div>
-                </div>
-                
-                <div class="winning-number" data-result="diamond"></div>
-                
-                <div class="slots-info">Slots: <span data-slots="diamond">0/6</span></div>
-                
-                <div class="your-bets">
-                    <div class="bets-label">Your Bets:</div>
-                    <div class="bet-numbers" data-mybets="diamond">
-                        <span style="color: #aaa; font-size: 13px;">No bets yet</span>
-                    </div>
-                </div>
-                
-                <div class="number-grid" data-grid="diamond">
-                    <button class="number-btn" data-number="0">0</button>
-                    <button class="number-btn" data-number="1">1</button>
-                    <button class="number-btn" data-number="2">2</button>
-                    <button class="number-btn" data-number="3">3</button>
-                    <button class="number-btn" data-number="4">4</button>
-                    <button class="number-btn" data-number="5">5</button>
-                    <button class="number-btn" data-number="6">6</button>
-                    <button class="number-btn" data-number="7">7</button>
-                    <button class="number-btn" data-number="8">8</button>
-                    <button class="number-btn" data-number="9">9</button>
-                </div>
-                
-                <div class="all-bets-list" data-bets="diamond">
-                    <div style="text-align: center; color: #aaa; padding: 10px;">No bets yet</div>
-                </div>
-                
-                <div data-message="diamond"></div>
-            </div>
-            
-            <div class="game-card platinum" data-game="platinum">
-                <div class="game-header">
-                    <div class="game-title">⭐ Platinum Game</div>
-                    <div class="game-info">Bet: 200 | Win: 1000</div>
-                </div>
-                
-                <div class="timer-section">
-                    <div class="timer" data-timer="platinum">5:00</div>
-                    <div class="round-info">Round: <span data-round="platinum">1</span></div>
-                </div>
-                
-                <div class="winning-number" data-result="platinum"></div>
-                
-                <div class="slots-info">Slots: <span data-slots="platinum">0/6</span></div>
-                
-                <div class="your-bets">
-                    <div class="bets-label">Your Bets:</div>
-                    <div class="bet-numbers" data-mybets="platinum">
-                        <span style="color: #aaa; font-size: 13px;">No bets yet</span>
-                    </div>
-                </div>
-                
-                <div class="number-grid" data-grid="platinum">
-                    <button class="number-btn" data-number="0">0</button>
-                    <button class="number-btn" data-number="1">1</button>
-                    <button class="number-btn" data-number="2">2</button>
-                    <button class="number-btn" data-number="3">3</button>
-                    <button class="number-btn" data-number="4">4</button>
-                    <button class="number-btn" data-number="5">5</button>
-                    <button class="number-btn" data-number="6">6</button>
-                    <button class="number-btn" data-number="7">7</button>
-                    <button class="number-btn" data-number="8">8</button>
-                    <button class="number-btn" data-number="9">9</button>
-                </div>
-                
-                <div class="all-bets-list" data-bets="platinum">
-                    <div style="text-align: center; color: #aaa; padding: 10px;">No bets yet</div>
-                </div>
-                
-                <div data-message="platinum"></div>
-            </div>
-        </div>
-    </div>
-    
-    <script>
-        // Generate unique user ID
-        let userId = localStorage.getItem('userId');
-        if (!userId) {
-            userId = 'user_' + Math.random().toString(36).substr(2, 9);
-            localStorage.setItem('userId', userId);
-        }
+        if len(self.bets) >= 6:
+            return False, "All slots are full"
         
-        const username = 'Player' + Math.floor(Math.random() * 9999);
-        document.getElementById('username').textContent = username;
+        if not is_bot:
+            self.real_users.add(user_id)
         
-        // Connect to Socket.IO
-        const socket = io();
-        
-        // Register user
-        fetch('/register', {
-            method: 'POST',
-            headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify({user_id: userId, username: username})
+        self.bets.append({
+            'user_id': user_id,
+            'username': username,
+            'number': number,
+            'is_bot': is_bot,
+            'bet_amount': self.config['bet_amount']
         })
-        .then(res => res.json())
-        .then(data => {
-            document.getElementById('balance').textContent = data.balance;
-        });
+        return True, "Bet placed successfully"
+    
+    def add_bot_bet(self):
+        if len(self.bets) >= 6:
+            return False
         
-        // Track user bets per game
-        const userBets = {
-            silver: {},
-            gold: {},
-            diamond: {},
-            platinum: {}
-        };
+        used_numbers = [b['number'] for b in self.bets]
+        available_numbers = [n for n in range(10) if used_numbers.count(n) < 1]
         
-        // Join all games
-        ['silver', 'gold', 'diamond', 'platinum'].forEach(gameType => {
-            socket.emit('join_game', {game_type: gameType, user_id: userId});
-            
-            // Add click handlers for number buttons
-            const grid = document.querySelector(`[data-grid="${gameType}"]`);
-            grid.querySelectorAll('.number-btn').forEach(btn => {
-                btn.addEventListener('click', function() {
-                    const number = parseInt(this.dataset.number);
-                    
-                    // Check if already bet 4 numbers
-                    const betCount = Object.keys(userBets[gameType]).length;
-                    
-                    if (betCount >= 4 && !userBets[gameType][number]) {
-                        showMaxBetsModal();
-                        return;
-                    }
-                    
-                    placeBet(gameType, number);
-                });
-            });
-        });
+        if not available_numbers:
+            available_numbers = list(range(10))
         
-        function placeBet(gameType, number) {
-            socket.emit('place_bet', {
-                game_type: gameType,
-                user_id: userId,
-                username: username,
-                number: number
-            });
-        }
+        bot_name = generate_bot_name()
+        bot_number = random.choice(available_numbers)
         
-        function updateRoundData(gameType, roundData) {
-            if (!roundData) return;
+        self.bets.append({
+            'user_id': f'bot_{bot_name}',
+            'username': bot_name,
+            'number': bot_number,
+            'is_bot': True,
+            'bet_amount': self.config['bet_amount']
+        })
+        return True
+    
+    def calculate_result(self):
+        real_user_bets = [b for b in self.bets if not b['is_bot']]
+        
+        if random.random() < 0.16 and real_user_bets:
+            winning_bet = random.choice(real_user_bets)
+            self.result = winning_bet['number']
+        else:
+            bot_bets = [b for b in self.bets if b['is_bot']]
             
-            const bets = roundData.bets || [];
-            const myBets = bets.filter(b => b.user_id === userId);
-            
-            // Update slots info
-            document.querySelector(`[data-slots="${gameType}"]`).textContent = `${bets.length}/6`;
-            
-            // Update user bets display
-            const myBetsContainer = document.querySelector(`[data-mybets="${gameType}"]`);
-            
-            if (myBets.length === 0) {
-                myBetsContainer.innerHTML = '<span style="color: #aaa; font-size: 13px;">No bets yet</span>';
-                userBets[gameType] = {};
-            } else {
-                const betsHTML = myBets.map(bet => `<div class="bet-badge">${bet.number}</div>`).join('');
-                myBetsContainer.innerHTML = betsHTML;
+            if bot_bets and random.random() < 0.5:
+                winning_bet = random.choice(bot_bets)
+                self.result = winning_bet['number']
+            else:
+                used_numbers = [b['number'] for b in self.bets]
+                available_numbers = [n for n in range(10) if n not in used_numbers]
                 
-                // Update userBets object
-                userBets[gameType] = {};
-                myBets.forEach(bet => {
-                    userBets[gameType][bet.number] = true;
-                });
-            }
+                if available_numbers:
+                    self.result = random.choice(available_numbers)
+                else:
+                    self.result = random.randint(0, 9)
+        
+        return self.result
+    
+    def get_winners(self):
+        if self.result is None:
+            return []
+        
+        winners = []
+        for bet in self.bets:
+            if bet['number'] == self.result and not bet['is_bot']:
+                winners.append({
+                    'user_id': bet['user_id'],
+                    'username': bet['username'],
+                    'payout': self.config['payout']
+                })
+        return winners
+    
+    def get_time_remaining(self):
+        now = datetime.now()
+        if now >= self.end_time:
+            return 0
+        return int((self.end_time - now).total_seconds())
+    
+    def get_betting_time_remaining(self):
+        now = datetime.now()
+        if now >= self.betting_close_time:
+            return 0
+        return int((self.betting_close_time - now).total_seconds())
+
+def game_timer_thread(game_type):
+    round_counter = 0
+    
+    while True:
+        try:
+            if game_rounds[game_type] is None:
+                round_counter += 1
+                game_rounds[game_type] = GameRound(game_type, round_counter)
+                socketio.emit('new_round', {
+                    'game_type': game_type,
+                    'round_number': round_counter,
+                    'round_data': get_round_data(game_type)
+                }, room=game_type)
             
-            // Update all bets list
-            const betsList = document.querySelector(`[data-bets="${gameType}"]`);
-            if (bets.length === 0) {
-                betsList.innerHTML = '<div style="text-align: center; color: #aaa; padding: 10px;">No bets yet</div>';
-            } else {
-                const isFinished = roundData.is_finished;
-                const result = roundData.result;
+            current_round = game_rounds[game_type]
+            now = datetime.now()
+            
+            time_elapsed = (now - current_round.start_time).total_seconds()
+            
+            if (time_elapsed >= 240 and 
+                len(current_round.real_users) == 1 and 
+                not current_round.bot_addition_started):
+                current_round.bot_addition_started = True
+                threading.Thread(target=add_bots_gradually, args=(game_type,), daemon=True).start()
+            
+            if now >= current_round.betting_close_time and not current_round.is_betting_closed:
+                current_round.is_betting_closed = True
+                socketio.emit('betting_closed', {
+                    'game_type': game_type
+                }, room=game_type)
+            
+            if now >= current_round.end_time and not current_round.is_finished:
+                current_round.is_finished = True
+                result = current_round.calculate_result()
+                winners = current_round.get_winners()
                 
-                betsList.innerHTML = bets.map(bet => {
-                    const isWinning = isFinished && bet.number === result && !bet.is_bot;
-                    const classes = `bet-item ${bet.is_bot ? 'bot-bet' : ''} ${isWinning ? 'winning' : ''}`;
-                    return `
-                        <div class="${classes}">
-                            <span>${bet.username}</span>
-                            <span>Number ${bet.number}</span>
-                        </div>
-                    `;
-                }).join('');
-            }
-            
-            // Highlight/disable number buttons
-            const grid = document.querySelector(`[data-grid="${gameType}"]`);
-            grid.querySelectorAll('.number-btn').forEach(btn => {
-                const num = parseInt(btn.dataset.number);
-                const isMyBet = myBets.some(b => b.number === num);
-                btn.classList.toggle('selected', isMyBet);
-                btn.disabled = roundData.is_betting_closed;
-            });
-        }
-        
-        function formatTime(seconds) {
-            const mins = Math.floor(seconds / 60);
-            const secs = seconds % 60;
-            return `${mins}:${secs.toString().padStart(2, '0')}`;
-        }
-        
-        function showMessage(gameType, message, isError = false) {
-            const msgDiv = document.querySelector(`[data-message="${gameType}"]`);
-            msgDiv.innerHTML = `<div class="message ${isError ? 'error' : 'success'}" style="display: block;">${message}</div>`;
-            setTimeout(() => {
-                msgDiv.innerHTML = '';
-            }, 3000);
-        }
-        
-        function showMaxBetsModal() {
-            document.getElementById('maxBetsModal').classList.add('show');
-        }
-        
-        function closeModal() {
-            document.getElementById('maxBetsModal').classList.remove('show');
-        }
-        
-        // Close modal when clicking outside
-        window.onclick = function(event) {
-            const modal = document.getElementById('maxBetsModal');
-            if (event.target == modal) {
-                modal.classList.remove('show');
-            }
-        }
-        
-        // Socket event handlers
-        socket.on('round_data', data => {
-            updateRoundData(data.game_type, data.round_data);
-        });
-        
-        socket.on('new_round', data => {
-            const gameType = data.game_type;
-            const roundNumber = data.round_number;
-            
-            // Reset UI for new round
-            userBets[gameType] = {};
-            
-            // Update round number
-            document.querySelector(`[data-round="${gameType}"]`).textContent = roundNumber;
-            
-            // Hide result
-            const resultDiv = document.querySelector(`[data-result="${gameType}"]`);
-            resultDiv.classList.remove('show');
-            resultDiv.textContent = '';
-            
-            // Reset buttons
-            const grid = document.querySelector(`[data-grid="${gameType}"]`);
-            grid.querySelectorAll('.number-btn').forEach(btn => {
-                btn.classList.remove('selected');
-                btn.disabled = false;
-            });
-            
-            updateRoundData(gameType, data.round_data);
-        });
-        
-        socket.on('timer_update', data => {
-            const timer = document.querySelector(`[data-timer="${data.game_type}"]`);
-            const timeRemaining = data.betting_time_remaining || data.time_remaining;
-            
-            timer.textContent = formatTime(timeRemaining);
-            timer.classList.remove('result-time');
-            
-            // If betting closed but game not finished
-            if (data.betting_time_remaining === 0 && data.time_remaining > 0) {
-                timer.classList.add('result-time');
-                timer.textContent = 'Result: ' + formatTime(data.time_remaining);
-            }
-        });
-        
-        socket.on('bet_placed', data => {
-            updateRoundData(data.game_type, data.round_data);
-        });
-        
-        socket.on('bet_success', data => {
-            document.getElementById('balance').textContent = data.new_balance;
-        });
-        
-        socket.on('bet_error', data => {
-            // Show error on all games
-            ['silver', 'gold', 'diamond', 'platinum'].forEach(gt => {
-                showMessage(gt, data.message, true);
-            });
-        });
-        
-        socket.on('betting_closed', data => {
-            // Disable number buttons
-            const grid = document.querySelector(`[data-grid="${data.game_type}"]`);
-            grid.querySelectorAll('.number-btn').forEach(btn => {
-                btn.disabled = true;
-            });
-        });
-        
-        socket.on('round_result', data => {
-            const gameType = data.game_type;
-            const resultDiv = document.querySelector(`[data-result="${gameType}"]`);
-            
-            const winners = data.winners || [];
-            const isWinner = winners.some(w => w.user_id === userId);
-            
-            resultDiv.textContent = `🎯 Winning Number: ${data.result}`;
-            
-            if (isWinner) {
-                const winAmount = winners.find(w => w.user_id === userId).payout;
-                resultDiv.textContent = `🎉 YOU WIN! Number: ${data.result} +${winAmount} coins`;
-                resultDiv.style.background = '#4ecca3';
+                for winner in winners:
+                    if winner['user_id'] in user_wallets:
+                        user_wallets[winner['user_id']] += winner['payout']
                 
-                // Update balance
-                fetch(`/balance/${userId}`)
-                    .then(res => res.json())
-                    .then(balanceData => {
-                        document.getElementById('balance').textContent = balanceData.balance;
-                    });
-            } else {
-                resultDiv.style.background = '#c41e3a';
-            }
+                socketio.emit('round_result', {
+                    'game_type': game_type,
+                    'result': result,
+                    'winners': winners,
+                    'all_bets': current_round.bets
+                }, room=game_type)
+                
+                time.sleep(3)
+                game_rounds[game_type] = None
             
-            resultDiv.classList.add('show');
+            socketio.emit('timer_update', {
+                'game_type': game_type,
+                'time_remaining': current_round.get_time_remaining(),
+                'betting_time_remaining': current_round.get_betting_time_remaining(),
+                'total_bets': len(current_round.bets)
+            }, room=game_type)
             
-            // Update final bets display with result
-            const betsData = {
-                ...data,
-                bets: data.all_bets,
-                is_betting_closed: true,
-                is_finished: true,
-                result: data.result
-            };
-            updateRoundData(gameType, betsData);
-        });
-    </script>
-</body>
-</html>
+            time.sleep(1)
+        except Exception as e:
+            print(f"Error in game timer thread for {game_type}: {e}")
+            time.sleep(1)
+
+def add_bots_gradually(game_type):
+    try:
+        while True:
+            current_round = game_rounds.get(game_type)
+            
+            if (current_round and 
+                not current_round.is_betting_closed and 
+                len(current_round.bets) < 6):
+                
+                time.sleep(random.uniform(5, 7))
+                
+                if current_round.add_bot_bet():
+                    socketio.emit('bet_placed', {
+                        'game_type': game_type,
+                        'round_data': get_round_data(game_type)
+                    }, room=game_type)
+            else:
+                break
+    except Exception as e:
+        print(f"Error in add_bots_gradually for {game_type}: {e}")
+
+def get_round_data(game_type):
+    current_round = game_rounds[game_type]
+    if not current_round:
+        return None
+    
+    return {
+        'bets': current_round.bets,
+        'time_remaining': current_round.get_time_remaining(),
+        'betting_time_remaining': current_round.get_betting_time_remaining(),
+        'is_betting_closed': current_round.is_betting_closed,
+        'is_finished': current_round.is_finished,
+        'config': current_round.config
+    }
+
+@app.route('/')
+def index():
+    return render_template('index.html')
+
+@app.route('/register', methods=['POST'])
+def register():
+    data = request.json
+    user_id = data.get('user_id')
+    username = data.get('username')
+    
+    if user_id not in user_wallets:
+        user_wallets[user_id] = 10000
+    
+    return jsonify({
+        'success': True,
+        'balance': user_wallets[user_id]
+    })
+
+@app.route('/balance/<user_id>')
+def get_balance(user_id):
+    balance = user_wallets.get(user_id, 0)
+    return jsonify({'balance': balance})
+
+@socketio.on('connect')
+def handle_connect():
+    print('Client connected')
+
+@socketio.on('disconnect')
+def handle_disconnect():
+    print('Client disconnected')
+
+@socketio.on('join_game')
+def handle_join_game(data):
+    game_type = data['game_type']
+    user_id = data['user_id']
+    
+    join_room(game_type)
+    
+    current_round = game_rounds[game_type]
+    if current_round:
+        round_data = get_round_data(game_type)
+        emit('round_data', {
+            'game_type': game_type,
+            'round_data': round_data
+        })
+
+@socketio.on('place_bet')
+def handle_place_bet(data):
+    game_type = data['game_type']
+    user_id = data['user_id']
+    username = data['username']
+    number = data['number']
+    
+    current_round = game_rounds[game_type]
+    
+    if not current_round or current_round.is_betting_closed:
+        emit('bet_error', {'message': 'Betting is closed'})
+        return
+    
+    bet_amount = GAME_CONFIGS[game_type]['bet_amount']
+    if user_wallets.get(user_id, 0) < bet_amount:
+        emit('bet_error', {'message': 'Insufficient balance'})
+        return
+    
+    user_bets = [b for b in current_round.bets if b['user_id'] == user_id]
+    if len(user_bets) >= 4:
+        emit('bet_error', {'message': 'Maximum 4 bets per user'})
+        return
+    
+    success, message = current_round.add_bet(user_id, username, number)
+    
+    if success:
+        user_wallets[user_id] -= bet_amount
+        
+        socketio.emit('bet_placed', {
+            'game_type': game_type,
+            'round_data': get_round_data(game_type)
+        }, room=game_type)
+        
+        emit('bet_success', {
+            'message': message,
+            'new_balance': user_wallets[user_id]
+        })
+    else:
+        emit('bet_error', {'message': message})
+
+def start_game_timers():
+    for game_type in GAME_CONFIGS.keys():
+        threading.Thread(target=game_timer_thread, args=(game_type,), daemon=True).start()
+
+if __name__ == '__main__':
+    start_game_timers()
+    socketio.run(app, host='0.0.0.0', port=int(os.environ.get('PORT', 10000)), debug=False)
