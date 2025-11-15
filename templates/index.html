@@ -1,0 +1,489 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Betting Game - Demo</title>
+    <script src="https://cdn.socket.io/4.5.4/socket.io.min.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: Arial, sans-serif;
+            background: #1a1a2e;
+            color: #eee;
+            padding: 20px;
+        }
+        
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+        
+        h1 {
+            text-align: center;
+            margin-bottom: 30px;
+            color: #ffd700;
+        }
+        
+        .user-info {
+            background: #16213e;
+            padding: 15px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        
+        .balance {
+            font-size: 20px;
+            font-weight: bold;
+            color: #4ecca3;
+        }
+        
+        .games-container {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 20px;
+        }
+        
+        .game-card {
+            background: #16213e;
+            border-radius: 10px;
+            padding: 20px;
+            border: 2px solid #4ecca3;
+        }
+        
+        .game-card.silver { border-color: #c0c0c0; }
+        .game-card.gold { border-color: #ffd700; }
+        .game-card.diamond { border-color: #b9f2ff; }
+        .game-card.platinum { border-color: #e5e4e2; }
+        
+        .game-header {
+            text-align: center;
+            margin-bottom: 15px;
+        }
+        
+        .game-title {
+            font-size: 24px;
+            font-weight: bold;
+            margin-bottom: 5px;
+        }
+        
+        .game-info {
+            font-size: 14px;
+            color: #aaa;
+        }
+        
+        .timer {
+            background: #0f3460;
+            padding: 10px;
+            border-radius: 5px;
+            text-align: center;
+            margin-bottom: 15px;
+            font-size: 18px;
+            font-weight: bold;
+        }
+        
+        .betting-closed {
+            background: #c41e3a;
+        }
+        
+        .number-grid {
+            display: grid;
+            grid-template-columns: repeat(5, 1fr);
+            gap: 10px;
+            margin-bottom: 15px;
+        }
+        
+        .number-btn {
+            padding: 15px;
+            border: 2px solid #4ecca3;
+            background: #0f3460;
+            color: #fff;
+            font-size: 18px;
+            font-weight: bold;
+            border-radius: 5px;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+        
+        .number-btn:hover:not(:disabled) {
+            background: #4ecca3;
+            color: #000;
+            transform: scale(1.05);
+        }
+        
+        .number-btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+        
+        .number-btn.selected {
+            background: #ffd700;
+            color: #000;
+            border-color: #ffd700;
+        }
+        
+        .bets-list {
+            background: #0f3460;
+            padding: 10px;
+            border-radius: 5px;
+            margin-bottom: 15px;
+            max-height: 150px;
+            overflow-y: auto;
+        }
+        
+        .bet-item {
+            padding: 5px;
+            margin-bottom: 5px;
+            background: #16213e;
+            border-radius: 3px;
+            font-size: 14px;
+        }
+        
+        .bot-bet {
+            opacity: 0.7;
+        }
+        
+        .result-display {
+            background: #4ecca3;
+            color: #000;
+            padding: 15px;
+            border-radius: 5px;
+            text-align: center;
+            font-size: 24px;
+            font-weight: bold;
+            margin-bottom: 15px;
+            display: none;
+        }
+        
+        .result-display.show {
+            display: block;
+        }
+        
+        .slots-info {
+            text-align: center;
+            margin-bottom: 10px;
+            font-size: 14px;
+            color: #aaa;
+        }
+        
+        .message {
+            padding: 10px;
+            border-radius: 5px;
+            margin-bottom: 10px;
+            text-align: center;
+        }
+        
+        .error {
+            background: #c41e3a;
+        }
+        
+        .success {
+            background: #4ecca3;
+            color: #000;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🎮 Betting Game Demo</h1>
+        
+        <div class="user-info">
+            <div>
+                <strong>User:</strong> <span id="username">Player</span>
+            </div>
+            <div class="balance">
+                💰 Balance: <span id="balance">0</span> Coins
+            </div>
+        </div>
+        
+        <div class="games-container">
+            <div class="game-card silver" data-game="silver">
+                <div class="game-header">
+                    <div class="game-title">🥈 Silver Game</div>
+                    <div class="game-info">Bet: 10 | Win: 50</div>
+                </div>
+                <div class="timer" data-timer="silver">5:00</div>
+                <div class="result-display" data-result="silver"></div>
+                <div class="slots-info">Slots: <span data-slots="silver">0/6</span> | Your Bets: <span data-mybets="silver">0/4</span></div>
+                <div class="number-grid" data-grid="silver">
+                    <button class="number-btn" data-number="0">0</button>
+                    <button class="number-btn" data-number="1">1</button>
+                    <button class="number-btn" data-number="2">2</button>
+                    <button class="number-btn" data-number="3">3</button>
+                    <button class="number-btn" data-number="4">4</button>
+                    <button class="number-btn" data-number="5">5</button>
+                    <button class="number-btn" data-number="6">6</button>
+                    <button class="number-btn" data-number="7">7</button>
+                    <button class="number-btn" data-number="8">8</button>
+                    <button class="number-btn" data-number="9">9</button>
+                </div>
+                <div class="bets-list" data-bets="silver">
+                    <div style="text-align: center; color: #aaa;">No bets yet</div>
+                </div>
+                <div data-message="silver"></div>
+            </div>
+            
+            <div class="game-card gold" data-game="gold">
+                <div class="game-header">
+                    <div class="game-title">🥇 Gold Game</div>
+                    <div class="game-info">Bet: 50 | Win: 200</div>
+                </div>
+                <div class="timer" data-timer="gold">5:00</div>
+                <div class="result-display" data-result="gold"></div>
+                <div class="slots-info">Slots: <span data-slots="gold">0/6</span> | Your Bets: <span data-mybets="gold">0/4</span></div>
+                <div class="number-grid" data-grid="gold">
+                    <button class="number-btn" data-number="0">0</button>
+                    <button class="number-btn" data-number="1">1</button>
+                    <button class="number-btn" data-number="2">2</button>
+                    <button class="number-btn" data-number="3">3</button>
+                    <button class="number-btn" data-number="4">4</button>
+                    <button class="number-btn" data-number="5">5</button>
+                    <button class="number-btn" data-number="6">6</button>
+                    <button class="number-btn" data-number="7">7</button>
+                    <button class="number-btn" data-number="8">8</button>
+                    <button class="number-btn" data-number="9">9</button>
+                </div>
+                <div class="bets-list" data-bets="gold">
+                    <div style="text-align: center; color: #aaa;">No bets yet</div>
+                </div>
+                <div data-message="gold"></div>
+            </div>
+            
+            <div class="game-card diamond" data-game="diamond">
+                <div class="game-header">
+                    <div class="game-title">💎 Diamond Game</div>
+                    <div class="game-info">Bet: 100 | Win: 500</div>
+                </div>
+                <div class="timer" data-timer="diamond">5:00</div>
+                <div class="result-display" data-result="diamond"></div>
+                <div class="slots-info">Slots: <span data-slots="diamond">0/6</span> | Your Bets: <span data-mybets="diamond">0/4</span></div>
+                <div class="number-grid" data-grid="diamond">
+                    <button class="number-btn" data-number="0">0</button>
+                    <button class="number-btn" data-number="1">1</button>
+                    <button class="number-btn" data-number="2">2</button>
+                    <button class="number-btn" data-number="3">3</button>
+                    <button class="number-btn" data-number="4">4</button>
+                    <button class="number-btn" data-number="5">5</button>
+                    <button class="number-btn" data-number="6">6</button>
+                    <button class="number-btn" data-number="7">7</button>
+                    <button class="number-btn" data-number="8">8</button>
+                    <button class="number-btn" data-number="9">9</button>
+                </div>
+                <div class="bets-list" data-bets="diamond">
+                    <div style="text-align: center; color: #aaa;">No bets yet</div>
+                </div>
+                <div data-message="diamond"></div>
+            </div>
+            
+            <div class="game-card platinum" data-game="platinum">
+                <div class="game-header">
+                    <div class="game-title">⭐ Platinum Game</div>
+                    <div class="game-info">Bet: 200 | Win: 1000</div>
+                </div>
+                <div class="timer" data-timer="platinum">5:00</div>
+                <div class="result-display" data-result="platinum"></div>
+                <div class="slots-info">Slots: <span data-slots="platinum">0/6</span> | Your Bets: <span data-mybets="platinum">0/4</span></div>
+                <div class="number-grid" data-grid="platinum">
+                    <button class="number-btn" data-number="0">0</button>
+                    <button class="number-btn" data-number="1">1</button>
+                    <button class="number-btn" data-number="2">2</button>
+                    <button class="number-btn" data-number="3">3</button>
+                    <button class="number-btn" data-number="4">4</button>
+                    <button class="number-btn" data-number="5">5</button>
+                    <button class="number-btn" data-number="6">6</button>
+                    <button class="number-btn" data-number="7">7</button>
+                    <button class="number-btn" data-number="8">8</button>
+                    <button class="number-btn" data-number="9">9</button>
+                </div>
+                <div class="bets-list" data-bets="platinum">
+                    <div style="text-align: center; color: #aaa;">No bets yet</div>
+                </div>
+                <div data-message="platinum"></div>
+            </div>
+        </div>
+    </div>
+    
+    <script>
+        // Generate unique user ID
+        let userId = localStorage.getItem('userId');
+        if (!userId) {
+            userId = 'user_' + Math.random().toString(36).substr(2, 9);
+            localStorage.setItem('userId', userId);
+        }
+        
+        const username = 'Player' + Math.floor(Math.random() * 9999);
+        document.getElementById('username').textContent = username;
+        
+        // Connect to Socket.IO
+        const socket = io();
+        
+        // Register user
+        fetch('/register', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({user_id: userId, username: username})
+        })
+        .then(res => res.json())
+        .then(data => {
+            document.getElementById('balance').textContent = data.balance;
+        });
+        
+        // Track user bets per game
+        const userBets = {
+            silver: [],
+            gold: [],
+            diamond: [],
+            platinum: []
+        };
+        
+        // Join all games
+        ['silver', 'gold', 'diamond', 'platinum'].forEach(gameType => {
+            socket.emit('join_game', {game_type: gameType, user_id: userId});
+            
+            // Add click handlers for number buttons
+            const grid = document.querySelector(`[data-grid="${gameType}"]`);
+            grid.querySelectorAll('.number-btn').forEach(btn => {
+                btn.addEventListener('click', function() {
+                    const number = parseInt(this.dataset.number);
+                    placeBet(gameType, number);
+                });
+            });
+        });
+        
+        function placeBet(gameType, number) {
+            socket.emit('place_bet', {
+                game_type: gameType,
+                user_id: userId,
+                username: username,
+                number: number
+            });
+        }
+        
+        function updateRoundData(gameType, roundData) {
+            if (!roundData) return;
+            
+            const bets = roundData.bets || [];
+            const myBets = bets.filter(b => b.user_id === userId);
+            
+            // Update slots info
+            document.querySelector(`[data-slots="${gameType}"]`).textContent = `${bets.length}/6`;
+            document.querySelector(`[data-mybets="${gameType}"]`).textContent = `${myBets.length}/4`;
+            
+            // Update bets list
+            const betsList = document.querySelector(`[data-bets="${gameType}"]`);
+            if (bets.length === 0) {
+                betsList.innerHTML = '<div style="text-align: center; color: #aaa;">No bets yet</div>';
+            } else {
+                betsList.innerHTML = bets.map(bet => `
+                    <div class="bet-item ${bet.is_bot ? 'bot-bet' : ''}">
+                        ${bet.username}: Number ${bet.number} (${bet.bet_amount} coins)
+                    </div>
+                `).join('');
+            }
+            
+            // Highlight user's selected numbers
+            const grid = document.querySelector(`[data-grid="${gameType}"]`);
+            grid.querySelectorAll('.number-btn').forEach(btn => {
+                const num = parseInt(btn.dataset.number);
+                const isMyBet = myBets.some(b => b.number === num);
+                btn.classList.toggle('selected', isMyBet);
+                btn.disabled = roundData.is_betting_closed || myBets.length >= 4;
+            });
+        }
+        
+        function formatTime(seconds) {
+            const mins = Math.floor(seconds / 60);
+            const secs = seconds % 60;
+            return `${mins}:${secs.toString().padStart(2, '0')}`;
+        }
+        
+        function showMessage(gameType, message, isError = false) {
+            const msgDiv = document.querySelector(`[data-message="${gameType}"]`);
+            msgDiv.innerHTML = `<div class="message ${isError ? 'error' : 'success'}">${message}</div>`;
+            setTimeout(() => {
+                msgDiv.innerHTML = '';
+            }, 3000);
+        }
+        
+        // Socket event handlers
+        socket.on('round_data', data => {
+            updateRoundData(data.game_type, data.round_data);
+        });
+        
+        socket.on('new_round', data => {
+            const gameType = data.game_type;
+            userBets[gameType] = [];
+            document.querySelector(`[data-result="${gameType}"]`).classList.remove('show');
+            updateRoundData(gameType, data.round_data);
+        });
+        
+        socket.on('timer_update', data => {
+            const timer = document.querySelector(`[data-timer="${data.game_type}"]`);
+            timer.textContent = formatTime(data.betting_time_remaining || data.time_remaining);
+            
+            if (data.betting_time_remaining === 0 && data.time_remaining > 0) {
+                timer.classList.add('betting-closed');
+                timer.textContent = 'Result in ' + formatTime(data.time_remaining);
+            } else {
+                timer.classList.remove('betting-closed');
+            }
+        });
+        
+        socket.on('bet_placed', data => {
+            updateRoundData(data.game_type, data.round_data);
+        });
+        
+        socket.on('bet_success', data => {
+            document.getElementById('balance').textContent = data.new_balance;
+        });
+        
+        socket.on('bet_error', data => {
+            // Show error on all games
+            ['silver', 'gold', 'diamond', 'platinum'].forEach(gt => {
+                showMessage(gt, data.message, true);
+            });
+        });
+        
+        socket.on('betting_closed', data => {
+            showMessage(data.game_type, 'Betting closed! Waiting for result...', false);
+        });
+        
+        socket.on('round_result', data => {
+            const gameType = data.game_type;
+            const resultDiv = document.querySelector(`[data-result="${gameType}"]`);
+            
+            const winners = data.winners || [];
+            const isWinner = winners.some(w => w.user_id === userId);
+            
+            if (isWinner) {
+                const winAmount = winners.find(w => w.user_id === userId).payout;
+                resultDiv.textContent = `🎉 WIN! Number: ${data.result} | You won ${winAmount} coins!`;
+                resultDiv.style.background = '#4ecca3';
+                
+                // Update balance
+                fetch(`/balance/${userId}`)
+                    .then(res => res.json())
+                    .then(balanceData => {
+                        document.getElementById('balance').textContent = balanceData.balance;
+                    });
+            } else {
+                resultDiv.textContent = `Result: ${data.result} | Better luck next time!`;
+                resultDiv.style.background = '#c41e3a';
+            }
+            
+            resultDiv.classList.add('show');
+            
+            // Update final bets display
+            updateRoundData(gameType, {bets: data.all_bets, is_betting_closed: true});
+        });
+    </script>
+</body>
+</html>
