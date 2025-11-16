@@ -16,11 +16,11 @@ socketio = SocketIO(app, cors_allowed_origins="*", async_mode='threading', ping_
 
 # Game configurations
 GAME_CONFIGS = {
-    'silver': {'bet_amount': 10, 'payout': 50, 'name': 'Silver Game', 'type': 'number'},
-    'gold': {'bet_amount': 50, 'payout': 200, 'name': 'Gold Game', 'type': 'number'},
-    'diamond': {'bet_amount': 100, 'payout': 500, 'name': 'Diamond Game', 'type': 'number'},
-    'platinum': {'bet_amount': 200, 'payout': 1000, 'name': 'Platinum Game', 'type': 'number'},
-    'roulette': {'bet_amount': 50, 'payout': 1750, 'name': 'Roulette Game', 'type': 'roulette'}  # 50 * 35 = 1750
+    'silver': {'bet_amount': 10, 'payout': 50, 'name': 'Silver Game', 'type': 'number', 'title': 'Frog Leap', 'emoji': '🐸'},
+    'gold': {'bet_amount': 50, 'payout': 200, 'name': 'Gold Game', 'type': 'number', 'title': 'Football Goal', 'emoji': '⚽'},
+    'diamond': {'bet_amount': 100, 'payout': 500, 'name': 'Diamond Game', 'type': 'number', 'title': 'Archer Hit', 'emoji': '🏹'},
+    'platinum': {'bet_amount': 200, 'payout': 1000, 'name': 'Platinum Game', 'type': 'number', 'title': 'Parachute Drop', 'emoji': '🪂'},
+    'roulette': {'bet_amount': 50, 'payout': 1750, 'name': 'Roulette Game', 'type': 'roulette', 'title': 'Roulette Spin', 'emoji': '🎡'}
 }
 
 game_rounds = {}
@@ -36,7 +36,6 @@ class GameRound:
         self.round_number = round_number
         self.config = GAME_CONFIGS[game_type]
         self.start_time = datetime.now()
-        # Total game time is 5 minutes, betting closes at 0:15 remaining (4:45 elapsed)
         self.end_time = self.start_time + timedelta(minutes=5)
         self.betting_close_time = self.start_time + timedelta(minutes=4, seconds=45)
         self.bets = []
@@ -47,11 +46,10 @@ class GameRound:
         self.bot_addition_started = False
     
     def get_number_range(self):
-        """Returns the number range based on game type"""
         if self.game_type == 'roulette':
-            return list(range(37))  # 0-36 for roulette
+            return list(range(37))
         else:
-            return list(range(10))  # 0-9 for other games
+            return list(range(10))
         
     def add_bet(self, user_id, username, number, is_bot=False):
         user_bets = [b for b in self.bets if b['user_id'] == user_id]
@@ -203,7 +201,6 @@ def game_timer_thread(game_type):
             
             time_elapsed = (now - current_round.start_time).total_seconds()
             
-            # Start adding bots after 4 minutes if only 1 real user
             if (time_elapsed >= 240 and 
                 len(current_round.real_users) == 1 and 
                 not current_round.bot_addition_started):
@@ -211,7 +208,6 @@ def game_timer_thread(game_type):
                 print(f"Starting bot addition for {game_type}")
                 threading.Thread(target=add_bots_gradually, args=(game_type,), daemon=True).start()
             
-            # Betting closes when 0:15 remains (4:45 elapsed)
             if now >= current_round.betting_close_time and not current_round.is_betting_closed:
                 current_round.is_betting_closed = True
                 print(f"Betting closed for {game_type}")
@@ -219,7 +215,6 @@ def game_timer_thread(game_type):
                     'game_type': game_type
                 }, room=game_type, namespace='/')
             
-            # Game ends at 5:00
             if now >= current_round.end_time and not current_round.is_finished:
                 current_round.is_finished = True
                 result = current_round.calculate_result()
@@ -241,7 +236,6 @@ def game_timer_thread(game_type):
                 time.sleep(3)
                 game_rounds[game_type] = None
             
-            # Update timer every second
             socketio.emit('timer_update', {
                 'game_type': game_type,
                 'time_remaining': current_round.get_time_remaining(),
@@ -255,8 +249,22 @@ def game_timer_thread(game_type):
             time.sleep(1)
 
 @app.route('/')
-def index():
-    return render_template('index.html')
+def home():
+    return render_template('home.html', games=GAME_CONFIGS)
+
+@app.route('/game/<game_type>')
+def game_info(game_type):
+    if game_type not in GAME_CONFIGS:
+        return "Game not found", 404
+    game = GAME_CONFIGS[game_type]
+    return render_template('game-info.html', game_type=game_type, game=game)
+
+@app.route('/play/<game_type>')
+def play_game(game_type):
+    if game_type not in GAME_CONFIGS:
+        return "Game not found", 404
+    game = GAME_CONFIGS[game_type]
+    return render_template(f'{game_type}-game.html', game_type=game_type, game=game)
 
 @app.route('/register', methods=['POST'])
 def register():
