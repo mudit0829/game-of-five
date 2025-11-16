@@ -1,0 +1,135 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <title>Archer Hit - BetGames</title>
+    <script src="https://cdn.socket.io/4.5.4/socket.io.min.js"></script>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        html, body { width: 100%; height: 100%; font-family: 'Segoe UI'; background: #1a1a2e; color: #fff; overflow: hidden; }
+        body { display: flex; flex-direction: column; }
+        .game-container { flex: 1; display: flex; flex-direction: column; background: linear-gradient(180deg, #87ceeb 0%, #d3d3d3 100%); position: relative; overflow: hidden; }
+        .header-bar { background: rgba(15, 52, 96, 0.9); padding: 10px 15px; display: flex; justify-content: space-between; align-items: center; z-index: 10; border-bottom: 2px solid #b9f2ff; }
+        .game-title { font-size: 18px; font-weight: 700; color: #b9f2ff; }
+        .timer-display { background: linear-gradient(135deg, #b9f2ff, #e0ffff); color: #000; padding: 6px 15px; border-radius: 20px; font-weight: 700; font-size: 14px; }
+        .timer-display.warning { background: linear-gradient(135deg, #ff6b6b, #ff5252); color: #fff; animation: pulse 1s infinite; }
+        @keyframes pulse { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.05); } }
+        .balance-info { background: rgba(185, 242, 255, 0.2); padding: 6px 12px; border-radius: 8px; font-size: 12px; color: #b9f2ff; }
+        .game-area { flex: 1; display: flex; align-items: center; justify-content: center; position: relative; padding: 20px; }
+        .archery-range { width: 100%; height: 100%; position: relative; display: flex; align-items: center; justify-content: space-between; padding: 40px; }
+        .archer { font-size: 70px; animation: aim 2s infinite; }
+        .archer.shooting { animation: shoot-arrow 0.8s ease-out forwards; }
+        @keyframes aim { 0%, 100% { transform: rotateZ(-5deg); } 50% { transform: rotateZ(5deg); } }
+        @keyframes shoot-arrow { 0% { transform: rotateZ(-5deg); } 100% { transform: rotateZ(0deg); } }
+        .arrow { position: absolute; width: 3px; height: 4px; background: #fff; opacity: 0; left: 15%; top: 50%; }
+        .arrow.flying { opacity: 1; animation: arrow-flight 0.6s ease-out forwards; }
+        @keyframes arrow-flight { 0% { left: 15%; } 100% { left: var(--target-x); } }
+        .targets-container { display: flex; gap: 15px; align-items: center; justify-content: center; flex: 1; }
+        .target { width: 70px; height: 70px; border-radius: 50%; background: radial-gradient(circle at 30% 30%, #ffff00, #ff8c00, #8b4513); border: 3px solid #000; cursor: pointer; transition: all 0.3s; position: relative; display: flex; align-items: center; justify-content: center; font-weight: 700; color: #fff; box-shadow: 0 4px 10px rgba(0, 0, 0, 0.3); }
+        .target::before { content: ''; position: absolute; width: 30px; height: 30px; border-radius: 50%; background: #fff; opacity: 0.8; }
+        .target::after { content: ''; position: absolute; width: 10px; height: 10px; border-radius: 50%; background: #000; z-index: 2; }
+        .target:hover { transform: scale(1.1); box-shadow: 0 6px 20px rgba(185, 242, 255, 0.5); }
+        .target.selected { background: radial-gradient(circle at 30% 30%, #00ff00, #00cc00, #008000); }
+        .target-number { position: absolute; bottom: 5px; font-size: 12px; z-index: 3; }
+        .betting-panel { background: rgba(15, 52, 96, 0.95); padding: 15px; border-top: 2px solid #b9f2ff; min-height: 80px; }
+        .status-text { font-size: 12px; color: #aaa; margin-bottom: 10px; }
+        .your-bets { display: flex; gap: 8px; flex-wrap: wrap; }
+        .bet-badge { background: #b9f2ff; color: #000; padding: 6px 12px; border-radius: 15px; font-size: 12px; font-weight: 700; }
+        .message-box { position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); background: linear-gradient(135deg, #b9f2ff, #e0ffff); color: #000; padding: 30px 40px; border-radius: 15px; font-size: 18px; font-weight: 700; z-index: 100; display: none; text-align: center; box-shadow: 0 10px 40px rgba(0, 0, 0, 0.5); }
+        .message-box.show { display: block; animation: message-pop 0.3s ease-out; }
+        .message-box.error { background: linear-gradient(135deg, #ff6b6b, #ff5252); color: #fff; }
+        @keyframes message-pop { 0% { transform: translate(-50%, -50%) scale(0.8); opacity: 0; } 100% { transform: translate(-50%, -50%) scale(1); opacity: 1; } }
+        .back-button { position: fixed; top: 10px; left: 10px; background: rgba(185, 242, 255, 0.3); border: 1px solid #b9f2ff; color: #b9f2ff; padding: 8px 15px; border-radius: 8px; cursor: pointer; font-weight: 600; font-size: 12px; z-index: 50; }
+        .back-button:hover { background: #b9f2ff; color: #000; }
+    </style>
+</head>
+<body>
+    <button class="back-button" onclick="goBack()">← Back</button>
+    <div class="game-container">
+        <div class="header-bar">
+            <div class="game-title">🏹 Archer Hit</div>
+            <div class="timer-display" id="timer">5:00</div>
+            <div class="balance-info">💰 <span id="balance">100000</span></div>
+        </div>
+        <div class="game-area">
+            <div class="archery-range">
+                <div class="archer" id="archer">🏹</div>
+                <div class="arrow" id="arrow"></div>
+                <div class="targets-container" id="targetsContainer"></div>
+            </div>
+        </div>
+        <div class="betting-panel">
+            <div class="status-text" id="statusText">Click targets to predict where the arrow hits!</div>
+            <div class="your-bets">
+                <span style="font-size: 12px; color: #b9f2ff; font-weight: 600;">Your Bets:</span>
+                <div id="myBets"></div>
+            </div>
+        </div>
+    </div>
+    <div class="message-box" id="messageBox"></div>
+
+    <script>
+        let userId = localStorage.getItem('userId'), username = localStorage.getItem('username'), gameType = 'diamond';
+        let mySelectedNumbers = [], socket = io();
+        fetch('/register', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({user_id: userId, username: username}) });
+        
+        function createTargets() {
+            const c = document.getElementById('targetsContainer');
+            c.innerHTML = '';
+            for (let i = 0; i < 6; i++) {
+                const t = document.createElement('div');
+                t.className = 'target';
+                t.innerHTML = `<div class="target-number">${i}</div>`;
+                t.id = `target-${i}`;
+                c.appendChild(t);
+            }
+        }
+        createTargets();
+        socket.emit('join_game', {game_type: gameType, user_id: userId});
+        socket.on('timer_update', data => {
+            if (data.game_type === gameType) {
+                const time = data.betting_time_remaining || data.time_remaining;
+                const mins = Math.floor(time / 60);
+                const secs = time % 60;
+                document.getElementById('timer').textContent = `${mins}:${secs.toString().padStart(2, '0')}`;
+                if (time <= 15 && time > 0) document.getElementById('timer').classList.add('warning');
+                else document.getElementById('timer').classList.remove('warning');
+            }
+        });
+        socket.on('round_result', data => {
+            if (data.game_type === gameType) shootArrow(data.result, data.winners);
+        });
+        socket.on('bet_placed', data => { if (data.game_type === gameType) updateTargets(data.round_data.bets); });
+        socket.on('bet_success', () => { fetch(`/balance/${userId}`).then(r => r.json()).then(d => { document.getElementById('balance').textContent = d.balance; }); });
+        socket.on('bet_error', data => { showMessage(data.message, true); });
+        socket.on('new_round', () => { mySelectedNumbers = []; updateMyBets(); });
+
+        function placeBet(number) {
+            if (mySelectedNumbers.includes(number)) { showMessage('Already bet on this target', true); return; }
+            if (mySelectedNumbers.length >= 4) { showMessage('Maximum 4 bets per game', true); return; }
+            socket.emit('place_bet', {game_type: gameType, user_id: userId, username: username, number: number});
+            mySelectedNumbers.push(number);
+            updateMyBets();
+        }
+        function updateTargets(bets) { for (let i = 0; i < 6; i++) document.getElementById(`target-${i}`).classList.toggle('selected', mySelectedNumbers.includes(i)); }
+        function updateMyBets() { const d = document.getElementById('myBets'); d.innerHTML = mySelectedNumbers.length === 0 ? '<span style="color: #aaa; font-size: 12px;">No bets yet</span>' : mySelectedNumbers.map(n => `<div class="bet-badge">Target ${n}</div>`).join(''); }
+        function shootArrow(num, winners) { 
+            setTimeout(() => {
+                document.getElementById('archer').classList.add('shooting');
+                const arr = document.getElementById('arrow');
+                arr.style.setProperty('--target-x', `calc(${(num + 1) * 14}%)`);
+                arr.classList.add('flying');
+                setTimeout(() => {
+                    document.getElementById(`target-${num}`).style.background = 'radial-gradient(circle at 30% 30%, #ff00ff, #ff69b4)';
+                    showMessage(winners.some(w => w.user_id === userId) ? `🎯 HIT! +${winners.find(w => w.user_id === userId).payout} coins!` : '❌ Missed the target', !winners.some(w => w.user_id === userId));
+                }, 600);
+            }, 500);
+        }
+        function showMessage(text, isError = false) { const m = document.getElementById('messageBox'); m.textContent = text; m.classList.toggle('error', isError); m.classList.add('show'); setTimeout(() => { m.classList.remove('show'); }, 2500); }
+        document.addEventListener('click', (e) => { if (e.target.closest('.target')) placeBet(parseInt(e.target.closest('.target').id.split('-')[1])); });
+        function goBack() { window.location.href = '/'; }
+        setInterval(() => { fetch(`/balance/${userId}`).then(r => r.json()).then(d => { document.getElementById('balance').textContent = d.balance; }); }, 2000);
+    </script>
+</body>
+</html>
