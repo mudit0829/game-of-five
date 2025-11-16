@@ -1,0 +1,419 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <title>Game Info - BetGames</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        html, body {
+            width: 100%;
+            height: 100%;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+            color: #fff;
+            overflow-x: hidden;
+        }
+
+        .container {
+            max-width: 100%;
+            min-height: 100vh;
+            padding: 20px 20px 100px 20px;
+        }
+
+        .back-button {
+            background: rgba(78, 204, 163, 0.2);
+            color: #4ecca3;
+            border: 1px solid #4ecca3;
+            padding: 10px 20px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-weight: 600;
+            font-size: 14px;
+            margin-bottom: 20px;
+            transition: all 0.3s;
+            display: inline-block;
+        }
+
+        .back-button:hover {
+            background: #4ecca3;
+            color: #000;
+        }
+
+        .game-header {
+            text-align: center;
+            margin-bottom: 30px;
+        }
+
+        .game-icon {
+            font-size: 80px;
+            margin-bottom: 15px;
+            display: block;
+            animation: bounce 2s infinite;
+        }
+
+        @keyframes bounce {
+            0%, 100% { transform: translateY(0); }
+            50% { transform: translateY(-15px); }
+        }
+
+        .game-title {
+            font-size: 32px;
+            font-weight: 700;
+            background: linear-gradient(90deg, #ffd700, #4ecca3);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            margin-bottom: 10px;
+        }
+
+        .game-subtitle {
+            font-size: 14px;
+            color: #aaa;
+        }
+
+        .info-card {
+            background: rgba(15, 52, 96, 0.5);
+            border: 1px solid rgba(78, 204, 163, 0.3);
+            border-radius: 12px;
+            padding: 20px;
+            margin-bottom: 20px;
+        }
+
+        .info-card h3 {
+            color: #ffd700;
+            margin-bottom: 12px;
+            font-size: 16px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        .info-card p {
+            color: #aaa;
+            line-height: 1.6;
+            font-size: 14px;
+            margin-bottom: 10px;
+        }
+
+        .stats-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 15px;
+            margin-top: 15px;
+        }
+
+        .stat-box {
+            background: rgba(78, 204, 163, 0.1);
+            border: 1px solid #4ecca3;
+            border-radius: 10px;
+            padding: 15px;
+            text-align: center;
+        }
+
+        .stat-label {
+            font-size: 12px;
+            color: #aaa;
+            text-transform: uppercase;
+            margin-bottom: 8px;
+        }
+
+        .stat-value {
+            font-size: 24px;
+            font-weight: 700;
+            color: #4ecca3;
+        }
+
+        .rule-list {
+            list-style: none;
+            padding: 0;
+        }
+
+        .rule-list li {
+            padding: 10px 0;
+            padding-left: 30px;
+            position: relative;
+            font-size: 14px;
+            color: #aaa;
+            line-height: 1.6;
+        }
+
+        .rule-list li:before {
+            content: '✓';
+            position: absolute;
+            left: 0;
+            color: #4ecca3;
+            font-weight: 700;
+            font-size: 18px;
+        }
+
+        .play-button-large {
+            width: 100%;
+            background: linear-gradient(135deg, #4ecca3 0%, #45b896 100%);
+            color: #000;
+            border: none;
+            padding: 18px;
+            border-radius: 12px;
+            font-weight: 700;
+            font-size: 18px;
+            cursor: pointer;
+            transition: all 0.3s;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+            box-shadow: 0 5px 20px rgba(78, 204, 163, 0.3);
+            margin-top: 30px;
+        }
+
+        .play-button-large:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 8px 25px rgba(78, 204, 163, 0.5);
+        }
+
+        .play-button-large:active {
+            transform: translateY(-1px);
+        }
+
+        .warning-box {
+            background: rgba(255, 107, 107, 0.1);
+            border: 1px solid #ff6b6b;
+            border-radius: 10px;
+            padding: 15px;
+            margin-top: 20px;
+            font-size: 13px;
+            color: #ff9999;
+        }
+
+        .game-description {
+            background: linear-gradient(135deg, rgba(78, 204, 163, 0.05) 0%, rgba(255, 215, 0, 0.05) 100%);
+            border-left: 4px solid #4ecca3;
+            padding: 20px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            font-size: 14px;
+            line-height: 1.7;
+            color: #ddd;
+        }
+
+        .loading {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.7);
+            z-index: 1000;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .loading.active {
+            display: flex;
+        }
+
+        .spinner {
+            border: 4px solid rgba(78, 204, 163, 0.2);
+            border-top: 4px solid #4ecca3;
+            border-radius: 50%;
+            width: 50px;
+            height: 50px;
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        @media (max-width: 768px) {
+            .game-title {
+                font-size: 26px;
+            }
+
+            .game-icon {
+                font-size: 60px;
+            }
+
+            .stats-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        @media (max-width: 480px) {
+            .container {
+                padding: 15px 15px 100px 15px;
+            }
+
+            .game-title {
+                font-size: 22px;
+            }
+
+            .game-icon {
+                font-size: 50px;
+            }
+
+            .info-card {
+                padding: 15px;
+            }
+
+            .play-button-large {
+                padding: 15px;
+                font-size: 16px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <button class="back-button" onclick="goBack()">← Back to Games</button>
+
+        <div class="game-header">
+            <span class="game-icon" id="gameIcon">🐸</span>
+            <h1 class="game-title" id="gameTitle">Frog Leap</h1>
+            <p class="game-subtitle" id="gameSubtitle">A game of chance and excitement</p>
+        </div>
+
+        <div class="game-description" id="gameDescription">
+            Watch the frog hop around the lake and land on a leaf. Pick your lucky numbers and see if the frog chooses you!
+        </div>
+
+        <div class="info-card">
+            <h3>💰 Betting Info</h3>
+            <div class="stats-grid">
+                <div class="stat-box">
+                    <div class="stat-label">Bet Amount</div>
+                    <div class="stat-value" id="betAmount">10</div>
+                    <div class="stat-label">coins</div>
+                </div>
+                <div class="stat-box">
+                    <div class="stat-label">If You Win</div>
+                    <div class="stat-value" id="winAmount">50</div>
+                    <div class="stat-label">coins</div>
+                </div>
+            </div>
+        </div>
+
+        <div class="info-card">
+            <h3>📋 How to Play</h3>
+            <ul class="rule-list">
+                <li>Select 1 to 4 numbers from 0-9</li>
+                <li>Each number costs <span id="betCost">10</span> coins</li>
+                <li>Game round lasts 5 minutes</li>
+                <li>Betting closes at 0:15 remaining</li>
+                <li>Watch the frog pick the winning number</li>
+                <li>Win 16% more often than bot players!</li>
+            </ul>
+        </div>
+
+        <div class="info-card">
+            <h3>⚡ Quick Tips</h3>
+            <ul class="rule-list">
+                <li>Bet on multiple numbers to increase chances</li>
+                <li>Max 4 bets per game for strategy</li>
+                <li>Games run 24/7 continuously</li>
+                <li>Withdraw or reinvest your winnings anytime</li>
+                <li>No time limit - play at your own pace</li>
+            </ul>
+        </div>
+
+        <div class="warning-box">
+            ⚠️ <strong>Remember:</strong> This is a game of chance. Only bet what you can afford to lose. Play responsibly!
+        </div>
+
+        <button class="play-button-large" onclick="playGame()">
+            🎮 START PLAYING NOW
+        </button>
+    </div>
+
+    <div class="loading" id="loading">
+        <div class="spinner"></div>
+    </div>
+
+    <script>
+        // Get game type from URL
+        const urlParams = new URLSearchParams(window.location.search);
+        const gameType = window.location.pathname.split('/').pop();
+
+        const gameData = {
+            'silver': {
+                icon: '🐸',
+                title: 'Frog Leap',
+                subtitle: 'Help the frog find its way',
+                description: 'Watch as a magical frog hops around a beautiful lake. Select your lucky numbers (0-9) and see if the frog lands on one of your leaves! The frog appears in the last 5 seconds and hops to reveal the winning number.',
+                bet: 10,
+                win: 50,
+                tips: ['Observe patterns', 'Bet on edges', 'Go with gut feeling']
+            },
+            'gold': {
+                icon: '⚽',
+                title: 'Football Goal',
+                subtitle: 'Score the winning goal',
+                description: 'A skilled footballer takes aim at 6 goal posts. Select which posts you think the ball will go into. Watch as the player runs up and kicks - will your prediction be correct?',
+                bet: 50,
+                win: 200,
+                tips: ['Spread your bets', 'Middle shots win more', 'React quickly']
+            },
+            'diamond': {
+                icon: '🏹',
+                title: 'Archer Hit',
+                subtitle: 'Hit the perfect bullseye',
+                description: 'An expert archer aims at 6 targets. Predict which targets will be hit with precision arrows. Watch the arrow fly through the air and hit the target. Pure skill meets luck!',
+                bet: 100,
+                win: 500,
+                tips: ['Trust your instinct', 'Avoid crowded targets', 'Split your shots']
+            },
+            'platinum': {
+                icon: '🪂',
+                title: 'Parachute Drop',
+                subtitle: 'Land on the winning boat',
+                description: 'A skydiver descends with a parachute above 6 boats on the river. Choose which boats they might land on. Watch the parachute drift and land - will you catch the prize?',
+                bet: 200,
+                win: 1000,
+                tips: ['Wind direction matters', 'Center spots risky', 'Edge landings pay']
+            },
+            'roulette': {
+                icon: '🎡',
+                title: 'Roulette Spin',
+                subtitle: 'Spin to win big',
+                description: 'Classic casino roulette with 37 numbers (0-36). Place your bets on individual numbers for a 35:1 payout! Watch the wheel spin and the ball bounce to find its home.',
+                bet: 50,
+                win: 1750,
+                tips: ['High variance game', '35:1 payout', 'Most thrilling option']
+            }
+        };
+
+        const game = gameData[gameType] || gameData['silver'];
+
+        // Populate game info
+        document.getElementById('gameIcon').textContent = game.icon;
+        document.getElementById('gameTitle').textContent = game.title;
+        document.getElementById('gameSubtitle').textContent = game.subtitle;
+        document.getElementById('gameDescription').textContent = game.description;
+        document.getElementById('betAmount').textContent = game.bet;
+        document.getElementById('winAmount').textContent = game.win;
+        document.getElementById('betCost').textContent = game.bet;
+
+        function goBack() {
+            window.location.href = '/';
+        }
+
+        function playGame() {
+            document.getElementById('loading').classList.add('active');
+            setTimeout(() => {
+                window.location.href = `/play/${gameType}`;
+            }, 500);
+        }
+
+        // Prevent zoom
+        document.addEventListener('touchmove', function(event) {
+            if (event.scale !== 1) {
+                event.preventDefault();
+            }
+        }, false);
+    </script>
+</body>
+</html>
