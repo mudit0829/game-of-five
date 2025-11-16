@@ -1,3 +1,4 @@
+
 from flask import Flask, render_template, request, jsonify
 from flask_socketio import SocketIO, emit, join_room
 from flask_cors import CORS
@@ -19,7 +20,7 @@ GAME_CONFIGS = {
     'gold': {'bet_amount': 50, 'payout': 200, 'name': 'Gold Game', 'type': 'number'},
     'diamond': {'bet_amount': 100, 'payout': 500, 'name': 'Diamond Game', 'type': 'number'},
     'platinum': {'bet_amount': 200, 'payout': 1000, 'name': 'Platinum Game', 'type': 'number'},
-    'roulette': {'bet_amount': 50, 'payout': 200, 'name': 'Roulette Game', 'type': 'roulette'}
+    'roulette': {'bet_amount': 50, 'payout': 1750, 'name': 'Roulette Game', 'type': 'roulette'}  # 50 * 35 = 1750
 }
 
 game_rounds = {}
@@ -44,6 +45,13 @@ class GameRound:
         self.is_finished = False
         self.real_users = set()
         self.bot_addition_started = False
+    
+    def get_number_range(self):
+        """Returns the number range based on game type"""
+        if self.game_type == 'roulette':
+            return list(range(37))  # 0-36 for roulette
+        else:
+            return list(range(10))  # 0-9 for other games
         
     def add_bet(self, user_id, username, number, is_bot=False):
         user_bets = [b for b in self.bets if b['user_id'] == user_id]
@@ -69,11 +77,12 @@ class GameRound:
         if len(self.bets) >= 6:
             return False
         
+        all_numbers = self.get_number_range()
         used_numbers = [b['number'] for b in self.bets]
-        available_numbers = [n for n in range(10) if used_numbers.count(n) < 1]
+        available_numbers = [n for n in all_numbers if used_numbers.count(n) < 1]
         
         if not available_numbers:
-            available_numbers = list(range(10))
+            available_numbers = all_numbers
         
         bot_name = generate_bot_name()
         bot_number = random.choice(available_numbers)
@@ -100,13 +109,14 @@ class GameRound:
                 winning_bet = random.choice(bot_bets)
                 self.result = winning_bet['number']
             else:
+                all_numbers = self.get_number_range()
                 used_numbers = [b['number'] for b in self.bets]
-                available_numbers = [n for n in range(10) if n not in used_numbers]
+                available_numbers = [n for n in all_numbers if n not in used_numbers]
                 
                 if available_numbers:
                     self.result = random.choice(available_numbers)
                 else:
-                    self.result = random.randint(0, 9)
+                    self.result = random.choice(all_numbers)
         
         return self.result
     
