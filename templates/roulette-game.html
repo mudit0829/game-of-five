@@ -1,0 +1,137 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <title>Roulette Spin - BetGames</title>
+    <script src="https://cdn.socket.io/4.5.4/socket.io.min.js"></script>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        html, body { width: 100%; height: 100%; font-family: 'Segoe UI'; background: #1a1a2e; color: #fff; overflow: hidden; }
+        body { display: flex; flex-direction: column; }
+        .game-container { flex: 1; display: flex; flex-direction: column; background: linear-gradient(135deg, #1a1a2e 0%, #0f3460 100%); overflow: hidden; }
+        .header-bar { background: rgba(15, 52, 96, 0.9); padding: 10px 15px; display: flex; justify-content: space-between; border-bottom: 2px solid #ff6b6b; }
+        .game-title { font-size: 18px; font-weight: 700; color: #ff6b6b; }
+        .timer-display { background: linear-gradient(135deg, #ff6b6b, #ff5252); color: #fff; padding: 6px 15px; border-radius: 20px; font-weight: 700; }
+        .timer-display.warning { animation: pulse 1s infinite; }
+        @keyframes pulse { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.05); } }
+        .balance-info { background: rgba(255, 107, 107, 0.2); padding: 6px 12px; border-radius: 8px; font-size: 12px; color: #ff6b6b; }
+        .game-area { flex: 1; display: flex; align-items: center; justify-content: center; position: relative; padding: 20px; }
+        .roulette-wheel { width: 300px; height: 300px; border-radius: 50%; background: conic-gradient(from 0deg, #ff0000 0deg 18.9deg, #000 18.9deg 37.8deg, #ff0000 37.8deg 56.7deg, #000 56.7deg 75.6deg, #ff0000 75.6deg 94.5deg, #000 94.5deg 113.4deg, #ff0000 113.4deg 132.3deg, #000 132.3deg 151.2deg, #ff0000 151.2deg 170.1deg, #000 170.1deg 189deg, #ff0000 189deg 207.9deg, #000 207.9deg 226.8deg, #ff0000 226.8deg 245.7deg, #000 245.7deg 264.6deg, #ff0000 264.6deg 283.5deg, #000 283.5deg 302.4deg, #ff0000 302.4deg 321.3deg, #000 321.3deg 340.2deg, #ff0000 340.2deg 360deg); border: 5px solid #ffd700; box-shadow: 0 0 30px rgba(255, 215, 0, 0.5), inset 0 0 30px rgba(0, 0, 0, 0.5); position: relative; display: flex; align-items: center; justify-content: center; }
+        .roulette-wheel.spinning { animation: spin 3s cubic-bezier(0.25, 0.46, 0.45, 0.94) forwards; }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(var(--spin-deg)); } }
+        .wheel-number { position: absolute; width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; }
+        .wheel-number span { position: absolute; font-weight: 700; color: #fff; font-size: 14px; text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.8); }
+        .wheel-center { width: 30px; height: 30px; border-radius: 50%; background: #ffd700; z-index: 10; border: 3px solid #ff8c00; box-shadow: 0 0 20px rgba(255, 215, 0, 0.8); }
+        .ball-indicator { position: absolute; top: -20px; left: 50%; transform: translateX(-50%); width: 15px; height: 15px; background: #fff; border-radius: 50%; box-shadow: 0 0 10px rgba(255, 255, 255, 0.8); z-index: 20; }
+        .numbers-grid { display: grid; grid-template-columns: repeat(6, 1fr); gap: 8px; margin-top: 30px; max-height: 200px; overflow-y: auto; width: 100%; }
+        .roulette-number-btn { background: #0f3460; border: 2px solid #ff6b6b; color: #fff; padding: 8px; border-radius: 6px; cursor: pointer; font-weight: 600; font-size: 12px; transition: all 0.3s; }
+        .roulette-number-btn:hover { background: #ff6b6b; color: #fff; transform: scale(1.05); }
+        .roulette-number-btn.selected { background: #ffd700; color: #000; border-color: #ffd700; }
+        .betting-panel { background: rgba(15, 52, 96, 0.95); padding: 15px; border-top: 2px solid #ff6b6b; min-height: 80px; }
+        .status-text { font-size: 12px; color: #aaa; margin-bottom: 8px; }
+        .your-bets { display: flex; gap: 6px; flex-wrap: wrap; font-size: 11px; }
+        .bet-badge { background: #ff6b6b; color: #fff; padding: 4px 8px; border-radius: 12px; font-size: 10px; font-weight: 700; }
+        .message-box { position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); background: linear-gradient(135deg, #ff6b6b, #ff5252); color: #fff; padding: 30px 40px; border-radius: 15px; font-size: 18px; font-weight: 700; z-index: 100; display: none; text-align: center; box-shadow: 0 10px 40px rgba(0, 0, 0, 0.5); }
+        .message-box.show { display: block; animation: message-pop 0.3s ease-out; }
+        .message-box.win { background: linear-gradient(135deg, #ffd700, #ffed4e); color: #000; }
+        @keyframes message-pop { 0% { transform: translate(-50%, -50%) scale(0.8); opacity: 0; } 100% { transform: translate(-50%, -50%) scale(1); opacity: 1; } }
+        .back-button { position: fixed; top: 10px; left: 10px; background: rgba(255, 107, 107, 0.3); border: 1px solid #ff6b6b; color: #ff6b6b; padding: 8px 15px; border-radius: 8px; cursor: pointer; font-weight: 600; font-size: 12px; z-index: 50; }
+        .back-button:hover { background: #ff6b6b; color: #fff; }
+        ::-webkit-scrollbar { width: 6px; }
+        ::-webkit-scrollbar-track { background: rgba(255, 107, 107, 0.1); }
+        ::-webkit-scrollbar-thumb { background: #ff6b6b; border-radius: 3px; }
+    </style>
+</head>
+<body>
+    <button class="back-button" onclick="goBack()">← Back</button>
+    <div class="game-container">
+        <div class="header-bar">
+            <div class="game-title">🎡 Roulette Spin (0-36)</div>
+            <div class="timer-display" id="timer">5:00</div>
+            <div class="balance-info">💰 <span id="balance">50000</span></div>
+        </div>
+        <div class="game-area">
+            <div style="display: flex; flex-direction: column; align-items: center; width: 100%; gap: 20px;">
+                <div style="position: relative;">
+                    <div class="roulette-wheel" id="wheel">
+                        <div class="wheel-center"></div>
+                    </div>
+                    <div class="ball-indicator"></div>
+                </div>
+                <div class="numbers-grid" id="numbersGrid"></div>
+            </div>
+        </div>
+        <div class="betting-panel">
+            <div class="status-text" id="statusText">Click numbers to place bets! 35:1 payout on straight numbers.</div>
+            <div class="your-bets">
+                <span style="font-size: 11px; color: #ff6b6b; font-weight: 600;">Your Bets:</span>
+                <div id="myBets"></div>
+            </div>
+        </div>
+    </div>
+    <div class="message-box" id="messageBox"></div>
+
+    <script>
+        let userId = localStorage.getItem('userId'), username = localStorage.getItem('username'), gameType = 'roulette';
+        let mySelectedNumbers = [], socket = io();
+        fetch('/register', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({user_id: userId, username: username}) });
+        
+        function createNumberButtons() {
+            const g = document.getElementById('numbersGrid');
+            for (let i = 0; i <= 36; i++) {
+                const b = document.createElement('button');
+                b.className = 'roulette-number-btn';
+                b.textContent = i;
+                b.id = `num-${i}`;
+                b.onclick = () => placeBet(i);
+                g.appendChild(b);
+            }
+        }
+        createNumberButtons();
+        socket.emit('join_game', {game_type: gameType, user_id: userId});
+        socket.on('timer_update', data => {
+            if (data.game_type === gameType) {
+                const time = data.betting_time_remaining || data.time_remaining;
+                const mins = Math.floor(time / 60);
+                const secs = time % 60;
+                document.getElementById('timer').textContent = `${mins}:${secs.toString().padStart(2, '0')}`;
+                if (time <= 15 && time > 0) document.getElementById('timer').classList.add('warning');
+                else document.getElementById('timer').classList.remove('warning');
+            }
+        });
+        socket.on('round_result', data => {
+            if (data.game_type === gameType) spinWheel(data.result, data.winners);
+        });
+        socket.on('bet_success', () => { fetch(`/balance/${userId}`).then(r => r.json()).then(d => { document.getElementById('balance').textContent = d.balance; }); });
+        socket.on('bet_error', data => { showMessage(data.message, false); });
+        socket.on('new_round', () => { mySelectedNumbers = []; updateMyBets(); });
+
+        function placeBet(number) {
+            if (mySelectedNumbers.includes(number)) { showMessage('Already bet on this number', false); return; }
+            if (mySelectedNumbers.length >= 4) { showMessage('Maximum 4 bets per game', false); return; }
+            socket.emit('place_bet', {game_type: gameType, user_id: userId, username: username, number: number});
+            mySelectedNumbers.push(number);
+            updateMyBets();
+            document.getElementById(`num-${number}`).classList.add('selected');
+        }
+        function updateMyBets() { const d = document.getElementById('myBets'); d.innerHTML = mySelectedNumbers.length === 0 ? '<span style="color: #aaa; font-size: 11px;">No bets yet</span>' : mySelectedNumbers.map(n => `<div class="bet-badge">#${n}</div>`).join(''); }
+        function spinWheel(num, winners) { 
+            setTimeout(() => {
+                const spins = Math.random() * 5 + 5;
+                const degPerNum = 360 / 37;
+                const finalDeg = (num * degPerNum + spins * 360) % 360;
+                const wheel = document.getElementById('wheel');
+                wheel.style.setProperty('--spin-deg', `${finalDeg}deg`);
+                wheel.classList.add('spinning');
+                setTimeout(() => {
+                    showMessage(winners.some(w => w.user_id === userId) ? `🎉 LUCKY #${num}! +${winners.find(w => w.user_id === userId).payout} coins!` : `❌ #${num} wasn't your number`, winners.some(w => w.user_id === userId));
+                }, 3000);
+            }, 500);
+        }
+        function showMessage(text, isWin = false) { const m = document.getElementById('messageBox'); m.textContent = text; m.classList.toggle('win', isWin); m.classList.add('show'); setTimeout(() => { m.classList.remove('show'); }, 2500); }
+        function goBack() { window.location.href = '/'; }
+        setInterval(() => { fetch(`/balance/${userId}`).then(r => r.json()).then(d => { document.getElementById('balance').textContent = d.balance; }); }, 2000);
+    </script>
+</body>
+</html>
