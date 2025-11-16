@@ -3,7 +3,10 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-    <title>BetGames - Play Now</title>
+    <title>BetGames Pro - Play Now</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Inter:wght@400;600;700;800&display=swap" rel="stylesheet">
     <style>
         * {
             margin: 0;
@@ -11,98 +14,178 @@
             box-sizing: border-box;
         }
 
+        :root {
+            --primary-dark: #0a0e27;
+            --secondary-dark: #151b3a;
+            --tertiary-dark: #1f2a4d;
+            --accent-cyan: #00d9ff;
+            --accent-purple: #b537f2;
+            --accent-gold: #ffd700;
+            --accent-pink: #ff1493;
+            --text-light: #ffffff;
+            --text-muted: #a0aec0;
+            --success: #00ff88;
+            --danger: #ff3366;
+        }
+
         html, body {
             width: 100%;
             height: 100%;
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
-            color: #fff;
+            background: linear-gradient(135deg, var(--primary-dark) 0%, #1a1f3a 100%);
+            color: var(--text-light);
             overflow-x: hidden;
+            font-family: 'Inter', sans-serif;
         }
 
+        /* =====================================
+           ANIMATED BACKGROUND
+           ===================================== */
+
+        body::before {
+            content: '';
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: 
+                radial-gradient(circle at 20% 50%, rgba(0, 217, 255, 0.1) 0%, transparent 50%),
+                radial-gradient(circle at 80% 80%, rgba(181, 55, 242, 0.1) 0%, transparent 50%);
+            z-index: -1;
+            animation: float 8s ease-in-out infinite;
+        }
+
+        @keyframes float {
+            0%, 100% { transform: translate(0, 0); }
+            50% { transform: translate(30px, 30px); }
+        }
+
+        /* =====================================
+           HEADER
+           ===================================== */
+
         .header {
-            background: linear-gradient(90deg, #0f3460 0%, #1a1a2e 100%);
+            background: linear-gradient(90deg, rgba(15, 20, 50, 0.8) 0%, rgba(25, 35, 70, 0.8) 100%);
+            backdrop-filter: blur(10px);
+            border-bottom: 2px solid;
+            border-image: linear-gradient(90deg, var(--accent-cyan), var(--accent-purple)) 1;
             padding: 20px;
             text-align: center;
-            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.3);
             position: sticky;
             top: 0;
             z-index: 100;
+            box-shadow: 0 8px 32px rgba(0, 217, 255, 0.1);
         }
 
         .header h1 {
-            font-size: 28px;
-            font-weight: 700;
-            background: linear-gradient(90deg, #ffd700, #4ecca3);
+            font-size: 38px;
+            font-weight: 900;
+            font-family: 'Orbitron', sans-serif;
+            background: linear-gradient(90deg, var(--accent-cyan), var(--accent-purple), var(--accent-gold));
             -webkit-background-clip: text;
             -webkit-text-fill-color: transparent;
             background-clip: text;
+            text-shadow: 0 0 20px rgba(0, 217, 255, 0.3);
             margin-bottom: 5px;
+            letter-spacing: 2px;
         }
 
         .header p {
-            font-size: 12px;
-            color: #aaa;
+            font-size: 13px;
+            color: var(--accent-cyan);
+            letter-spacing: 3px;
+            text-transform: uppercase;
+            font-weight: 700;
         }
+
+        /* =====================================
+           USER SECTION
+           ===================================== */
 
         .user-section {
             display: flex;
             justify-content: space-between;
             align-items: center;
             padding: 15px 20px;
-            background: rgba(15, 52, 96, 0.5);
-            border-bottom: 1px solid rgba(78, 204, 163, 0.2);
+            background: linear-gradient(90deg, rgba(31, 42, 77, 0.5) 0%, rgba(21, 27, 58, 0.5) 100%);
+            border-bottom: 1px solid rgba(0, 217, 255, 0.2);
+            backdrop-filter: blur(5px);
         }
 
         .user-name {
             font-size: 14px;
-            font-weight: 600;
+            font-weight: 700;
+            color: var(--accent-cyan);
         }
 
         .balance-display {
-            background: linear-gradient(135deg, #4ecca3 0%, #45b896 100%);
-            color: #000;
-            padding: 8px 16px;
-            border-radius: 20px;
-            font-weight: 700;
-            font-size: 14px;
-            box-shadow: 0 4px 10px rgba(78, 204, 163, 0.3);
+            background: linear-gradient(135deg, var(--accent-cyan), var(--accent-purple));
+            color: var(--primary-dark);
+            padding: 8px 20px;
+            border-radius: 25px;
+            font-weight: 800;
+            font-size: 15px;
+            box-shadow: 0 0 20px rgba(0, 217, 255, 0.4), inset 0 0 10px rgba(255, 255, 255, 0.2);
+            text-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
         }
+
+        /* =====================================
+           CONTAINER
+           ===================================== */
 
         .container {
             max-width: 100%;
-            padding: 20px;
+            padding: 40px 20px;
             margin: 0 auto;
         }
 
         .games-title {
-            font-size: 20px;
-            font-weight: 700;
-            margin-bottom: 20px;
+            font-size: 28px;
+            font-weight: 900;
+            margin-bottom: 30px;
             text-align: center;
-            color: #ffd700;
-            text-transform: uppercase;
+            color: var(--text-light);
+            font-family: 'Orbitron', sans-serif;
             letter-spacing: 2px;
+            text-transform: uppercase;
+            position: relative;
+            padding-bottom: 20px;
         }
+
+        .games-title::after {
+            content: '';
+            position: absolute;
+            bottom: 0;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 100px;
+            height: 3px;
+            background: linear-gradient(90deg, transparent, var(--accent-cyan), transparent);
+        }
+
+        /* =====================================
+           GAMES GRID
+           ===================================== */
 
         .games-grid {
             display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
-            gap: 15px;
-            margin-bottom: 40px;
+            grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+            gap: 25px;
+            margin-bottom: 50px;
         }
 
         .game-card {
-            background: linear-gradient(135deg, #16213e 0%, #0f3460 100%);
-            border: 2px solid #4ecca3;
-            border-radius: 15px;
-            padding: 20px;
+            background: linear-gradient(135deg, rgba(31, 42, 77, 0.8) 0%, rgba(25, 35, 70, 0.6) 100%);
+            border: 2px solid;
+            border-radius: 20px;
+            padding: 25px;
             cursor: pointer;
-            transition: all 0.3s ease;
+            transition: all 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
             text-align: center;
             position: relative;
             overflow: hidden;
-            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.3);
+            backdrop-filter: blur(10px);
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
         }
 
         .game-card::before {
@@ -114,6 +197,7 @@
             height: 100%;
             background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.1), transparent);
             transition: left 0.5s;
+            z-index: 1;
         }
 
         .game-card:hover::before {
@@ -121,189 +205,172 @@
         }
 
         .game-card:hover {
-            transform: translateY(-8px);
-            box-shadow: 0 12px 25px rgba(78, 204, 163, 0.4);
-            border-color: #ffd700;
+            transform: translateY(-15px) scale(1.05);
+            box-shadow: 0 20px 50px rgba(0, 217, 255, 0.3);
+            border-color: var(--accent-gold);
         }
 
-        .game-card.silver { border-color: #c0c0c0; }
-        .game-card.gold { border-color: #ffd700; }
-        .game-card.diamond { border-color: #b9f2ff; }
-        .game-card.platinum { border-color: #e5e4e2; }
-        .game-card.roulette { border-color: #ff6b6b; }
+        .game-card.silver { border-color: #c0c0c0; background: linear-gradient(135deg, rgba(192, 192, 192, 0.1) 0%, rgba(31, 42, 77, 0.8) 100%); }
+        .game-card.gold { border-color: var(--accent-gold); background: linear-gradient(135deg, rgba(255, 215, 0, 0.1) 0%, rgba(31, 42, 77, 0.8) 100%); }
+        .game-card.diamond { border-color: #b9f2ff; background: linear-gradient(135deg, rgba(185, 242, 255, 0.1) 0%, rgba(31, 42, 77, 0.8) 100%); }
+        .game-card.platinum { border-color: #e5e4e2; background: linear-gradient(135deg, rgba(229, 228, 226, 0.1) 0%, rgba(31, 42, 77, 0.8) 100%); }
+        .game-card.roulette { border-color: var(--accent-pink); background: linear-gradient(135deg, rgba(255, 20, 147, 0.1) 0%, rgba(31, 42, 77, 0.8) 100%); }
+
+        .game-card:hover.silver { border-color: var(--accent-cyan); }
+        .game-card:hover.gold { border-color: var(--accent-cyan); }
+        .game-card:hover.diamond { border-color: var(--accent-cyan); }
+        .game-card:hover.platinum { border-color: var(--accent-cyan); }
+        .game-card:hover.roulette { border-color: var(--accent-cyan); }
 
         .game-emoji {
-            font-size: 48px;
-            margin-bottom: 10px;
+            font-size: 60px;
+            margin-bottom: 15px;
             display: block;
             animation: bounce 2s infinite;
+            filter: drop-shadow(0 0 8px rgba(0, 217, 255, 0.5));
+            z-index: 2;
+            position: relative;
         }
 
         @keyframes bounce {
             0%, 100% { transform: translateY(0); }
-            50% { transform: translateY(-10px); }
+            50% { transform: translateY(-12px); }
         }
 
         .game-name {
-            font-size: 16px;
-            font-weight: 700;
-            margin-bottom: 8px;
-            color: #fff;
+            font-size: 18px;
+            font-weight: 800;
+            margin-bottom: 10px;
+            color: var(--text-light);
+            font-family: 'Orbitron', sans-serif;
+            letter-spacing: 1px;
+            z-index: 2;
+            position: relative;
         }
 
         .game-bet {
-            font-size: 12px;
-            color: #4ecca3;
+            font-size: 13px;
+            color: var(--accent-cyan);
             margin-bottom: 8px;
-            font-weight: 600;
+            font-weight: 700;
+            z-index: 2;
+            position: relative;
         }
 
         .game-payout {
-            font-size: 11px;
-            color: #aaa;
-            margin-bottom: 12px;
+            font-size: 12px;
+            color: var(--text-muted);
+            margin-bottom: 15px;
+            z-index: 2;
+            position: relative;
         }
 
         .play-btn {
-            background: linear-gradient(135deg, #4ecca3 0%, #45b896 100%);
-            color: #000;
+            background: linear-gradient(135deg, var(--accent-cyan), var(--accent-purple));
+            color: var(--primary-dark);
             border: none;
-            padding: 8px 16px;
-            border-radius: 8px;
-            font-weight: 700;
-            font-size: 12px;
+            padding: 10px 20px;
+            border-radius: 12px;
+            font-weight: 800;
+            font-size: 13px;
             cursor: pointer;
             transition: all 0.3s;
             text-transform: uppercase;
             letter-spacing: 1px;
+            box-shadow: 0 4px 15px rgba(0, 217, 255, 0.3);
+            z-index: 2;
+            position: relative;
+            font-family: 'Orbitron', sans-serif;
         }
 
         .play-btn:hover {
-            transform: scale(1.05);
-            box-shadow: 0 5px 15px rgba(78, 204, 163, 0.4);
+            transform: scale(1.1);
+            box-shadow: 0 8px 25px rgba(0, 217, 255, 0.5);
+            background: linear-gradient(135deg, var(--accent-purple), var(--accent-pink));
         }
 
         .play-btn:active {
             transform: scale(0.95);
         }
 
+        /* =====================================
+           INFO SECTION
+           ===================================== */
+
         .info-section {
-            background: rgba(15, 52, 96, 0.5);
-            border: 1px solid rgba(78, 204, 163, 0.3);
-            border-radius: 12px;
-            padding: 20px;
+            background: linear-gradient(135deg, rgba(31, 42, 77, 0.6) 0%, rgba(25, 35, 70, 0.4) 100%);
+            border: 2px solid var(--accent-cyan);
+            border-radius: 20px;
+            padding: 30px;
             margin-bottom: 30px;
             text-align: center;
+            backdrop-filter: blur(10px);
+            box-shadow: 0 8px 32px rgba(0, 217, 255, 0.15);
         }
 
         .info-section h2 {
-            font-size: 18px;
-            color: #ffd700;
-            margin-bottom: 10px;
+            font-size: 22px;
+            color: var(--accent-gold);
+            margin-bottom: 15px;
+            font-family: 'Orbitron', sans-serif;
+            letter-spacing: 1px;
         }
 
         .info-section p {
-            font-size: 14px;
-            color: #aaa;
-            line-height: 1.6;
+            font-size: 15px;
+            color: var(--text-muted);
+            line-height: 1.8;
         }
+
+        /* =====================================
+           BOTTOM NAV
+           ===================================== */
 
         .bottom-nav {
             display: flex;
             justify-content: space-around;
             padding: 15px;
-            background: rgba(15, 52, 96, 0.7);
-            border-top: 1px solid rgba(78, 204, 163, 0.2);
+            background: linear-gradient(90deg, rgba(15, 20, 50, 0.9) 0%, rgba(25, 35, 70, 0.9) 100%);
+            border-top: 2px solid rgba(0, 217, 255, 0.2);
             position: fixed;
             bottom: 0;
             left: 0;
             right: 0;
             gap: 10px;
+            backdrop-filter: blur(10px);
+            z-index: 50;
         }
 
         .nav-btn {
             flex: 1;
-            background: rgba(78, 204, 163, 0.2);
-            color: #4ecca3;
-            border: 1px solid #4ecca3;
-            padding: 10px;
-            border-radius: 8px;
+            background: linear-gradient(135deg, rgba(0, 217, 255, 0.2), rgba(181, 55, 242, 0.2));
+            color: var(--accent-cyan);
+            border: 1px solid var(--accent-cyan);
+            padding: 12px;
+            border-radius: 12px;
             cursor: pointer;
-            font-size: 12px;
-            font-weight: 600;
+            font-size: 13px;
+            font-weight: 700;
             transition: all 0.3s;
             text-align: center;
+            font-family: 'Inter', sans-serif;
+            letter-spacing: 0.5px;
         }
 
         .nav-btn:hover {
-            background: #4ecca3;
-            color: #000;
+            background: linear-gradient(135deg, var(--accent-cyan), var(--accent-purple));
+            color: var(--primary-dark);
+            transform: translateY(-3px);
+            box-shadow: 0 5px 15px rgba(0, 217, 255, 0.3);
         }
 
         .nav-btn:active {
             transform: scale(0.95);
         }
 
-        .content-wrapper {
-            padding-bottom: 80px;
-        }
-
-        /* Mobile optimizations */
-        @media (max-width: 768px) {
-            .games-grid {
-                grid-template-columns: repeat(2, 1fr);
-                gap: 12px;
-            }
-
-            .game-emoji {
-                font-size: 40px;
-            }
-
-            .game-name {
-                font-size: 14px;
-            }
-
-            .header h1 {
-                font-size: 24px;
-            }
-
-            .balance-display {
-                padding: 6px 12px;
-                font-size: 12px;
-            }
-        }
-
-        @media (max-width: 480px) {
-            .games-grid {
-                grid-template-columns: 1fr;
-                gap: 10px;
-            }
-
-            .container {
-                padding: 15px;
-            }
-
-            .user-section {
-                padding: 10px 15px;
-                font-size: 12px;
-            }
-
-            .game-emoji {
-                font-size: 36px;
-            }
-        }
-
-        /* Landscape mode */
-        @media (max-height: 600px) and (orientation: landscape) {
-            .games-grid {
-                grid-template-columns: repeat(5, 1fr);
-                gap: 10px;
-            }
-
-            .content-wrapper {
-                padding-bottom: 100px;
-            }
-        }
+        /* =====================================
+           LOADING & EFFECTS
+           ===================================== */
 
         .loading {
             display: none;
@@ -312,10 +379,11 @@
             left: 0;
             width: 100%;
             height: 100%;
-            background: rgba(0, 0, 0, 0.7);
+            background: rgba(10, 14, 39, 0.95);
             z-index: 1000;
             align-items: center;
             justify-content: center;
+            backdrop-filter: blur(5px);
         }
 
         .loading.active {
@@ -323,79 +391,160 @@
         }
 
         .spinner {
-            border: 4px solid rgba(78, 204, 163, 0.2);
-            border-top: 4px solid #4ecca3;
+            width: 60px;
+            height: 60px;
+            border: 4px solid rgba(0, 217, 255, 0.2);
+            border-top: 4px solid var(--accent-cyan);
+            border-right: 4px solid var(--accent-purple);
             border-radius: 50%;
-            width: 50px;
-            height: 50px;
             animation: spin 1s linear infinite;
+            box-shadow: 0 0 20px rgba(0, 217, 255, 0.5);
         }
 
         @keyframes spin {
             0% { transform: rotate(0deg); }
             100% { transform: rotate(360deg); }
         }
+
+        /* =====================================
+           CONTENT WRAPPER
+           ===================================== */
+
+        .content-wrapper {
+            padding-bottom: 100px;
+        }
+
+        /* =====================================
+           RESPONSIVE
+           ===================================== */
+
+        @media (max-width: 768px) {
+            .games-grid {
+                grid-template-columns: repeat(2, 1fr);
+                gap: 15px;
+            }
+
+            .game-emoji {
+                font-size: 45px;
+            }
+
+            .game-name {
+                font-size: 16px;
+            }
+
+            .header h1 {
+                font-size: 28px;
+            }
+
+            .balance-display {
+                padding: 6px 15px;
+                font-size: 13px;
+            }
+        }
+
+        @media (max-width: 480px) {
+            .games-grid {
+                grid-template-columns: 1fr;
+                gap: 12px;
+            }
+
+            .container {
+                padding: 20px 15px;
+            }
+
+            .header h1 {
+                font-size: 24px;
+            }
+
+            .games-title {
+                font-size: 20px;
+            }
+
+            .game-emoji {
+                font-size: 40px;
+            }
+
+            .bottom-nav {
+                padding: 12px;
+            }
+
+            .nav-btn {
+                padding: 10px;
+                font-size: 11px;
+            }
+        }
+
+        @media (max-height: 600px) and (orientation: landscape) {
+            .games-grid {
+                grid-template-columns: repeat(5, 1fr);
+                gap: 12px;
+            }
+
+            .content-wrapper {
+                padding-bottom: 80px;
+            }
+        }
     </style>
 </head>
 <body>
     <div class="header">
-        <h1>🎮 BET GAMES</h1>
-        <p>Play. Win. Repeat.</p>
+        <h1>🎮 BET GAMES PRO</h1>
+        <p>✨ Premium Gaming Experience ✨</p>
     </div>
 
     <div class="user-section">
         <div class="user-name">👤 <span id="username">Player</span></div>
-        <div class="balance-display">💰 <span id="balance">10000</span> Coins</div>
+        <div class="balance-display">💎 <span id="balance">10000</span></div>
     </div>
 
     <div class="content-wrapper">
         <div class="container">
             <div class="info-section">
-                <h2>🎯 Welcome Back!</h2>
-                <p>Select a game and start betting. Max 4 bets per game. Good luck! 🍀</p>
+                <h2>🎯 Welcome to BetGames Pro</h2>
+                <p>Experience premium gaming with stunning visuals and real-time action. Select your game and start winning! Max 4 bets per game. 🍀</p>
             </div>
 
-            <div class="games-title">Available Games</div>
+            <div class="games-title">⚡ FEATURED GAMES</div>
 
             <div class="games-grid">
                 <div class="game-card silver" onclick="navigateToGame('silver')">
                     <span class="game-emoji">🐸</span>
                     <div class="game-name">Frog Leap</div>
-                    <div class="game-bet">Bet: 10</div>
-                    <div class="game-payout">Win: 50</div>
-                    <button class="play-btn">Play</button>
+                    <div class="game-bet">💰 Bet: 10</div>
+                    <div class="game-payout">🏆 Win: 50</div>
+                    <button class="play-btn">Play Now</button>
                 </div>
 
                 <div class="game-card gold" onclick="navigateToGame('gold')">
                     <span class="game-emoji">⚽</span>
                     <div class="game-name">Football Goal</div>
-                    <div class="game-bet">Bet: 50</div>
-                    <div class="game-payout">Win: 200</div>
-                    <button class="play-btn">Play</button>
+                    <div class="game-bet">💰 Bet: 50</div>
+                    <div class="game-payout">🏆 Win: 200</div>
+                    <button class="play-btn">Play Now</button>
                 </div>
 
                 <div class="game-card diamond" onclick="navigateToGame('diamond')">
                     <span class="game-emoji">🏹</span>
                     <div class="game-name">Archer Hit</div>
-                    <div class="game-bet">Bet: 100</div>
-                    <div class="game-payout">Win: 500</div>
-                    <button class="play-btn">Play</button>
+                    <div class="game-bet">💰 Bet: 100</div>
+                    <div class="game-payout">🏆 Win: 500</div>
+                    <button class="play-btn">Play Now</button>
                 </div>
 
                 <div class="game-card platinum" onclick="navigateToGame('platinum')">
                     <span class="game-emoji">🪂</span>
                     <div class="game-name">Parachute Drop</div>
-                    <div class="game-bet">Bet: 200</div>
-                    <div class="game-payout">Win: 1000</div>
-                    <button class="play-btn">Play</button>
+                    <div class="game-bet">💰 Bet: 200</div>
+                    <div class="game-payout">🏆 Win: 1000</div>
+                    <button class="play-btn">Play Now</button>
                 </div>
 
                 <div class="game-card roulette" onclick="navigateToGame('roulette')">
                     <span class="game-emoji">🎡</span>
                     <div class="game-name">Roulette Spin</div>
-                    <div class="game-bet">Bet: 50</div>
-                    <div class="game-payout">Win: 1750</div>
-                    <button class="play-btn">Play</button>
+                    <div class="game-bet">💰 Bet: 50</div>
+                    <div class="game-payout">🏆 Win: 1750</div>
+                    <button class="play-btn">Play Now</button>
                 </div>
             </div>
         </div>
@@ -413,7 +562,6 @@
 
     <script src="https://cdn.socket.io/4.5.4/socket.io.min.js"></script>
     <script>
-        // Initialize
         let userId = localStorage.getItem('userId');
         if (!userId) {
             userId = 'user_' + Math.random().toString(36).substr(2, 9);
@@ -424,7 +572,6 @@
         localStorage.setItem('username', username);
         document.getElementById('username').textContent = username;
 
-        // Register user
         fetch('/register', {
             method: 'POST',
             headers: {'Content-Type': 'application/json'},
@@ -460,17 +607,11 @@
             alert('💬 Support Contact:\nEmail: support@betgames.com\nWhatsApp: +1-XXX-XXX-XXXX');
         }
 
-        // Prevent zoom
         document.addEventListener('touchmove', function(event) {
             if (event.scale !== 1) {
                 event.preventDefault();
             }
         }, false);
-
-        // Landscape detection
-        window.addEventListener('orientationchange', function() {
-            console.log('Orientation changed:', window.innerWidth, window.innerHeight);
-        });
     </script>
 </body>
 </html>
