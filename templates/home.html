@@ -1,0 +1,476 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <title>BetGames - Play Now</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        html, body {
+            width: 100%;
+            height: 100%;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+            color: #fff;
+            overflow-x: hidden;
+        }
+
+        .header {
+            background: linear-gradient(90deg, #0f3460 0%, #1a1a2e 100%);
+            padding: 20px;
+            text-align: center;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.3);
+            position: sticky;
+            top: 0;
+            z-index: 100;
+        }
+
+        .header h1 {
+            font-size: 28px;
+            font-weight: 700;
+            background: linear-gradient(90deg, #ffd700, #4ecca3);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            margin-bottom: 5px;
+        }
+
+        .header p {
+            font-size: 12px;
+            color: #aaa;
+        }
+
+        .user-section {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 15px 20px;
+            background: rgba(15, 52, 96, 0.5);
+            border-bottom: 1px solid rgba(78, 204, 163, 0.2);
+        }
+
+        .user-name {
+            font-size: 14px;
+            font-weight: 600;
+        }
+
+        .balance-display {
+            background: linear-gradient(135deg, #4ecca3 0%, #45b896 100%);
+            color: #000;
+            padding: 8px 16px;
+            border-radius: 20px;
+            font-weight: 700;
+            font-size: 14px;
+            box-shadow: 0 4px 10px rgba(78, 204, 163, 0.3);
+        }
+
+        .container {
+            max-width: 100%;
+            padding: 20px;
+            margin: 0 auto;
+        }
+
+        .games-title {
+            font-size: 20px;
+            font-weight: 700;
+            margin-bottom: 20px;
+            text-align: center;
+            color: #ffd700;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+        }
+
+        .games-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+            gap: 15px;
+            margin-bottom: 40px;
+        }
+
+        .game-card {
+            background: linear-gradient(135deg, #16213e 0%, #0f3460 100%);
+            border: 2px solid #4ecca3;
+            border-radius: 15px;
+            padding: 20px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            text-align: center;
+            position: relative;
+            overflow: hidden;
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.3);
+        }
+
+        .game-card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: -100%;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.1), transparent);
+            transition: left 0.5s;
+        }
+
+        .game-card:hover::before {
+            left: 100%;
+        }
+
+        .game-card:hover {
+            transform: translateY(-8px);
+            box-shadow: 0 12px 25px rgba(78, 204, 163, 0.4);
+            border-color: #ffd700;
+        }
+
+        .game-card.silver { border-color: #c0c0c0; }
+        .game-card.gold { border-color: #ffd700; }
+        .game-card.diamond { border-color: #b9f2ff; }
+        .game-card.platinum { border-color: #e5e4e2; }
+        .game-card.roulette { border-color: #ff6b6b; }
+
+        .game-emoji {
+            font-size: 48px;
+            margin-bottom: 10px;
+            display: block;
+            animation: bounce 2s infinite;
+        }
+
+        @keyframes bounce {
+            0%, 100% { transform: translateY(0); }
+            50% { transform: translateY(-10px); }
+        }
+
+        .game-name {
+            font-size: 16px;
+            font-weight: 700;
+            margin-bottom: 8px;
+            color: #fff;
+        }
+
+        .game-bet {
+            font-size: 12px;
+            color: #4ecca3;
+            margin-bottom: 8px;
+            font-weight: 600;
+        }
+
+        .game-payout {
+            font-size: 11px;
+            color: #aaa;
+            margin-bottom: 12px;
+        }
+
+        .play-btn {
+            background: linear-gradient(135deg, #4ecca3 0%, #45b896 100%);
+            color: #000;
+            border: none;
+            padding: 8px 16px;
+            border-radius: 8px;
+            font-weight: 700;
+            font-size: 12px;
+            cursor: pointer;
+            transition: all 0.3s;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        .play-btn:hover {
+            transform: scale(1.05);
+            box-shadow: 0 5px 15px rgba(78, 204, 163, 0.4);
+        }
+
+        .play-btn:active {
+            transform: scale(0.95);
+        }
+
+        .info-section {
+            background: rgba(15, 52, 96, 0.5);
+            border: 1px solid rgba(78, 204, 163, 0.3);
+            border-radius: 12px;
+            padding: 20px;
+            margin-bottom: 30px;
+            text-align: center;
+        }
+
+        .info-section h2 {
+            font-size: 18px;
+            color: #ffd700;
+            margin-bottom: 10px;
+        }
+
+        .info-section p {
+            font-size: 14px;
+            color: #aaa;
+            line-height: 1.6;
+        }
+
+        .bottom-nav {
+            display: flex;
+            justify-content: space-around;
+            padding: 15px;
+            background: rgba(15, 52, 96, 0.7);
+            border-top: 1px solid rgba(78, 204, 163, 0.2);
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            gap: 10px;
+        }
+
+        .nav-btn {
+            flex: 1;
+            background: rgba(78, 204, 163, 0.2);
+            color: #4ecca3;
+            border: 1px solid #4ecca3;
+            padding: 10px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 12px;
+            font-weight: 600;
+            transition: all 0.3s;
+            text-align: center;
+        }
+
+        .nav-btn:hover {
+            background: #4ecca3;
+            color: #000;
+        }
+
+        .nav-btn:active {
+            transform: scale(0.95);
+        }
+
+        .content-wrapper {
+            padding-bottom: 80px;
+        }
+
+        /* Mobile optimizations */
+        @media (max-width: 768px) {
+            .games-grid {
+                grid-template-columns: repeat(2, 1fr);
+                gap: 12px;
+            }
+
+            .game-emoji {
+                font-size: 40px;
+            }
+
+            .game-name {
+                font-size: 14px;
+            }
+
+            .header h1 {
+                font-size: 24px;
+            }
+
+            .balance-display {
+                padding: 6px 12px;
+                font-size: 12px;
+            }
+        }
+
+        @media (max-width: 480px) {
+            .games-grid {
+                grid-template-columns: 1fr;
+                gap: 10px;
+            }
+
+            .container {
+                padding: 15px;
+            }
+
+            .user-section {
+                padding: 10px 15px;
+                font-size: 12px;
+            }
+
+            .game-emoji {
+                font-size: 36px;
+            }
+        }
+
+        /* Landscape mode */
+        @media (max-height: 600px) and (orientation: landscape) {
+            .games-grid {
+                grid-template-columns: repeat(5, 1fr);
+                gap: 10px;
+            }
+
+            .content-wrapper {
+                padding-bottom: 100px;
+            }
+        }
+
+        .loading {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.7);
+            z-index: 1000;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .loading.active {
+            display: flex;
+        }
+
+        .spinner {
+            border: 4px solid rgba(78, 204, 163, 0.2);
+            border-top: 4px solid #4ecca3;
+            border-radius: 50%;
+            width: 50px;
+            height: 50px;
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>🎮 BET GAMES</h1>
+        <p>Play. Win. Repeat.</p>
+    </div>
+
+    <div class="user-section">
+        <div class="user-name">👤 <span id="username">Player</span></div>
+        <div class="balance-display">💰 <span id="balance">10000</span> Coins</div>
+    </div>
+
+    <div class="content-wrapper">
+        <div class="container">
+            <div class="info-section">
+                <h2>🎯 Welcome Back!</h2>
+                <p>Select a game and start betting. Max 4 bets per game. Good luck! 🍀</p>
+            </div>
+
+            <div class="games-title">Available Games</div>
+
+            <div class="games-grid">
+                <div class="game-card silver" onclick="navigateToGame('silver')">
+                    <span class="game-emoji">🐸</span>
+                    <div class="game-name">Frog Leap</div>
+                    <div class="game-bet">Bet: 10</div>
+                    <div class="game-payout">Win: 50</div>
+                    <button class="play-btn">Play</button>
+                </div>
+
+                <div class="game-card gold" onclick="navigateToGame('gold')">
+                    <span class="game-emoji">⚽</span>
+                    <div class="game-name">Football Goal</div>
+                    <div class="game-bet">Bet: 50</div>
+                    <div class="game-payout">Win: 200</div>
+                    <button class="play-btn">Play</button>
+                </div>
+
+                <div class="game-card diamond" onclick="navigateToGame('diamond')">
+                    <span class="game-emoji">🏹</span>
+                    <div class="game-name">Archer Hit</div>
+                    <div class="game-bet">Bet: 100</div>
+                    <div class="game-payout">Win: 500</div>
+                    <button class="play-btn">Play</button>
+                </div>
+
+                <div class="game-card platinum" onclick="navigateToGame('platinum')">
+                    <span class="game-emoji">🪂</span>
+                    <div class="game-name">Parachute Drop</div>
+                    <div class="game-bet">Bet: 200</div>
+                    <div class="game-payout">Win: 1000</div>
+                    <button class="play-btn">Play</button>
+                </div>
+
+                <div class="game-card roulette" onclick="navigateToGame('roulette')">
+                    <span class="game-emoji">🎡</span>
+                    <div class="game-name">Roulette Spin</div>
+                    <div class="game-bet">Bet: 50</div>
+                    <div class="game-payout">Win: 1750</div>
+                    <button class="play-btn">Play</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="bottom-nav">
+        <button class="nav-btn" onclick="refreshBalance()">🔄 Refresh</button>
+        <button class="nav-btn" onclick="viewStats()">📊 Stats</button>
+        <button class="nav-btn" onclick="contactSupport()">💬 Support</button>
+    </div>
+
+    <div class="loading" id="loading">
+        <div class="spinner"></div>
+    </div>
+
+    <script src="https://cdn.socket.io/4.5.4/socket.io.min.js"></script>
+    <script>
+        // Initialize
+        let userId = localStorage.getItem('userId');
+        if (!userId) {
+            userId = 'user_' + Math.random().toString(36).substr(2, 9);
+            localStorage.setItem('userId', userId);
+        }
+
+        const username = 'Player' + Math.floor(Math.random() * 9999);
+        localStorage.setItem('username', username);
+        document.getElementById('username').textContent = username;
+
+        // Register user
+        fetch('/register', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({user_id: userId, username: username})
+        })
+        .then(res => res.json())
+        .then(data => {
+            document.getElementById('balance').textContent = data.balance;
+            localStorage.setItem('balance', data.balance);
+        });
+
+        function navigateToGame(gameType) {
+            document.getElementById('loading').classList.add('active');
+            setTimeout(() => {
+                window.location.href = `/play/${gameType}`;
+            }, 500);
+        }
+
+        function refreshBalance() {
+            fetch(`/balance/${userId}`)
+                .then(res => res.json())
+                .then(data => {
+                    document.getElementById('balance').textContent = data.balance;
+                    localStorage.setItem('balance', data.balance);
+                });
+        }
+
+        function viewStats() {
+            alert('📊 Stats Coming Soon!\nTrack your wins, losses, and earnings.');
+        }
+
+        function contactSupport() {
+            alert('💬 Support Contact:\nEmail: support@betgames.com\nWhatsApp: +1-XXX-XXX-XXXX');
+        }
+
+        // Prevent zoom
+        document.addEventListener('touchmove', function(event) {
+            if (event.scale !== 1) {
+                event.preventDefault();
+            }
+        }, false);
+
+        // Landscape detection
+        window.addEventListener('orientationchange', function() {
+            console.log('Orientation changed:', window.innerWidth, window.innerHeight);
+        });
+    </script>
+</body>
+</html>
