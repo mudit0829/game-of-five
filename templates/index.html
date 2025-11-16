@@ -136,6 +136,10 @@
             margin-bottom: 15px;
         }
         
+        .number-grid.roulette-grid {
+            grid-template-columns: repeat(7, 1fr);
+        }
+        
         .number-btn {
             padding: 15px;
             border: 2px solid #4ecca3;
@@ -146,6 +150,11 @@
             border-radius: 5px;
             cursor: pointer;
             transition: all 0.3s;
+        }
+        
+        .number-btn.roulette-btn {
+            padding: 10px;
+            font-size: 14px;
         }
         
         .number-btn:hover:not(:disabled) {
@@ -468,7 +477,7 @@
             <div class="game-card roulette" data-game="roulette">
                 <div class="game-header">
                     <div class="game-title">🎡 Roulette Game</div>
-                    <div class="game-info">Bet: 50 | Win: 200</div>
+                    <div class="game-info">Bet: 50 | Win: 1750 (35:1)</div>
                 </div>
                 <div class="timer-section">
                     <div class="timer" data-timer="roulette">5:00</div>
@@ -482,17 +491,44 @@
                         <span style="color: #aaa; font-size: 13px;">No bets yet</span>
                     </div>
                 </div>
-                <div class="number-grid" data-grid="roulette">
-                    <button class="number-btn" data-number="0">0</button>
-                    <button class="number-btn" data-number="1">1</button>
-                    <button class="number-btn" data-number="2">2</button>
-                    <button class="number-btn" data-number="3">3</button>
-                    <button class="number-btn" data-number="4">4</button>
-                    <button class="number-btn" data-number="5">5</button>
-                    <button class="number-btn" data-number="6">6</button>
-                    <button class="number-btn" data-number="7">7</button>
-                    <button class="number-btn" data-number="8">8</button>
-                    <button class="number-btn" data-number="9">9</button>
+                <div class="number-grid roulette-grid" data-grid="roulette">
+                    <button class="number-btn roulette-btn" data-number="0">0</button>
+                    <button class="number-btn roulette-btn" data-number="1">1</button>
+                    <button class="number-btn roulette-btn" data-number="2">2</button>
+                    <button class="number-btn roulette-btn" data-number="3">3</button>
+                    <button class="number-btn roulette-btn" data-number="4">4</button>
+                    <button class="number-btn roulette-btn" data-number="5">5</button>
+                    <button class="number-btn roulette-btn" data-number="6">6</button>
+                    <button class="number-btn roulette-btn" data-number="7">7</button>
+                    <button class="number-btn roulette-btn" data-number="8">8</button>
+                    <button class="number-btn roulette-btn" data-number="9">9</button>
+                    <button class="number-btn roulette-btn" data-number="10">10</button>
+                    <button class="number-btn roulette-btn" data-number="11">11</button>
+                    <button class="number-btn roulette-btn" data-number="12">12</button>
+                    <button class="number-btn roulette-btn" data-number="13">13</button>
+                    <button class="number-btn roulette-btn" data-number="14">14</button>
+                    <button class="number-btn roulette-btn" data-number="15">15</button>
+                    <button class="number-btn roulette-btn" data-number="16">16</button>
+                    <button class="number-btn roulette-btn" data-number="17">17</button>
+                    <button class="number-btn roulette-btn" data-number="18">18</button>
+                    <button class="number-btn roulette-btn" data-number="19">19</button>
+                    <button class="number-btn roulette-btn" data-number="20">20</button>
+                    <button class="number-btn roulette-btn" data-number="21">21</button>
+                    <button class="number-btn roulette-btn" data-number="22">22</button>
+                    <button class="number-btn roulette-btn" data-number="23">23</button>
+                    <button class="number-btn roulette-btn" data-number="24">24</button>
+                    <button class="number-btn roulette-btn" data-number="25">25</button>
+                    <button class="number-btn roulette-btn" data-number="26">26</button>
+                    <button class="number-btn roulette-btn" data-number="27">27</button>
+                    <button class="number-btn roulette-btn" data-number="28">28</button>
+                    <button class="number-btn roulette-btn" data-number="29">29</button>
+                    <button class="number-btn roulette-btn" data-number="30">30</button>
+                    <button class="number-btn roulette-btn" data-number="31">31</button>
+                    <button class="number-btn roulette-btn" data-number="32">32</button>
+                    <button class="number-btn roulette-btn" data-number="33">33</button>
+                    <button class="number-btn roulette-btn" data-number="34">34</button>
+                    <button class="number-btn roulette-btn" data-number="35">35</button>
+                    <button class="number-btn roulette-btn" data-number="36">36</button>
                 </div>
                 <div class="all-bets-list" data-bets="roulette">
                     <div style="text-align: center; color: #aaa; padding: 10px;">No bets yet</div>
