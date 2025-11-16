@@ -1,0 +1,574 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <title>Football Goal - BetGames</title>
+    <script src="https://cdn.socket.io/4.5.4/socket.io.min.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        html, body {
+            width: 100%;
+            height: 100%;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: #1a1a2e;
+            color: #fff;
+            overflow: hidden;
+        }
+
+        body {
+            display: flex;
+            flex-direction: column;
+        }
+
+        .game-container {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            background: linear-gradient(180deg, #87ceeb 0%, #90EE90 100%);
+            position: relative;
+            overflow: hidden;
+        }
+
+        .header-bar {
+            background: rgba(15, 52, 96, 0.9);
+            padding: 10px 15px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            z-index: 10;
+            border-bottom: 2px solid #ffd700;
+        }
+
+        .game-title {
+            font-size: 18px;
+            font-weight: 700;
+            color: #ffd700;
+        }
+
+        .timer-display {
+            background: linear-gradient(135deg, #ffd700, #ffed4e);
+            color: #000;
+            padding: 6px 15px;
+            border-radius: 20px;
+            font-weight: 700;
+            font-size: 14px;
+        }
+
+        .timer-display.warning {
+            background: linear-gradient(135deg, #ff6b6b, #ff5252);
+            color: #fff;
+            animation: pulse 1s infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { transform: scale(1); }
+            50% { transform: scale(1.05); }
+        }
+
+        .balance-info {
+            background: rgba(255, 215, 0, 0.2);
+            padding: 6px 12px;
+            border-radius: 8px;
+            font-size: 12px;
+            color: #ffd700;
+        }
+
+        .game-area {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            position: relative;
+            padding: 20px;
+        }
+
+        .football-field {
+            width: 100%;
+            height: 100%;
+            position: relative;
+            background: linear-gradient(180deg, #90EE90 0%, #7CCD7C 100%);
+            border: 3px solid #fff;
+            overflow: hidden;
+        }
+
+        .field-lines {
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            top: 0;
+            left: 0;
+        }
+
+        .center-line {
+            position: absolute;
+            left: 50%;
+            width: 2px;
+            height: 100%;
+            background: #fff;
+            opacity: 0.5;
+        }
+
+        .goal-posts {
+            position: absolute;
+            width: 100%;
+            height: 60%;
+            top: 20%;
+            display: flex;
+            justify-content: space-around;
+            align-items: center;
+            padding: 0 20px;
+        }
+
+        .goal-post {
+            width: 60px;
+            height: 80px;
+            background: linear-gradient(90deg, #FFD700, #FFA500);
+            border: 3px solid #FF8C00;
+            border-radius: 10px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 28px;
+            font-weight: 700;
+            cursor: pointer;
+            transition: all 0.3s;
+            position: relative;
+            box-shadow: 0 4px 10px rgba(0, 0, 0, 0.3);
+            overflow: hidden;
+        }
+
+        .goal-post::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: linear-gradient(45deg, transparent 30%, rgba(255, 255, 255, 0.1) 50%, transparent 70%);
+        }
+
+        .goal-post:hover {
+            transform: scale(1.1);
+            box-shadow: 0 6px 20px rgba(255, 215, 0, 0.5);
+        }
+
+        .goal-post.selected {
+            background: linear-gradient(90deg, #00ff00, #00cc00);
+            border-color: #00ff00;
+            box-shadow: 0 0 25px rgba(0, 255, 0, 0.7);
+        }
+
+        .footballer {
+            position: absolute;
+            left: 5%;
+            bottom: 20%;
+            font-size: 60px;
+            z-index: 20;
+            animation: run-animation 0.6s infinite;
+        }
+
+        .footballer.shooting {
+            animation: shoot-animation 1s ease-out forwards;
+        }
+
+        @keyframes run-animation {
+            0%, 100% { transform: translateY(0); }
+            50% { transform: translateY(-10px); }
+        }
+
+        @keyframes shoot-animation {
+            0% {
+                left: 5%;
+                transform: scaleX(1);
+            }
+            70% {
+                left: 40%;
+                transform: scaleX(1);
+            }
+            100% {
+                left: 45%;
+                transform: scaleX(-1) rotateY(180deg);
+            }
+        }
+
+        .ball {
+            position: absolute;
+            width: 20px;
+            height: 20px;
+            background: radial-gradient(circle at 30% 30%, #fff, #000);
+            border-radius: 50%;
+            z-index: 15;
+            display: none;
+        }
+
+        .ball.flying {
+            display: block;
+            animation: ball-flight 0.8s ease-out forwards;
+        }
+
+        @keyframes ball-flight {
+            0% {
+                left: 20%;
+                bottom: 25%;
+            }
+            50% {
+                bottom: 55%;
+            }
+            100% {
+                left: var(--ball-x);
+                bottom: 25%;
+            }
+        }
+
+        .betting-panel {
+            background: rgba(15, 52, 96, 0.95);
+            padding: 15px;
+            border-top: 2px solid #ffd700;
+            display: flex;
+            gap: 10px;
+            overflow-x: auto;
+            align-items: center;
+            justify-content: space-between;
+            min-height: 80px;
+        }
+
+        .status-text {
+            font-size: 12px;
+            color: #aaa;
+            text-align: center;
+            width: 100%;
+            margin-bottom: 10px;
+        }
+
+        .your-bets {
+            display: flex;
+            gap: 8px;
+            flex-wrap: wrap;
+            align-items: center;
+        }
+
+        .bet-badge {
+            background: #ffd700;
+            color: #000;
+            padding: 6px 12px;
+            border-radius: 15px;
+            font-size: 12px;
+            font-weight: 700;
+        }
+
+        .message-box {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: linear-gradient(135deg, #ffd700, #ffed4e);
+            color: #000;
+            padding: 30px 40px;
+            border-radius: 15px;
+            font-size: 18px;
+            font-weight: 700;
+            z-index: 100;
+            display: none;
+            text-align: center;
+            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.5);
+            animation: message-pop 0.3s ease-out;
+        }
+
+        .message-box.show {
+            display: block;
+        }
+
+        .message-box.error {
+            background: linear-gradient(135deg, #ff6b6b, #ff5252);
+            color: #fff;
+        }
+
+        @keyframes message-pop {
+            0% {
+                transform: translate(-50%, -50%) scale(0.8);
+                opacity: 0;
+            }
+            100% {
+                transform: translate(-50%, -50%) scale(1);
+                opacity: 1;
+            }
+        }
+
+        .back-button {
+            position: fixed;
+            top: 10px;
+            left: 10px;
+            background: rgba(255, 215, 0, 0.3);
+            border: 1px solid #ffd700;
+            color: #ffd700;
+            padding: 8px 15px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-weight: 600;
+            font-size: 12px;
+            z-index: 50;
+        }
+
+        .back-button:hover {
+            background: #ffd700;
+            color: #000;
+        }
+
+        @media (max-width: 480px) {
+            .goal-post {
+                width: 50px;
+                height: 60px;
+                font-size: 24px;
+            }
+
+            .footballer {
+                font-size: 45px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <button class="back-button" onclick="goBack()">← Back</button>
+
+    <div class="game-container">
+        <div class="header-bar">
+            <div class="game-title">⚽ Football Goal</div>
+            <div class="timer-display" id="timer">5:00</div>
+            <div class="balance-info">💰 <span id="balance">50000</span></div>
+        </div>
+
+        <div class="game-area">
+            <div class="football-field">
+                <div class="field-lines">
+                    <div class="center-line"></div>
+                </div>
+                <div class="footballer" id="footballer">⚽</div>
+                <div class="ball" id="ball"></div>
+                <div class="goal-posts" id="goalPostsContainer"></div>
+            </div>
+        </div>
+
+        <div class="betting-panel">
+            <div style="width: 100%;">
+                <div class="status-text" id="statusText">Click goal posts to predict where the ball goes!</div>
+                <div class="your-bets">
+                    <span style="font-size: 12px; color: #ffd700; font-weight: 600;">Your Bets:</span>
+                    <div id="myBets"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="message-box" id="messageBox"></div>
+
+    <script>
+        let userId = localStorage.getItem('userId');
+        const username = localStorage.getItem('username');
+        const gameType = 'gold';
+        
+        let userBets = [];
+        let mySelectedNumbers = [];
+        const socket = io();
+
+        fetch('/register', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({user_id: userId, username: username})
+        });
+
+        function createGoalPosts() {
+            const container = document.getElementById('goalPostsContainer');
+            container.innerHTML = '';
+            for (let i = 0; i < 6; i++) {
+                const post = document.createElement('div');
+                post.className = 'goal-post';
+                post.innerHTML = i;
+                post.id = `post-${i}`;
+                post.style.cursor = 'pointer';
+                container.appendChild(post);
+            }
+        }
+
+        createGoalPosts();
+
+        socket.emit('join_game', {game_type: gameType, user_id: userId});
+
+        socket.on('round_data', data => {
+            if (data.game_type === gameType && data.round_data) {
+                updateGameUI(data.round_data);
+            }
+        });
+
+        socket.on('new_round', data => {
+            if (data.game_type === gameType) {
+                mySelectedNumbers = [];
+                updateMyBets();
+                updateGoalPosts([]);
+                document.getElementById('footballer').classList.remove('shooting');
+                document.getElementById('ball').classList.remove('flying');
+                document.getElementById('statusText').textContent = 'Click goal posts to predict!';
+            }
+        });
+
+        socket.on('timer_update', data => {
+            if (data.game_type === gameType) {
+                const time = data.betting_time_remaining || data.time_remaining;
+                const mins = Math.floor(time / 60);
+                const secs = time % 60;
+                document.getElementById('timer').textContent = `${mins}:${secs.toString().padStart(2, '0')}`;
+                
+                if (time <= 15 && time > 0) {
+                    document.getElementById('timer').classList.add('warning');
+                    if (time === 15) {
+                        document.getElementById('statusText').textContent = 'The footballer is taking aim...';
+                    }
+                } else {
+                    document.getElementById('timer').classList.remove('warning');
+                }
+            }
+        });
+
+        socket.on('bet_placed', data => {
+            if (data.game_type === gameType) {
+                updateGoalPosts(data.round_data.bets);
+            }
+        });
+
+        socket.on('round_result', data => {
+            if (data.game_type === gameType) {
+                shootBall(data.result, data.winners);
+                document.getElementById('statusText').textContent = `⚽ Goal! Ball went into post #${data.result}!`;
+            }
+        });
+
+        socket.on('bet_error', data => {
+            showMessage(data.message, true);
+        });
+
+        socket.on('bet_success', data => {
+            fetch(`/balance/${userId}`)
+                .then(res => res.json())
+                .then(balanceData => {
+                    document.getElementById('balance').textContent = balanceData.balance;
+                });
+        });
+
+        function updateGameUI(roundData) {
+            updateGoalPosts(roundData.bets);
+        }
+
+        function updateGoalPosts(bets) {
+            for (let i = 0; i < 6; i++) {
+                const post = document.getElementById(`post-${i}`);
+                if (mySelectedNumbers.includes(i)) {
+                    post.classList.add('selected');
+                } else {
+                    post.classList.remove('selected');
+                }
+            }
+        }
+
+        function placeBet(number) {
+            if (mySelectedNumbers.includes(number)) {
+                showMessage('Already bet on this post', true);
+                return;
+            }
+            if (mySelectedNumbers.length >= 4) {
+                showMessage('Maximum 4 bets per game', true);
+                return;
+            }
+
+            socket.emit('place_bet', {
+                game_type: gameType,
+                user_id: userId,
+                username: username,
+                number: number
+            });
+
+            mySelectedNumbers.push(number);
+            updateMyBets();
+        }
+
+        function updateMyBets() {
+            const myBetsDiv = document.getElementById('myBets');
+            if (mySelectedNumbers.length === 0) {
+                myBetsDiv.innerHTML = '<span style="color: #aaa; font-size: 12px;">No bets yet</span>';
+            } else {
+                myBetsDiv.innerHTML = mySelectedNumbers.map(num => 
+                    `<div class="bet-badge">Post ${num}</div>`
+                ).join('');
+            }
+        }
+
+        function shootBall(goalNumber, winners) {
+            setTimeout(() => {
+                document.getElementById('footballer').classList.add('shooting');
+                const ball = document.getElementById('ball');
+                const post = document.getElementById(`post-${goalNumber}`);
+                const fieldRect = document.querySelector('.football-field').getBoundingClientRect();
+                const postRect = post.getBoundingClientRect();
+                
+                const ballX = ((postRect.left - fieldRect.left + postRect.width / 2) / fieldRect.width) * 100;
+                ball.style.setProperty('--ball-x', `calc(${ballX}% - 10px)`);
+                ball.classList.add('flying');
+                
+                setTimeout(() => {
+                    post.style.backgroundColor = '#00ff00';
+                    post.style.borderColor = '#00ff00';
+                    post.style.boxShadow = '0 0 30px rgba(0, 255, 0, 1)';
+                    
+                    const isWinner = winners.some(w => w.user_id === userId);
+                    showMessage(
+                        isWinner ? `🎉 GOAL! +${winners.find(w => w.user_id === userId).payout} coins!` : '❌ Missed the goal',
+                        !isWinner
+                    );
+                }, 800);
+            }, 500);
+        }
+
+        function showMessage(text, isError = false) {
+            const msgBox = document.getElementById('messageBox');
+            msgBox.textContent = text;
+            msgBox.classList.toggle('error', isError);
+            msgBox.classList.add('show');
+            
+            setTimeout(() => {
+                msgBox.classList.remove('show');
+            }, 2500);
+        }
+
+        document.addEventListener('click', (e) => {
+            if (e.target.closest('.goal-post')) {
+                const post = e.target.closest('.goal-post');
+                const postNumber = parseInt(post.id.split('-')[1]);
+                placeBet(postNumber);
+            }
+        });
+
+        function goBack() {
+            window.location.href = '/';
+        }
+
+        document.addEventListener('touchmove', function(event) {
+            if (event.scale !== 1) {
+                event.preventDefault();
+            }
+        }, false);
+
+        setInterval(() => {
+            fetch(`/balance/${userId}`)
+                .then(res => res.json())
+                .then(data => {
+                    document.getElementById('balance').textContent = data.balance;
+                });
+        }, 2000);
+    </script>
+</body>
+</html>
