@@ -9,7 +9,7 @@
 </head>
 <body>
   <div class="game-root">
-    <!-- TOP BAR (same pattern as frog game) -->
+    <!-- TOP BAR (same style as frog) -->
     <header class="top-bar">
       <div class="top-left">
         <div class="game-label">GAME <span id="roundId">–</span></div>
@@ -35,7 +35,7 @@
 
     <!-- FOOTBALL PITCH -->
     <section class="pitch">
-      <!-- Player and ball at the back -->
+      <!-- Player and ball -->
       <div class="player-area">
         <img
           id="playerSprite"
@@ -51,7 +51,7 @@
         >
       </div>
 
-      <!-- 6 goal posts (2 x 3) -->
+      <!-- 6 goals (2 rows x 3) -->
       <div class="goals">
         <div class="goals-row">
           {% for i in range(1,4) %}
@@ -74,7 +74,7 @@
       </div>
     </section>
 
-    <!-- BOTTOM CONTROLS -->
+    <!-- BOTTOM CONTROLS (same behaviour as frog) -->
     <section class="controls">
       <div class="numbers-title">Select your number (0–9)</div>
 
@@ -114,12 +114,10 @@
   </div>
 
   <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
-
   <script>
     const GAME_TYPE = "{{ game_type }}";            // "gold"
     const FIXED_BET_AMOUNT = {{ game.bet_amount }}; // 50
   </script>
-
   <script src="{{ url_for('static', filename='js/gold-game.js') }}"></script>
 </body>
 </html>
