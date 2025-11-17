@@ -19,7 +19,7 @@ body {
   padding: 10px 10px 18px;
 }
 
-/* ===== TOP BAR (same as frog) ===== */
+/* ===== TOP BAR ===== */
 
 .top-bar {
   display: flex;
@@ -103,9 +103,15 @@ body {
 .pitch {
   position: relative;
   margin-top: 4px;
-  padding: 26px 12px 20px;
+  padding: 26px 12px 22px;
   border-radius: 26px;
-  background: radial-gradient(circle at 50% 25%, #022c22 0, #020617 55%, #020617 100%);
+  background: repeating-linear-gradient(
+      to bottom,
+      #065f46 0,
+      #065f46 26px,
+      #047857 26px,
+      #047857 52px
+  );
   box-shadow: 0 18px 40px rgba(0, 0, 0, 0.9);
   overflow: hidden;
 }
@@ -116,57 +122,72 @@ body {
   position: relative;
   display: flex;
   justify-content: center;
-  margin-bottom: 10px;
+  margin-bottom: 16px;
+  z-index: 2;
 }
 
 .player {
   width: 120px;
   height: auto;
+  transform-origin: center bottom;
+}
+
+.player.kick {
+  animation: playerKick 0.3s ease-out;
+}
+
+@keyframes playerKick {
+  0%   { transform: translateY(0) rotate(0deg); }
+  40%  { transform: translateY(-6px) rotate(-4deg); }
+  100% { transform: translateY(0) rotate(0deg); }
 }
 
 .ball {
   position: absolute;
-  bottom: -10px;          /* near feet */
-  right: 50%;
-  transform: translateX(40px); /* small offset from centre */
-  width: 32px;
-  height: 32px;
+  bottom: -6px;
+  left: 50%;
+  transform: translateX(-46px); /* near player's foot */
+  width: 34px;
+  height: 34px;
+  z-index: 4; /* ABOVE all goals */
 }
 
-/* goals (pads) */
+/* goals */
 
 .goals {
-  margin-top: 10px;
+  position: relative;
+  z-index: 1;
 }
 
 .goals-row {
   display: flex;
   justify-content: space-around;
   align-items: center;
-  margin-bottom: 12px;
+  margin-bottom: 14px;
 }
 
 .goal {
   position: relative;
-  width: 150px;
-  height: 95px;
+  width: 140px;
+  height: 90px;
   display: flex;
   justify-content: center;
   align-items: center;
+  z-index: 1;
 }
 
 .goal img {
-  width: 150px;
+  width: 140px;
   height: auto;
-  filter: drop-shadow(0 8px 10px rgba(0,0,0,0.6));
+  filter: drop-shadow(0 6px 8px rgba(0,0,0,0.6));
 }
 
-/* small variations per goal so they don't look identical */
-.goal[data-pad="1"] img { transform: scale(1.0) rotate(-2deg); }
-.goal[data-pad="2"] img { transform: scale(1.05) rotate(1deg); }
-.goal[data-pad="3"] img { transform: scale(1.02) rotate(3deg); }
-.goal[data-pad="4"] img { transform: scale(1.03) rotate(-3deg); }
-.goal[data-pad="5"] img { transform: scale(1.05) rotate(2deg); }
+/* small variations per goal */
+.goal[data-pad="1"] img { transform: scale(1.0) rotate(-1deg); }
+.goal[data-pad="2"] img { transform: scale(1.04) rotate(1deg); }
+.goal[data-pad="3"] img { transform: scale(1.02) rotate(2deg); }
+.goal[data-pad="4"] img { transform: scale(1.03) rotate(-2deg); }
+.goal[data-pad="5"] img { transform: scale(1.04) rotate(1deg); }
 .goal[data-pad="6"] img { transform: scale(1.01) rotate(-1deg); }
 
 .pad-number {
