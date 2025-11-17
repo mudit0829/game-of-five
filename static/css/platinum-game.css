@@ -166,10 +166,8 @@ html, body {
 /* Boats grid */
 .boats-layer {
   position: absolute;
-  left: 0;
-  right: 0;
-  top: 18%;
-  bottom: 32%;
+  inset: 0;      /* full play area */
+  z-index: 10;
 }
 
 /* boat images */
@@ -208,13 +206,15 @@ html, body {
   right: 10px;
   bottom: 10px;
   padding: 10px 12px 8px;
-  border-radius: 14px;
-  background: rgba(3, 7, 18, 0.92);
-  box-shadow: 0 -8px 20px rgba(0, 0, 0, 0.75);
+  border-radius: 18px;
+  background: rgba(3, 7, 18, 0.25);      /* much lighter */
+  backdrop-filter: blur(10px);           /* glass effect */
+  box-shadow: 0 -4px 14px rgba(0, 0, 0, 0.5);
   z-index: 30;
   color: #f9fafb;
   font-size: 13px;
 }
+
 
 .controls h3 {
   margin: 0 0 6px;
