@@ -1,17 +1,21 @@
-body {
-    margin: 0;
-    overflow: hidden;
-    font-family: system-ui, sans-serif;
-    background: #000;
+/* Global full-screen setup */
+html, body {
+  margin: 0;
+  padding: 0;
+  height: 100%;
+  overflow: hidden;
+  font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  background: #000;
 }
 
-/* Fullscreen container */
-.platinum-container {
-    position: fixed;
-    inset: 0;
-    width: 100%;
-    height: 100%;
-    overflow: hidden;
+/* Root container */
+.platinum-page {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  max-width: 480px;      /* mobile width */
+  margin: 0 auto;
+  overflow: hidden;
 }
 
 /* =========================
@@ -19,186 +23,282 @@ body {
 ========================= */
 
 .bg-wrapper {
-    position: absolute;
-    top: 0;
-    left: 0;
-    width: 100%;
-    height: 100%;
-    overflow: hidden;
-    z-index: 0;
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  z-index: 0;
 }
 
-/* Base static background fills full screen */
+/* base static background fills whole screen */
 .bg-base {
-    width: 100%;
-    height: 100%;
-    object-fit: cover;
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
 }
 
-/* Water animation layers */
+/* water PNG strips scrolling horizontally */
 .water-layer {
-    position: absolute;
-    width: 300%;
-    height: 45%;
-    left: 0;
-    bottom: 0;
-    background-repeat: repeat-x;
-    background-size: auto 100%;
-    opacity: 0.8;
-    pointer-events: none;
+  position: absolute;
+  left: 0;
+  width: 260%;
+  background-repeat: repeat-x;
+  background-size: auto 100%;
+  pointer-events: none;
 }
 
-/* Far water (higher, slower) */
+/* far water (higher, dimmer, slower) */
 .water-far {
-    background-image: url("../img/platinum_water_far.png");
-    height: 40%;
-    bottom: 12%;
-    animation: driftFar 22s linear infinite;
+  bottom: 20%;
+  height: 40%;
+  opacity: 0.6;
+  background-image: url("../img/platinum_water_far.png");
+  animation: waterFar 24s linear infinite;
 }
 
-/* Near water (closer, faster) */
+/* near water (closer, brighter, faster) */
 .water-near {
-    background-image: url("../img/platinum_water_near.png");
-    height: 45%;
-    bottom: 0%;
-    animation: driftNear 14s linear infinite;
+  bottom: 0;
+  height: 43%;
+  opacity: 0.85;
+  background-image: url("../img/platinum_water_near.png");
+  animation: waterNear 16s linear infinite;
 }
 
-/* Water animation keyframes */
-@keyframes driftFar {
-    0% { transform: translateX(0); }
-    100% { transform: translateX(-33.33%); }
+@keyframes waterFar {
+  0%   { transform: translateX(0); }
+  100% { transform: translateX(-33%); }
 }
 
-@keyframes driftNear {
-    0% { transform: translateX(0); }
-    100% { transform: translateX(-50%); }
+@keyframes waterNear {
+  0%   { transform: translateX(0); }
+  100% { transform: translateX(-50%); }
 }
 
 /* =========================
-   TOP UI BAR
+   TOP HUD
 ========================= */
 
-.top-bar {
-    position: absolute;
-    top: 12px;
-    left: 12px;
-    right: 12px;
-    z-index: 20;
-    display: flex;
-    justify-content: space-between;
-    color: #fff;
+.top-hud {
+  position: absolute;
+  top: 10px;
+  left: 10px;
+  right: 10px;
+  z-index: 20;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  color: #f9fafb;
+  pointer-events: none; /* HUD itself not clickable */
 }
 
-.game-id {
-    font-size: 14px;
-    font-weight: 800;
-    color: #60a5fa;
+.hud-left {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  font-size: 11px;
+  pointer-events: auto;
 }
 
-.players {
-    font-size: 12px;
+.hud-game {
+  font-size: 13px;
+  font-weight: 800;
+  color: #60a5fa;
+}
+
+.hud-line {
+  color: #e5e7eb;
+  font-size: 11px;
+}
+
+.hud-center {
+  flex: 0 0 auto;
+  pointer-events: auto;
 }
 
 .timer-pill {
-    background: linear-gradient(90deg, #ec4899, #6366f1);
-    padding: 7px 18px;
-    border-radius: 999px;
-    font-weight: 700;
-    font-size: 16px;
+  min-width: 70px;
+  padding: 4px 16px;
+  border-radius: 999px;
+  background: linear-gradient(90deg, #ec4899, #6366f1);
+  text-align: center;
+  font-weight: 800;
+  font-size: 15px;
+  line-height: 1.2;
+}
+
+/* prevents the crazy stretching */
+.timer-pill span {
+  display: inline-block;
+}
+
+.hud-right {
+  flex: 0 0 auto;
+  pointer-events: auto;
 }
 
 .coins {
-    display: flex;
-    align-items: center;
-    gap: 6px;
-    background: rgba(0,0,0,0.45);
-    padding: 6px 12px;
-    border-radius: 999px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  border-radius: 999px;
+  background: rgba(0, 0, 0, 0.55);
+  font-size: 13px;
+}
+
+.coins img {
+  width: 20px;
+  height: 20px;
 }
 
 /* =========================
-   BOATS
+   PLAY AREA: BOATS + PARATROOPER
 ========================= */
 
+.play-layer {
+  position: absolute;
+  inset: 0;
+  z-index: 10;
+}
+
+/* Boats grid */
 .boats-layer {
-    position: absolute;
-    top: 20%;
-    width: 100%;
-    height: 60%;
-    z-index: 10;
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 18%;
+  bottom: 32%;
 }
 
-/* Boat style */
+/* boat images */
 .boat {
-    position: absolute;
-    width: 22%;
-    animation: floatBoat 3.2s ease-in-out infinite;
+  position: absolute;
+  width: 22%;
+  transform-origin: 50% 50%;
+  animation: floatBoat 3.2s ease-in-out infinite;
 }
 
-/* Floating effect */
+/* gentle floating */
 @keyframes floatBoat {
-    0% { transform: translateY(0); }
-    50% { transform: translateY(-6px); }
-    100% { transform: translateY(0); }
+  0%   { transform: translateY(0); }
+  50%  { transform: translateY(-6px); }
+  100% { transform: translateY(0); }
 }
 
-/* =========================
-   PARATROOPER LANDING
-========================= */
-
+/* Paratrooper */
 #paratrooper {
-    position: absolute;
-    width: 130px;
-    top: -240px;
-    left: 50%;
-    transform: translateX(-50%);
-    z-index: 25;
-    transition: top 2.1s ease-out, left 1.3s ease-out;
+  position: absolute;
+  width: 130px;
+  top: -260px;           /* start off-screen */
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 25;
+  transition: top 2.1s ease-out, left 1.3s ease-out;
 }
 
 /* =========================
-   CONTROLS
+   BOTTOM CONTROLS
 ========================= */
 
 .controls {
-    position: absolute;
-    bottom: 10px;
-    left: 10px;
-    right: 10px;
-    padding: 14px;
-    background: rgba(0, 0, 0, 0.55);
-    border-radius: 14px;
-    z-index: 20;
-    color: #fff;
+  position: absolute;
+  left: 10px;
+  right: 10px;
+  bottom: 10px;
+  padding: 10px 12px 8px;
+  border-radius: 14px;
+  background: rgba(3, 7, 18, 0.92);
+  box-shadow: 0 -8px 20px rgba(0, 0, 0, 0.75);
+  z-index: 30;
+  color: #f9fafb;
+  font-size: 13px;
+}
+
+.controls h3 {
+  margin: 0 0 6px;
+  font-size: 14px;
+  font-weight: 600;
+  color: #e5e7eb;
+  text-align: center;
 }
 
 .number-row {
-    display: flex;
-    gap: 8px;
-    justify-content: center;
-    margin: 8px 0;
+  display: flex;
+  justify-content: center;
+  gap: 6px;
+  margin-bottom: 6px;
 }
 
 .num-chip {
-    width: 38px;
-    height: 38px;
-    border-radius: 50%;
-    border: none;
-    background: #0f172a;
-    color: white;
-    font-size: 16px;
-    font-weight: 700;
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  border: none;
+  background: #020617;
+  color: #e5e7eb;
+  font-weight: 600;
+  cursor: pointer;
 }
 
 .num-chip.selected {
-    background: #38bdf8;
-    color: #000;
+  background: #38bdf8;
+  color: #020617;
+}
+
+.my-bets-title {
+  font-size: 11px;
+  color: #9ca3af;
+  text-align: center;
+  margin-top: 4px;
 }
 
 .my-bets {
-    display: flex;
-    justify-content: center;
-    gap: 6px;
-    margin-bottom: 10px;
+  display: flex;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin: 4px 0 6px;
+}
+
+.bet-row {
+  display: flex;
+  gap: 6px;
+  margin-bottom: 4px;
+}
+
+#betAmount {
+  flex: 1;
+  padding: 7px 10px;
+  border-radius: 999px;
+  border: 1px solid #38bdf8;
+  background: #020617;
+  color: #e5e7eb;
+  font-size: 13px;
+}
+
+#placeBetBtn {
+  padding: 7px 12px;
+  border-radius: 999px;
+  border: none;
+  background: linear-gradient(90deg, #22c55e, #38bdf8);
+  color: #020617;
+  font-weight: 800;
+  font-size: 13px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.status {
+  text-align: center;
+  font-size: 12px;
+  min-height: 16px;
+}
+
+/* Small screens */
+@media (max-width: 480px) {
+  .platinum-page {
+    max-width: 100%;
+  }
 }
