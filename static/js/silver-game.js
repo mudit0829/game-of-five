@@ -1,4 +1,4 @@
-// ===== basic identity =====
+// ========= Basics =========
 const GAME = GAME_TYPE || "silver";
 
 let uid = localStorage.getItem("frog_user_id");
@@ -15,7 +15,7 @@ if (!uname) {
 }
 const USERNAME = uname;
 
-// ===== DOM =====
+// ========= DOM =========
 const frogImg = document.getElementById("frogSprite");
 const pads = Array.from(document.querySelectorAll(".pad"));
 const numChips = Array.from(document.querySelectorAll(".num-chip"));
@@ -27,10 +27,16 @@ const timerText = document.getElementById("timerText");
 const walletBalanceSpan = document.getElementById("walletBalance");
 const statusEl = document.getElementById("statusMessage");
 const coinsWrapper = document.querySelector(".coins");
+const userNameLabel = document.getElementById("userName");
+const userBetCountLabel = document.getElementById("userBetCount");
+const myBetsRow = document.getElementById("myBetsRow");
+
+userNameLabel.textContent = USERNAME;
 
 let walletBalance = 0;
-let selectedNumber = 0; // default
+let selectedNumber = 0;
 
+// ========= UI helpers =========
 function setStatus(msg, type = "") {
   statusEl.textContent = msg || "";
   statusEl.className = "status";
@@ -52,67 +58,89 @@ function setSelectedNumber(n) {
   });
 }
 
-/**
- * Fill pads with up to 6 unique bet numbers.
- * If you want fixed 1–6 labels, you can replace this logic with
- * padNumber = index + 1 instead.
- */
+// Draw my bets row (numbers this user has bet on)
+function updateMyBets(bets) {
+  const myBets = (bets || []).filter((b) => b.user_id === USER_ID);
+  userBetCountLabel.textContent = myBets.length;
+
+  myBetsRow.innerHTML = "";
+  myBets.forEach((b) => {
+    const chip = document.createElement("div");
+    chip.className = "my-bet-chip";
+    chip.textContent = b.number;
+    myBetsRow.appendChild(chip);
+  });
+}
+
+// Update lily pads:
+// - every pad shows number
+// - pad label includes username for that bet
 function updatePadsFromBets(bets) {
-  const uniqueNumbers = [];
+  const uniqueBets = [];
   (bets || []).forEach((b) => {
-    if (!uniqueNumbers.includes(b.number)) uniqueNumbers.push(b.number);
+    // only keep first bet we see for each number
+    if (!uniqueBets.find((x) => x.number === b.number)) {
+      uniqueBets.push(b);
+    }
   });
 
   pads.forEach((pad, i) => {
-    const span = pad.querySelector(".pad-number");
-    const num = uniqueNumbers[i];
+    const numSpan = pad.querySelector(".pad-number");
+    const userSpan = pad.querySelector(".pad-user");
     pad.classList.remove("win");
 
-    if (num === undefined) {
+    const bet = uniqueBets[i];
+
+    if (!bet) {
       pad.dataset.number = "";
-      span.textContent = "";
+      numSpan.textContent = "";
+      userSpan.textContent = "";
     } else {
-      pad.dataset.number = String(num);
-      span.textContent = num;
+      pad.dataset.number = String(bet.number);
+      numSpan.textContent = bet.number;
+      userSpan.textContent = bet.username; // show name on pad
     }
   });
 }
 
-// ===== Smooth frog jump (arc) =====
-
+// ========= Smooth frog jump (above pad) =========
 function jumpFrogToWinningNumber(winningNumber) {
+  const pond = document.querySelector(".pond");
+  const pondRect = pond.getBoundingClientRect();
+  const frogRect = frogImg.getBoundingClientRect();
   const targetPad = pads.find(
     (p) => p.dataset.number === String(winningNumber)
   );
+
   if (!targetPad) {
     console.log("Winning number not on any pad:", winningNumber);
     return;
   }
 
-  const pondRect = document.querySelector(".pond").getBoundingClientRect();
-  const frogRect = frogImg.getBoundingClientRect();
   const padRect = targetPad.getBoundingClientRect();
 
   const startX = frogRect.left + frogRect.width / 2 - pondRect.left;
   const startY = frogRect.top + frogRect.height / 2 - pondRect.top;
+
+  // end Y slightly ABOVE pad center so frog sits on top
   const endX = padRect.left + padRect.width / 2 - pondRect.left;
-  const endY = padRect.top + padRect.height / 2 - pondRect.top;
+  const endY =
+    padRect.top + padRect.height * 0.2 - pondRect.top; // 0.2 keeps frog above
 
   const deltaX = endX - startX;
   const deltaY = endY - startY;
 
-  const duration = 600; // ms
-  const peak = -80;     // jump height (negative = up)
+  const duration = 700; // ms
+  const peak = -90;     // arc height
   const startTime = performance.now();
 
-  // remove any inline transform so we can control from JS
   frogImg.style.transition = "none";
 
   function step(now) {
     const tRaw = (now - startTime) / duration;
     const t = Math.min(Math.max(tRaw, 0), 1);
 
-    // Smooth easing
+    // ease in-out
     const ease = t < 0.5
       ? 2 * t * t
       : -1 + (4 - 2 * t) * t;
@@ -121,7 +149,6 @@ function jumpFrogToWinningNumber(winningNumber) {
     const yLinear = startY + deltaY * ease;
     const yArc = yLinear + peak * (4 * t * (1 - t)); // parabola
 
-    // convert to relative to left/top
     const relX = x - frogRect.width / 2;
     const relY = yArc - frogRect.height / 2;
 
@@ -130,21 +157,19 @@ function jumpFrogToWinningNumber(winningNumber) {
     if (t < 1) {
       requestAnimationFrame(step);
     } else {
-      // highlight pad
       targetPad.classList.add("win");
-      // return to base after short delay
+      // reset frog after short pause
       setTimeout(() => {
         frogImg.style.transition = "transform 0.6s ease-out";
         frogImg.style.transform = "translateX(0) translateY(0)";
-      }, 700);
+      }, 800);
     }
   }
 
   requestAnimationFrame(step);
 }
 
-// ===== backend / socket =====
-
+// ========= Socket.IO / backend =========
 const socket = io();
 
 async function registerUser() {
@@ -171,7 +196,6 @@ function joinGameRoom() {
 }
 
 socket.on("connect", () => {
-  console.log("socket connected");
   joinGameRoom();
 });
 
@@ -182,18 +206,30 @@ socket.on("connection_response", (data) => {
 socket.on("round_data", (payload) => {
   if (payload.game_type !== GAME) return;
   const rd = payload.round_data || {};
-  if (payload.round_number) roundIdSpan.textContent = payload.round_number;
+  // Show unique game number if present
+  if (rd.round_code) {
+    roundIdSpan.textContent = rd.round_code;
+  } else if (rd.round_number) {
+    roundIdSpan.textContent = rd.round_number;
+  }
   timerText.textContent = rd.time_remaining ?? "--";
   playerCountSpan.textContent = (rd.bets || []).length;
   updatePadsFromBets(rd.bets || []);
+  updateMyBets(rd.bets || []);
 });
 
 socket.on("new_round", (payload) => {
   if (payload.game_type !== GAME) return;
-  roundIdSpan.textContent = payload.round_number || "";
   const rd = payload.round_data || {};
+  if (payload.round_code) {
+    roundIdSpan.textContent = payload.round_code;
+  } else if (payload.round_number) {
+    roundIdSpan.textContent = payload.round_number;
+  }
   timerText.textContent = rd.time_remaining ?? "--";
+  playerCountSpan.textContent = (rd.bets || []).length;
   updatePadsFromBets(rd.bets || []);
+  updateMyBets(rd.bets || []);
   setStatus("New round started", "ok");
   frogImg.style.transform = "translateX(0) translateY(0)";
 });
@@ -213,6 +249,7 @@ socket.on("bet_placed", (payload) => {
   if (payload.game_type !== GAME) return;
   const rd = payload.round_data || {};
   updatePadsFromBets(rd.bets || []);
+  updateMyBets(rd.bets || []);
   playerCountSpan.textContent = (rd.bets || []).length;
 });
 
@@ -235,8 +272,7 @@ socket.on("round_result", (payload) => {
   jumpFrogToWinningNumber(winning);
 });
 
-// ===== UI events =====
-
+// ========= UI events =========
 numChips.forEach((chip) => {
   chip.addEventListener("click", () => {
     const n = parseInt(chip.dataset.number, 10);
@@ -254,6 +290,7 @@ placeBetBtn.addEventListener("click", () => {
     return;
   }
 
+  // show the number typed, but back-end uses fixed amount as per config
   socket.emit("place_bet", {
     game_type: GAME,
     user_id: USER_ID,
@@ -262,7 +299,7 @@ placeBetBtn.addEventListener("click", () => {
   });
 });
 
-// ===== init =====
+// ========= init =========
 registerUser().then(joinGameRoom);
 setSelectedNumber(0);
 setStatus("");
