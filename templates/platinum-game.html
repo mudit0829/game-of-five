@@ -49,15 +49,15 @@
     <main class="play-layer">
       <!-- Boats -->
       <div class="boats-layer">
-        <!-- top row -->
-        <img id="boat1" class="boat" src="{{ url_for('static', filename='img/boat1.png') }}" style="top:28%; left:10%;">
-        <img id="boat2" class="boat" src="{{ url_for('static', filename='img/boat2.png') }}" style="top:28%; left:40%;">
-        <img id="boat3" class="boat" src="{{ url_for('static', filename='img/boat3.png') }}" style="top:28%; left:70%;">
+       <!-- top row (just above mid-water) -->
+<img id="boat1" class="boat" src="{{ url_for('static', filename='img/boat1.png') }}" style="top:40%; left:10%;">
+<img id="boat2" class="boat" src="{{ url_for('static', filename='img/boat2.png') }}" style="top:40%; left:40%;">
+<img id="boat3" class="boat" src="{{ url_for('static', filename='img/boat3.png') }}" style="top:40%; left:70%;">
 
-        <!-- bottom row -->
-        <img id="boat4" class="boat" src="{{ url_for('static', filename='img/boat4.png') }}" style="top:55%; left:14%;">
-        <img id="boat5" class="boat" src="{{ url_for('static', filename='img/boat5.png') }}" style="top:55%; left:44%;">
-        <img id="boat6" class="boat" src="{{ url_for('static', filename='img/boat6.png') }}" style="top:55%; left:74%;">
+<!-- bottom row (a little lower, but still floating) -->
+<img id="boat4" class="boat" src="{{ url_for('static', filename='img/boat4.png') }}" style="top:58%; left:14%;">
+<img id="boat5" class="boat" src="{{ url_for('static', filename='img/boat5.png') }}" style="top:58%; left:44%;">
+<img id="boat6" class="boat" src="{{ url_for('static', filename='img/boat6.png') }}" style="top:58%; left:74%;">
       </div>
 
       <!-- Paratrooper (animated in JS) -->
