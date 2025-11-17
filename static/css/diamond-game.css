@@ -1,0 +1,377 @@
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  padding: 0;
+  font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  background: radial-gradient(circle at top, #020617, #020617 45%, #000 100%);
+  color: #f9fafb;
+}
+
+/* Full page container */
+.diamond-page {
+  min-height: 100vh;
+  width: 100%;
+  max-width: 480px;
+  margin: 0 auto;
+  padding: 10px 10px 14px;
+  display: flex;
+  flex-direction: column;
+}
+
+/* ===== TOP BAR ===== */
+
+.top-bar {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+
+.top-left {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.game-label {
+  font-size: 14px;
+  font-weight: 800;
+  color: #38bdf8;
+}
+
+.players {
+  font-size: 12px;
+  color: #9ca3af;
+}
+
+.user-stats {
+  font-size: 11px;
+  color: #e5e7eb;
+}
+
+.top-center {
+  flex: 1;
+  display: flex;
+  justify-content: center;
+}
+
+.timer-pill {
+  min-width: 70px;
+  padding: 4px 14px;
+  border-radius: 999px;
+  background: linear-gradient(90deg, #ec4899, #6366f1);
+  text-align: center;
+  font-weight: 800;
+  font-size: 15px;
+}
+
+.top-right {
+  display: flex;
+  justify-content: flex-end;
+}
+
+.coins {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  border-radius: 999px;
+  background: rgba(15, 23, 42, 0.9);
+  border: 1px solid rgba(148, 163, 184, 0.5);
+  font-size: 13px;
+}
+
+.coins img {
+  width: 20px;
+  height: 20px;
+}
+
+.coins.coin-bounce {
+  animation: coinBounce 0.5s ease-out;
+}
+
+@keyframes coinBounce {
+  0% { transform: translateY(0); }
+  40% { transform: translateY(-6px) scale(1.05); }
+  100% { transform: translateY(0); }
+}
+
+/* ===== ARCHERY RANGE ===== */
+
+.range-wrapper {
+  flex: 1 1 auto;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 10px;
+}
+
+.range {
+  position: relative;
+  width: 100%;
+  min-height: 260px;
+  border-radius: 28px;
+  overflow: hidden;
+  box-shadow: 0 18px 40px rgba(0, 0, 0, 0.9);
+}
+
+/* background image */
+.range-bg {
+  position: absolute;
+  inset: 0;
+  background-image: url("../img/diamond_bg.png");
+  background-size: cover;
+  background-position: center;
+  filter: brightness(0.9);
+  z-index: 0;
+}
+
+/* Targets */
+
+.targets {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+  padding: 0 12px;
+}
+
+.targets-top {
+  margin-top: 18px;
+  margin-bottom: 18px;
+}
+
+.targets-bottom {
+  margin-bottom: 56px;  /* leaves space for archer */
+}
+
+.target {
+  position: relative;
+  flex: 1 1 0;
+  aspect-ratio: 1 / 1;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+.target img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  filter: drop-shadow(0 6px 8px rgba(0,0,0,0.7));
+}
+
+/* slight per-target variation */
+.target[data-pad="1"] img { transform: scale(1.0) rotate(-2deg); }
+.target[data-pad="2"] img { transform: scale(1.04) rotate(1deg); }
+.target[data-pad="3"] img { transform: scale(1.02) rotate(1.5deg); }
+.target[data-pad="4"] img { transform: scale(1.03) rotate(-1.5deg); }
+.target[data-pad="5"] img { transform: scale(1.03) rotate(1deg); }
+.target[data-pad="6"] img { transform: scale(1.01) rotate(-1deg); }
+
+.pad-number {
+  position: absolute;
+  font-size: 20px;
+  font-weight: 800;
+  color: #f9fafb;
+  text-shadow: 0 0 6px rgba(0,0,0,0.9);
+}
+
+/* username label under target */
+.pad-user {
+  position: absolute;
+  bottom: -18px;
+  left: 50%;
+  transform: translateX(-50%);
+  padding: 2px 6px;
+  font-size: 10px;
+  border-radius: 999px;
+  background: rgba(15, 23, 42, 0.9);
+  border: 1px solid rgba(148, 163, 184, 0.7);
+  white-space: nowrap;
+}
+
+.target.win {
+  animation: targetGlow 0.9s ease-out;
+}
+
+@keyframes targetGlow {
+  0% { transform: scale(1); filter: drop-shadow(0 0 0 rgba(56,189,248,0.0)); }
+  30% { transform: scale(1.05); filter: drop-shadow(0 0 16px rgba(56,189,248,0.9)); }
+  100% { transform: scale(1.02); filter: drop-shadow(0 0 6px rgba(56,189,248,0.6)); }
+}
+
+/* Archer & arrow */
+
+.archer-layer {
+  position: absolute;
+  bottom: 8px;
+  left: 0;
+  right: 0;
+  height: 80px;
+  display: flex;
+  align-items: flex-end;
+  justify-content: flex-start; /* archer on left side */
+  padding-left: 24px;
+  z-index: 2;
+}
+
+.archer {
+  width: 110px;
+  height: auto;
+  transform-origin: center bottom;
+}
+
+.archer.shoot {
+  animation: archerShoot 0.35s ease-out;
+}
+
+@keyframes archerShoot {
+  0%   { transform: translateY(0) rotate(0deg); }
+  40%  { transform: translateY(-6px) rotate(-4deg); }
+  100% { transform: translateY(0) rotate(0deg); }
+}
+
+.arrow {
+  position: absolute;
+  bottom: 32px;
+  left: 70px; /* near bow */
+  width: 52px;
+  height: auto;
+  transform-origin: left center;
+  z-index: 4;   /* always above targets */
+}
+
+/* ===== BOTTOM CONTROLS ===== */
+
+.controls-sheet {
+  padding: 10px 12px 4px;
+  border-radius: 18px;
+  background: radial-gradient(circle at top, #020617, #020617 70%, #000 100%);
+  box-shadow: 0 -8px 24px rgba(0, 0, 0, 0.8);
+}
+
+.numbers-title {
+  text-align: center;
+  font-size: 14px;
+  color: #9ca3af;
+  margin-bottom: 6px;
+}
+
+.numbers-row {
+  display: flex;
+  justify-content: center;
+  gap: 6px;
+  margin-bottom: 8px;
+  flex-wrap: wrap;
+}
+
+.num-chip {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  border: none;
+  background: radial-gradient(circle, #111827, #020617);
+  color: #e5e7eb;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  box-shadow: 0 4px 10px rgba(0,0,0,0.7);
+}
+
+.num-chip.selected {
+  background: radial-gradient(circle, #38bdf8, #0ea5e9);
+  color: #020617;
+}
+
+.my-bets-title {
+  font-size: 12px;
+  color: #9ca3af;
+  margin: 4px 0;
+  text-align: center;
+}
+
+.my-bets-row {
+  display: flex;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 4px;
+  min-height: 24px;
+  margin-bottom: 8px;
+}
+
+.my-bet-chip {
+  min-width: 26px;
+  padding: 3px 6px;
+  border-radius: 999px;
+  font-size: 11px;
+  border: 1px solid #38bdf8;
+  background: rgba(15,23,42,0.9);
+}
+
+.bet-container {
+  margin: 8px 0;
+  display: flex;
+  justify-content: center;
+}
+
+.bet-container input {
+  width: 100%;
+  padding: 10px 16px;
+  border-radius: 999px;
+  border: 1px solid #38bdf8;
+  background: rgba(15, 23, 42, 0.9);
+  color: #f9fafb;
+  font-size: 14px;
+}
+
+.bet-container input::placeholder {
+  color: #6b7280;
+}
+
+.bet-button {
+  display: block;
+  width: 100%;
+  padding: 11px 16px;
+  border-radius: 999px;
+  border: none;
+  background: linear-gradient(90deg, #22c55e, #38bdf8);
+  font-size: 15px;
+  font-weight: 800;
+  color: #020617;
+  cursor: pointer;
+  box-shadow: 0 8px 16px rgba(22,163,74,0.7);
+}
+
+.bet-button:active {
+  transform: translateY(1px) scale(0.99);
+  box-shadow: 0 4px 10px rgba(22,163,74,0.5);
+}
+
+.status {
+  margin-top: 6px;
+  text-align: center;
+  font-size: 13px;
+  min-height: 18px;
+}
+
+.status.ok { color: #bbf7d0; }
+.status.error { color: #fecaca; }
+
+@media (max-width: 480px) {
+  .range {
+    min-height: 240px;
+  }
+
+  .archer {
+    width: 96px;
+  }
+}
