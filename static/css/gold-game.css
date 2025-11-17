@@ -12,7 +12,9 @@ body {
   color: #f9fafb;
 }
 
+/* full-width game area on screen */
 .game-root {
+  width: 100%;
   max-width: 480px;
   margin: 0 auto;
   min-height: 100vh;
@@ -103,7 +105,7 @@ body {
 .pitch {
   position: relative;
   margin-top: 4px;
-  padding: 26px 12px 22px;
+  padding: 20px 10px 24px;
   border-radius: 26px;
   background: repeating-linear-gradient(
       to bottom,
@@ -114,42 +116,7 @@ body {
   );
   box-shadow: 0 18px 40px rgba(0, 0, 0, 0.9);
   overflow: hidden;
-}
-
-/* player + ball */
-
-.player-area {
-  position: relative;
-  display: flex;
-  justify-content: center;
-  margin-bottom: 16px;
-  z-index: 2;
-}
-
-.player {
-  width: 120px;
-  height: auto;
-  transform-origin: center bottom;
-}
-
-.player.kick {
-  animation: playerKick 0.3s ease-out;
-}
-
-@keyframes playerKick {
-  0%   { transform: translateY(0) rotate(0deg); }
-  40%  { transform: translateY(-6px) rotate(-4deg); }
-  100% { transform: translateY(0) rotate(0deg); }
-}
-
-.ball {
-  position: absolute;
-  bottom: -6px;
-  left: 50%;
-  transform: translateX(-46px); /* near player's foot */
-  width: 34px;
-  height: 34px;
-  z-index: 4; /* ABOVE all goals */
+  width: 100%;
 }
 
 /* goals */
@@ -161,15 +128,17 @@ body {
 
 .goals-row {
   display: flex;
-  justify-content: space-around;
+  justify-content: space-between;   /* stretch across width */
   align-items: center;
   margin-bottom: 14px;
+  gap: 6px;
 }
 
 .goal {
   position: relative;
-  width: 140px;
-  height: 90px;
+  flex: 1 1 0;          /* each goal takes equal width */
+  max-width: none;
+  aspect-ratio: 4 / 3;  /* keeps proportion */
   display: flex;
   justify-content: center;
   align-items: center;
@@ -177,17 +146,18 @@ body {
 }
 
 .goal img {
-  width: 140px;
-  height: auto;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
   filter: drop-shadow(0 6px 8px rgba(0,0,0,0.6));
 }
 
 /* small variations per goal */
 .goal[data-pad="1"] img { transform: scale(1.0) rotate(-1deg); }
-.goal[data-pad="2"] img { transform: scale(1.04) rotate(1deg); }
-.goal[data-pad="3"] img { transform: scale(1.02) rotate(2deg); }
-.goal[data-pad="4"] img { transform: scale(1.03) rotate(-2deg); }
-.goal[data-pad="5"] img { transform: scale(1.04) rotate(1deg); }
+.goal[data-pad="2"] img { transform: scale(1.03) rotate(1deg); }
+.goal[data-pad="3"] img { transform: scale(1.02) rotate(1.5deg); }
+.goal[data-pad="4"] img { transform: scale(1.03) rotate(-1.5deg); }
+.goal[data-pad="5"] img { transform: scale(1.03) rotate(1deg); }
 .goal[data-pad="6"] img { transform: scale(1.01) rotate(-1deg); }
 
 .pad-number {
@@ -220,6 +190,44 @@ body {
   0% { transform: scale(1); filter: drop-shadow(0 0 0 rgba(34,197,94,0.0)); }
   30% { transform: scale(1.05); filter: drop-shadow(0 0 16px rgba(34,197,94,0.9)); }
   100% { transform: scale(1.02); filter: drop-shadow(0 0 6px rgba(34,197,94,0.6)); }
+}
+
+/* player + ball AT BOTTOM */
+
+.player-area {
+  position: relative;
+  display: flex;
+  justify-content: center;
+  align-items: flex-end;
+  margin-top: 18px;
+  z-index: 2;
+  height: 80px;
+}
+
+.player {
+  width: 120px;
+  height: auto;
+  transform-origin: center bottom;
+}
+
+.player.kick {
+  animation: playerKick 0.3s ease-out;
+}
+
+@keyframes playerKick {
+  0%   { transform: translateY(0) rotate(0deg); }
+  40%  { transform: translateY(-6px) rotate(-4deg); }
+  100% { transform: translateY(0) rotate(0deg); }
+}
+
+.ball {
+  position: absolute;
+  bottom: 4px;
+  left: 50%;
+  transform: translateX(-46px); /* near player's foot */
+  width: 34px;
+  height: 34px;
+  z-index: 4; /* ABOVE all goals */
 }
 
 /* ===== CONTROLS (same as frog) ===== */
@@ -340,14 +348,10 @@ body {
 
 @media (max-width: 480px) {
   .pitch {
-    padding: 22px 8px 18px;
+    padding: 18px 8px 20px;
   }
 
   .player {
     width: 100px;
-  }
-
-  .goal img {
-    width: 130px;
   }
 }
