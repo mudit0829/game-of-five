@@ -9,7 +9,7 @@
 </head>
 <body>
   <div class="game-root">
-    <!-- TOP BAR (same style as frog) -->
+    <!-- TOP BAR -->
     <header class="top-bar">
       <div class="top-left">
         <div class="game-label">GAME <span id="roundId">–</span></div>
@@ -35,22 +35,6 @@
 
     <!-- FOOTBALL PITCH -->
     <section class="pitch">
-      <!-- Player and ball -->
-      <div class="player-area">
-        <img
-          id="playerSprite"
-          class="player"
-          src="{{ url_for('static', filename='img/gold_player.png') }}"
-          alt="Player"
-        >
-        <img
-          id="ballSprite"
-          class="ball"
-          src="{{ url_for('static', filename='img/gold_ball.png') }}"
-          alt="Ball"
-        >
-      </div>
-
       <!-- 6 goals (2 rows x 3) -->
       <div class="goals">
         <div class="goals-row">
@@ -72,9 +56,25 @@
           {% endfor %}
         </div>
       </div>
+
+      <!-- Player and ball AT THE BOTTOM -->
+      <div class="player-area">
+        <img
+          id="playerSprite"
+          class="player"
+          src="{{ url_for('static', filename='img/gold_player.png') }}"
+          alt="Player"
+        >
+        <img
+          id="ballSprite"
+          class="ball"
+          src="{{ url_for('static', filename='img/gold_ball.png') }}"
+          alt="Ball"
+        >
+      </div>
     </section>
 
-    <!-- BOTTOM CONTROLS (same behaviour as frog) -->
+    <!-- BOTTOM CONTROLS -->
     <section class="controls">
       <div class="numbers-title">Select your number (0–9)</div>
 
