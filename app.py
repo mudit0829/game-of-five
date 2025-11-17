@@ -77,10 +77,10 @@ def generate_bot_name():
 class GameRound:
     def __init__(self, game_type, round_number):
         self.game_type = game_type
-        self.round_number = round_number
+        self.round_number = round_number         # numeric counter
+        self.round_code = self._make_round_code()  # FYYYYMMDD1000...
         self.config = GAME_CONFIGS[game_type]
         self.start_time = datetime.now()
-        # one round = 5 minutes total
         self.end_time = self.start_time + timedelta(minutes=5)
         self.betting_close_time = self.start_time + timedelta(minutes=4, seconds=45)
         self.bets = []
@@ -90,12 +90,20 @@ class GameRound:
         self.real_users = set()
         self.bot_addition_started = False
 
+    def _make_round_code(self):
+        """
+        Format: FYYYYMMDD1000+
+        Example: F202511171000, F202511171001 ...
+        """
+        date_str = datetime.now().strftime('%Y%m%d')
+        # you can also use self.round_number, but keep it independent:
+        base = 1000 + self.round_number - 1
+        return f"F{date_str}{base}"
+
     def get_number_range(self):
         if self.game_type == 'roulette':
             return list(range(37))
-        else:
-            # 0–9 for all number games (frog game uses this)
-            return list(range(10))
+        return list(range(10))
 
     def add_bet(self, user_id, username, number, is_bot=False):
         user_bets = [b for b in self.bets if b['user_id'] == user_id]
@@ -143,13 +151,11 @@ class GameRound:
     def calculate_result(self):
         real_user_bets = [b for b in self.bets if not b['is_bot']]
 
-        # Try to give users some wins but still random
         if random.random() < 0.16 and real_user_bets:
             winning_bet = random.choice(real_user_bets)
             self.result = winning_bet['number']
         else:
             bot_bets = [b for b in self.bets if b['is_bot']]
-
             if bot_bets and random.random() < 0.5:
                 winning_bet = random.choice(bot_bets)
                 self.result = winning_bet['number']
@@ -162,13 +168,11 @@ class GameRound:
                     self.result = random.choice(available_numbers)
                 else:
                     self.result = random.choice(all_numbers)
-
         return self.result
 
     def get_winners(self):
         if self.result is None:
             return []
-
         winners = []
         for bet in self.bets:
             if bet['number'] == self.result and not bet['is_bot']:
@@ -198,6 +202,8 @@ def get_round_data(game_type):
         return None
 
     return {
+        'round_number': current_round.round_number,
+        'round_code': current_round.round_code,   # NEW
         'bets': current_round.bets,
         'time_remaining': current_round.get_time_remaining(),
         'betting_time_remaining': current_round.get_betting_time_remaining(),
@@ -208,34 +214,6 @@ def get_round_data(game_type):
     }
 
 
-def add_bots_gradually(game_type):
-    try:
-        while True:
-            current_round = game_rounds.get(game_type)
-
-            if (
-                current_round
-                and not current_round.is_betting_closed
-                and len(current_round.bets) < 6
-            ):
-                time.sleep(random.uniform(5, 7))
-
-                if current_round.add_bot_bet():
-                    socketio.emit(
-                        'bet_placed',
-                        {
-                            'game_type': game_type,
-                            'round_data': get_round_data(game_type)
-                        },
-                        room=game_type,
-                        namespace='/'
-                    )
-            else:
-                break
-    except Exception as e:
-        print(f"Error in add_bots_gradually for {game_type}: {e}")
-
-
 def game_timer_thread(game_type):
     round_counter = 0
 
@@ -244,29 +222,24 @@ def game_timer_thread(game_type):
             if game_type not in game_rounds or game_rounds[game_type] is None:
                 round_counter += 1
                 game_rounds[game_type] = GameRound(game_type, round_counter)
-                print(f"New round started for {game_type} - Round {round_counter}")
+                current_round = game_rounds[game_type]
+                print(f"New round started for {game_type} - {current_round.round_code}")
 
-                socketio.emit(
-                    'new_round',
-                    {
-                        'game_type': game_type,
-                        'round_number': round_counter,
-                        'round_data': get_round_data(game_type)
-                    },
-                    room=game_type,
-                    namespace='/'
-                )
+                socketio.emit('new_round', {
+                    'game_type': game_type,
+                    'round_number': current_round.round_number,
+                    'round_code': current_round.round_code,   # NEW
+                    'round_data': get_round_data(game_type)
+                }, room=game_type, namespace='/')
 
             current_round = game_rounds[game_type]
             now = datetime.now()
 
             time_elapsed = (now - current_round.start_time).total_seconds()
 
-            if (
-                time_elapsed >= 240
-                and len(current_round.real_users) == 1
-                and not current_round.bot_addition_started
-            ):
+            if (time_elapsed >= 240 and
+                len(current_round.real_users) == 1 and
+                not current_round.bot_addition_started):
                 current_round.bot_addition_started = True
                 print(f"Starting bot addition for {game_type}")
                 threading.Thread(
@@ -278,14 +251,9 @@ def game_timer_thread(game_type):
             if now >= current_round.betting_close_time and not current_round.is_betting_closed:
                 current_round.is_betting_closed = True
                 print(f"Betting closed for {game_type}")
-                socketio.emit(
-                    'betting_closed',
-                    {
-                        'game_type': game_type
-                    },
-                    room=game_type,
-                    namespace='/'
-                )
+                socketio.emit('betting_closed', {
+                    'game_type': game_type
+                }, room=game_type, namespace='/')
 
             if now >= current_round.end_time and not current_round.is_finished:
                 current_round.is_finished = True
@@ -298,37 +266,29 @@ def game_timer_thread(game_type):
                     if winner['user_id'] in user_wallets:
                         user_wallets[winner['user_id']] += winner['payout']
 
-                socketio.emit(
-                    'round_result',
-                    {
-                        'game_type': game_type,
-                        'result': result,
-                        'winners': winners,
-                        'all_bets': current_round.bets
-                    },
-                    room=game_type,
-                    namespace='/'
-                )
+                socketio.emit('round_result', {
+                    'game_type': game_type,
+                    'round_code': current_round.round_code,  # optional
+                    'result': result,
+                    'winners': winners,
+                    'all_bets': current_round.bets
+                }, room=game_type, namespace='/')
 
                 time.sleep(3)
                 game_rounds[game_type] = None
 
-            socketio.emit(
-                'timer_update',
-                {
-                    'game_type': game_type,
-                    'time_remaining': current_round.get_time_remaining(),
-                    'betting_time_remaining': current_round.get_betting_time_remaining(),
-                    'total_bets': len(current_round.bets)
-                },
-                room=game_type,
-                namespace='/'
-            )
+            socketio.emit('timer_update', {
+                'game_type': game_type,
+                'time_remaining': current_round.get_time_remaining(),
+                'betting_time_remaining': current_round.get_betting_time_remaining(),
+                'total_bets': len(current_round.bets)
+            }, room=game_type, namespace='/')
 
             time.sleep(1)
         except Exception as e:
             print(f"Error in game timer thread for {game_type}: {e}")
             time.sleep(1)
+
 
 
 @app.route('/')
