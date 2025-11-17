@@ -72,13 +72,10 @@ function updateMyBets(bets) {
   });
 }
 
-// Update lily pads:
-// - every pad shows number
-// - pad label includes username for that bet
+// Update pads: show number + username label on each pad
 function updatePadsFromBets(bets) {
   const uniqueBets = [];
   (bets || []).forEach((b) => {
-    // only keep first bet we see for each number
     if (!uniqueBets.find((x) => x.number === b.number)) {
       uniqueBets.push(b);
     }
@@ -98,12 +95,12 @@ function updatePadsFromBets(bets) {
     } else {
       pad.dataset.number = String(bet.number);
       numSpan.textContent = bet.number;
-      userSpan.textContent = bet.username; // show name on pad
+      userSpan.textContent = bet.username;
     }
   });
 }
 
-// ========= Smooth frog jump (above pad) =========
+// ========= Smooth frog jump ABOVE pad =========
 function jumpFrogToWinningNumber(winningNumber) {
   const pond = document.querySelector(".pond");
   const pondRect = pond.getBoundingClientRect();
@@ -122,16 +119,15 @@ function jumpFrogToWinningNumber(winningNumber) {
   const startX = frogRect.left + frogRect.width / 2 - pondRect.left;
   const startY = frogRect.top + frogRect.height / 2 - pondRect.top;
 
-  // end Y slightly ABOVE pad center so frog sits on top
+  // End a bit above the pad (so frog covers it)
   const endX = padRect.left + padRect.width / 2 - pondRect.left;
-  const endY =
-    padRect.top + padRect.height * 0.2 - pondRect.top; // 0.2 keeps frog above
+  const endY = padRect.top - frogRect.height * 0.2 - pondRect.top;
 
   const deltaX = endX - startX;
   const deltaY = endY - startY;
 
   const duration = 700; // ms
-  const peak = -90;     // arc height
+  const peak = -90;     // jump height
   const startTime = performance.now();
 
   frogImg.style.transition = "none";
@@ -140,7 +136,7 @@ function jumpFrogToWinningNumber(winningNumber) {
     const tRaw = (now - startTime) / duration;
     const t = Math.min(Math.max(tRaw, 0), 1);
 
-    // ease in-out
+    // smooth ease-in-out
     const ease = t < 0.5
       ? 2 * t * t
       : -1 + (4 - 2 * t) * t;
@@ -158,7 +154,6 @@ function jumpFrogToWinningNumber(winningNumber) {
       requestAnimationFrame(step);
     } else {
       targetPad.classList.add("win");
-      // reset frog after short pause
       setTimeout(() => {
         frogImg.style.transition = "transform 0.6s ease-out";
         frogImg.style.transform = "translateX(0) translateY(0)";
@@ -206,14 +201,16 @@ socket.on("connection_response", (data) => {
 socket.on("round_data", (payload) => {
   if (payload.game_type !== GAME) return;
   const rd = payload.round_data || {};
-  // Show unique game number if present
+
   if (rd.round_code) {
     roundIdSpan.textContent = rd.round_code;
   } else if (rd.round_number) {
     roundIdSpan.textContent = rd.round_number;
   }
+
   timerText.textContent = rd.time_remaining ?? "--";
-  playerCountSpan.textContent = (rd.bets || []).length;
+  playerCountSpan.textContent = rd.players ?? 0;
+
   updatePadsFromBets(rd.bets || []);
   updateMyBets(rd.bets || []);
 });
@@ -221,13 +218,15 @@ socket.on("round_data", (payload) => {
 socket.on("new_round", (payload) => {
   if (payload.game_type !== GAME) return;
   const rd = payload.round_data || {};
+
   if (payload.round_code) {
     roundIdSpan.textContent = payload.round_code;
   } else if (payload.round_number) {
     roundIdSpan.textContent = payload.round_number;
   }
+
   timerText.textContent = rd.time_remaining ?? "--";
-  playerCountSpan.textContent = (rd.bets || []).length;
+  playerCountSpan.textContent = rd.players ?? 0;
   updatePadsFromBets(rd.bets || []);
   updateMyBets(rd.bets || []);
   setStatus("New round started", "ok");
@@ -237,7 +236,7 @@ socket.on("new_round", (payload) => {
 socket.on("timer_update", (payload) => {
   if (payload.game_type !== GAME) return;
   timerText.textContent = (payload.time_remaining ?? 0).toString().padStart(2, "0");
-  playerCountSpan.textContent = payload.total_bets ?? 0;
+  playerCountSpan.textContent = payload.players ?? 0;
 });
 
 socket.on("betting_closed", (payload) => {
@@ -250,7 +249,7 @@ socket.on("bet_placed", (payload) => {
   const rd = payload.round_data || {};
   updatePadsFromBets(rd.bets || []);
   updateMyBets(rd.bets || []);
-  playerCountSpan.textContent = (rd.bets || []).length;
+  playerCountSpan.textContent = rd.players ?? 0;
 });
 
 socket.on("bet_success", (payload) => {
@@ -290,7 +289,6 @@ placeBetBtn.addEventListener("click", () => {
     return;
   }
 
-  // show the number typed, but back-end uses fixed amount as per config
   socket.emit("place_bet", {
     game_type: GAME,
     user_id: USER_ID,
