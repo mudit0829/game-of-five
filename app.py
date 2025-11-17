@@ -202,6 +202,9 @@ def get_round_data(game_type):
     if not current_round:
         return None
 
+    # Unique user_ids from all bets (real + bots)
+    unique_players = len({b['user_id'] for b in current_round.bets})
+
     return {
         'round_number': current_round.round_number,
         'round_code': current_round.round_code,
@@ -212,7 +215,7 @@ def get_round_data(game_type):
         'is_finished': current_round.is_finished,
         'config': current_round.config,
         'result': current_round.result,
-        'players': len(current_round.real_users)
+        'players': unique_players
     }
 
 
@@ -285,13 +288,15 @@ def game_timer_thread(game_type):
                 time.sleep(3)
                 game_rounds[game_type] = None
 
-            socketio.emit('timer_update', {
-                'game_type': game_type,
-                'time_remaining': current_round.get_time_remaining(),
-                'betting_time_remaining': current_round.get_betting_time_remaining(),
-                'total_bets': len(current_round.bets),
-                'players': len(current_round.real_users)
-            }, room=game_type, namespace='/')
+           unique_players = len({b['user_id'] for b in current_round.bets})
+
+socketio.emit('timer_update', {
+    'game_type': game_type,
+    'time_remaining': current_round.get_time_remaining(),
+    'betting_time_remaining': current_round.get_betting_time_remaining(),
+    'total_bets': len(current_round.bets),
+    'players': unique_players
+}, room=game_type, namespace='/')
 
             time.sleep(1)
         except Exception as e:
