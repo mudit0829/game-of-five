@@ -5,102 +5,98 @@
   <title>{{ game.title }} – {{ game.name }}</title>
   <meta name="viewport" content="width=device-width, initial-scale=1" />
 
-  <!-- Frog game CSS -->
-  <link rel="stylesheet" href="{{ url_for('static', filename='css/silver-game.css') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/silver-game.css') }}" />
 </head>
 <body>
   <div class="game-root">
-    <!-- Top bar -->
+    <!-- TOP BAR -->
     <header class="top-bar">
-      <div class="left">
-        <div class="game-title">
-          <span class="emoji">{{ game.emoji }}</span>
-          <span>{{ game.title }}</span>
-        </div>
-        <div class="round-info">
-          Game #<span id="roundId">–</span> ·
-          <span id="playerCount">0</span> players
+      <div class="top-left">
+        <div class="game-label">GAME #<span id="roundId">–</span></div>
+        <div class="players"><span id="playerCount">0</span> PLAYERS</div>
+      </div>
+
+      <div class="top-center">
+        <div class="timer-pill">
+          <span id="timerText">--</span>
         </div>
       </div>
 
-      <div class="center">
-        <div class="timer-circle">
-          <span id="timerText">--</span>s
-        </div>
-      </div>
-
-      <div class="right">
-        <div class="wallet">
-          Balance: ₹<span id="walletBalance">0</span>
+      <div class="top-right">
+        <div class="coins">
+          <img src="{{ url_for('static', filename='img/coin.png') }}" alt="Coins">
+          <span id="walletBalance">0</span>
         </div>
       </div>
     </header>
 
-    <!-- Pond -->
+    <!-- FROG + POND -->
     <section class="pond">
-      <!-- Frog sitting at back -->
-      <img
-        id="frogSprite"
-        class="frog"
-        src="{{ url_for('static', filename='img/frog.png') }}"
-        alt="Frog"
-      >
-
-      <!-- 6 lily pads in front (2 rows x 3) -->
-      <div class="pads-row">
-        {% for i in range(1,4) %}
-        <div class="pad" data-pad="{{ i }}">
-          <img src="{{ url_for('static', filename='img/lilypad.png') }}" alt="Pad">
-          <span class="pad-number"></span>
-        </div>
-        {% endfor %}
+      <div class="frog-wrapper">
+        <img
+          id="frogSprite"
+          class="frog"
+          src="{{ url_for('static', filename='img/frog.png') }}"
+          alt="Frog"
+        >
       </div>
-      <div class="pads-row">
-        {% for i in range(4,7) %}
-        <div class="pad" data-pad="{{ i }}">
-          <img src="{{ url_for('static', filename='img/lilypad.png') }}" alt="Pad">
-          <span class="pad-number"></span>
+
+      <!-- 6 lily pads (2 x 3) -->
+      <div class="pads">
+        <div class="pads-row">
+          {% for i in range(1,4) %}
+          <div class="pad" data-pad="{{ i }}">
+            <img src="{{ url_for('static', filename='img/lilypad.png') }}" alt="Pad">
+            <span class="pad-number"></span>
+          </div>
+          {% endfor %}
         </div>
-        {% endfor %}
+        <div class="pads-row">
+          {% for i in range(4,7) %}
+          <div class="pad" data-pad="{{ i }}">
+            <img src="{{ url_for('static', filename='img/lilypad.png') }}" alt="Pad">
+            <span class="pad-number"></span>
+          </div>
+          {% endfor %}
+        </div>
       </div>
     </section>
 
-    <!-- Controls -->
+    <!-- BOTTOM UI -->
     <section class="controls">
-      <div class="numbers-title">Select a number (0–9)</div>
-      <div class="numbers">
-        {% for n in range(10) %}
-        <button class="num-btn" data-number="{{ n }}">{{ n }}</button>
+      <div class="numbers-title">Select your number</div>
+      <div class="numbers-row">
+        {% for n in range(7) %} {# 0–6 like your mockup #}
+        <button class="num-chip" data-number="{{ n }}">{{ n }}</button>
         {% endfor %}
       </div>
 
-      <div class="bet-row">
+      <div class="bet-container">
         <input
           id="betAmount"
           type="number"
           min="{{ game.bet_amount }}"
           step="{{ game.bet_amount }}"
-          placeholder="Bet amount (₹{{ game.bet_amount }} fixed)"
-        />
-        <button id="placeBetBtn">
-          Place Bet (₹{{ game.bet_amount }})
-        </button>
+          placeholder="Your Bet"
+        >
       </div>
 
-      <div class="status" id="statusMessage"></div>
+      <button id="placeBetBtn" class="bet-button">
+        Place Bet (₹{{ game.bet_amount }})
+      </button>
+
+      <div id="statusMessage" class="status"></div>
     </section>
   </div>
 
-  <!-- Socket.IO client -->
+  <!-- Socket.IO -->
   <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
 
-  <!-- Config values for JS -->
   <script>
-    const GAME_TYPE = "{{ game_type }}";             // "silver"
-    const FIXED_BET_AMOUNT = {{ game.bet_amount }};  // 10
+    const GAME_TYPE = "{{ game_type }}";            // "silver"
+    const FIXED_BET_AMOUNT = {{ game.bet_amount }}; // 10
   </script>
 
-  <!-- Frog game JS -->
   <script src="{{ url_for('static', filename='js/silver-game.js') }}"></script>
 </body>
 </html>
