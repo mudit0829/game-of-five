@@ -12,8 +12,11 @@
     <!-- TOP BAR -->
     <header class="top-bar">
       <div class="top-left">
-        <div class="game-label">GAME #<span id="roundId">–</span></div>
+        <div class="game-label">GAME <span id="roundId">–</span></div>
         <div class="players"><span id="playerCount">0</span> PLAYERS</div>
+        <div class="user-stats">
+          You: <span id="userName"></span> · Bets: <span id="userBetCount">0</span>
+        </div>
       </div>
 
       <div class="top-center">
@@ -48,6 +51,7 @@
           <div class="pad" data-pad="{{ i }}">
             <img src="{{ url_for('static', filename='img/lilypad.png') }}" alt="Pad">
             <span class="pad-number"></span>
+            <span class="pad-user"></span>
           </div>
           {% endfor %}
         </div>
@@ -56,19 +60,26 @@
           <div class="pad" data-pad="{{ i }}">
             <img src="{{ url_for('static', filename='img/lilypad.png') }}" alt="Pad">
             <span class="pad-number"></span>
+            <span class="pad-user"></span>
           </div>
           {% endfor %}
         </div>
       </div>
     </section>
 
-    <!-- BOTTOM UI -->
+    <!-- BOTTOM CONTROLS -->
     <section class="controls">
-      <div class="numbers-title">Select your number</div>
+      <div class="numbers-title">Select your number (0–9)</div>
       <div class="numbers-row">
-        {% for n in range(7) %} {# 0–6 like your mockup #}
+        {% for n in range(10) %}
         <button class="num-chip" data-number="{{ n }}">{{ n }}</button>
         {% endfor %}
+      </div>
+
+      <!-- Your current bets this round -->
+      <div class="my-bets-title">Your bets in this game</div>
+      <div id="myBetsRow" class="my-bets-row">
+        <!-- small chips with numbers will appear here -->
       </div>
 
       <div class="bet-container">
@@ -89,7 +100,6 @@
     </section>
   </div>
 
-  <!-- Socket.IO -->
   <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
 
   <script>
