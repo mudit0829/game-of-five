@@ -19,7 +19,9 @@ socketio = SocketIO(
     ping_interval=25
 )
 
+# ---------------------------------------------------
 # Game configurations
+# ---------------------------------------------------
 GAME_CONFIGS = {
     # Frog game
     'silver': {
@@ -68,6 +70,9 @@ game_rounds = {}
 user_wallets = {}
 
 
+# ---------------------------------------------------
+# Helpers
+# ---------------------------------------------------
 def generate_bot_name():
     prefixes = ['Amit', 'Sanjay', 'Riya', 'Kunal', 'Anita', 'Rohit', 'Meera', 'Neeraj']
     suffix = random.randint(100, 999)
@@ -77,7 +82,7 @@ def generate_bot_name():
 class GameRound:
     def __init__(self, game_type, round_number):
         self.game_type = game_type
-        self.round_number = round_number     # simple counter
+        self.round_number = round_number  # simple counter
         self.round_code = self._make_round_code()
         self.config = GAME_CONFIGS[game_type]
         self.start_time = datetime.now()
@@ -152,6 +157,7 @@ class GameRound:
     def calculate_result(self):
         real_user_bets = [b for b in self.bets if not b['is_bot']]
 
+        # 16% chance to favour real user bet if available
         if random.random() < 0.16 and real_user_bets:
             winning_bet = random.choice(real_user_bets)
             self.result = winning_bet['number']
@@ -219,23 +225,32 @@ def get_round_data(game_type):
     }
 
 
+# ---------------------------------------------------
+# Game timer thread (per game type)
+# ---------------------------------------------------
 def game_timer_thread(game_type):
     round_counter = 0
 
     while True:
         try:
+            # Start new round if none exists
             if game_type not in game_rounds or game_rounds[game_type] is None:
                 round_counter += 1
                 game_rounds[game_type] = GameRound(game_type, round_counter)
                 current_round = game_rounds[game_type]
                 print(f"New round started for {game_type} - {current_round.round_code}")
 
-                socketio.emit('new_round', {
-                    'game_type': game_type,
-                    'round_number': current_round.round_number,
-                    'round_code': current_round.round_code,
-                    'round_data': get_round_data(game_type)
-                }, room=game_type, namespace='/')
+                socketio.emit(
+                    'new_round',
+                    {
+                        'game_type': game_type,
+                        'round_number': current_round.round_number,
+                        'round_code': current_round.round_code,
+                        'round_data': get_round_data(game_type)
+                    },
+                    room=game_type,
+                    namespace='/'
+                )
 
             current_round = game_rounds[game_type]
             now = datetime.now()
@@ -244,28 +259,39 @@ def game_timer_thread(game_type):
             time_elapsed = (now - current_round.start_time).total_seconds()
 
             # ---- BOT LOGIC: fill remaining slots between 150s and 30s ----
-            if (not current_round.is_betting_closed and
-                len(current_round.bets) < 6 and
-                30 < time_remaining <= 150):
-
-                if (current_round.last_bot_added_at is None or
-                        (now - current_round.last_bot_added_at).total_seconds() >= 15):
+            if (
+                not current_round.is_betting_closed
+                and len(current_round.bets) < 6
+                and 30 < time_remaining <= 150
+            ):
+                if (
+                    current_round.last_bot_added_at is None
+                    or (now - current_round.last_bot_added_at).total_seconds() >= 15
+                ):
                     if current_round.add_bot_bet():
                         current_round.last_bot_added_at = now
-                        socketio.emit('bet_placed', {
-                            'game_type': game_type,
-                            'round_data': get_round_data(game_type)
-                        }, room=game_type, namespace='/')
+                        socketio.emit(
+                            'bet_placed',
+                            {
+                                'game_type': game_type,
+                                'round_data': get_round_data(game_type)
+                            },
+                            room=game_type,
+                            namespace='/'
+                        )
 
-            # close betting
+            # ---- Close betting ----
             if now >= current_round.betting_close_time and not current_round.is_betting_closed:
                 current_round.is_betting_closed = True
                 print(f"Betting closed for {game_type}")
-                socketio.emit('betting_closed', {
-                    'game_type': game_type
-                }, room=game_type, namespace='/')
+                socketio.emit(
+                    'betting_closed',
+                    {'game_type': game_type},
+                    room=game_type,
+                    namespace='/'
+                )
 
-            # finish round
+            # ---- Finish round ----
             if now >= current_round.end_time and not current_round.is_finished:
                 current_round.is_finished = True
                 result = current_round.calculate_result()
@@ -277,33 +303,48 @@ def game_timer_thread(game_type):
                     if winner['user_id'] in user_wallets:
                         user_wallets[winner['user_id']] += winner['payout']
 
-                socketio.emit('round_result', {
-                    'game_type': game_type,
-                    'round_code': current_round.round_code,
-                    'result': result,
-                    'winners': winners,
-                    'all_bets': current_round.bets
-                }, room=game_type, namespace='/')
+                socketio.emit(
+                    'round_result',
+                    {
+                        'game_type': game_type,
+                        'round_code': current_round.round_code,
+                        'result': result,
+                        'winners': winners,
+                        'all_bets': current_round.bets
+                    },
+                    room=game_type,
+                    namespace='/'
+                )
 
                 time.sleep(3)
                 game_rounds[game_type] = None
 
-           unique_players = len({b['user_id'] for b in current_round.bets})
+            # ---- Timer update ----
+            unique_players = len({b['user_id'] for b in current_round.bets})
 
-socketio.emit('timer_update', {
-    'game_type': game_type,
-    'time_remaining': current_round.get_time_remaining(),
-    'betting_time_remaining': current_round.get_betting_time_remaining(),
-    'total_bets': len(current_round.bets),
-    'players': unique_players
-}, room=game_type, namespace='/')
+            socketio.emit(
+                'timer_update',
+                {
+                    'game_type': game_type,
+                    'time_remaining': current_round.get_time_remaining(),
+                    'betting_time_remaining': current_round.get_betting_time_remaining(),
+                    'total_bets': len(current_round.bets),
+                    'players': unique_players
+                },
+                room=game_type,
+                namespace='/'
+            )
 
             time.sleep(1)
+
         except Exception as e:
             print(f"Error in game timer thread for {game_type}: {e}")
             time.sleep(1)
 
 
+# ---------------------------------------------------
+# Routes
+# ---------------------------------------------------
 @app.route('/')
 def home():
     return render_template('home.html', games=GAME_CONFIGS)
@@ -346,6 +387,9 @@ def get_balance(user_id):
     return jsonify({'balance': balance})
 
 
+# ---------------------------------------------------
+# Socket.IO handlers
+# ---------------------------------------------------
 @socketio.on('connect')
 def handle_connect():
     print(f'Client connected: {request.sid}')
@@ -404,10 +448,15 @@ def handle_place_bet(data):
     if success:
         user_wallets[user_id] -= bet_amount
 
-        socketio.emit('bet_placed', {
-            'game_type': game_type,
-            'round_data': get_round_data(game_type)
-        }, room=game_type, namespace='/')
+        socketio.emit(
+            'bet_placed',
+            {
+                'game_type': game_type,
+                'round_data': get_round_data(game_type)
+            },
+            room=game_type,
+            namespace='/'
+        )
 
         emit('bet_success', {
             'message': message,
@@ -417,13 +466,16 @@ def handle_place_bet(data):
         emit('bet_error', {'message': message})
 
 
+# ---------------------------------------------------
+# Start game timers
+# ---------------------------------------------------
 def start_game_timers():
-  for game_type in GAME_CONFIGS.keys():
-      threading.Thread(
-          target=game_timer_thread,
-          args=(game_type,),
-          daemon=True
-      ).start()
+    for game_type in GAME_CONFIGS.keys():
+        threading.Thread(
+            target=game_timer_thread,
+            args=(game_type,),
+            daemon=True
+        ).start()
 
 
 if __name__ == '__main__':
