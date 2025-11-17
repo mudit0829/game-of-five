@@ -1,34 +1,35 @@
-// ========= basic user identity =========
+// ===== basic identity =====
 const GAME = GAME_TYPE || "silver";
 
-let storedId = localStorage.getItem("frog_user_id");
-if (!storedId) {
-  storedId = "user_" + Math.floor(Math.random() * 1e8);
-  localStorage.setItem("frog_user_id", storedId);
+let uid = localStorage.getItem("frog_user_id");
+if (!uid) {
+  uid = "user_" + Math.floor(Math.random() * 1e8);
+  localStorage.setItem("frog_user_id", uid);
 }
-const USER_ID = storedId;
+const USER_ID = uid;
 
-let storedName = localStorage.getItem("frog_username");
-if (!storedName) {
-  storedName = "Player" + Math.floor(Math.random() * 9999);
-  localStorage.setItem("frog_username", storedName);
+let uname = localStorage.getItem("frog_username");
+if (!uname) {
+  uname = "Player" + Math.floor(Math.random() * 9999);
+  localStorage.setItem("frog_username", uname);
 }
-const USERNAME = storedName;
+const USERNAME = uname;
 
-let walletBalance = 0;
-let selectedNumber = null;
-
-// DOM elements
+// ===== DOM =====
 const frogImg = document.getElementById("frogSprite");
 const pads = Array.from(document.querySelectorAll(".pad"));
-const numButtons = Array.from(document.querySelectorAll(".num-btn"));
+const numChips = Array.from(document.querySelectorAll(".num-chip"));
 const betInput = document.getElementById("betAmount");
 const placeBetBtn = document.getElementById("placeBetBtn");
 const roundIdSpan = document.getElementById("roundId");
 const playerCountSpan = document.getElementById("playerCount");
 const timerText = document.getElementById("timerText");
-const walletSpan = document.getElementById("walletBalance");
+const walletBalanceSpan = document.getElementById("walletBalance");
 const statusEl = document.getElementById("statusMessage");
+const coinsWrapper = document.querySelector(".coins");
+
+let walletBalance = 0;
+let selectedNumber = 0; // default
 
 function setStatus(msg, type = "") {
   statusEl.textContent = msg || "";
@@ -36,76 +37,115 @@ function setStatus(msg, type = "") {
   if (type) statusEl.classList.add(type);
 }
 
-function updateWalletUI() {
-  walletSpan.textContent = walletBalance.toFixed(0);
+function updateWallet(balance) {
+  walletBalance = balance;
+  walletBalanceSpan.textContent = walletBalance.toFixed(0);
+  coinsWrapper.classList.add("coin-bounce");
+  setTimeout(() => coinsWrapper.classList.remove("coin-bounce"), 500);
 }
 
 function setSelectedNumber(n) {
   selectedNumber = n;
-  numButtons.forEach((btn) => {
-    const val = parseInt(btn.dataset.number, 10);
-    btn.classList.toggle("selected", val === n);
+  numChips.forEach((chip) => {
+    const v = parseInt(chip.dataset.number, 10);
+    chip.classList.toggle("selected", v === n);
   });
 }
 
-// Map bets -> up to 6 unique numbers -> show on pads
+/**
+ * Fill pads with up to 6 unique bet numbers.
+ * If you want fixed 1–6 labels, you can replace this logic with
+ * padNumber = index + 1 instead.
+ */
 function updatePadsFromBets(bets) {
   const uniqueNumbers = [];
   (bets || []).forEach((b) => {
-    if (!uniqueNumbers.includes(b.number)) {
-      uniqueNumbers.push(b.number);
-    }
+    if (!uniqueNumbers.includes(b.number)) uniqueNumbers.push(b.number);
   });
 
-  pads.forEach((pad, index) => {
-    const numSpan = pad.querySelector(".pad-number");
-    const num = uniqueNumbers[index];
+  pads.forEach((pad, i) => {
+    const span = pad.querySelector(".pad-number");
+    const num = uniqueNumbers[i];
     pad.classList.remove("win");
 
     if (num === undefined) {
       pad.dataset.number = "";
-      numSpan.textContent = "";
+      span.textContent = "";
     } else {
       pad.dataset.number = String(num);
-      numSpan.textContent = num;
+      span.textContent = num;
     }
   });
 }
 
-// frog movement: from back to winning pad
-function animateFrogToNumber(winningNumber) {
+// ===== Smooth frog jump (arc) =====
+
+function jumpFrogToWinningNumber(winningNumber) {
   const targetPad = pads.find(
     (p) => p.dataset.number === String(winningNumber)
   );
   if (!targetPad) {
-    console.log("No pad for winning number", winningNumber);
+    console.log("Winning number not on any pad:", winningNumber);
     return;
   }
 
+  const pondRect = document.querySelector(".pond").getBoundingClientRect();
   const frogRect = frogImg.getBoundingClientRect();
   const padRect = targetPad.getBoundingClientRect();
 
-  const frogCenterX = frogRect.left + frogRect.width / 2;
-  const frogCenterY = frogRect.top + frogRect.height / 2;
-  const padCenterX = padRect.left + padRect.width / 2;
-  const padCenterY = padRect.top + padRect.height / 2;
+  const startX = frogRect.left + frogRect.width / 2 - pondRect.left;
+  const startY = frogRect.top + frogRect.height / 2 - pondRect.top;
+  const endX = padRect.left + padRect.width / 2 - pondRect.left;
+  const endY = padRect.top + padRect.height / 2 - pondRect.top;
 
-  const dx = padCenterX - frogCenterX;
-  const dy = padCenterY - frogCenterY;
+  const deltaX = endX - startX;
+  const deltaY = endY - startY;
 
-  frogImg.style.transition = "transform 0.6s ease-out";
-  frogImg.style.transform = `translateX(-50%) translate(${dx}px, ${dy}px)`;
-  targetPad.classList.add("win");
+  const duration = 600; // ms
+  const peak = -80;     // jump height (negative = up)
+  const startTime = performance.now();
 
-  // after some time, send frog back
-  setTimeout(() => {
-    frogImg.style.transition = "transform 0.5s ease-out";
-    frogImg.style.transform = "translateX(-50%)";
-  }, 1500);
+  // remove any inline transform so we can control from JS
+  frogImg.style.transition = "none";
+
+  function step(now) {
+    const tRaw = (now - startTime) / duration;
+    const t = Math.min(Math.max(tRaw, 0), 1);
+
+    // Smooth easing
+    const ease = t < 0.5
+      ? 2 * t * t
+      : -1 + (4 - 2 * t) * t;
+
+    const x = startX + deltaX * ease;
+    const yLinear = startY + deltaY * ease;
+    const yArc = yLinear + peak * (4 * t * (1 - t)); // parabola
+
+    // convert to relative to left/top
+    const relX = x - frogRect.width / 2;
+    const relY = yArc - frogRect.height / 2;
+
+    frogImg.style.transform = `translate(${relX}px, ${relY}px)`;
+
+    if (t < 1) {
+      requestAnimationFrame(step);
+    } else {
+      // highlight pad
+      targetPad.classList.add("win");
+      // return to base after short delay
+      setTimeout(() => {
+        frogImg.style.transition = "transform 0.6s ease-out";
+        frogImg.style.transform = "translateX(0) translateY(0)";
+      }, 700);
+    }
+  }
+
+  requestAnimationFrame(step);
 }
 
-// ========= Socket.IO + backend =========
-const socket = io(); // same origin
+// ===== backend / socket =====
+
+const socket = io();
 
 async function registerUser() {
   try {
@@ -116,8 +156,7 @@ async function registerUser() {
     });
     const data = await res.json();
     if (data && data.success) {
-      walletBalance = data.balance || 0;
-      updateWalletUI();
+      updateWallet(data.balance || 0);
     }
   } catch (err) {
     console.error("register error", err);
@@ -156,12 +195,12 @@ socket.on("new_round", (payload) => {
   timerText.textContent = rd.time_remaining ?? "--";
   updatePadsFromBets(rd.bets || []);
   setStatus("New round started", "ok");
-  frogImg.style.transform = "translateX(-50%)";
+  frogImg.style.transform = "translateX(0) translateY(0)";
 });
 
 socket.on("timer_update", (payload) => {
   if (payload.game_type !== GAME) return;
-  timerText.textContent = (payload.time_remaining ?? 0).toString();
+  timerText.textContent = (payload.time_remaining ?? 0).toString().padStart(2, "0");
   playerCountSpan.textContent = payload.total_bets ?? 0;
 });
 
@@ -180,8 +219,7 @@ socket.on("bet_placed", (payload) => {
 socket.on("bet_success", (payload) => {
   setStatus(payload.message || "Bet placed", "ok");
   if (typeof payload.new_balance === "number") {
-    walletBalance = payload.new_balance;
-    updateWalletUI();
+    updateWallet(payload.new_balance);
   }
 });
 
@@ -194,29 +232,28 @@ socket.on("round_result", (payload) => {
   const winning = payload.result;
   if (winning === undefined || winning === null) return;
   setStatus(`Winning number: ${winning}`, "ok");
-  animateFrogToNumber(winning);
+  jumpFrogToWinningNumber(winning);
 });
 
-// ========= UI events =========
-numButtons.forEach((btn) => {
-  btn.addEventListener("click", () => {
-    const n = parseInt(btn.dataset.number, 10);
+// ===== UI events =====
+
+numChips.forEach((chip) => {
+  chip.addEventListener("click", () => {
+    const n = parseInt(chip.dataset.number, 10);
     setSelectedNumber(n);
   });
 });
 
 placeBetBtn.addEventListener("click", () => {
-  if (selectedNumber === null) {
-    setStatus("Select a number first", "error");
-    return;
-  }
-
   if (walletBalance < FIXED_BET_AMOUNT) {
     setStatus("Insufficient balance", "error");
     return;
   }
+  if (selectedNumber === null || selectedNumber === undefined) {
+    setStatus("Select a number first", "error");
+    return;
+  }
 
-  // amount is fixed per your config – we ignore user typing for now
   socket.emit("place_bet", {
     game_type: GAME,
     user_id: USER_ID,
@@ -225,8 +262,7 @@ placeBetBtn.addEventListener("click", () => {
   });
 });
 
-// ========= init =========
-registerUser().then(() => {
-  joinGameRoom();
-});
+// ===== init =====
+registerUser().then(joinGameRoom);
 setSelectedNumber(0);
+setStatus("");
