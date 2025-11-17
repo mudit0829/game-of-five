@@ -116,18 +116,20 @@ function jumpFrogToWinningNumber(winningNumber) {
 
   const padRect = targetPad.getBoundingClientRect();
 
+  // frog start center relative to pond
   const startX = frogRect.left + frogRect.width / 2 - pondRect.left;
   const startY = frogRect.top + frogRect.height / 2 - pondRect.top;
 
-  // End a bit above the pad (so frog covers it)
+  // END position: above pad (so frog overlaps pad nicely)
   const endX = padRect.left + padRect.width / 2 - pondRect.left;
-  const endY = padRect.top - frogRect.height * 0.2 - pondRect.top;
+  const endY =
+    padRect.top - pondRect.top - frogRect.height * 0.6; // higher above pad
 
   const deltaX = endX - startX;
   const deltaY = endY - startY;
 
   const duration = 700; // ms
-  const peak = -90;     // jump height
+  const peak = -110;    // higher jump
   const startTime = performance.now();
 
   frogImg.style.transition = "none";
