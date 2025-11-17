@@ -9,26 +9,25 @@
 </head>
 <body>
   <div class="diamond-page">
-    <!-- TOP HUD -->
-    <header class="hud">
-      <div class="hud-left">
-        <div class="hud-game-label">GAME <span id="roundId">–</span></div>
-        <div class="hud-sub">
-          <span id="playerCount">0</span> PLAYERS ·
-          You: <span id="userName"></span> ·
-          Bets: <span id="userBetCount">0</span>
+    <!-- TOP BAR (same info as other games) -->
+    <header class="top-bar">
+      <div class="top-left">
+        <div class="game-label">GAME <span id="roundId">–</span></div>
+        <div class="players"><span id="playerCount">0</span> PLAYERS</div>
+        <div class="user-stats">
+          You: <span id="userName"></span> · Bets: <span id="userBetCount">0</span>
         </div>
       </div>
 
-      <div class="hud-center">
-        <div class="hud-timer-pill">
+      <div class="top-center">
+        <div class="timer-pill">
           <span id="timerText">--</span>
         </div>
       </div>
 
-      <div class="hud-right">
-        <div class="hud-coins">
-          <img src="{{ url_for('static', filename='img/coin.png') }}" alt="Coins" />
+      <div class="top-right">
+        <div class="coins">
+          <img src="{{ url_for('static', filename='img/coin.png') }}" alt="Coins">
           <span id="walletBalance">0</span>
         </div>
       </div>
@@ -37,11 +36,14 @@
     <!-- MIDDLE: ARCHERY RANGE -->
     <main class="range-wrapper">
       <section class="range">
-        <!-- Targets -->
+        <!-- Background image -->
+        <div class="range-bg"></div>
+
+        <!-- 6 targets (3 x 2) -->
         <div class="targets targets-top">
           {% for i in range(1,4) %}
           <div class="target pad" data-pad="{{ i }}">
-            <img src="{{ url_for('static', filename='img/diamond_target.png') }}" alt="Target" />
+            <img src="{{ url_for('static', filename='img/diamond_target.png') }}" alt="Target">
             <span class="pad-number"></span>
             <span class="pad-user"></span>
           </div>
@@ -51,8 +53,75 @@
         <div class="targets targets-bottom">
           {% for i in range(4,7) %}
           <div class="target pad" data-pad="{{ i }}">
-            <img src="{{ url_for('static', filename='img/diamond_target.png') }}" alt="Target" />
+            <img src="{{ url_for('static', filename='img/diamond_target.png') }}" alt="Target">
             <span class="pad-number"></span>
             <span class="pad-user"></span>
           </div>
           {% endfor %}
+        </div>
+
+        <!-- Archer & arrow at bottom-left -->
+        <div class="archer-layer">
+          <img
+            id="archerSprite"
+            class="archer"
+            src="{{ url_for('static', filename='img/diamond_archer.png') }}"
+            alt="Archer"
+          >
+          <img
+            id="arrowSprite"
+            class="arrow"
+            src="{{ url_for('static', filename='img/diamond_arrow.png') }}"
+            alt="Arrow"
+          >
+        </div>
+      </section>
+    </main>
+
+    <!-- BOTTOM SHEET: CONTROLS -->
+    <section class="controls-sheet">
+      <div class="numbers-title">Select your number (0–9)</div>
+
+      <!-- 0–4 -->
+      <div class="numbers-row">
+        {% for n in range(5) %}
+        <button class="num-chip" data-number="{{ n }}">{{ n }}</button>
+        {% endfor %}
+      </div>
+
+      <!-- 5–9 -->
+      <div class="numbers-row">
+        {% for n in range(5,10) %}
+        <button class="num-chip" data-number="{{ n }}">{{ n }}</button>
+        {% endfor %}
+      </div>
+
+      <div class="my-bets-title">Your bets in this game</div>
+      <div id="myBetsRow" class="my-bets-row"></div>
+
+      <div class="bet-container">
+        <input
+          id="betAmount"
+          type="number"
+          min="{{ game.bet_amount }}"
+          step="{{ game.bet_amount }}"
+          placeholder="Your Bet"
+        >
+      </div>
+
+      <button id="placeBetBtn" class="bet-button">
+        Place Bet (₹{{ game.bet_amount }})
+      </button>
+
+      <div id="statusMessage" class="status"></div>
+    </section>
+  </div>
+
+  <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
+  <script>
+    const GAME_TYPE = "{{ game_type }}";             // "diamond"
+    const FIXED_BET_AMOUNT = {{ game.bet_amount }};  // 100
+  </script>
+  <script src="{{ url_for('static', filename='js/diamond-game.js') }}"></script>
+</body>
+</html>
