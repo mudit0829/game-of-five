@@ -1,93 +1,106 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <title>{{ game.title }} – {{ game.name }}</title>
-    <meta name="viewport" content="width=device-width, initial-scale=1" />
-
-    <link rel="stylesheet" href="{{ url_for('static', filename='css/platinum-game.css') }}">
+  <meta charset="UTF-8">
+  <title>{{ game.title }} – {{ game.name }}</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/platinum-game.css') }}">
 </head>
-
 <body>
+  <div class="platinum-page">
+    <!-- BACKGROUND + ANIMATED WATER -->
+    <div class="bg-wrapper">
+      <img
+        src="{{ url_for('static', filename='img/platinum_bg.png') }}"
+        alt="Sea background"
+        class="bg-base"
+      />
 
-<div class="platinum-container">
+      <!-- Animated water strips (PNG, repeated) -->
+      <div class="water-layer water-far"></div>
+      <div class="water-layer water-near"></div>
+    </div>
 
-    <!-- VIDEO or Animated Background -->
-    <video id="bgVideo" autoplay muted loop playsinline>
-        <source src="{{ url_for('static', filename='video/platinum_bg.mp4') }}" type="video/mp4">
-    </video>
-
-    <!-- Fallback PNG background -->
-    <img id="fallbackBG" src="{{ url_for('static', filename='img/platinum_bg.png') }}">
-
-    <!-- TOP UI BAR -->
-    <div class="top-bar">
-        <div class="left-info">
-            <div class="game-id">GAME <span id="roundCode">--</span></div>
-            <div class="players"><span id="playerCount">0</span> PLAYERS</div>
-            <div class="self">
-                You: <span id="userName"></span> · Bets: <span id="userBets">0</span>
-            </div>
+    <!-- TOP HUD -->
+    <header class="top-hud">
+      <div class="hud-left">
+        <div class="hud-game">GAME <span id="roundCode">--</span></div>
+        <div class="hud-line"><span id="playerCount">0</span> PLAYERS</div>
+        <div class="hud-line">
+          You: <span id="userName"></span> · Bets: <span id="userBets">0</span>
         </div>
+      </div>
 
-        <div class="timer-pill" id="timerText">--</div>
+      <div class="hud-center">
+        <div class="timer-pill">
+          <span id="timerText">--</span>
+        </div>
+      </div>
 
+      <div class="hud-right">
         <div class="coins">
-            <img src="{{ url_for('static', filename='img/coin.png') }}">
-            <span id="walletBalance">0</span>
+          <img src="{{ url_for('static', filename='img/coin.png') }}" alt="Coins">
+          <span id="walletBalance">0</span>
         </div>
-    </div>
+      </div>
+    </header>
 
-    <!-- FLOATING BOATS (6) -->
-    <div class="boats-layer">
+    <!-- BOATS + PARATROOPER -->
+    <main class="play-layer">
+      <!-- Boats -->
+      <div class="boats-layer">
+        <!-- top row -->
+        <img id="boat1" class="boat" src="{{ url_for('static', filename='img/boat1.png') }}" style="top:28%; left:10%;">
+        <img id="boat2" class="boat" src="{{ url_for('static', filename='img/boat2.png') }}" style="top:28%; left:40%;">
+        <img id="boat3" class="boat" src="{{ url_for('static', filename='img/boat3.png') }}" style="top:28%; left:70%;">
 
-        <img id="boat1" class="boat" src="{{ url_for('static', filename='img/boat1.png') }}" style="top:20%; left:10%;">
-        <img id="boat2" class="boat" src="{{ url_for('static', filename='img/boat2.png') }}" style="top:20%; left:40%;">
-        <img id="boat3" class="boat" src="{{ url_for('static', filename='img/boat3.png') }}" style="top:20%; left:70%;">
+        <!-- bottom row -->
+        <img id="boat4" class="boat" src="{{ url_for('static', filename='img/boat4.png') }}" style="top:55%; left:14%;">
+        <img id="boat5" class="boat" src="{{ url_for('static', filename='img/boat5.png') }}" style="top:55%; left:44%;">
+        <img id="boat6" class="boat" src="{{ url_for('static', filename='img/boat6.png') }}" style="top:55%; left:74%;">
+      </div>
 
-        <img id="boat4" class="boat" src="{{ url_for('static', filename='img/boat4.png') }}" style="top:55%; left:15%;">
-        <img id="boat5" class="boat" src="{{ url_for('static', filename='img/boat5.png') }}" style="top:55%; left:45%;">
-        <img id="boat6" class="boat" src="{{ url_for('static', filename='img/boat6.png') }}" style="top:55%; left:75%;">
+      <!-- Paratrooper (animated in JS) -->
+      <img
+        id="paratrooper"
+        src="{{ url_for('static', filename='img/paratrooper.png') }}"
+        alt="Paratrooper"
+      >
+    </main>
 
-    </div>
+    <!-- BOTTOM CONTROLS -->
+    <section class="controls">
+      <h3>Select your number (0–9)</h3>
 
-    <!-- PARATROOPER -->
-    <img id="paratrooper" src="{{ url_for('static', filename='img/paratrooper.png') }}">
+      <div class="number-row">
+        {% for i in range(5) %}
+        <button class="num-chip" data-number="{{ i }}">{{ i }}</button>
+        {% endfor %}
+      </div>
 
-    <!-- Betting UI -->
-    <div class="controls">
-        <h3>Select your number (0–9)</h3>
+      <div class="number-row">
+        {% for i in range(5, 10) %}
+        <button class="num-chip" data-number="{{ i }}">{{ i }}</button>
+        {% endfor %}
+      </div>
 
-        <div class="number-row">
-            {% for i in range(5) %}
-            <button class="num-chip" data-number="{{ i }}">{{ i }}</button>
-            {% endfor %}
-        </div>
+      <div class="my-bets-title">Your bets in this game</div>
+      <div id="myBets" class="my-bets"></div>
 
-        <div class="number-row">
-            {% for i in range(5,10) %}
-            <button class="num-chip" data-number="{{ i }}">{{ i }}</button>
-            {% endfor %}
-        </div>
-
-        <div class="my-bets-title">Your bets in this game</div>
-        <div id="myBets" class="my-bets"></div>
-
-        <input id="betAmount" placeholder="Your Bet" />
-
+      <div class="bet-row">
+        <input id="betAmount" placeholder="Your Bet">
         <button id="placeBetBtn">Place Bet (₹{{ game.bet_amount }})</button>
+      </div>
 
-        <div id="statusMessage" class="status"></div>
-    </div>
+      <div id="statusMessage" class="status"></div>
+    </section>
+  </div>
 
-</div>
-
-<script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
-<script>
-    const GAME_TYPE = "{{ game_type }}";
-    const FIXED_BET_AMOUNT = {{ game.bet_amount }};
-</script>
-<script src="{{ url_for('static', filename='js/platinum-game.js') }}"></script>
-
+  <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
+  <script>
+    const GAME_TYPE = "{{ game_type }}";           // "platinum"
+    const FIXED_BET_AMOUNT = {{ game.bet_amount }}; // 200
+  </script>
+  <script src="{{ url_for('static', filename='js/platinum-game.js') }}"></script>
 </body>
 </html>
