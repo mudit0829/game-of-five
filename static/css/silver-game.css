@@ -138,8 +138,8 @@ body {
 
 .pad {
   position: relative;
-  width: 110px;
-  height: 70px;
+  width: 140px;
+  height: 90px;
   display: flex;
   justify-content: center;
   align-items: center;
@@ -154,7 +154,7 @@ body {
 .pad[data-pad="6"] img { transform: rotate(2deg) scale(1.04); }
 
 .pad img {
-  width: 110px;
+  width: 140px;
   height: auto;
   filter: drop-shadow(0 8px 10px rgba(0,0,0,0.5));
 }
