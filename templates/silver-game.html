@@ -1,636 +1,106 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-    <title>Frog Leap - BetGames</title>
-    <script src="https://cdn.socket.io/4.5.4/socket.io.min.js"></script>
-    <style>
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-        }
+  <meta charset="UTF-8" />
+  <title>{{ game.title }} – {{ game.name }}</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
 
-        html, body {
-            width: 100%;
-            height: 100%;
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            background: #1a1a2e;
-            color: #fff;
-            overflow: hidden;
-        }
-
-        body {
-            display: flex;
-            flex-direction: column;
-        }
-
-        .game-container {
-            flex: 1;
-            display: flex;
-            flex-direction: column;
-            background: linear-gradient(180deg, #87ceeb 0%, #e0f6ff 50%, #90ee90 100%);
-            position: relative;
-            overflow: hidden;
-        }
-
-        .header-bar {
-            background: rgba(15, 52, 96, 0.9);
-            padding: 10px 15px;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            z-index: 10;
-            border-bottom: 2px solid #4ecca3;
-        }
-
-        .game-title {
-            font-size: 18px;
-            font-weight: 700;
-            color: #ffd700;
-        }
-
-        .timer-display {
-            background: linear-gradient(135deg, #4ecca3, #45b896);
-            color: #000;
-            padding: 6px 15px;
-            border-radius: 20px;
-            font-weight: 700;
-            font-size: 14px;
-        }
-
-        .timer-display.warning {
-            background: linear-gradient(135deg, #ff6b6b, #ff5252);
-            color: #fff;
-            animation: pulse 1s infinite;
-        }
-
-        @keyframes pulse {
-            0%, 100% { transform: scale(1); }
-            50% { transform: scale(1.05); }
-        }
-
-        .balance-info {
-            background: rgba(78, 204, 163, 0.2);
-            padding: 6px 12px;
-            border-radius: 8px;
-            font-size: 12px;
-            color: #4ecca3;
-        }
-
-        .game-area {
-            flex: 1;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            justify-content: center;
-            position: relative;
-            padding: 20px;
-        }
-
-        /* Lake Scene */
-        .lake-scene {
-            width: 100%;
-            height: 100%;
-            position: relative;
-            display: flex;
-            align-items: flex-end;
-            justify-content: center;
-        }
-
-        .water {
-            position: absolute;
-            bottom: 0;
-            width: 100%;
-            height: 40%;
-            background: linear-gradient(180deg, #4dd0e1 0%, #0288d1 100%);
-            opacity: 0.8;
-            border-radius: 50% 50% 0 0 / 60% 60% 0 0;
-        }
-
-        .ripple {
-            position: absolute;
-            bottom: 15%;
-            border: 2px solid #4dd0e1;
-            border-radius: 50%;
-            opacity: 0.7;
-            animation: ripple-animation 2s infinite;
-        }
-
-        @keyframes ripple-animation {
-            0% {
-                width: 0;
-                height: 0;
-                opacity: 1;
-            }
-            100% {
-                width: 200px;
-                height: 200px;
-                opacity: 0;
-            }
-        }
-
-        .leaves-container {
-            position: absolute;
-            bottom: 25%;
-            width: 100%;
-            display: flex;
-            justify-content: space-around;
-            align-items: center;
-            z-index: 5;
-            padding: 0 20px;
-        }
-
-        .leaf {
-            width: 70px;
-            height: 70px;
-            background: linear-gradient(135deg, #228B22, #32CD32);
-            border-radius: 50%;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 32px;
-            font-weight: 700;
-            color: #fff;
-            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.3);
-            cursor: pointer;
-            transition: all 0.3s;
-            position: relative;
-            border: 3px solid #1a5c1a;
-        }
-
-        .leaf:hover {
-            transform: scale(1.1);
-            box-shadow: 0 6px 20px rgba(78, 204, 163, 0.5);
-        }
-
-        .leaf.selected {
-            background: linear-gradient(135deg, #ffd700, #ffed4e);
-            color: #000;
-            border-color: #ff8c00;
-            box-shadow: 0 0 20px rgba(255, 215, 0, 0.7);
-        }
-
-        .leaf-number {
-            font-size: 24px;
-            font-weight: 700;
-        }
-
-        .frog {
-            position: absolute;
-            bottom: 25%;
-            left: 50%;
-            transform: translateX(-50%);
-            font-size: 60px;
-            z-index: 20;
-            display: none;
-            animation: frog-idle 1.5s infinite;
-        }
-
-        .frog.show {
-            display: block;
-        }
-
-        .frog.jumping {
-            animation: frog-jump 0.6s ease-out;
-        }
-
-        @keyframes frog-idle {
-            0%, 100% { transform: translateX(-50%) translateY(0); }
-            50% { transform: translateX(-50%) translateY(-5px); }
-        }
-
-        @keyframes frog-jump {
-            0% {
-                transform: translateX(-50%) translateY(0) rotateZ(0deg);
-            }
-            50% {
-                transform: translateX(var(--tx)) translateY(-80px) rotateZ(10deg);
-            }
-            100% {
-                transform: translateX(var(--tx)) translateY(0) rotateZ(0deg);
-            }
-        }
-
-        .betting-panel {
-            background: rgba(15, 52, 96, 0.95);
-            padding: 15px;
-            border-top: 2px solid #4ecca3;
-            display: flex;
-            gap: 10px;
-            overflow-x: auto;
-            align-items: center;
-            justify-content: space-between;
-            min-height: 80px;
-        }
-
-        .betting-info {
-            display: flex;
-            gap: 10px;
-            align-items: center;
-            flex-wrap: wrap;
-        }
-
-        .bet-slot {
-            background: #0f3460;
-            border: 2px solid #4ecca3;
-            padding: 10px 15px;
-            border-radius: 8px;
-            cursor: pointer;
-            transition: all 0.3s;
-            font-weight: 600;
-            min-width: 50px;
-            text-align: center;
-        }
-
-        .bet-slot:hover:not(:disabled) {
-            background: #4ecca3;
-            color: #000;
-            transform: scale(1.05);
-        }
-
-        .bet-slot:disabled {
-            opacity: 0.5;
-            cursor: not-allowed;
-        }
-
-        .your-bets {
-            display: flex;
-            gap: 8px;
-            flex-wrap: wrap;
-            align-items: center;
-        }
-
-        .bet-badge {
-            background: #ffd700;
-            color: #000;
-            padding: 6px 12px;
-            border-radius: 15px;
-            font-size: 12px;
-            font-weight: 700;
-        }
-
-        .status-text {
-            font-size: 12px;
-            color: #aaa;
-            text-align: center;
-            width: 100%;
-            margin-bottom: 10px;
-        }
-
-        .message-box {
-            position: fixed;
-            top: 50%;
-            left: 50%;
-            transform: translate(-50%, -50%);
-            background: linear-gradient(135deg, #4ecca3, #45b896);
-            color: #000;
-            padding: 30px 40px;
-            border-radius: 15px;
-            font-size: 18px;
-            font-weight: 700;
-            z-index: 100;
-            display: none;
-            text-align: center;
-            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.5);
-            animation: message-pop 0.3s ease-out;
-        }
-
-        .message-box.show {
-            display: block;
-        }
-
-        .message-box.error {
-            background: linear-gradient(135deg, #ff6b6b, #ff5252);
-            color: #fff;
-        }
-
-        @keyframes message-pop {
-            0% {
-                transform: translate(-50%, -50%) scale(0.8);
-                opacity: 0;
-            }
-            100% {
-                transform: translate(-50%, -50%) scale(1);
-                opacity: 1;
-            }
-        }
-
-        .back-button {
-            position: fixed;
-            top: 10px;
-            left: 10px;
-            background: rgba(78, 204, 163, 0.3);
-            border: 1px solid #4ecca3;
-            color: #4ecca3;
-            padding: 8px 15px;
-            border-radius: 8px;
-            cursor: pointer;
-            font-weight: 600;
-            font-size: 12px;
-            z-index: 50;
-        }
-
-        .back-button:hover {
-            background: #4ecca3;
-            color: #000;
-        }
-
-        @media (max-height: 600px) {
-            .leaf {
-                width: 50px;
-                height: 50px;
-                font-size: 24px;
-            }
-
-            .frog {
-                font-size: 40px;
-            }
-
-            .betting-panel {
-                padding: 10px;
-                min-height: 60px;
-            }
-        }
-
-        @media (max-width: 480px) {
-            .leaf {
-                width: 60px;
-                height: 60px;
-            }
-
-            .betting-panel {
-                padding: 12px 10px;
-            }
-
-            .bet-slot {
-                padding: 8px 12px;
-                font-size: 12px;
-            }
-        }
-    </style>
+  <!-- Frog game CSS -->
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/silver-game.css') }}">
 </head>
 <body>
-    <button class="back-button" onclick="goBack()">← Back</button>
-
-    <div class="game-container">
-        <div class="header-bar">
-            <div class="game-title">🐸 Frog Leap</div>
-            <div class="timer-display" id="timer">5:00</div>
-            <div class="balance-info">💰 <span id="balance">10000</span></div>
+  <div class="game-root">
+    <!-- Top bar -->
+    <header class="top-bar">
+      <div class="left">
+        <div class="game-title">
+          <span class="emoji">{{ game.emoji }}</span>
+          <span>{{ game.title }}</span>
         </div>
-
-        <div class="game-area">
-            <div class="lake-scene">
-                <div class="water">
-                    <div class="ripple" style="left: 20%;"></div>
-                    <div class="ripple" style="left: 80%; animation-delay: 1s;"></div>
-                </div>
-                <div class="frog" id="frog">🐸</div>
-                <div class="leaves-container" id="leavesContainer"></div>
-            </div>
+        <div class="round-info">
+          Game #<span id="roundId">–</span> ·
+          <span id="playerCount">0</span> players
         </div>
+      </div>
 
-        <div class="betting-panel">
-            <div style="width: 100%;">
-                <div class="status-text" id="statusText">Select numbers (0-9) and wait for the frog to leap!</div>
-                <div class="your-bets">
-                    <span style="font-size: 12px; color: #4ecca3; font-weight: 600;">Your Bets:</span>
-                    <div id="myBets"></div>
-                </div>
-            </div>
+      <div class="center">
+        <div class="timer-circle">
+          <span id="timerText">--</span>s
         </div>
-    </div>
+      </div>
 
-    <div class="message-box" id="messageBox"></div>
+      <div class="right">
+        <div class="wallet">
+          Balance: ₹<span id="walletBalance">0</span>
+        </div>
+      </div>
+    </header>
 
-    <script>
-        let userId = localStorage.getItem('userId');
-        const username = localStorage.getItem('username');
-        const gameType = 'silver';
-        
-        let userBets = [];
-        let mySelectedNumbers = [];
-        const socket = io();
+    <!-- Pond -->
+    <section class="pond">
+      <!-- Frog sitting at back -->
+      <img
+        id="frogSprite"
+        class="frog"
+        src="{{ url_for('static', filename='img/frog.png') }}"
+        alt="Frog"
+      >
 
-        // Initialize game
-        fetch('/register', {
-            method: 'POST',
-            headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify({user_id: userId, username: username})
-        });
+      <!-- 6 lily pads in front (2 rows x 3) -->
+      <div class="pads-row">
+        {% for i in range(1,4) %}
+        <div class="pad" data-pad="{{ i }}">
+          <img src="{{ url_for('static', filename='img/lilypad.png') }}" alt="Pad">
+          <span class="pad-number"></span>
+        </div>
+        {% endfor %}
+      </div>
+      <div class="pads-row">
+        {% for i in range(4,7) %}
+        <div class="pad" data-pad="{{ i }}">
+          <img src="{{ url_for('static', filename='img/lilypad.png') }}" alt="Pad">
+          <span class="pad-number"></span>
+        </div>
+        {% endfor %}
+      </div>
+    </section>
 
-        // Create leaf slots
-        function createLeaves() {
-            const container = document.getElementById('leavesContainer');
-            container.innerHTML = '';
-            for (let i = 0; i < 6; i++) {
-                const leaf = document.createElement('div');
-                leaf.className = 'leaf';
-                leaf.innerHTML = '<div class="leaf-number">?</div>';
-                leaf.id = `leaf-${i}`;
-                container.appendChild(leaf);
-            }
-        }
+    <!-- Controls -->
+    <section class="controls">
+      <div class="numbers-title">Select a number (0–9)</div>
+      <div class="numbers">
+        {% for n in range(10) %}
+        <button class="num-btn" data-number="{{ n }}">{{ n }}</button>
+        {% endfor %}
+      </div>
 
-        createLeaves();
+      <div class="bet-row">
+        <input
+          id="betAmount"
+          type="number"
+          min="{{ game.bet_amount }}"
+          step="{{ game.bet_amount }}"
+          placeholder="Bet amount (₹{{ game.bet_amount }} fixed)"
+        />
+        <button id="placeBetBtn">
+          Place Bet (₹{{ game.bet_amount }})
+        </button>
+      </div>
 
-        // Join game and connect socket
-        socket.emit('join_game', {game_type: gameType, user_id: userId});
+      <div class="status" id="statusMessage"></div>
+    </section>
+  </div>
 
-        socket.on('round_data', data => {
-            if (data.game_type === gameType && data.round_data) {
-                updateGameUI(data.round_data);
-            }
-        });
+  <!-- Socket.IO client -->
+  <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
 
-        socket.on('new_round', data => {
-            if (data.game_type === gameType) {
-                mySelectedNumbers = [];
-                updateMyBets();
-                updateLeaves([]);
-                document.getElementById('frog').classList.remove('show', 'jumping');
-                document.getElementById('statusText').textContent = 'Select numbers and wait!';
-            }
-        });
+  <!-- Config values for JS -->
+  <script>
+    const GAME_TYPE = "{{ game_type }}";             // "silver"
+    const FIXED_BET_AMOUNT = {{ game.bet_amount }};  // 10
+  </script>
 
-        socket.on('timer_update', data => {
-            if (data.game_type === gameType) {
-                const time = data.betting_time_remaining || data.time_remaining;
-                const mins = Math.floor(time / 60);
-                const secs = time % 60;
-                document.getElementById('timer').textContent = `${mins}:${secs.toString().padStart(2, '0')}`;
-                
-                if (time <= 15 && time > 0) {
-                    document.getElementById('timer').classList.add('warning');
-                    if (time === 15) {
-                        document.getElementById('statusText').textContent = 'The frog is watching...';
-                        document.getElementById('frog').classList.add('show');
-                    }
-                } else {
-                    document.getElementById('timer').classList.remove('warning');
-                }
-            }
-        });
-
-        socket.on('bet_placed', data => {
-            if (data.game_type === gameType) {
-                updateLeaves(data.round_data.bets);
-            }
-        });
-
-        socket.on('round_result', data => {
-            if (data.game_type === gameType) {
-                showWinningLeaf(data.result, data.winners);
-                document.getElementById('statusText').textContent = `🐸 The frog jumped on leaf #${data.result}!`;
-            }
-        });
-
-        socket.on('bet_error', data => {
-            showMessage(data.message, true);
-        });
-
-        socket.on('bet_success', data => {
-            fetch(`/balance/${userId}`)
-                .then(res => res.json())
-                .then(balanceData => {
-                    document.getElementById('balance').textContent = balanceData.balance;
-                });
-        });
-
-        // Update game UI
-        function updateGameUI(roundData) {
-            updateLeaves(roundData.bets);
-        }
-
-        // Update leaf display
-        function updateLeaves(bets) {
-            const numberMap = {};
-            bets.forEach(bet => {
-                if (!numberMap[bet.number]) numberMap[bet.number] = [];
-                numberMap[bet.number].push(bet.username);
-            });
-
-            for (let i = 0; i < 6; i++) {
-                const leaf = document.getElementById(`leaf-${i}`);
-                if (numberMap[i]) {
-                    const betCount = numberMap[i].length;
-                    leaf.innerHTML = `<div class="leaf-number">${i}</div>`;
-                    leaf.style.cursor = 'pointer';
-                    
-                    if (mySelectedNumbers.includes(i)) {
-                        leaf.classList.add('selected');
-                    }
-                } else {
-                    leaf.innerHTML = '<div class="leaf-number">?</div>';
-                    leaf.classList.remove('selected');
-                }
-            }
-        }
-
-        // Place bet
-        function placeBet(number) {
-            if (mySelectedNumbers.includes(number)) {
-                showMessage('Already bet on this number', true);
-                return;
-            }
-            if (mySelectedNumbers.length >= 4) {
-                showMessage('Maximum 4 bets per game', true);
-                return;
-            }
-
-            socket.emit('place_bet', {
-                game_type: gameType,
-                user_id: userId,
-                username: username,
-                number: number
-            });
-
-            mySelectedNumbers.push(number);
-            updateMyBets();
-        }
-
-        // Update my bets display
-        function updateMyBets() {
-            const myBetsDiv = document.getElementById('myBets');
-            if (mySelectedNumbers.length === 0) {
-                myBetsDiv.innerHTML = '<span style="color: #aaa; font-size: 12px;">No bets yet</span>';
-            } else {
-                myBetsDiv.innerHTML = mySelectedNumbers.map(num => 
-                    `<div class="bet-badge">#${num}</div>`
-                ).join('');
-            }
-        }
-
-        // Show winning leaf with frog jump animation
-        function showWinningLeaf(number, winners) {
-            setTimeout(() => {
-                const leaf = document.getElementById(`leaf-${number}`);
-                if (leaf) {
-                    const rect = leaf.getBoundingClientRect();
-                    const containerRect = document.querySelector('.leaves-container').getBoundingClientRect();
-                    const offsetX = rect.left - containerRect.left + rect.width / 2;
-                    
-                    const frog = document.getElementById('frog');
-                    frog.style.setProperty('--tx', `${offsetX - window.innerWidth / 2}px`);
-                    frog.classList.add('jumping');
-                    
-                    leaf.style.backgroundColor = '#FFD700';
-                    leaf.style.borderColor = '#FF8C00';
-                    leaf.style.boxShadow = '0 0 30px rgba(255, 215, 0, 1)';
-                    
-                    setTimeout(() => {
-                        const isWinner = winners.some(w => w.user_id === userId);
-                        showMessage(
-                            isWinner ? `🎉 YOU WIN! +${winners.find(w => w.user_id === userId).payout} coins!` : '❌ Better luck next time',
-                            !isWinner
-                        );
-                    }, 600);
-                }
-            }, 500);
-        }
-
-        // Show message
-        function showMessage(text, isError = false) {
-            const msgBox = document.getElementById('messageBox');
-            msgBox.textContent = text;
-            msgBox.classList.toggle('error', isError);
-            msgBox.classList.add('show');
-            
-            setTimeout(() => {
-                msgBox.classList.remove('show');
-            }, 2500);
-        }
-
-        // Add click listeners to leaves
-        document.addEventListener('click', (e) => {
-            if (e.target.closest('.leaf')) {
-                const leaf = e.target.closest('.leaf');
-                const leafNumber = parseInt(leaf.id.split('-')[1]);
-                placeBet(leafNumber);
-            }
-        });
-
-        function goBack() {
-            window.location.href = '/';
-        }
-
-        // Prevent zoom
-        document.addEventListener('touchmove', function(event) {
-            if (event.scale !== 1) {
-                event.preventDefault();
-            }
-        }, false);
-
-        // Update balance periodically
-        setInterval(() => {
-            fetch(`/balance/${userId}`)
-                .then(res => res.json())
-                .then(data => {
-                    document.getElementById('balance').textContent = data.balance;
-                });
-        }, 2000);
-    </script>
+  <!-- Frog game JS -->
+  <script src="{{ url_for('static', filename='js/silver-game.js') }}"></script>
 </body>
 </html>
