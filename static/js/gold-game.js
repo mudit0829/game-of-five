@@ -74,7 +74,7 @@ function updateMyBets(bets) {
   });
 }
 
-// ---- goals content from bets ----
+// ---- goals from bets ----
 function updateGoalsFromBets(bets) {
   const uniqueBets = [];
   (bets || []).forEach((b) => {
@@ -102,7 +102,7 @@ function updateGoalsFromBets(bets) {
   });
 }
 
-// ========= Ball animation: from player -> winning goal =========
+// ========= Ball animation + player kick =========
 function shootBallToWinningNumber(winningNumber) {
   const pitchRect = pitch.getBoundingClientRect();
   const ballRect = ballImg.getBoundingClientRect();
@@ -117,19 +117,25 @@ function shootBallToWinningNumber(winningNumber) {
 
   const goalRect = targetGoal.getBoundingClientRect();
 
+  // starting center of ball (relative to pitch)
   const startX = ballRect.left + ballRect.width / 2 - pitchRect.left;
   const startY = ballRect.top + ballRect.height / 2 - pitchRect.top;
 
+  // end point: just in front of goal mouth
   const endX = goalRect.left + goalRect.width / 2 - pitchRect.left;
   const endY =
-    goalRect.top + goalRect.height * 0.25 - pitchRect.top; // roughly goal mouth
+    goalRect.top + goalRect.height * 0.25 - pitchRect.top;
 
   const deltaX = endX - startX;
   const deltaY = endY - startY;
 
-  const duration = 650;
-  const peak = -80; // arc
+  const duration = 650; // ms
+  const peak = -90;     // arc height
   const startTime = performance.now();
+
+  // trigger player kick animation
+  playerImg.classList.add("kick");
+  setTimeout(() => playerImg.classList.remove("kick"), 320);
 
   ballImg.style.transition = "none";
 
@@ -137,6 +143,7 @@ function shootBallToWinningNumber(winningNumber) {
     const tRaw = (now - startTime) / duration;
     const t = Math.min(Math.max(tRaw, 0), 1);
 
+    // ease in-out
     const ease = t < 0.5
       ? 2 * t * t
       : -1 + (4 - 2 * t) * t;
@@ -148,6 +155,7 @@ function shootBallToWinningNumber(winningNumber) {
     const relX = x - ballRect.width / 2;
     const relY = yArc - ballRect.height / 2;
 
+    // ball always above goals due to z-index in CSS
     ballImg.style.transform = `translate(${relX}px, ${relY}px)`;
 
     if (t < 1) {
@@ -156,7 +164,7 @@ function shootBallToWinningNumber(winningNumber) {
       targetGoal.classList.add("win");
       setTimeout(() => {
         ballImg.style.transition = "transform 0.5s ease-out";
-        ballImg.style.transform = "translate(0, 0)"; // back near player
+        ballImg.style.transform = "translate(0, 0)"; // back to player
       }, 700);
     }
   }
