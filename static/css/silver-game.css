@@ -119,7 +119,7 @@ body {
 .frog-wrapper {
   position: absolute;
   left: 50%;
-  top: 10%;                /* move up/down if needed: smaller = closer to top */
+  top: 5%;                /* move up/down if needed: smaller = closer to top */
   transform: translateX(-50%);
   width: 150px;
   height: 150px;
@@ -150,7 +150,7 @@ body {
 .pads {
   position: absolute;
   left: 50%;
-  bottom: 4%;            /* move up/down as you like */
+  bottom: 15%;            /* move up/down as you like */
   transform: translateX(-50%);
   width: 100%;
   max-width: 380px;
