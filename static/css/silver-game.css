@@ -130,7 +130,7 @@ body {
 .frog-wrapper {
   position: absolute;
   left: 50%;
-  top: 9%;          /* smaller = higher, bigger = lower */
+  top: 12%;          /* smaller = higher, bigger = lower */
   transform: translateX(-50%);
   width: 150px;
   height: 150px;
@@ -161,7 +161,7 @@ body {
 .pads {
   position: absolute;
   left: 50%;
-  bottom: 4%;        /* smaller = lower, bigger = higher */
+  bottom: -10%;        /* smaller = lower, bigger = higher */
   transform: translateX(-50%);
   width: 100%;
   max-width: 380px;
@@ -244,6 +244,7 @@ body {
   text-align: center;
   font-size: 14px;
   color: #9ca3af;
+  margin-top: -6px;   /* pulls chips upward */
   margin-bottom: 4px;
 }
 
@@ -299,7 +300,7 @@ body {
 }
 
 .bet-container {
-  margin: 6px 0 4px;
+  margin: 4px 0 2px;
   display: flex;
   justify-content: center;
 }
