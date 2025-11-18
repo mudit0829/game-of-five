@@ -122,6 +122,13 @@ body {
   position: relative; /* needed for transform math */
   transform: translateX(0) translateY(0);
 }
+/* Frog image */
+#frogSprite {
+  position: absolute;          /* already inside the pond card */
+  z-index: 5;                  /* always on top of lily pads */
+  pointer-events: none;
+  transition: none;            /* JS will control animation */
+}
 
 /* ===== PADS ===== */
 
