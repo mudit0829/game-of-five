@@ -18,11 +18,10 @@ const USERNAME = uname;
 // ========= DOM =========
 const pitch = document.querySelector(".pitch");
 const ballImg = document.getElementById("ballSprite");
-const playerImg = document.getElementById("playerSprite");
+const cssPlayer = document.getElementById("cssPlayer");
 const playerArea = document.querySelector(".player-area");
 const goals = Array.from(document.querySelectorAll(".goal.pad"));
 const numChips = Array.from(document.querySelectorAll(".num-chip"));
-const betInput = document.getElementById("betAmount");
 const placeBetBtn = document.getElementById("placeBetBtn");
 const roundIdSpan = document.getElementById("roundId");
 const playerCountSpan = document.getElementById("playerCount");
@@ -63,7 +62,7 @@ function setSelectedNumber(n) {
   });
 }
 
-// ---- my bets row ----
+// ---- my bets inline display ----
 function updateMyBets(bets) {
   const myBets = (bets || []).filter((b) => b.user_id === USER_ID);
   userBetCountLabel.textContent = myBets.length;
@@ -71,15 +70,20 @@ function updateMyBets(bets) {
   myBetsRow.innerHTML = "";
   
   if (myBets.length === 0) {
-    myBetsRow.innerHTML = '<span style="color: #6b7280; font-size: 11px;">—</span>';
+    myBetsRow.innerHTML = '<span style="color: #6b7280; font-size: 11px;">none</span>';
     return;
   }
 
-  myBets.forEach((b) => {
-    const chip = document.createElement("div");
+  myBets.forEach((b, index) => {
+    const chip = document.createElement("span");
     chip.className = "my-bet-chip";
     chip.textContent = b.number;
     myBetsRow.appendChild(chip);
+    
+    // Add comma separator except for last item
+    if (index < myBets.length - 1) {
+      myBetsRow.appendChild(document.createTextNode(", "));
+    }
   });
 }
 
@@ -111,7 +115,7 @@ function updateGoalsFromBets(bets) {
   });
 }
 
-// ========= DOTTED LINE TRAJECTORY ANIMATION =========
+// ========= DOTTED LINE TRAJECTORY =========
 function createTrajectoryLine(startX, startY, endX, endY, peak) {
   const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
   svg.setAttribute("class", "trajectory-line");
@@ -149,7 +153,7 @@ function createTrajectoryLine(startX, startY, endX, endY, peak) {
   }, 1200);
 }
 
-// CSS animation for path
+// CSS animations
 if (!document.getElementById("trajectory-styles")) {
   const style = document.createElement("style");
   style.id = "trajectory-styles";
@@ -175,7 +179,7 @@ if (!document.getElementById("trajectory-styles")) {
   document.head.appendChild(style);
 }
 
-// ========= FIXED BALL SHOOTING ANIMATION =========
+// ========= PROFESSIONAL BALL SHOOTING =========
 function shootBallToWinningNumber(winningNumber) {
   const pitchRect = pitch.getBoundingClientRect();
   const ballRect = ballImg.getBoundingClientRect();
@@ -190,10 +194,9 @@ function shootBallToWinningNumber(winningNumber) {
 
   const goalRect = targetGoal.getBoundingClientRect();
 
-  // FIXED: Calculate positions relative to VIEWPORT, not pitch
+  // Viewport coordinates
   const startX = ballRect.left + ballRect.width / 2;
   const startY = ballRect.top + ballRect.height / 2;
-
   const endX = goalRect.left + goalRect.width / 2;
   const endY = goalRect.top + goalRect.height / 2;
 
@@ -202,11 +205,10 @@ function shootBallToWinningNumber(winningNumber) {
   const distance = Math.sqrt(deltaX * deltaX + deltaY * deltaY);
 
   const peak = -Math.min(100, distance * 0.3);
-  
   const duration = 750;
   const startTime = performance.now();
 
-  // Create trajectory line (relative to pitch)
+  // Trajectory line (relative to pitch)
   const pitchStartX = ballRect.left + ballRect.width / 2 - pitchRect.left;
   const pitchStartY = ballRect.top + ballRect.height / 2 - pitchRect.top;
   const pitchEndX = goalRect.left + goalRect.width / 2 - pitchRect.left;
@@ -214,18 +216,15 @@ function shootBallToWinningNumber(winningNumber) {
   
   createTrajectoryLine(pitchStartX, pitchStartY, pitchEndX, pitchEndY, peak);
 
-  // Trigger player kick
-  playerImg.classList.add("kick");
+  // Trigger CSS player kick
+  cssPlayer.classList.add("kick");
   
   setTimeout(() => {
-    // Store original ball transform
     const originalTransform = ballImg.style.transform;
     
-    ballImg.style.position = "fixed"; // Use fixed positioning for viewport
+    ballImg.style.position = "fixed";
     ballImg.style.transition = "none";
     ballImg.style.zIndex = "1000";
-    
-    // Set initial position
     ballImg.style.left = startX + "px";
     ballImg.style.top = startY + "px";
     ballImg.style.transform = "translate(-50%, -50%)";
@@ -252,10 +251,10 @@ function shootBallToWinningNumber(winningNumber) {
       if (t < 1) {
         requestAnimationFrame(step);
       } else {
-        // Ball reached goal
+        // Goal reached!
         targetGoal.classList.add("win");
         
-        // Goal flash effect
+        // Goal flash
         const flash = document.createElement("div");
         flash.style.position = "absolute";
         flash.style.top = "50%";
@@ -272,7 +271,7 @@ function shootBallToWinningNumber(winningNumber) {
         
         setTimeout(() => flash.remove(), 600);
 
-        // Return ball to original position
+        // Return ball
         setTimeout(() => {
           ballImg.style.position = "";
           ballImg.style.left = "";
@@ -287,7 +286,7 @@ function shootBallToWinningNumber(winningNumber) {
     requestAnimationFrame(step);
   }, 200);
 
-  setTimeout(() => playerImg.classList.remove("kick"), 600);
+  setTimeout(() => cssPlayer.classList.remove("kick"), 700);
 }
 
 // ========= Socket.IO / backend =========
@@ -377,13 +376,13 @@ socket.on("timer_update", (payload) => {
   timerText.textContent = timeRemaining.toString().padStart(2, "0");
   playerCountSpan.textContent = payload.players ?? 0;
   
-  // Show player at 15 seconds
+  // Show CSS player at 15 seconds
   if (timeRemaining <= 15 && !playerShown) {
     playerArea.classList.add("visible");
     playerShown = true;
   }
   
-  // Urgent timer at 10 seconds
+  // Urgent timer
   if (timeRemaining <= 10) {
     timerPill.classList.add("urgent");
   } else {
@@ -393,7 +392,7 @@ socket.on("timer_update", (payload) => {
 
 socket.on("betting_closed", (payload) => {
   if (payload.game_type !== GAME) return;
-  setStatus("Betting closed for this round", "error");
+  setStatus("Betting closed", "error");
 });
 
 socket.on("bet_placed", (payload) => {
@@ -405,7 +404,7 @@ socket.on("bet_placed", (payload) => {
 });
 
 socket.on("bet_success", (payload) => {
-  setStatus(payload.message || "Bet placed successfully", "ok");
+  setStatus(payload.message || "Bet placed!", "ok");
   if (typeof payload.new_balance === "number") {
     updateWallet(payload.new_balance);
   }
@@ -419,9 +418,8 @@ socket.on("round_result", (payload) => {
   if (payload.game_type !== GAME) return;
   const winning = payload.result;
   if (winning === undefined || winning === null) return;
-  setStatus(`Winning number: ${winning}`, "ok");
+  setStatus(`Winner: ${winning}! 🎉`, "ok");
   
-  // Small delay to let status show
   setTimeout(() => {
     shootBallToWinningNumber(winning);
   }, 100);
