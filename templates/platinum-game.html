@@ -8,17 +8,14 @@
 </head>
 <body>
   <div class="platinum-page">
-    <!-- BACKGROUND + ANIMATED WATER -->
+    
+    <!-- SIMPLE WATER BACKGROUND -->
     <div class="bg-wrapper">
       <img
         src="{{ url_for('static', filename='img/platinum_bg.png') }}"
-        alt="Sea background"
+        alt="Water background"
         class="bg-base"
       />
-
-      <!-- Animated water strips (PNG, repeated) -->
-      <div class="water-layer water-far"></div>
-      <div class="water-layer water-near"></div>
     </div>
 
     <!-- TOP HUD -->
@@ -45,22 +42,51 @@
       </div>
     </header>
 
-    <!-- BOATS + PARATROOPER -->
+    <!-- PLAY AREA: BOATS + PARATROOPER -->
     <main class="play-layer">
-      <!-- Boats -->
-      <div class="boats-layer">
-       <!-- top row (just above mid-water) -->
-<img id="boat1" class="boat" src="{{ url_for('static', filename='img/boat1.png') }}" style="top:40%; left:10%;">
-<img id="boat2" class="boat" src="{{ url_for('static', filename='img/boat2.png') }}" style="top:40%; left:40%;">
-<img id="boat3" class="boat" src="{{ url_for('static', filename='img/boat3.png') }}" style="top:40%; left:70%;">
+      
+      <!-- BOATS (2 rows, 3 per row) -->
+      <div class="boats-container">
+        <!-- Row 1 -->
+        <div class="boat-row">
+          <div class="boat" data-boat="1">
+            <img src="{{ url_for('static', filename='img/boat1.png') }}" alt="Boat 1">
+            <span class="boat-number"></span>
+            <span class="boat-user"></span>
+          </div>
+          <div class="boat" data-boat="2">
+            <img src="{{ url_for('static', filename='img/boat2.png') }}" alt="Boat 2">
+            <span class="boat-number"></span>
+            <span class="boat-user"></span>
+          </div>
+          <div class="boat" data-boat="3">
+            <img src="{{ url_for('static', filename='img/boat3.png') }}" alt="Boat 3">
+            <span class="boat-number"></span>
+            <span class="boat-user"></span>
+          </div>
+        </div>
 
-<!-- bottom row (a little lower, but still floating) -->
-<img id="boat4" class="boat" src="{{ url_for('static', filename='img/boat4.png') }}" style="top:58%; left:14%;">
-<img id="boat5" class="boat" src="{{ url_for('static', filename='img/boat5.png') }}" style="top:58%; left:44%;">
-<img id="boat6" class="boat" src="{{ url_for('static', filename='img/boat6.png') }}" style="top:58%; left:74%;">
+        <!-- Row 2 -->
+        <div class="boat-row">
+          <div class="boat" data-boat="4">
+            <img src="{{ url_for('static', filename='img/boat4.png') }}" alt="Boat 4">
+            <span class="boat-number"></span>
+            <span class="boat-user"></span>
+          </div>
+          <div class="boat" data-boat="5">
+            <img src="{{ url_for('static', filename='img/boat5.png') }}" alt="Boat 5">
+            <span class="boat-number"></span>
+            <span class="boat-user"></span>
+          </div>
+          <div class="boat" data-boat="6">
+            <img src="{{ url_for('static', filename='img/boat6.png') }}" alt="Boat 6">
+            <span class="boat-number"></span>
+            <span class="boat-user"></span>
+          </div>
+        </div>
       </div>
 
-      <!-- Paratrooper (animated in JS) -->
+      <!-- PARATROOPER -->
       <img
         id="paratrooper"
         src="{{ url_for('static', filename='img/paratrooper.png') }}"
@@ -68,38 +94,45 @@
       >
     </main>
 
-    <!-- BOTTOM CONTROLS -->
+    <!-- BOTTOM CONTROLS (EXACT GOLD GAME STYLE) -->
     <section class="controls">
       <h3>Select your number (0–9)</h3>
 
+      <!-- Numbers 0-4 -->
       <div class="number-row">
         {% for i in range(5) %}
         <button class="num-chip" data-number="{{ i }}">{{ i }}</button>
         {% endfor %}
       </div>
 
+      <!-- Numbers 5-9 -->
       <div class="number-row">
         {% for i in range(5, 10) %}
         <button class="num-chip" data-number="{{ i }}">{{ i }}</button>
         {% endfor %}
       </div>
 
-      <div class="my-bets-title">Your bets in this game</div>
-      <div id="myBets" class="my-bets"></div>
-
-      <div class="bet-row">
-        <input id="betAmount" placeholder="Your Bet">
-        <button id="placeBetBtn">Place Bet (₹{{ game.bet_amount }})</button>
+      <!-- Your Bets Display -->
+      <div class="my-bets-section">
+        <div class="my-bets-title">Your bets in this game</div>
+        <div id="myBetsContainer" class="my-bets"></div>
       </div>
 
+      <!-- Place Bet Button (no input field) -->
+      <button id="placeBetBtn" class="bet-button">
+        Place Bet (₹{{ game.bet_amount }})
+      </button>
+
+      <!-- Status Message -->
       <div id="statusMessage" class="status"></div>
     </section>
+
   </div>
 
   <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
   <script>
-    const GAME_TYPE = "{{ game_type }}";           // "platinum"
-    const FIXED_BET_AMOUNT = {{ game.bet_amount }}; // 200
+    const GAME_TYPE = "{{ game_type }}";
+    const FIXED_BET_AMOUNT = {{ game.bet_amount }};
   </script>
   <script src="{{ url_for('static', filename='js/platinum-game.js') }}"></script>
 </body>
