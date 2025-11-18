@@ -110,18 +110,18 @@ body {
   overflow: hidden;
 }
 
-/* Frog sits ON TOP of center lilypad */
+/* Frog ABOVE pads like reference design */
 .frog-wrapper {
-  position: absolute;               /* overlay inside pond */
+  position: absolute;
   left: 50%;
-  top: 48%;                         /* adjust 46–52% if needed */
-  transform: translate(-50%, -55%); /* small down shift so it sits on pad */
+  top: 18%;                         /* move frog towards top of pond */
+  transform: translate(-50%, -50%); /* center horizontally, nice vertical placement */
   width: 120px;
   height: 120px;
   display: flex;
   align-items: center;
   justify-content: center;
-  pointer-events: none;             /* clicks still hit pads */
+  pointer-events: none;
   z-index: 3;
 }
 
@@ -130,7 +130,7 @@ body {
   width: 100%;
   height: auto;
   position: relative;
-  transform: translate(0, 0);       /* base position */
+  transform: translate(0, 0);
   transition: transform 0.3s ease-out;  /* smooth jump when JS updates transform */
 }
 
@@ -332,6 +332,7 @@ body {
   .frog-wrapper {
     width: 100px;
     height: 100px;
+    top: 18%;                      /* keep same relative position on small screens */
   }
   .frog {
     width: 100%;
