@@ -8,7 +8,15 @@ body {
   margin: 0;
   padding: 0;
   font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-  background: radial-gradient(circle at top, #020617, #020617 45%, #000 100%);
+
+  /* Full-screen background */
+  background-color: #020617;
+  background-image: url("../img/silver_bg.png");
+  background-size: cover;
+  background-position: center top;
+  background-repeat: no-repeat;
+  background-attachment: fixed; /* nice feel on tall screens */
+
   color: #f9fafb;
 }
 
@@ -26,7 +34,7 @@ body {
   align-items: flex-start;
   justify-content: space-between;
   gap: 8px;
-  margin-bottom: 10px;
+  margin-bottom: 12px;
 }
 
 .top-left {
@@ -98,32 +106,23 @@ body {
   100% { transform: translateY(0); }
 }
 
-/* ===== POND / BACKGROUND / FROG ===== */
+/* ===== FROG + LILYPADS AREA (on background) ===== */
 
 .pond {
   position: relative;
-  margin-top: 4px;
-  border-radius: 26px;
-  /* background image you added */
-  background-image: url("../img/silver_bg.png");
-  background-size: cover;
-  background-position: center top;
-  background-repeat: no-repeat;
-  box-shadow: 0 18px 40px rgba(0, 0, 0, 0.9);
-  overflow: hidden;
-  /* fixed height so composition matches your reference */
-  height: 320px;
-  padding: 0; /* padding not needed now, we position internals absolutely */
+  width: 100%;
+  height: 330px;           /* controls how much of BG is used for frog + pads */
+  margin-top: 10px;
 }
 
-/* Frog ABOVE the lilypads, near top of background */
+/* Frog on land (upper part of background) */
 .frog-wrapper {
   position: absolute;
   left: 50%;
-  top: 26%;                          /* higher = closer to top, lower = closer to pads */
-  transform: translate(-50%, -50%);
-  width: 140px;
-  height: 140px;
+  top: 16%;                /* move up/down if needed: smaller = closer to top */
+  transform: translateX(-50%);
+  width: 150px;
+  height: 150px;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -137,44 +136,43 @@ body {
   height: auto;
   position: relative;
   transform: translate(0, 0);
-  transition: transform 0.3s ease-out;  /* smooth jump when JS updates transform */
+  transition: transform 0.3s ease-out;  /* smooth reset; jump uses JS animation */
 }
 
-/* Target image (same as .frog if you use both id+class) */
+/* Target image (same element) */
 #frogSprite {
   position: relative;
   z-index: 5;
   pointer-events: none;
 }
 
-/* ===== PADS (floating on water, near bottom of pond) ===== */
-
+/* Lilypads floating on water (middle of screen) */
 .pads {
   position: absolute;
   left: 50%;
-  bottom: 24px;                      /* move up/down to adjust pads on water */
+  bottom: 10%;            /* move up/down as you like */
   transform: translateX(-50%);
   width: 100%;
-  max-width: 360px;
+  max-width: 380px;
 }
 
 .pads-row {
   display: flex;
   justify-content: space-around;
   align-items: center;
-  margin-bottom: 12px;
+  margin-bottom: 14px;
 }
 
 .pad {
   position: relative;
-  width: 110px;
-  height: 80px;
+  width: 120px;
+  height: 82px;
   display: flex;
   justify-content: center;
   align-items: center;
 }
 
-/* subtle rotation / scale variations */
+/* slight variation for each pad */
 .pad[data-pad="1"] img { transform: rotate(-6deg) scale(0.98); }
 .pad[data-pad="2"] img { transform: rotate(3deg) scale(1.03); }
 .pad[data-pad="3"] img { transform: rotate(-2deg) scale(1.00); }
@@ -183,7 +181,7 @@ body {
 .pad[data-pad="6"] img { transform: rotate(2deg) scale(1.04); }
 
 .pad img {
-  width: 110px;
+  width: 120px;
   height: auto;
   filter: drop-shadow(0 8px 10px rgba(0,0,0,0.5));
 }
@@ -220,10 +218,11 @@ body {
   100% { transform: scale(1.03); filter: drop-shadow(0 0 6px rgba(34,197,94,0.6)); }
 }
 
-/* ===== CONTROLS ===== */
+/* ===== CONTROLS (0–9, Your Bet, Place Bet) ===== */
 
 .controls {
-  margin-top: 18px;
+  margin-top: 24px;
+  padding-bottom: 10px;
 }
 
 .numbers-title {
@@ -340,21 +339,21 @@ body {
 
 @media (max-width: 480px) {
   .pond {
-    height: 300px;
+    height: 310px;
   }
 
   .frog-wrapper {
-    width: 120px;
-    height: 120px;
-    top: 28%;                         /* small tweak for tall screens */
+    width: 130px;
+    height: 130px;
+    top: 18%;
   }
 
   .pad {
-    width: 100px;
-    height: 72px;
+    width: 105px;
+    height: 74px;
   }
 
   .pad img {
-    width: 100px;
+    width: 105px;
   }
 }
