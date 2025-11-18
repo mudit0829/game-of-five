@@ -14,13 +14,11 @@ body {
   margin: 0;
   padding: 0;
   font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-  
   background-color: #0a5f3a;
   background-image: url("../img/football_bg.png");
   background-size: cover;
   background-position: center center;
   background-repeat: no-repeat;
-  
   color: #f9fafb;
 }
 
@@ -145,41 +143,43 @@ body {
   100% { transform: translateY(0) scale(1); }
 }
 
-/* ===== PITCH AREA (Goals + Player) ===== */
+/* ===== PITCH ===== */
 
 .pitch {
   position: relative;
   flex: 0 0 auto;
-  height: 50vh;
-  margin-bottom: 8px;
+  height: 52vh;
+  margin-bottom: 6px;
   padding: 0;
   background: transparent;
-  border: none;
   overflow: visible;
   width: 100%;
 }
 
-/* ===== GOALS - PROPERLY ALIGNED ===== */
+/* ===== GOALS - PERFECTLY CENTER ALIGNED ===== */
 
 .goals {
   position: relative;
   z-index: 2;
-  padding: 0 10px;
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
 }
 
 .goals-row {
   display: flex;
-  justify-content: space-evenly;  /* Even spacing */
-  align-items: flex-start;  /* Align to top for straight line */
-  margin-bottom: 16px;
-  gap: 10px;
+  justify-content: center;
+  align-items: flex-start;
+  margin-bottom: 18px;
+  gap: 12px;
+  width: 100%;
 }
 
 .goal {
   position: relative;
-  flex: 0 0 auto;
-  width: 110px;
-  height: 80px;
+  width: 100px;
+  height: 75px;
   display: flex;
   justify-content: center;
   align-items: center;
@@ -244,65 +244,166 @@ body {
   }
 }
 
-/* ===== PLAYER + BALL - BELOW GOALS, ABOVE NUMBERS ===== */
+/* ===== CSS ANIMATED PLAYER (Professional) ===== */
 
 .player-area {
   position: absolute;
-  bottom: 50px;  /* Above the numbers section */
+  bottom: 40px;
   left: 50%;
   transform: translateX(-50%);
   display: flex;
   justify-content: center;
   align-items: flex-end;
   z-index: 3;
-  height: 100px;
-  width: 160px;
+  height: 110px;
+  width: 180px;
 }
 
-/* Player hidden by default */
-.player {
-  width: 115px;
-  height: auto;
-  transform-origin: center bottom;
-  filter: drop-shadow(0 8px 15px rgba(0, 0, 0, 0.7));
+.css-player {
+  position: relative;
+  width: 60px;
+  height: 100px;
   opacity: 0;
   transition: opacity 0.5s ease-in;
+  filter: drop-shadow(0 8px 15px rgba(0, 0, 0, 0.7));
 }
 
-.player-area.visible .player {
+.player-area.visible .css-player {
   opacity: 1;
-  animation: playerIdle 2s ease-in-out infinite;
+  animation: playerIdle 2.5s ease-in-out infinite;
 }
 
-/* Idle breathing animation */
+/* Player body parts */
+.player-head {
+  position: absolute;
+  top: 0;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 24px;
+  height: 24px;
+  background: #f4a261;
+  border-radius: 50%;
+  border: 2px solid #2c3e50;
+}
+
+.player-body {
+  position: absolute;
+  top: 22px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 28px;
+  height: 35px;
+  background: linear-gradient(135deg, #e74c3c, #c0392b);
+  border-radius: 8px 8px 4px 4px;
+  border: 2px solid #2c3e50;
+}
+
+.player-arm {
+  position: absolute;
+  width: 10px;
+  height: 30px;
+  background: #e74c3c;
+  border-radius: 5px;
+  border: 2px solid #2c3e50;
+}
+
+.player-arm-left {
+  top: 25px;
+  left: 8px;
+  transform-origin: top center;
+  animation: armSwingLeft 1.5s ease-in-out infinite;
+}
+
+.player-arm-right {
+  top: 25px;
+  right: 8px;
+  transform-origin: top center;
+  animation: armSwingRight 1.5s ease-in-out infinite;
+}
+
+.player-leg {
+  position: absolute;
+  width: 12px;
+  height: 40px;
+  background: #2980b9;
+  border-radius: 6px;
+  border: 2px solid #2c3e50;
+}
+
+.player-leg-left {
+  bottom: 0;
+  left: 14px;
+  transform-origin: top center;
+  animation: legSwingLeft 1.5s ease-in-out infinite;
+}
+
+.player-leg-right {
+  bottom: 0;
+  right: 14px;
+  transform-origin: top center;
+  animation: legSwingRight 1.5s ease-in-out infinite;
+}
+
+/* Idle animations */
 @keyframes playerIdle {
-  0%, 100% { transform: translateY(0) scale(1); }
-  50% { transform: translateY(-3px) scale(1.01); }
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-4px); }
 }
 
-.player.kick {
-  animation: playerKick 0.5s ease-out !important;
+@keyframes armSwingLeft {
+  0%, 100% { transform: rotate(10deg); }
+  50% { transform: rotate(-20deg); }
 }
 
-@keyframes playerKick {
-  0%   { transform: translateY(0) rotate(0deg) scale(1); }
-  20%  { transform: translateY(-4px) rotate(-3deg) scale(1.02); }
-  40%  { transform: translateY(-12px) rotate(-8deg) scale(1.06); }
-  60%  { transform: translateY(-6px) rotate(-4deg) scale(1.03); }
-  100% { transform: translateY(0) rotate(0deg) scale(1); }
+@keyframes armSwingRight {
+  0%, 100% { transform: rotate(-10deg); }
+  50% { transform: rotate(20deg); }
 }
 
-/* Ball always visible */
+@keyframes legSwingLeft {
+  0%, 100% { transform: rotate(-5deg); }
+  50% { transform: rotate(10deg); }
+}
+
+@keyframes legSwingRight {
+  0%, 100% { transform: rotate(5deg); }
+  50% { transform: rotate(-10deg); }
+}
+
+/* Kick animation */
+.css-player.kick {
+  animation: playerKickJump 0.6s ease-out !important;
+}
+
+.css-player.kick .player-leg-right {
+  animation: kickLeg 0.6s ease-out !important;
+}
+
+@keyframes playerKickJump {
+  0% { transform: translateY(0) rotate(0deg); }
+  30% { transform: translateY(-15px) rotate(-8deg); }
+  50% { transform: translateY(-20px) rotate(-10deg); }
+  70% { transform: translateY(-10px) rotate(-5deg); }
+  100% { transform: translateY(0) rotate(0deg); }
+}
+
+@keyframes kickLeg {
+  0% { transform: rotate(0deg); }
+  40% { transform: rotate(-60deg); }
+  70% { transform: rotate(-80deg); }
+  100% { transform: rotate(0deg); }
+}
+
+/* Ball */
 .ball {
   position: absolute;
-  bottom: 12px;
+  bottom: 15px;
   left: 50%;
-  transform: translateX(-52px);
+  transform: translateX(-50px);
   width: 34px;
   height: 34px;
   z-index: 10;
   filter: drop-shadow(0 6px 10px rgba(0, 0, 0, 0.6));
-  transition: transform 0.1s ease;
 }
 
 /* ===== CONTROLS ===== */
@@ -380,101 +481,61 @@ body {
   50% { box-shadow: 0 4px 20px rgba(34, 197, 94, 1), 0 0 30px rgba(34, 197, 94, 0.6); }
 }
 
-/* ===== YOUR BETS SECTION (between numbers and bet input) ===== */
+/* ===== YOUR BETS (Inline display) ===== */
 
 .my-bets-section {
-  background: rgba(2, 6, 23, 0.8);
+  background: rgba(2, 6, 23, 0.7);
   backdrop-filter: blur(8px);
   border: 1px solid rgba(148, 163, 184, 0.3);
   border-radius: 12px;
   padding: 8px 12px;
-  margin: 10px 0 12px;
-  min-height: 45px;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-}
-
-.my-bets-title {
-  font-size: 11px;
-  font-weight: 600;
-  color: #94a3b8;
-  margin: 0 0 6px 0;
+  margin: 12px 0;
   text-align: center;
 }
 
-.my-bets-row {
+.my-bets-title {
+  font-size: 12px;
+  font-weight: 600;
+  color: #94a3b8;
   display: flex;
+  align-items: center;
   justify-content: center;
+  gap: 8px;
   flex-wrap: wrap;
+}
+
+.my-bets-row {
+  display: inline-flex;
   gap: 6px;
-  min-height: 22px;
+  flex-wrap: wrap;
+  color: #3b82f6;
+  font-weight: 700;
+  font-size: 14px;
 }
 
 .my-bet-chip {
-  min-width: 30px;
-  padding: 4px 10px;
+  display: inline-block;
+  min-width: 24px;
+  padding: 2px 8px;
   border-radius: 999px;
-  font-size: 13px;
+  font-size: 12px;
   font-weight: 700;
-  border: 1px solid #3b82f6;
-  background: rgba(29, 78, 216, 0.3);
-  backdrop-filter: blur(4px);
+  background: rgba(59, 130, 246, 0.3);
   color: #93c5fd;
-  box-shadow: 0 2px 8px rgba(59, 130, 246, 0.4);
+  border: 1px solid #3b82f6;
+  box-shadow: 0 2px 6px rgba(59, 130, 246, 0.4);
 }
 
-/* ===== BET SECTION ===== */
-
-.bet-section {
-  background: rgba(15, 23, 42, 0.85);
-  backdrop-filter: blur(12px);
-  border: 1px solid rgba(148, 163, 184, 0.3);
-  border-radius: 18px;
-  padding: 10px 12px 12px;
-  margin-top: auto;
-  box-shadow: 0 -4px 20px rgba(0, 0, 0, 0.5);
-}
-
-.bet-container {
-  margin: 0 0 8px 0;
-  display: flex;
-  justify-content: center;
-}
-
-.bet-container input {
-  width: 100%;
-  padding: 9px 14px;
-  border-radius: 999px;
-  border: 2px solid rgba(29, 78, 216, 0.4);
-  background: rgba(2, 6, 23, 0.8);
-  backdrop-filter: blur(8px);
-  color: #f9fafb;
-  font-size: 14px;
-  font-weight: 500;
-  transition: all 0.3s ease;
-}
-
-.bet-container input:focus {
-  outline: none;
-  border-color: #3b82f6;
-  box-shadow: 0 0 0 4px rgba(59, 130, 246, 0.2),
-              0 4px 12px rgba(59, 130, 246, 0.3);
-}
-
-.bet-container input::placeholder {
-  color: #6b7280;
-}
+/* ===== PLACE BET BUTTON ===== */
 
 .bet-button {
   display: block;
   width: 100%;
-  padding: 11px 16px;
+  padding: 13px 16px;
   border-radius: 999px;
   border: none;
   background: linear-gradient(135deg, #22c55e, #10b981, #14b8a6);
-  font-size: 15px;
+  font-size: 16px;
   font-weight: 800;
   color: #020617;
   cursor: pointer;
@@ -484,6 +545,7 @@ body {
   transition: all 0.2s ease;
   text-transform: uppercase;
   letter-spacing: 0.5px;
+  margin-bottom: 10px;
 }
 
 .bet-button:hover {
@@ -498,12 +560,11 @@ body {
 }
 
 .status {
-  margin-top: 8px;
   text-align: center;
   font-size: 12px;
   font-weight: 600;
   min-height: 20px;
-  padding: 3px 6px;
+  padding: 4px 6px;
   line-height: 1.4;
 }
 
@@ -521,48 +582,38 @@ body {
 
 @media (max-height: 750px) {
   .pitch {
-    height: 46vh;
-    margin-bottom: 6px;
+    height: 48vh;
   }
 
   .player-area {
-    bottom: 40px;
+    bottom: 35px;
+    height: 95px;
+  }
+
+  .css-player {
+    width: 55px;
+    height: 90px;
+  }
+}
+
+@media (max-height: 680px) {
+  .pitch {
+    height: 44vh;
+  }
+
+  .player-area {
+    bottom: 30px;
     height: 85px;
   }
 
-  .player {
-    width: 100px;
-  }
-
-  .ball {
-    width: 30px;
-    height: 30px;
+  .css-player {
+    width: 50px;
+    height: 80px;
   }
 
   .num-chip {
     width: 36px;
     height: 36px;
     font-size: 14px;
-  }
-}
-
-@media (max-height: 680px) {
-  .pitch {
-    height: 42vh;
-  }
-
-  .player-area {
-    bottom: 35px;
-    height: 75px;
-  }
-
-  .player {
-    width: 90px;
-  }
-
-  .num-chip {
-    width: 34px;
-    height: 34px;
-    font-size: 13px;
   }
 }
