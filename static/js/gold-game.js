@@ -180,6 +180,7 @@ if (!document.getElementById("trajectory-styles")) {
 }
 
 // ========= PROFESSIONAL BALL SHOOTING =========
+// ========= PROFESSIONAL BALL SHOOTING WITH KICK =========
 function shootBallToWinningNumber(winningNumber) {
   const pitchRect = pitch.getBoundingClientRect();
   const ballRect = ballImg.getBoundingClientRect();
@@ -216,9 +217,10 @@ function shootBallToWinningNumber(winningNumber) {
   
   createTrajectoryLine(pitchStartX, pitchStartY, pitchEndX, pitchEndY, peak);
 
-  // Trigger CSS player kick
+  // TRIGGER KICK ANIMATION
   cssPlayer.classList.add("kick");
   
+  // Wait for kick wind-up (280ms - when foot hits ball)
   setTimeout(() => {
     const originalTransform = ballImg.style.transform;
     
@@ -234,14 +236,14 @@ function shootBallToWinningNumber(winningNumber) {
       const tRaw = elapsed / duration;
       const t = Math.min(Math.max(tRaw, 0), 1);
 
-      // Ease-out cubic
+      // Ease-out cubic for smooth deceleration
       const ease = 1 - Math.pow(1 - t, 3);
 
       const x = startX + deltaX * ease;
       const yLinear = startY + deltaY * ease;
       const yArc = yLinear + peak * (4 * t * (1 - t));
 
-      const rotation = t * (distance * 1.2);
+      const rotation = t * (distance * 1.5);
       const scale = 1 - (t * 0.12);
       
       ballImg.style.left = x + "px";
@@ -284,10 +286,12 @@ function shootBallToWinningNumber(winningNumber) {
     }
 
     requestAnimationFrame(step);
-  }, 200);
+  }, 280); // Ball launches when foot makes contact
 
-  setTimeout(() => cssPlayer.classList.remove("kick"), 700);
+  // Remove kick class after animation completes
+  setTimeout(() => cssPlayer.classList.remove("kick"), 800);
 }
+
 
 // ========= Socket.IO / backend =========
 const socket = io();
