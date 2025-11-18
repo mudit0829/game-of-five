@@ -4,7 +4,6 @@
   <meta charset="UTF-8" />
   <title>{{ game.title }} – {{ game.name }}</title>
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-
   <link rel="stylesheet" href="{{ url_for('static', filename='css/gold-game.css') }}" />
 </head>
 <body>
@@ -33,9 +32,9 @@
       </div>
     </header>
 
-    <!-- FOOTBALL PITCH (Goals + Player/Ball) -->
+    <!-- FOOTBALL PITCH -->
     <section class="pitch">
-      <!-- 6 GOALS (2 rows x 3) -->
+      <!-- 6 GOALS -->
       <div class="goals">
         <div class="goals-row">
           {% for i in range(1,4) %}
@@ -57,14 +56,19 @@
         </div>
       </div>
 
-      <!-- PLAYER + BALL (Below goals, above numbers) -->
+      <!-- CSS ANIMATED PLAYER + BALL -->
       <div class="player-area">
-        <img
-          id="playerSprite"
-          class="player"
-          src="{{ url_for('static', filename='img/gold_player.png') }}"
-          alt="Player"
-        >
+        <!-- Pure CSS Player (no image needed) -->
+        <div id="cssPlayer" class="css-player">
+          <div class="player-head"></div>
+          <div class="player-body"></div>
+          <div class="player-arm player-arm-left"></div>
+          <div class="player-arm player-arm-right"></div>
+          <div class="player-leg player-leg-left"></div>
+          <div class="player-leg player-leg-right"></div>
+        </div>
+        
+        <!-- Ball -->
         <img
           id="ballSprite"
           class="ball"
@@ -74,57 +78,40 @@
       </div>
     </section>
 
-    <!-- BOTTOM CONTROLS -->
+    <!-- CONTROLS -->
     <section class="controls">
-      <!-- Number Selection Title -->
       <div class="numbers-title">Select your number (0–9)</div>
 
-      <!-- Numbers 0–4 -->
       <div class="numbers-row">
         {% for n in range(5) %}
         <button class="num-chip" data-number="{{ n }}">{{ n }}</button>
         {% endfor %}
       </div>
 
-      <!-- Numbers 5–9 -->
       <div class="numbers-row">
         {% for n in range(5,10) %}
         <button class="num-chip" data-number="{{ n }}">{{ n }}</button>
         {% endfor %}
       </div>
 
-      <!-- YOUR BETS SECTION (New styled container) -->
+      <!-- YOUR BETS DISPLAY (improved) -->
       <div class="my-bets-section">
-        <div class="my-bets-title">Your bets in this game</div>
-        <div id="myBetsRow" class="my-bets-row">
-          <span style="color: #6b7280; font-size: 11px;">—</span>
-        </div>
+        <div class="my-bets-title">Your bets: <span id="myBetsRow" class="my-bets-row"></span></div>
       </div>
 
-      <!-- BET INPUT SECTION -->
-      <div class="bet-section">
-        <div class="bet-container">
-          <input
-            id="betAmount"
-            type="text"
-            placeholder="Your Bet"
-            readonly
-          >
-        </div>
+      <!-- PLACE BET BUTTON (no input field) -->
+      <button id="placeBetBtn" class="bet-button">
+        Place Bet (₹{{ game.bet_amount }})
+      </button>
 
-        <button id="placeBetBtn" class="bet-button">
-          Place Bet (₹{{ game.bet_amount }})
-        </button>
-
-        <div id="statusMessage" class="status"></div>
-      </div>
+      <div id="statusMessage" class="status"></div>
     </section>
   </div>
 
   <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
   <script>
-    const GAME_TYPE = "{{ game_type }}";            // "gold"
-    const FIXED_BET_AMOUNT = {{ game.bet_amount }}; // 50
+    const GAME_TYPE = "{{ game_type }}";
+    const FIXED_BET_AMOUNT = {{ game.bet_amount }};
   </script>
   <script src="{{ url_for('static', filename='js/gold-game.js') }}"></script>
 </body>
