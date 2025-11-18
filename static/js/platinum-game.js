@@ -22,9 +22,25 @@ function selectNumber(n) {
     });
 }
 
-document.querySelectorAll(".num-chip").forEach(btn => {
-    btn.addEventListener("click", () => selectNumber(parseInt(btn.dataset.number)));
-});
+function showStatus(msg, error=false) {
+    const s = document.getElementById("statusMessage");
+    s.textContent = msg;
+    s.className = "status";
+    if (error) {
+        s.classList.add("error");
+    } else {
+        s.classList.add("ok");
+    }
+}
+
+function updateWallet(balance) {
+    walletBalance = balance;
+    document.getElementById("walletBalance").textContent = walletBalance;
+    document.querySelector(".coins").classList.add("coin-bounce");
+    setTimeout(() => {
+        document.querySelector(".coins").classList.remove("coin-bounce");
+    }, 500);
+}
 
 /* ---------------------------
    Update Boats from Bets
@@ -66,6 +82,9 @@ function updateMyBets(bets) {
     const myBets = (bets || []).filter((b) => b.user_id === USER_ID);
     const container = document.getElementById("myBetsContainer");
     
+    // Update bet count
+    document.getElementById("userBets").textContent = myBets.length;
+    
     container.innerHTML = "";
     
     if (myBets.length === 0) {
@@ -82,7 +101,17 @@ function updateMyBets(bets) {
 }
 
 /* ---------------------------
-   Betting Button
+   Number Chip Click Events
+----------------------------*/
+
+document.querySelectorAll(".num-chip").forEach(btn => {
+    btn.addEventListener("click", () => {
+        selectNumber(parseInt(btn.dataset.number));
+    });
+});
+
+/* ---------------------------
+   Place Bet Button
 ----------------------------*/
 
 document.getElementById("placeBetBtn").onclick = () => {
@@ -103,19 +132,8 @@ document.getElementById("placeBetBtn").onclick = () => {
     });
 };
 
-function showStatus(msg, error=false) {
-    const s = document.getElementById("statusMessage");
-    s.textContent = msg;
-    s.className = "status";
-    if (error) {
-        s.classList.add("error");
-    } else {
-        s.classList.add("ok");
-    }
-}
-
 /* ---------------------------
-   Paratrooper Animation (IMPROVED)
+   Paratrooper Animation (SMOOTH)
 ----------------------------*/
 
 function landParatrooper(winningNumber) {
@@ -137,39 +155,41 @@ function landParatrooper(winningNumber) {
     const rect = targetBoat.getBoundingClientRect();
     const para = document.getElementById("paratrooper");
 
-    // Calculate landing position
-    const landingTop = rect.top - 100;
+    // Calculate landing position (on top of boat)
+    const landingTop = rect.top - 80;
     const landingLeft = rect.left + rect.width / 2;
 
     // Reset paratrooper to top
     para.style.transition = "none";
     para.style.top = "-260px";
     para.style.left = "50%";
-    para.classList.remove("falling");
+    para.style.transform = "translateX(-50%)";
 
     // Force reflow
     void para.offsetWidth;
 
-    // Animate to target
+    // Animate smooth landing
     setTimeout(() => {
-        para.style.transition = "top 2.5s cubic-bezier(0.25, 0.46, 0.45, 0.94), left 2.5s cubic-bezier(0.25, 0.46, 0.45, 0.94)";
+        para.style.transition = "top 2.2s cubic-bezier(0.25, 0.46, 0.45, 0.94), left 2.2s cubic-bezier(0.25, 0.46, 0.45, 0.94), transform 2.2s ease-out";
         para.style.top = landingTop + "px";
         para.style.left = landingLeft + "px";
-        para.classList.add("falling");
+        para.style.transform = "translateX(-50%)";
 
-        // Mark winning boat
-        targetBoat.classList.add("win");
+        // Mark winning boat with glow
+        setTimeout(() => {
+            targetBoat.classList.add("win");
+        }, 2000);
 
-        // Create splash effect
+        // Create landing splash effect
         setTimeout(() => {
             const splash = document.createElement("div");
             splash.style.position = "fixed";
             splash.style.top = (rect.top + rect.height / 2) + "px";
             splash.style.left = (rect.left + rect.width / 2) + "px";
             splash.style.transform = "translate(-50%, -50%)";
-            splash.style.width = "150%";
-            splash.style.height = "150%";
-            splash.style.background = "radial-gradient(circle, rgba(34,197,94,0.6) 0%, transparent 70%)";
+            splash.style.width = "200px";
+            splash.style.height = "200px";
+            splash.style.background = "radial-gradient(circle, rgba(34,197,94,0.6) 0%, rgba(34,197,94,0.3) 40%, transparent 70%)";
             splash.style.borderRadius = "50%";
             splash.style.pointerEvents = "none";
             splash.style.animation = "splashEffect 0.8s ease-out";
@@ -177,29 +197,32 @@ function landParatrooper(winningNumber) {
             document.body.appendChild(splash);
 
             setTimeout(() => splash.remove(), 800);
-        }, 2300);
+        }, 2100);
     }, 50);
 }
 
-// Splash animation
-const style = document.createElement("style");
-style.textContent = `
-  @keyframes splashEffect {
-    0% {
-      opacity: 0;
-      transform: translate(-50%, -50%) scale(0.3);
-    }
-    50% {
-      opacity: 1;
-      transform: translate(-50%, -50%) scale(1);
-    }
-    100% {
-      opacity: 0;
-      transform: translate(-50%, -50%) scale(1.5);
-    }
-  }
-`;
-document.head.appendChild(style);
+// Splash animation CSS
+if (!document.getElementById("splash-animation")) {
+    const style = document.createElement("style");
+    style.id = "splash-animation";
+    style.textContent = `
+        @keyframes splashEffect {
+            0% {
+                opacity: 0;
+                transform: translate(-50%, -50%) scale(0.3);
+            }
+            50% {
+                opacity: 1;
+                transform: translate(-50%, -50%) scale(1);
+            }
+            100% {
+                opacity: 0;
+                transform: translate(-50%, -50%) scale(1.5);
+            }
+        }
+    `;
+    document.head.appendChild(style);
+}
 
 /* ---------------------------
    Socket Events
@@ -214,8 +237,9 @@ socket.on("connect", () => {
 
 socket.on("round_data", data => {
     const rd = data.round_data;
-    document.getElementById("roundCode").textContent = rd.round_code;
-    document.getElementById("playerCount").textContent = rd.players;
+    
+    document.getElementById("roundCode").textContent = rd.round_code || rd.round_number || "--";
+    document.getElementById("playerCount").textContent = rd.players || 0;
 
     walletBalance = rd.balance || walletBalance;
     document.getElementById("walletBalance").textContent = walletBalance;
@@ -226,37 +250,35 @@ socket.on("round_data", data => {
 
 socket.on("new_round", data => {
     const rd = data.round_data;
-    document.getElementById("roundCode").textContent = data.round_code || rd.round_number;
-    document.getElementById("playerCount").textContent = rd.players;
+    
+    document.getElementById("roundCode").textContent = data.round_code || rd.round_number || "--";
+    document.getElementById("playerCount").textContent = rd.players || 0;
 
     updateBoatsFromBets(rd.bets || []);
     updateMyBets(rd.bets || []);
     showStatus("New round started", false);
 
-    // Reset paratrooper
+    // Reset paratrooper to top
     const para = document.getElementById("paratrooper");
     para.style.transition = "none";
     para.style.top = "-260px";
     para.style.left = "50%";
-    para.classList.remove("falling");
+    para.style.transform = "translateX(-50%)";
+
+    // Remove urgent timer styling
+    document.querySelector(".timer-pill").classList.remove("urgent");
 });
 
 socket.on("bet_placed", data => {
-    document.getElementById("playerCount").textContent = data.round_data.players;
-    updateBoatsFromBets(data.round_data.bets || []);
-    updateMyBets(data.round_data.bets || []);
+    const rd = data.round_data;
+    document.getElementById("playerCount").textContent = rd.players || 0;
+    updateBoatsFromBets(rd.bets || []);
+    updateMyBets(rd.bets || []);
 });
 
 socket.on("bet_success", data => {
-    walletBalance = data.new_balance;
-    document.getElementById("walletBalance").textContent = walletBalance;
-    showStatus("Bet placed!", false);
-    
-    // Coin bounce effect
-    document.querySelector(".coins").classList.add("coin-bounce");
-    setTimeout(() => {
-        document.querySelector(".coins").classList.remove("coin-bounce");
-    }, 500);
+    updateWallet(data.new_balance);
+    showStatus("Bet placed successfully!", false);
 });
 
 socket.on("bet_error", data => {
@@ -265,18 +287,20 @@ socket.on("bet_error", data => {
 
 socket.on("round_result", data => {
     const winning = data.result;
-    showStatus("Winning boat: " + winning + "! 🎉", false);
+    showStatus("Winning: " + winning + "! 🎉", false);
     
+    // Small delay before paratrooper animation
     setTimeout(() => {
         landParatrooper(winning);
-    }, 100);
+    }, 150);
 });
 
 socket.on("timer_update", data => {
     const timeRemaining = data.time_remaining || 0;
-    document.getElementById("timerText").textContent = timeRemaining;
+    document.getElementById("timerText").textContent = timeRemaining.toString().padStart(2, "0");
+    document.getElementById("playerCount").textContent = data.players || 0;
     
-    // Add urgent styling
+    // Add urgent styling at 10 seconds
     const pill = document.querySelector(".timer-pill");
     if (timeRemaining <= 10) {
         pill.classList.add("urgent");
@@ -285,7 +309,15 @@ socket.on("timer_update", data => {
     }
 });
 
-/* REGISTER USER */
+socket.on("betting_closed", data => {
+    if (data.game_type !== GAME_TYPE) return;
+    showStatus("Betting closed for this round", true);
+});
+
+/* ---------------------------
+   Register User
+----------------------------*/
+
 fetch("/register", {
     method: "POST",
     headers: {"Content-Type":"application/json"},
@@ -293,10 +325,17 @@ fetch("/register", {
 })
 .then(r => r.json())
 .then(d => {
-    walletBalance = d.balance;
-    document.getElementById("walletBalance").textContent = walletBalance;
+    if (d && d.success) {
+        updateWallet(d.balance || 0);
+    }
+})
+.catch(err => {
+    console.error("Registration error:", err);
 });
 
-// Initialize
+/* ---------------------------
+   Initialize
+----------------------------*/
+
 selectNumber(0);
 showStatus("");
