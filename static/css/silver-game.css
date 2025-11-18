@@ -110,24 +110,35 @@ body {
   overflow: hidden;
 }
 
+/* Frog sits ON TOP of center lilypad */
 .frog-wrapper {
+  position: absolute;               /* overlay inside pond */
+  left: 50%;
+  top: 48%;                         /* adjust 46–52% if needed */
+  transform: translate(-50%, -55%); /* small down shift so it sits on pad */
+  width: 120px;
+  height: 120px;
   display: flex;
+  align-items: center;
   justify-content: center;
-  margin-bottom: 8px;
+  pointer-events: none;             /* clicks still hit pads */
+  z-index: 3;
 }
 
+/* This element is moved by JS using transform */
 .frog {
-  width: 120px;
+  width: 100%;
   height: auto;
-  position: relative; /* needed for transform math */
-  transform: translateX(0) translateY(0);
+  position: relative;
+  transform: translate(0, 0);       /* base position */
+  transition: transform 0.3s ease-out;  /* smooth jump when JS updates transform */
 }
-/* Frog image */
+
+/* Target image (same as .frog if you use both id+class) */
 #frogSprite {
-  position: absolute;          /* already inside the pond card */
-  z-index: 5;                  /* always on top of lily pads */
+  position: relative;
+  z-index: 5;
   pointer-events: none;
-  transition: none;            /* JS will control animation */
 }
 
 /* ===== PADS ===== */
@@ -318,8 +329,12 @@ body {
   .pond {
     padding: 22px 8px 18px;
   }
-  .frog {
+  .frog-wrapper {
     width: 100px;
+    height: 100px;
+  }
+  .frog {
+    width: 100%;
   }
   .pad img {
     width: 96px;
