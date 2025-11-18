@@ -19,6 +19,7 @@ const USERNAME = uname;
 const pitch = document.querySelector(".pitch");
 const ballImg = document.getElementById("ballSprite");
 const playerImg = document.getElementById("playerSprite");
+const playerArea = document.querySelector(".player-area");
 const goals = Array.from(document.querySelectorAll(".goal.pad"));
 const numChips = Array.from(document.querySelectorAll(".num-chip"));
 const betInput = document.getElementById("betAmount");
@@ -26,6 +27,7 @@ const placeBetBtn = document.getElementById("placeBetBtn");
 const roundIdSpan = document.getElementById("roundId");
 const playerCountSpan = document.getElementById("playerCount");
 const timerText = document.getElementById("timerText");
+const timerPill = document.querySelector(".timer-pill");
 const walletBalanceSpan = document.getElementById("walletBalance");
 const statusEl = document.getElementById("statusMessage");
 const coinsWrapper = document.querySelector(".coins");
@@ -37,6 +39,7 @@ userNameLabel.textContent = USERNAME;
 
 let walletBalance = 0;
 let selectedNumber = 0;
+let playerShown = false;
 
 // ========= UI helpers =========
 function setStatus(msg, type = "") {
@@ -121,21 +124,20 @@ function shootBallToWinningNumber(winningNumber) {
   const startX = ballRect.left + ballRect.width / 2 - pitchRect.left;
   const startY = ballRect.top + ballRect.height / 2 - pitchRect.top;
 
-  // end point: just in front of goal mouth
+  // end point: center of goal
   const endX = goalRect.left + goalRect.width / 2 - pitchRect.left;
-  const endY =
-    goalRect.top + goalRect.height * 0.25 - pitchRect.top;
+  const endY = goalRect.top + goalRect.height * 0.3 - pitchRect.top;
 
   const deltaX = endX - startX;
   const deltaY = endY - startY;
 
-  const duration = 650; // ms
-  const peak = -90;     // arc height
+  const duration = 700; // ms
+  const peak = -100;    // arc height
   const startTime = performance.now();
 
   // trigger player kick animation
   playerImg.classList.add("kick");
-  setTimeout(() => playerImg.classList.remove("kick"), 320);
+  setTimeout(() => playerImg.classList.remove("kick"), 400);
 
   ballImg.style.transition = "none";
 
@@ -143,10 +145,8 @@ function shootBallToWinningNumber(winningNumber) {
     const tRaw = (now - startTime) / duration;
     const t = Math.min(Math.max(tRaw, 0), 1);
 
-    // ease in-out
-    const ease = t < 0.5
-      ? 2 * t * t
-      : -1 + (4 - 2 * t) * t;
+    // ease out cubic
+    const ease = 1 - Math.pow(1 - t, 3);
 
     const x = startX + deltaX * ease;
     const yLinear = startY + deltaY * ease;
@@ -155,8 +155,9 @@ function shootBallToWinningNumber(winningNumber) {
     const relX = x - ballRect.width / 2;
     const relY = yArc - ballRect.height / 2;
 
-    // ball always above goals due to z-index in CSS
-    ballImg.style.transform = `translate(${relX}px, ${relY}px)`;
+    // Rotate ball for realism
+    const rotation = t * 720; // 2 full rotations
+    ballImg.style.transform = `translate(${relX}px, ${relY}px) rotate(${rotation}deg)`;
 
     if (t < 1) {
       requestAnimationFrame(step);
@@ -164,8 +165,8 @@ function shootBallToWinningNumber(winningNumber) {
       targetGoal.classList.add("win");
       setTimeout(() => {
         ballImg.style.transition = "transform 0.5s ease-out";
-        ballImg.style.transform = "translate(0, 0)"; // back to player
-      }, 700);
+        ballImg.style.transform = "translate(0, 0) rotate(0deg)";
+      }, 800);
     }
   }
 
@@ -238,13 +239,33 @@ socket.on("new_round", (payload) => {
   updateGoalsFromBets(rd.bets || []);
   updateMyBets(rd.bets || []);
   setStatus("New round started", "ok");
-  ballImg.style.transform = "translate(0, 0)";
+  ballImg.style.transform = "translate(0, 0) rotate(0deg)";
+  
+  // Hide player for new round
+  playerArea.classList.remove("visible");
+  playerShown = false;
+  timerPill.classList.remove("urgent");
 });
 
 socket.on("timer_update", (payload) => {
   if (payload.game_type !== GAME) return;
-  timerText.textContent = (payload.time_remaining ?? 0).toString().padStart(2, "0");
+  const timeRemaining = payload.time_remaining ?? 0;
+  
+  timerText.textContent = timeRemaining.toString().padStart(2, "0");
   playerCountSpan.textContent = payload.players ?? 0;
+  
+  // Show player when 15 seconds or less
+  if (timeRemaining <= 15 && !playerShown) {
+    playerArea.classList.add("visible");
+    playerShown = true;
+  }
+  
+  // Add urgent styling when time is low
+  if (timeRemaining <= 10) {
+    timerPill.classList.add("urgent");
+  } else {
+    timerPill.classList.remove("urgent");
+  }
 });
 
 socket.on("betting_closed", (payload) => {
