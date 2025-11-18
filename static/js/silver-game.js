@@ -20,7 +20,9 @@ const USERNAME = uname;
 // ======== DOM REFERENCES ========
 
 const frogImg = document.getElementById("frogSprite");
-const pondEl = frogImg ? frogImg.parentElement : document.body;
+// IMPORTANT: use the .pond card, not the frog's parent
+const pondEl = document.querySelector(".pond"); // CHANGED
+
 const pads = Array.from(document.querySelectorAll(".pad")); // lily pads
 
 const numChips = Array.from(document.querySelectorAll(".num-chip"));
@@ -103,7 +105,7 @@ function updatePadsFromBets(bets) {
       numSpan.textContent = "";
       userSpan.textContent = "";
     } else {
-      pad.dataset.number = String(bet.number);
+      pad.dataset.number = String(b.number);
       numSpan.textContent = bet.number;
       userSpan.textContent = bet.username;
     }
@@ -149,6 +151,7 @@ function hopFrogToWinningNumber(winningNumber) {
 
   frogImg.style.transition = "none";
   frogImg.style.zIndex = "6";
+  frogImg.style.willChange = "transform";
 
   function step(now) {
     const tRaw = (now - startTime) / duration;
@@ -179,6 +182,7 @@ function hopFrogToWinningNumber(winningNumber) {
         endY - baseCenterY
       }px) scale(1)`;
       targetPad.classList.add("win");
+      frogImg.style.willChange = "auto";
     }
   }
 
