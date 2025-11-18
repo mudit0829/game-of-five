@@ -129,7 +129,7 @@ body {
 .frog-wrapper {
   position: absolute;
   left: 50%;
-  top: 6%;          /* smaller = higher, bigger = lower */
+  top: 12%;          /* smaller = higher, bigger = lower */
   transform: translateX(-50%);
   width: 150px;
   height: 150px;
@@ -339,7 +339,7 @@ body {
 }
 
 .status {
-  margin-top: 4px;
+  margin-top: 15px;
   text-align: center;
   font-size: 13px;
   min-height: 18px;
@@ -358,7 +358,7 @@ body {
   .frog-wrapper {
     width: 130px;
     height: 130px;
-    top: 6%;
+    top: 12%;
   }
 
   .pad {
