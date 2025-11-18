@@ -4,6 +4,13 @@
   box-sizing: border-box;
 }
 
+/* Make page exactly one screen high, no scroll */
+html,
+body {
+  height: 100%;
+  overflow: hidden; /* stop scrolling */
+}
+
 body {
   margin: 0;
   padding: 0;
@@ -15,26 +22,29 @@ body {
   background-size: cover;
   background-position: center top;
   background-repeat: no-repeat;
-  background-attachment: fixed; /* nice feel on tall screens */
 
   color: #f9fafb;
 }
 
+/* Root fills full screen, vertical layout */
 .game-root {
+  height: 100vh;
   max-width: 480px;
   margin: 0 auto;
-  min-height: 100vh;
-  padding: 10px 10px 18px;
+  padding: 10px 10px 8px;
+  display: flex;
+  flex-direction: column;
 }
 
 /* ===== TOP BAR ===== */
 
 .top-bar {
+  flex: 0 0 auto;
   display: flex;
   align-items: flex-start;
   justify-content: space-between;
   gap: 8px;
-  margin-bottom: 12px;
+  margin-bottom: 6px;
 }
 
 .top-left {
@@ -66,13 +76,13 @@ body {
 }
 
 .timer-pill {
-  min-width: 120px;
-  padding: 6px 18px;
+  min-width: 110px;
+  padding: 5px 16px;
   border-radius: 999px;
   background: linear-gradient(90deg, #ec4899, #6366f1);
   text-align: center;
   font-weight: 800;
-  font-size: 16px;
+  font-size: 15px;
 }
 
 .top-right {
@@ -84,7 +94,7 @@ body {
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  padding: 5px 10px;
+  padding: 4px 9px;
   border-radius: 999px;
   background: rgba(15, 23, 42, 0.9);
   border: 1px solid rgba(148, 163, 184, 0.7);
@@ -106,20 +116,21 @@ body {
   100% { transform: translateY(0); }
 }
 
-/* ===== FROG + LILYPADS AREA (on background) ===== */
+/* ===== FROG + LILYPADS AREA ===== */
 
+/* This block takes a fixed portion of screen height */
 .pond {
   position: relative;
   width: 100%;
-  height: 330px;           /* controls how much of BG is used for frog + pads */
-  margin-top: 10px;
+  flex: 0 0 40vh;   /* around 40% of screen height */
+  margin-top: 4px;
 }
 
-/* Frog on land (upper part of background) */
+/* Frog on land (upper area of background) */
 .frog-wrapper {
   position: absolute;
   left: 50%;
-  top: 2%;                /* move up/down if needed: smaller = closer to top */
+  top: 9%;          /* smaller = higher, bigger = lower */
   transform: translateX(-50%);
   width: 150px;
   height: 150px;
@@ -136,7 +147,7 @@ body {
   height: auto;
   position: relative;
   transform: translate(0, 0);
-  transition: transform 0.3s ease-out;  /* smooth reset; jump uses JS animation */
+  transition: transform 0.3s ease-out;  /* for reset; jump uses JS animation */
 }
 
 /* Target image (same element) */
@@ -146,11 +157,11 @@ body {
   pointer-events: none;
 }
 
-/* Lilypads floating on water (middle of screen) */
+/* Lilypads floating on the water (middle / lower part) */
 .pads {
   position: absolute;
   left: 50%;
-  bottom: -10%;            /* move up/down as you like */
+  bottom: 4%;        /* smaller = lower, bigger = higher */
   transform: translateX(-50%);
   width: 100%;
   max-width: 380px;
@@ -160,7 +171,7 @@ body {
   display: flex;
   justify-content: space-around;
   align-items: center;
-  margin-bottom: 14px;
+  margin-bottom: 12px;
 }
 
 .pad {
@@ -218,25 +229,29 @@ body {
   100% { transform: scale(1.03); filter: drop-shadow(0 0 6px rgba(34,197,94,0.6)); }
 }
 
-/* ===== CONTROLS (0–9, Your Bet, Place Bet) ===== */
+/* ===== CONTROLS (0–9, bet input, button) ===== */
 
+/* Controls occupy remaining vertical space */
 .controls {
-  margin-top: 24px;
-  padding-bottom: 1px;
+  flex: 1 1 auto;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-start;
+  padding-top: 6px;
 }
 
 .numbers-title {
   text-align: center;
   font-size: 14px;
   color: #9ca3af;
-  margin-bottom: 6px;
+  margin-bottom: 4px;
 }
 
 .numbers-row {
   display: flex;
   justify-content: center;
   gap: 6px;
-  margin-bottom: 10px;
+  margin-bottom: 6px;
   flex-wrap: wrap;
 }
 
@@ -261,7 +276,7 @@ body {
 .my-bets-title {
   font-size: 12px;
   color: #9ca3af;
-  margin: 4px 0;
+  margin: 2px 0;
   text-align: center;
 }
 
@@ -270,8 +285,8 @@ body {
   justify-content: center;
   flex-wrap: wrap;
   gap: 4px;
-  min-height: 24px;
-  margin-bottom: 8px;
+  min-height: 22px;
+  margin-bottom: 6px;
 }
 
 .my-bet-chip {
@@ -284,7 +299,7 @@ body {
 }
 
 .bet-container {
-  margin: 8px 0;
+  margin: 6px 0 4px;
   display: flex;
   justify-content: center;
 }
@@ -292,7 +307,7 @@ body {
 .bet-container input {
   width: 100%;
   max-width: 420px;
-  padding: 10px 16px;
+  padding: 8px 14px;
   border-radius: 999px;
   border: 1px solid #1d4ed8;
   background: rgba(15, 23, 42, 0.9);
@@ -309,7 +324,7 @@ body {
   width: 100%;
   max-width: 420px;
   margin: 0 auto;
-  padding: 11px 16px;
+  padding: 10px 16px;
   border-radius: 999px;
   border: none;
   background: linear-gradient(90deg, #22c55e, #38bdf8);
@@ -326,7 +341,7 @@ body {
 }
 
 .status {
-  margin-top: 8px;
+  margin-top: 4px;
   text-align: center;
   font-size: 13px;
   min-height: 18px;
@@ -335,24 +350,21 @@ body {
 .status.ok { color: #bbf7d0; }
 .status.error { color: #fecaca; }
 
-/* ===== RESPONSIVE ===== */
+/* ===== SMALL SCREENS TWEAK ===== */
 
-@media (max-width: 480px) {
+@media (max-height: 650px) {
   .pond {
-    height: 310px;
+    flex-basis: 36vh;
   }
-
   .frog-wrapper {
     width: 130px;
     height: 130px;
-    top: 18%;
+    top: 10%;
   }
-
   .pad {
     width: 105px;
     height: 74px;
   }
-
   .pad img {
     width: 105px;
   }
