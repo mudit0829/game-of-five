@@ -142,18 +142,18 @@ body {
 .pond {
   position: relative;
   flex: 0 0 auto;
-  height: 36vh;  /* Reduced height to prevent overlap */
+  height: 32vh;  /* Further reduced to push lily pads higher */
   width: 100%;
-  margin-bottom: 20px;  /* Increased margin before controls */
+  margin-bottom: 30px;  /* INCREASED margin for clear separation */
 }
 
 /* Frog on LAND */
 .frog-wrapper {
   position: absolute;
   left: 50%;
-  top: 5%;
+  top: 6%;
   transform: translateX(-50%);
-  width: 130px;  /* Slightly smaller */
+  width: 130px;
   height: 130px;
   display: flex;
   align-items: center;
@@ -183,11 +183,11 @@ body {
   pointer-events: none;
 }
 
-/* Lilypads in WATER - properly contained */
+/* Lilypads in WATER - positioned HIGHER like image 2 */
 .pads {
   position: absolute;
   left: 50%;
-  top: 48%;  /* Adjusted to fit within pond height */
+  top: 42%;  /* MOVED UP from 48% to match image 2 */
   transform: translateX(-50%);
   width: 100%;
   max-width: 360px;
@@ -198,12 +198,12 @@ body {
   display: flex;
   justify-content: space-around;
   align-items: center;
-  margin-bottom: 6px;  /* Reduced spacing */
+  margin-bottom: 5px;  /* Tight spacing between rows */
 }
 
 .pad {
   position: relative;
-  width: 90px;  /* Smaller for better fit */
+  width: 90px;
   height: 62px;
   display: flex;
   justify-content: center;
@@ -273,14 +273,14 @@ body {
   z-index: 2;
 }
 
-/* username label on pad - FIXED positioning */
+/* username label on pad - positioned INSIDE the pad area */
 .pad-user {
   position: absolute;
-  bottom: -14px;  /* Moved closer to pad */
+  bottom: -12px;  /* Very close to pad bottom */
   left: 50%;
   transform: translateX(-50%);
   padding: 2px 6px;
-  font-size: 9px;
+  font-size: 8px;
   font-weight: 600;
   border-radius: 999px;
   background: rgba(2, 6, 23, 0.9);
@@ -310,7 +310,7 @@ body {
   }
 }
 
-/* ===== CONTROLS (numbers, bet, button) ===== */
+/* ===== CONTROLS - CLEAR SEPARATION FROM LILY PADS ===== */
 
 .controls {
   flex: 1 1 auto;
@@ -327,7 +327,7 @@ body {
   font-size: 12px;
   font-weight: 600;
   color: #cbd5e1;
-  margin: 0 auto 8px;
+  margin: 0 auto 10px;  /* Increased bottom margin */
   text-transform: uppercase;
   letter-spacing: 1px;
   background: rgba(2, 6, 23, 0.8);
@@ -415,14 +415,14 @@ body {
   box-shadow: 0 2px 6px rgba(59, 130, 246, 0.3);
 }
 
-/* ===== BET SECTION - Container at bottom ===== */
+/* ===== BET SECTION ===== */
 
 .bet-section {
   background: rgba(15, 23, 42, 0.85);
   backdrop-filter: blur(12px);
   border: 1px solid rgba(148, 163, 184, 0.3);
   border-radius: 18px;
-  padding: 10px 12px 10px;  /* Fixed padding to contain status message */
+  padding: 10px 12px 10px;
   margin-top: auto;
   box-shadow: 0 -4px 20px rgba(0, 0, 0, 0.5);
 }
@@ -511,12 +511,12 @@ body {
 
 @media (max-height: 750px) {
   .pond {
-    height: 33vh;
-    margin-bottom: 16px;
+    height: 30vh;
+    margin-bottom: 25px;
   }
 
   .pads {
-    top: 50%;
+    top: 44%;
   }
 
   .pad {
@@ -537,8 +537,8 @@ body {
 
 @media (max-height: 680px) {
   .pond {
-    height: 30vh;
-    margin-bottom: 14px;
+    height: 28vh;
+    margin-bottom: 22px;
   }
 
   .frog-wrapper {
@@ -548,7 +548,7 @@ body {
   }
 
   .pads {
-    top: 52%;
+    top: 46%;
   }
 
   .pad {
@@ -567,7 +567,7 @@ body {
   .pad-user {
     font-size: 8px;
     padding: 2px 5px;
-    bottom: -12px;
+    bottom: -11px;
   }
 
   .num-chip {
@@ -584,16 +584,12 @@ body {
   .bet-section {
     padding: 9px 11px;
   }
-
-  .status {
-    font-size: 10px;
-  }
 }
 
 @media (max-height: 600px) {
   .pond {
-    height: 28vh;
-    margin-bottom: 12px;
+    height: 26vh;
+    margin-bottom: 18px;
   }
 
   .frog-wrapper {
@@ -603,7 +599,7 @@ body {
   }
 
   .pads {
-    top: 54%;
+    top: 48%;
   }
 
   .pad {
