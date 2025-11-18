@@ -27,6 +27,61 @@ document.querySelectorAll(".num-chip").forEach(btn => {
 });
 
 /* ---------------------------
+   Update Boats from Bets
+----------------------------*/
+
+function updateBoatsFromBets(bets) {
+    const uniqueBets = [];
+    (bets || []).forEach((b) => {
+        if (!uniqueBets.find((x) => x.number === b.number)) {
+            uniqueBets.push(b);
+        }
+    });
+
+    const boats = document.querySelectorAll(".boat");
+    boats.forEach((boat, i) => {
+        const numSpan = boat.querySelector(".boat-number");
+        const userSpan = boat.querySelector(".boat-user");
+        boat.classList.remove("win");
+
+        const bet = uniqueBets[i];
+
+        if (!bet) {
+            boat.dataset.number = "";
+            numSpan.textContent = "";
+            userSpan.textContent = "";
+        } else {
+            boat.dataset.number = String(bet.number);
+            numSpan.textContent = bet.number;
+            userSpan.textContent = bet.username;
+        }
+    });
+}
+
+/* ---------------------------
+   Update My Bets Display
+----------------------------*/
+
+function updateMyBets(bets) {
+    const myBets = (bets || []).filter((b) => b.user_id === USER_ID);
+    const container = document.getElementById("myBetsContainer");
+    
+    container.innerHTML = "";
+    
+    if (myBets.length === 0) {
+        container.innerHTML = '<span style="color: #6b7280; font-size: 11px;">none</span>';
+        return;
+    }
+
+    myBets.forEach((b) => {
+        const chip = document.createElement("span");
+        chip.className = "my-bet-chip";
+        chip.textContent = b.number;
+        container.appendChild(chip);
+    });
+}
+
+/* ---------------------------
    Betting Button
 ----------------------------*/
 
@@ -51,23 +106,100 @@ document.getElementById("placeBetBtn").onclick = () => {
 function showStatus(msg, error=false) {
     const s = document.getElementById("statusMessage");
     s.textContent = msg;
-    s.style.color = error ? "#fca5a5" : "#bbf7d0";
+    s.className = "status";
+    if (error) {
+        s.classList.add("error");
+    } else {
+        s.classList.add("ok");
+    }
 }
 
 /* ---------------------------
-   Paratrooper Animation
+   Paratrooper Animation (IMPROVED)
 ----------------------------*/
 
-function landParatrooper(winningBoat) {
-    const boat = document.getElementById("boat" + winningBoat);
-    if (!boat) return;
+function landParatrooper(winningNumber) {
+    const boats = document.querySelectorAll(".boat");
+    let targetBoat = null;
 
-    const rect = boat.getBoundingClientRect();
+    // Find boat with winning number
+    boats.forEach(boat => {
+        if (boat.dataset.number === String(winningNumber)) {
+            targetBoat = boat;
+        }
+    });
 
+    if (!targetBoat) {
+        console.log("Winning number not on any boat:", winningNumber);
+        return;
+    }
+
+    const rect = targetBoat.getBoundingClientRect();
     const para = document.getElementById("paratrooper");
-    para.style.top = (rect.top - 100) + "px";
-    para.style.left = (rect.left + rect.width/2) + "px";
+
+    // Calculate landing position
+    const landingTop = rect.top - 100;
+    const landingLeft = rect.left + rect.width / 2;
+
+    // Reset paratrooper to top
+    para.style.transition = "none";
+    para.style.top = "-260px";
+    para.style.left = "50%";
+    para.classList.remove("falling");
+
+    // Force reflow
+    void para.offsetWidth;
+
+    // Animate to target
+    setTimeout(() => {
+        para.style.transition = "top 2.5s cubic-bezier(0.25, 0.46, 0.45, 0.94), left 2.5s cubic-bezier(0.25, 0.46, 0.45, 0.94)";
+        para.style.top = landingTop + "px";
+        para.style.left = landingLeft + "px";
+        para.classList.add("falling");
+
+        // Mark winning boat
+        targetBoat.classList.add("win");
+
+        // Create splash effect
+        setTimeout(() => {
+            const splash = document.createElement("div");
+            splash.style.position = "fixed";
+            splash.style.top = (rect.top + rect.height / 2) + "px";
+            splash.style.left = (rect.left + rect.width / 2) + "px";
+            splash.style.transform = "translate(-50%, -50%)";
+            splash.style.width = "150%";
+            splash.style.height = "150%";
+            splash.style.background = "radial-gradient(circle, rgba(34,197,94,0.6) 0%, transparent 70%)";
+            splash.style.borderRadius = "50%";
+            splash.style.pointerEvents = "none";
+            splash.style.animation = "splashEffect 0.8s ease-out";
+            splash.style.zIndex = "100";
+            document.body.appendChild(splash);
+
+            setTimeout(() => splash.remove(), 800);
+        }, 2300);
+    }, 50);
 }
+
+// Splash animation
+const style = document.createElement("style");
+style.textContent = `
+  @keyframes splashEffect {
+    0% {
+      opacity: 0;
+      transform: translate(-50%, -50%) scale(0.3);
+    }
+    50% {
+      opacity: 1;
+      transform: translate(-50%, -50%) scale(1);
+    }
+    100% {
+      opacity: 0;
+      transform: translate(-50%, -50%) scale(1.5);
+    }
+  }
+`;
+document.head.appendChild(style);
 
 /* ---------------------------
    Socket Events
@@ -88,26 +220,69 @@ socket.on("round_data", data => {
     walletBalance = rd.balance || walletBalance;
     document.getElementById("walletBalance").textContent = walletBalance;
 
+    updateBoatsFromBets(rd.bets || []);
+    updateMyBets(rd.bets || []);
+});
+
+socket.on("new_round", data => {
+    const rd = data.round_data;
+    document.getElementById("roundCode").textContent = data.round_code || rd.round_number;
+    document.getElementById("playerCount").textContent = rd.players;
+
+    updateBoatsFromBets(rd.bets || []);
+    updateMyBets(rd.bets || []);
+    showStatus("New round started", false);
+
+    // Reset paratrooper
+    const para = document.getElementById("paratrooper");
+    para.style.transition = "none";
+    para.style.top = "-260px";
+    para.style.left = "50%";
+    para.classList.remove("falling");
 });
 
 socket.on("bet_placed", data => {
     document.getElementById("playerCount").textContent = data.round_data.players;
+    updateBoatsFromBets(data.round_data.bets || []);
+    updateMyBets(data.round_data.bets || []);
 });
 
 socket.on("bet_success", data => {
     walletBalance = data.new_balance;
     document.getElementById("walletBalance").textContent = walletBalance;
     showStatus("Bet placed!", false);
+    
+    // Coin bounce effect
+    document.querySelector(".coins").classList.add("coin-bounce");
+    setTimeout(() => {
+        document.querySelector(".coins").classList.remove("coin-bounce");
+    }, 500);
+});
+
+socket.on("bet_error", data => {
+    showStatus(data.message || "Bet error", true);
 });
 
 socket.on("round_result", data => {
     const winning = data.result;
-    showStatus("Winning boat: " + winning);
-    landParatrooper(winning);
+    showStatus("Winning boat: " + winning + "! 🎉", false);
+    
+    setTimeout(() => {
+        landParatrooper(winning);
+    }, 100);
 });
 
 socket.on("timer_update", data => {
-    document.getElementById("timerText").textContent = data.time_remaining;
+    const timeRemaining = data.time_remaining || 0;
+    document.getElementById("timerText").textContent = timeRemaining;
+    
+    // Add urgent styling
+    const pill = document.querySelector(".timer-pill");
+    if (timeRemaining <= 10) {
+        pill.classList.add("urgent");
+    } else {
+        pill.classList.remove("urgent");
+    }
 });
 
 /* REGISTER USER */
@@ -121,3 +296,7 @@ fetch("/register", {
     walletBalance = d.balance;
     document.getElementById("walletBalance").textContent = walletBalance;
 });
+
+// Initialize
+selectNumber(0);
+showStatus("");
