@@ -69,6 +69,12 @@ function updateMyBets(bets) {
   userBetCountLabel.textContent = myBets.length;
 
   myBetsRow.innerHTML = "";
+  
+  if (myBets.length === 0) {
+    myBetsRow.innerHTML = '<span style="color: #6b7280; font-size: 11px;">—</span>';
+    return;
+  }
+
   myBets.forEach((b) => {
     const chip = document.createElement("div");
     chip.className = "my-bet-chip";
@@ -107,7 +113,6 @@ function updateGoalsFromBets(bets) {
 
 // ========= DOTTED LINE TRAJECTORY ANIMATION =========
 function createTrajectoryLine(startX, startY, endX, endY, peak) {
-  // Create SVG overlay for dotted line
   const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
   svg.setAttribute("class", "trajectory-line");
   svg.style.position = "absolute";
@@ -120,27 +125,23 @@ function createTrajectoryLine(startX, startY, endX, endY, peak) {
 
   const path = document.createElementNS("http://www.w3.org/2000/svg", "path");
   
-  // Calculate control point for quadratic curve (arc)
   const midX = (startX + endX) / 2;
   const midY = (startY + endY) / 2 + peak;
 
-  // Quadratic Bezier curve: M start, Q control end
   const pathData = `M ${startX} ${startY} Q ${midX} ${midY} ${endX} ${endY}`;
   path.setAttribute("d", pathData);
-  path.setAttribute("stroke", "#fbbf24"); // Yellow/gold color
+  path.setAttribute("stroke", "#fbbf24");
   path.setAttribute("stroke-width", "3");
-  path.setAttribute("stroke-dasharray", "8 6"); // Dotted pattern
+  path.setAttribute("stroke-dasharray", "8 6");
   path.setAttribute("fill", "none");
-  path.setAttribute("opacity", "0.8");
+  path.setAttribute("opacity", "0.9");
   
-  // Animate the stroke
   path.style.strokeDashoffset = "1000";
   path.style.animation = "drawPath 0.6s ease-out forwards";
 
   svg.appendChild(path);
   pitch.appendChild(svg);
 
-  // Remove after animation
   setTimeout(() => {
     if (svg.parentNode) {
       svg.parentNode.removeChild(svg);
@@ -148,18 +149,33 @@ function createTrajectoryLine(startX, startY, endX, endY, peak) {
   }, 1200);
 }
 
-// Add CSS animation for path drawing
-const style = document.createElement("style");
-style.textContent = `
-  @keyframes drawPath {
-    to {
-      stroke-dashoffset: 0;
+// CSS animation for path
+if (!document.getElementById("trajectory-styles")) {
+  const style = document.createElement("style");
+  style.id = "trajectory-styles";
+  style.textContent = `
+    @keyframes drawPath {
+      to { stroke-dashoffset: 0; }
     }
-  }
-`;
-document.head.appendChild(style);
+    @keyframes goalFlash {
+      0% {
+        opacity: 0;
+        transform: translate(-50%, -50%) scale(0.5);
+      }
+      50% {
+        opacity: 1;
+        transform: translate(-50%, -50%) scale(1);
+      }
+      100% {
+        opacity: 0;
+        transform: translate(-50%, -50%) scale(1.2);
+      }
+    }
+  `;
+  document.head.appendChild(style);
+}
 
-// ========= PROFESSIONAL BALL SHOOTING ANIMATION =========
+// ========= FIXED BALL SHOOTING ANIMATION =========
 function shootBallToWinningNumber(winningNumber) {
   const pitchRect = pitch.getBoundingClientRect();
   const ballRect = ballImg.getBoundingClientRect();
@@ -174,71 +190,72 @@ function shootBallToWinningNumber(winningNumber) {
 
   const goalRect = targetGoal.getBoundingClientRect();
 
-  // Starting center of ball (relative to pitch)
-  const startX = ballRect.left + ballRect.width / 2 - pitchRect.left;
-  const startY = ballRect.top + ballRect.height / 2 - pitchRect.top;
+  // FIXED: Calculate positions relative to VIEWPORT, not pitch
+  const startX = ballRect.left + ballRect.width / 2;
+  const startY = ballRect.top + ballRect.height / 2;
 
-  // End point: center of goal (slightly in front of net)
-  const endX = goalRect.left + goalRect.width / 2 - pitchRect.left;
-  const endY = goalRect.top + goalRect.height * 0.35 - pitchRect.top;
+  const endX = goalRect.left + goalRect.width / 2;
+  const endY = goalRect.top + goalRect.height / 2;
 
   const deltaX = endX - startX;
   const deltaY = endY - startY;
   const distance = Math.sqrt(deltaX * deltaX + deltaY * deltaY);
 
-  // Arc height based on distance (longer shots = higher arc)
-  const peak = -Math.min(120, distance * 0.35);
+  const peak = -Math.min(100, distance * 0.3);
   
-  const duration = 800; // ms - smooth professional speed
+  const duration = 750;
   const startTime = performance.now();
 
-  // Create dotted trajectory line
-  createTrajectoryLine(startX, startY, endX, endY, peak);
+  // Create trajectory line (relative to pitch)
+  const pitchStartX = ballRect.left + ballRect.width / 2 - pitchRect.left;
+  const pitchStartY = ballRect.top + ballRect.height / 2 - pitchRect.top;
+  const pitchEndX = goalRect.left + goalRect.width / 2 - pitchRect.left;
+  const pitchEndY = goalRect.top + goalRect.height / 2 - pitchRect.top;
+  
+  createTrajectoryLine(pitchStartX, pitchStartY, pitchEndX, pitchEndY, peak);
 
-  // Trigger player kick animation FIRST
+  // Trigger player kick
   playerImg.classList.add("kick");
   
-  // Start ball movement after brief delay (kick wind-up)
   setTimeout(() => {
+    // Store original ball transform
+    const originalTransform = ballImg.style.transform;
+    
+    ballImg.style.position = "fixed"; // Use fixed positioning for viewport
     ballImg.style.transition = "none";
-    ballImg.style.zIndex = "15"; // Ball above everything during flight
+    ballImg.style.zIndex = "1000";
+    
+    // Set initial position
+    ballImg.style.left = startX + "px";
+    ballImg.style.top = startY + "px";
+    ballImg.style.transform = "translate(-50%, -50%)";
 
     function step(now) {
       const elapsed = now - startTime;
       const tRaw = elapsed / duration;
       const t = Math.min(Math.max(tRaw, 0), 1);
 
-      // Ease-out cubic for smooth deceleration
+      // Ease-out cubic
       const ease = 1 - Math.pow(1 - t, 3);
 
-      // Calculate position along curved path
       const x = startX + deltaX * ease;
       const yLinear = startY + deltaY * ease;
-      
-      // Add parabolic arc (smooth curve)
       const yArc = yLinear + peak * (4 * t * (1 - t));
 
-      const relX = x - ballRect.width / 2;
-      const relY = yArc - ballRect.height / 2;
-
-      // Rotate ball for realism (more spins for longer distance)
-      const rotation = t * (distance * 1.5);
+      const rotation = t * (distance * 1.2);
+      const scale = 1 - (t * 0.12);
       
-      // Scale ball slightly smaller as it goes away (depth effect)
-      const scale = 1 - (t * 0.15);
-      
-      ballImg.style.transform = `translate(${relX}px, ${relY}px) rotate(${rotation}deg) scale(${scale})`;
+      ballImg.style.left = x + "px";
+      ballImg.style.top = yArc + "px";
+      ballImg.style.transform = `translate(-50%, -50%) rotate(${rotation}deg) scale(${scale})`;
 
       if (t < 1) {
         requestAnimationFrame(step);
       } else {
-        // Ball reached goal!
-        ballImg.style.zIndex = "10";
-        
-        // Trigger goal celebration
+        // Ball reached goal
         targetGoal.classList.add("win");
         
-        // Create goal flash effect
+        // Goal flash effect
         const flash = document.createElement("div");
         flash.style.position = "absolute";
         flash.style.top = "50%";
@@ -250,44 +267,28 @@ function shootBallToWinningNumber(winningNumber) {
         flash.style.borderRadius = "50%";
         flash.style.pointerEvents = "none";
         flash.style.animation = "goalFlash 0.6s ease-out";
+        flash.style.zIndex = "100";
         targetGoal.appendChild(flash);
         
         setTimeout(() => flash.remove(), 600);
 
-        // Return ball after celebration
+        // Return ball to original position
         setTimeout(() => {
-          ballImg.style.transition = "transform 0.6s ease-out";
-          ballImg.style.transform = "translate(0, 0) rotate(0deg) scale(1)";
-        }, 1000);
+          ballImg.style.position = "";
+          ballImg.style.left = "";
+          ballImg.style.top = "";
+          ballImg.style.transition = "transform 0.5s ease-out";
+          ballImg.style.transform = originalTransform || "translate(0, 0)";
+          ballImg.style.zIndex = "10";
+        }, 900);
       }
     }
 
     requestAnimationFrame(step);
-  }, 150); // Delay for kick wind-up
+  }, 200);
 
-  // Remove kick animation after completion
-  setTimeout(() => playerImg.classList.remove("kick"), 500);
+  setTimeout(() => playerImg.classList.remove("kick"), 600);
 }
-
-// Add goal flash animation
-const flashStyle = document.createElement("style");
-flashStyle.textContent = `
-  @keyframes goalFlash {
-    0% {
-      opacity: 0;
-      transform: translate(-50%, -50%) scale(0.5);
-    }
-    50% {
-      opacity: 1;
-      transform: translate(-50%, -50%) scale(1);
-    }
-    100% {
-      opacity: 0;
-      transform: translate(-50%, -50%) scale(1.2);
-    }
-  }
-`;
-document.head.appendChild(flashStyle);
 
 // ========= Socket.IO / backend =========
 const socket = io();
@@ -355,9 +356,15 @@ socket.on("new_round", (payload) => {
   updateGoalsFromBets(rd.bets || []);
   updateMyBets(rd.bets || []);
   setStatus("New round started", "ok");
-  ballImg.style.transform = "translate(0, 0) rotate(0deg) scale(1)";
   
-  // Hide player for new round
+  // Reset ball
+  ballImg.style.position = "";
+  ballImg.style.left = "";
+  ballImg.style.top = "";
+  ballImg.style.transform = "";
+  ballImg.style.zIndex = "10";
+  
+  // Hide player
   playerArea.classList.remove("visible");
   playerShown = false;
   timerPill.classList.remove("urgent");
@@ -370,13 +377,13 @@ socket.on("timer_update", (payload) => {
   timerText.textContent = timeRemaining.toString().padStart(2, "0");
   playerCountSpan.textContent = payload.players ?? 0;
   
-  // Show player when 15 seconds or less
+  // Show player at 15 seconds
   if (timeRemaining <= 15 && !playerShown) {
     playerArea.classList.add("visible");
     playerShown = true;
   }
   
-  // Add urgent styling when time is low
+  // Urgent timer at 10 seconds
   if (timeRemaining <= 10) {
     timerPill.classList.add("urgent");
   } else {
@@ -398,7 +405,7 @@ socket.on("bet_placed", (payload) => {
 });
 
 socket.on("bet_success", (payload) => {
-  setStatus(payload.message || "Bet placed", "ok");
+  setStatus(payload.message || "Bet placed successfully", "ok");
   if (typeof payload.new_balance === "number") {
     updateWallet(payload.new_balance);
   }
@@ -413,7 +420,11 @@ socket.on("round_result", (payload) => {
   const winning = payload.result;
   if (winning === undefined || winning === null) return;
   setStatus(`Winning number: ${winning}`, "ok");
-  shootBallToWinningNumber(winning);
+  
+  // Small delay to let status show
+  setTimeout(() => {
+    shootBallToWinningNumber(winning);
+  }, 100);
 });
 
 // ========= UI events =========
