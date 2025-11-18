@@ -4,21 +4,21 @@
   box-sizing: border-box;
 }
 
-/* Make page exactly one screen high, no scroll */
+/* Full-screen, no scroll */
 html,
 body {
   height: 100%;
-  overflow: hidden; /* stop scrolling */
+  overflow: hidden;
 }
 
+/* Background = land + water */
 body {
   margin: 0;
   padding: 0;
   font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
 
-  /* Full-screen background */
   background-color: #020617;
-  background-image: url("../img/silver_bg.png");
+  background-image: url("../img/silver_bg.png"); /* your water+land image */
   background-size: cover;
   background-position: center top;
   background-repeat: no-repeat;
@@ -26,7 +26,7 @@ body {
   color: #f9fafb;
 }
 
-/* Root fills full screen, vertical layout */
+/* Root layout: full screen, vertical stack */
 .game-root {
   height: 100vh;
   max-width: 480px;
@@ -118,19 +118,18 @@ body {
 
 /* ===== FROG + LILYPADS AREA ===== */
 
-/* This block takes a fixed portion of screen height */
+/* Uses a fixed portion of screen height, sits on top of background */
 .pond {
   position: relative;
+  flex: 0 0 42vh;   /* ~ top-middle part of the screen */
   width: 100%;
-  flex: 0 0 40vh;   /* around 40% of screen height */
-  margin-top: 4px;
 }
 
-/* Frog on land (upper area of background) */
+/* Frog on land (upper part of bg) */
 .frog-wrapper {
   position: absolute;
   left: 50%;
-  top: 12%;          /* smaller = higher, bigger = lower */
+  top: 6%;          /* smaller = higher, bigger = lower */
   transform: translateX(-50%);
   width: 150px;
   height: 150px;
@@ -147,21 +146,20 @@ body {
   height: auto;
   position: relative;
   transform: translate(0, 0);
-  transition: transform 0.3s ease-out;  /* for reset; jump uses JS animation */
+  transition: transform 0.3s ease-out;  /* smooth reset; hop is JS-animated */
 }
 
-/* Target image (same element) */
 #frogSprite {
   position: relative;
   z-index: 5;
   pointer-events: none;
 }
 
-/* Lilypads floating on the water (middle / lower part) */
+/* Lilypads in water (lower middle of bg) */
 .pads {
   position: absolute;
   left: 50%;
-  bottom: -10%;        /* smaller = lower, bigger = higher */
+  top: 46%;          /* this defines where the pad grid starts */
   transform: translateX(-50%);
   width: 100%;
   max-width: 380px;
@@ -183,7 +181,7 @@ body {
   align-items: center;
 }
 
-/* slight variation for each pad */
+/* subtle per-pad variation */
 .pad[data-pad="1"] img { transform: rotate(-6deg) scale(0.98); }
 .pad[data-pad="2"] img { transform: rotate(3deg) scale(1.03); }
 .pad[data-pad="3"] img { transform: rotate(-2deg) scale(1.00); }
@@ -229,22 +227,21 @@ body {
   100% { transform: scale(1.03); filter: drop-shadow(0 0 6px rgba(34,197,94,0.6)); }
 }
 
-/* ===== CONTROLS (0–9, bet input, button) ===== */
+/* ===== CONTROLS (numbers, bet, button) ===== */
 
-/* Controls occupy remaining vertical space */
 .controls {
   flex: 1 1 auto;
   display: flex;
   flex-direction: column;
   justify-content: flex-start;
-  padding-top: 6px;
+  padding-top: 4px;
 }
 
 .numbers-title {
   text-align: center;
   font-size: 14px;
   color: #9ca3af;
-  margin-top: -6px;   /* pulls chips upward */
+  margin-top: 0;
   margin-bottom: 4px;
 }
 
@@ -351,21 +348,24 @@ body {
 .status.ok { color: #bbf7d0; }
 .status.error { color: #fecaca; }
 
-/* ===== SMALL SCREENS TWEAK ===== */
+/* ===== SMALL HEIGHT SCREENS TWEAK ===== */
 
 @media (max-height: 650px) {
   .pond {
-    flex-basis: 36vh;
+    flex-basis: 38vh;
   }
+
   .frog-wrapper {
     width: 130px;
     height: 130px;
-    top: 10%;
+    top: 6%;
   }
+
   .pad {
     width: 105px;
     height: 74px;
   }
+
   .pad img {
     width: 105px;
   }
