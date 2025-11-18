@@ -246,6 +246,8 @@ body {
 
 /* ===== CSS ANIMATED PLAYER (Professional) ===== */
 
+/* ===== PROFESSIONAL CSS ANIMATED PLAYER ===== */
+
 .player-area {
   position: absolute;
   bottom: 40px;
@@ -255,17 +257,17 @@ body {
   justify-content: center;
   align-items: flex-end;
   z-index: 3;
-  height: 110px;
+  height: 120px;
   width: 180px;
 }
 
 .css-player {
   position: relative;
-  width: 60px;
-  height: 100px;
+  width: 70px;
+  height: 110px;
   opacity: 0;
   transition: opacity 0.5s ease-in;
-  filter: drop-shadow(0 8px 15px rgba(0, 0, 0, 0.7));
+  filter: drop-shadow(0 10px 20px rgba(0, 0, 0, 0.8));
 }
 
 .player-area.visible .css-player {
@@ -273,125 +275,342 @@ body {
   animation: playerIdle 2.5s ease-in-out infinite;
 }
 
-/* Player body parts */
+/* ===== PLAYER HEAD ===== */
 .player-head {
   position: absolute;
   top: 0;
   left: 50%;
   transform: translateX(-50%);
-  width: 24px;
-  height: 24px;
-  background: #f4a261;
+  width: 26px;
+  height: 26px;
+  background: radial-gradient(circle at 35% 35%, #f4a582, #d08770);
   border-radius: 50%;
-  border: 2px solid #2c3e50;
+  border: 2px solid #1a1a1a;
+  z-index: 5;
 }
 
-.player-body {
+/* Hair */
+.player-head::before {
+  content: "";
   position: absolute;
-  top: 22px;
+  top: -4px;
   left: 50%;
   transform: translateX(-50%);
-  width: 28px;
-  height: 35px;
-  background: linear-gradient(135deg, #e74c3c, #c0392b);
-  border-radius: 8px 8px 4px 4px;
-  border: 2px solid #2c3e50;
+  width: 24px;
+  height: 12px;
+  background: #2c3e50;
+  border-radius: 50% 50% 0 0;
+  border: 2px solid #1a1a1a;
+  border-bottom: none;
 }
 
+/* Face details */
+.player-head::after {
+  content: "";
+  position: absolute;
+  top: 10px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 3px;
+  height: 3px;
+  background: #1a1a1a;
+  border-radius: 50%;
+  box-shadow: 
+    -6px 0 0 0 #1a1a1a,
+    6px 0 0 0 #1a1a1a,
+    0 6px 0 0 #1a1a1a;
+}
+
+/* ===== PLAYER BODY (Jersey) ===== */
+.player-body {
+  position: absolute;
+  top: 24px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 32px;
+  height: 38px;
+  background: linear-gradient(135deg, #e74c3c 0%, #c0392b 50%, #e74c3c 100%);
+  border-radius: 10px 10px 6px 6px;
+  border: 2px solid #1a1a1a;
+  z-index: 3;
+}
+
+/* Jersey details/stripes */
+.player-body::before {
+  content: "";
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 4px;
+  height: 30px;
+  background: rgba(255, 255, 255, 0.2);
+  border-radius: 2px;
+}
+
+/* Jersey number */
+.player-body::after {
+  content: "9";
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  font-size: 14px;
+  font-weight: 900;
+  color: rgba(255, 255, 255, 0.9);
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.5);
+  font-family: Arial, sans-serif;
+}
+
+/* ===== ARMS ===== */
 .player-arm {
   position: absolute;
-  width: 10px;
-  height: 30px;
-  background: #e74c3c;
-  border-radius: 5px;
-  border: 2px solid #2c3e50;
+  width: 11px;
+  height: 32px;
+  background: linear-gradient(180deg, #e74c3c 0%, #e74c3c 60%, #f4a582 60%, #f4a582 100%);
+  border-radius: 6px;
+  border: 2px solid #1a1a1a;
+  z-index: 2;
 }
 
 .player-arm-left {
-  top: 25px;
-  left: 8px;
+  top: 26px;
+  left: 4px;
   transform-origin: top center;
-  animation: armSwingLeft 1.5s ease-in-out infinite;
+  animation: armSwingLeft 2s ease-in-out infinite;
 }
 
 .player-arm-right {
-  top: 25px;
-  right: 8px;
+  top: 26px;
+  right: 4px;
   transform-origin: top center;
-  animation: armSwingRight 1.5s ease-in-out infinite;
+  animation: armSwingRight 2s ease-in-out infinite;
 }
 
+/* Hand details */
+.player-arm::after {
+  content: "";
+  position: absolute;
+  bottom: -4px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 9px;
+  height: 9px;
+  background: #f4a582;
+  border-radius: 50%;
+  border: 2px solid #1a1a1a;
+}
+
+/* ===== SHORTS ===== */
+.player-body {
+  box-shadow: 0 38px 0 0 #2980b9;
+}
+
+/* ===== LEGS ===== */
 .player-leg {
   position: absolute;
-  width: 12px;
-  height: 40px;
-  background: #2980b9;
-  border-radius: 6px;
-  border: 2px solid #2c3e50;
+  width: 13px;
+  height: 42px;
+  background: linear-gradient(180deg, #2980b9 0%, #2980b9 40%, #f4a582 40%, #f4a582 70%, #1a1a1a 70%, #1a1a1a 100%);
+  border-radius: 7px;
+  border: 2px solid #1a1a1a;
+  z-index: 1;
 }
 
 .player-leg-left {
   bottom: 0;
-  left: 14px;
+  left: 16px;
   transform-origin: top center;
-  animation: legSwingLeft 1.5s ease-in-out infinite;
+  animation: legSwingLeft 2s ease-in-out infinite;
 }
 
 .player-leg-right {
   bottom: 0;
-  right: 14px;
+  right: 16px;
   transform-origin: top center;
-  animation: legSwingRight 1.5s ease-in-out infinite;
+  animation: legSwingRight 2s ease-in-out infinite;
 }
 
-/* Idle animations */
+/* Boot details */
+.player-leg::after {
+  content: "";
+  position: absolute;
+  bottom: -6px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 16px;
+  height: 10px;
+  background: #1a1a1a;
+  border-radius: 50% 50% 4px 4px;
+  border: 2px solid #000;
+}
+
+/* ===== IDLE ANIMATIONS ===== */
 @keyframes playerIdle {
-  0%, 100% { transform: translateY(0); }
-  50% { transform: translateY(-4px); }
+  0%, 100% { 
+    transform: translateY(0);
+  }
+  50% { 
+    transform: translateY(-5px);
+  }
 }
 
 @keyframes armSwingLeft {
-  0%, 100% { transform: rotate(10deg); }
-  50% { transform: rotate(-20deg); }
+  0%, 100% { 
+    transform: rotate(15deg);
+  }
+  50% { 
+    transform: rotate(-25deg);
+  }
 }
 
 @keyframes armSwingRight {
-  0%, 100% { transform: rotate(-10deg); }
-  50% { transform: rotate(20deg); }
+  0%, 100% { 
+    transform: rotate(-15deg);
+  }
+  50% { 
+    transform: rotate(25deg);
+  }
 }
 
 @keyframes legSwingLeft {
-  0%, 100% { transform: rotate(-5deg); }
-  50% { transform: rotate(10deg); }
+  0%, 100% { 
+    transform: rotate(-8deg);
+  }
+  50% { 
+    transform: rotate(12deg);
+  }
 }
 
 @keyframes legSwingRight {
-  0%, 100% { transform: rotate(5deg); }
-  50% { transform: rotate(-10deg); }
+  0%, 100% { 
+    transform: rotate(8deg);
+  }
+  50% { 
+    transform: rotate(-12deg);
+  }
 }
 
-/* Kick animation */
+/* ===== POWERFUL KICK ANIMATION ===== */
 .css-player.kick {
-  animation: playerKickJump 0.6s ease-out !important;
+  animation: playerKickJump 0.7s cubic-bezier(0.25, 0.46, 0.45, 0.94) !important;
+}
+
+.css-player.kick .player-head {
+  animation: headKick 0.7s ease-out;
+}
+
+.css-player.kick .player-body {
+  animation: bodyLean 0.7s ease-out;
+}
+
+.css-player.kick .player-arm-left {
+  animation: armKickLeft 0.7s ease-out !important;
+}
+
+.css-player.kick .player-arm-right {
+  animation: armKickRight 0.7s ease-out !important;
+}
+
+.css-player.kick .player-leg-left {
+  animation: legKickSupport 0.7s ease-out !important;
 }
 
 .css-player.kick .player-leg-right {
-  animation: kickLeg 0.6s ease-out !important;
+  animation: legKickSwing 0.7s cubic-bezier(0.6, 0.04, 0.98, 0.335) !important;
 }
 
+/* Kick jump */
 @keyframes playerKickJump {
-  0% { transform: translateY(0) rotate(0deg); }
-  30% { transform: translateY(-15px) rotate(-8deg); }
-  50% { transform: translateY(-20px) rotate(-10deg); }
-  70% { transform: translateY(-10px) rotate(-5deg); }
-  100% { transform: translateY(0) rotate(0deg); }
+  0% { 
+    transform: translateY(0) rotate(0deg);
+  }
+  20% { 
+    transform: translateY(-8px) rotate(-3deg);
+  }
+  35% { 
+    transform: translateY(-20px) rotate(-8deg);
+  }
+  50% { 
+    transform: translateY(-25px) rotate(-12deg);
+  }
+  70% { 
+    transform: translateY(-15px) rotate(-6deg);
+  }
+  100% { 
+    transform: translateY(0) rotate(0deg);
+  }
 }
 
-@keyframes kickLeg {
-  0% { transform: rotate(0deg); }
-  40% { transform: rotate(-60deg); }
-  70% { transform: rotate(-80deg); }
-  100% { transform: rotate(0deg); }
+/* Head movement during kick */
+@keyframes headKick {
+  0%, 100% { 
+    transform: translateX(-50%) rotate(0deg);
+  }
+  40% { 
+    transform: translateX(-50%) rotate(-15deg);
+  }
+}
+
+/* Body lean during kick */
+@keyframes bodyLean {
+  0%, 100% { 
+    transform: translateX(-50%) rotate(0deg);
+  }
+  40% { 
+    transform: translateX(-50%) rotate(-10deg);
+  }
+}
+
+/* Arms during kick */
+@keyframes armKickLeft {
+  0%, 100% { 
+    transform: rotate(15deg);
+  }
+  40% { 
+    transform: rotate(-60deg);
+  }
+}
+
+@keyframes armKickRight {
+  0%, 100% { 
+    transform: rotate(-15deg);
+  }
+  40% { 
+    transform: rotate(50deg);
+  }
+}
+
+/* Support leg */
+@keyframes legKickSupport {
+  0%, 100% { 
+    transform: rotate(-8deg);
+  }
+  40% { 
+    transform: rotate(-25deg);
+  }
+}
+
+/* Kicking leg - POWERFUL SWING */
+@keyframes legKickSwing {
+  0% { 
+    transform: rotate(8deg);
+  }
+  20% { 
+    transform: rotate(-30deg);
+  }
+  40% { 
+    transform: rotate(-90deg);
+  }
+  50% { 
+    transform: rotate(-100deg);
+  }
+  70% { 
+    transform: rotate(-50deg);
+  }
+  100% { 
+    transform: rotate(8deg);
+  }
 }
 
 /* Ball */
@@ -405,6 +624,7 @@ body {
   z-index: 10;
   filter: drop-shadow(0 6px 10px rgba(0, 0, 0, 0.6));
 }
+
 
 /* ===== CONTROLS ===== */
 
