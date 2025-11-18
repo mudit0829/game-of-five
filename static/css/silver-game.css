@@ -150,7 +150,7 @@ body {
 .pads {
   position: absolute;
   left: 50%;
-  bottom: -5%;            /* move up/down as you like */
+  bottom: -10%;            /* move up/down as you like */
   transform: translateX(-50%);
   width: 100%;
   max-width: 380px;
@@ -222,7 +222,7 @@ body {
 
 .controls {
   margin-top: 24px;
-  padding-bottom: 10px;
+  padding-bottom: 1px;
 }
 
 .numbers-title {
