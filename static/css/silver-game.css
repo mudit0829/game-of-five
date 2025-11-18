@@ -98,26 +98,32 @@ body {
   100% { transform: translateY(0); }
 }
 
-/* ===== POND / FROG ===== */
+/* ===== POND / BACKGROUND / FROG ===== */
 
 .pond {
   position: relative;
   margin-top: 4px;
-  padding: 26px 12px 20px;
   border-radius: 26px;
-  background: radial-gradient(circle at 50% 25%, #0f172a 0, #020617 55%, #020617 100%);
+  /* background image you added */
+  background-image: url("../img/silver_bg.png");
+  background-size: cover;
+  background-position: center top;
+  background-repeat: no-repeat;
   box-shadow: 0 18px 40px rgba(0, 0, 0, 0.9);
   overflow: hidden;
+  /* fixed height so composition matches your reference */
+  height: 320px;
+  padding: 0; /* padding not needed now, we position internals absolutely */
 }
 
-/* Frog ABOVE pads like reference design */
+/* Frog ABOVE the lilypads, near top of background */
 .frog-wrapper {
   position: absolute;
   left: 50%;
-  top: 18%;                         /* move frog towards top of pond */
-  transform: translate(-50%, -50%); /* center horizontally, nice vertical placement */
-  width: 120px;
-  height: 120px;
+  top: 26%;                          /* higher = closer to top, lower = closer to pads */
+  transform: translate(-50%, -50%);
+  width: 140px;
+  height: 140px;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -141,10 +147,15 @@ body {
   pointer-events: none;
 }
 
-/* ===== PADS ===== */
+/* ===== PADS (floating on water, near bottom of pond) ===== */
 
 .pads {
-  margin-top: 6px;
+  position: absolute;
+  left: 50%;
+  bottom: 24px;                      /* move up/down to adjust pads on water */
+  transform: translateX(-50%);
+  width: 100%;
+  max-width: 360px;
 }
 
 .pads-row {
@@ -156,23 +167,23 @@ body {
 
 .pad {
   position: relative;
-  width: 140px;
-  height: 90px;
+  width: 110px;
+  height: 80px;
   display: flex;
   justify-content: center;
   align-items: center;
 }
 
-/* same image, but small variations so they don't look identical */
+/* subtle rotation / scale variations */
 .pad[data-pad="1"] img { transform: rotate(-6deg) scale(0.98); }
 .pad[data-pad="2"] img { transform: rotate(3deg) scale(1.03); }
-.pad[data-pad="3"] img { transform: rotate(-2deg) scale(1.0); }
+.pad[data-pad="3"] img { transform: rotate(-2deg) scale(1.00); }
 .pad[data-pad="4"] img { transform: rotate(5deg) scale(1.02); }
 .pad[data-pad="5"] img { transform: rotate(-4deg) scale(0.99); }
 .pad[data-pad="6"] img { transform: rotate(2deg) scale(1.04); }
 
 .pad img {
-  width: 140px;
+  width: 110px;
   height: auto;
   filter: drop-shadow(0 8px 10px rgba(0,0,0,0.5));
 }
@@ -325,19 +336,25 @@ body {
 .status.ok { color: #bbf7d0; }
 .status.error { color: #fecaca; }
 
+/* ===== RESPONSIVE ===== */
+
 @media (max-width: 480px) {
   .pond {
-    padding: 22px 8px 18px;
+    height: 300px;
   }
+
   .frog-wrapper {
+    width: 120px;
+    height: 120px;
+    top: 28%;                         /* small tweak for tall screens */
+  }
+
+  .pad {
     width: 100px;
-    height: 100px;
-    top: 18%;                      /* keep same relative position on small screens */
+    height: 72px;
   }
-  .frog {
-    width: 100%;
-  }
+
   .pad img {
-    width: 96px;
+    width: 100px;
   }
 }
