@@ -1,42 +1,60 @@
-// === GAME LOBBY - Table Management ===
+// === GAME LOBBY - Table Management (Simplified & Working) ===
+
+console.log('Game Lobby JS Loaded!'); // Debug message
 
 const USER_ID = localStorage.getItem('user_id') || 'guest';
 const USERNAME = localStorage.getItem('username') || 'Player';
 
-// Mock data for tables (replace with real Socket.IO data)
+// Store available tables
 let availableTables = [];
 
-// Initialize 6 tables
+// Initialize 6 tables on page load
 function initializeTables() {
+  console.log('Initializing tables...'); // Debug
+  
   availableTables = [];
+  
   for (let i = 1; i <= 6; i++) {
     availableTables.push({
-      tableNumber: `Table ${i}`,
-      roundCode: `T${Date.now()}-${i}`,
-      players: Math.floor(Math.random() * 5) + 1, // 1-5 players
+      tableNumber: i,
+      roundCode: `GAME${Date.now()}-${i}`,
+      players: Math.floor(Math.random() * 4) + 1, // 1-4 players
       maxPlayers: 6,
-      timeRemaining: Math.floor(Math.random() * 280) + 20, // 20-300 seconds
+      timeRemaining: Math.floor(Math.random() * 250) + 50, // 50-300 seconds
       isFull: false
     });
   }
+  
+  console.log('Tables created:', availableTables); // Debug
   renderTables();
 }
 
-// Render tables
+// Render all tables to the page
 function renderTables() {
   const tablesGrid = document.getElementById('tablesGrid');
-  tablesGrid.innerHTML = '';
-
+  
+  if (!tablesGrid) {
+    console.error('tablesGrid element not found!');
+    return;
+  }
+  
+  tablesGrid.innerHTML = ''; // Clear existing cards
+  
   availableTables.forEach((table, index) => {
     const isFull = table.players >= table.maxPlayers;
     
+    // Create card element
     const card = document.createElement('div');
     card.className = `table-card ${isFull ? 'full' : ''}`;
-    card.onclick = () => joinTable(table, index);
-
+    
+    if (!isFull) {
+      card.onclick = () => joinTable(index);
+    }
+    
+    // Build card HTML
     card.innerHTML = `
       <div class="table-header">
-        <div class="table-number">${table.tableNumber}</div>
+        <div class="table-number">Game #${table.tableNumber}</div>
         <div class="table-timer">
           <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
             <circle cx="12" cy="12" r="10"/>
@@ -56,77 +74,134 @@ function renderTables() {
           <span>${table.players}/${table.maxPlayers} Players</span>
         </div>
         <div class="slots-indicator">
-          ${renderSlots(table.players, table.maxPlayers)}
+          ${generateSlots(table.players, table.maxPlayers)}
         </div>
       </div>
     `;
-
+    
     tablesGrid.appendChild(card);
   });
+  
+  console.log('Tables rendered successfully');
 }
 
-// Render slot indicators
-function renderSlots(players, maxPlayers) {
-  let slotsHTML = '';
-  for (let i = 0; i < maxPlayers; i++) {
-    const slotClass = i < players ? 'filled' : 'empty';
-    slotsHTML += `<div class="slot ${slotClass}"></div>`;
+// Generate slot indicator dots
+function generateSlots(filled, total) {
+  let html = '';
+  for (let i = 0; i < total; i++) {
+    const slotClass = i < filled ? 'filled' : 'empty';
+    html += `<div class="slot ${slotClass}"></div>`;
   }
-  return slotsHTML;
+  return html;
 }
 
-// Format time (seconds to MM:SS)
+// Format seconds to MM:SS
 function formatTime(seconds) {
   const mins = Math.floor(seconds / 60);
   const secs = seconds % 60;
   return `${mins}:${secs.toString().padStart(2, '0')}`;
 }
 
-// Join table
-function joinTable(table, index) {
+// Join a specific table
+function joinTable(index) {
+  const table = availableTables[index];
+  
   if (table.isFull || table.players >= table.maxPlayers) {
     alert('This table is full! Please choose another table.');
     return;
   }
-
+  
+  console.log('Joining table:', table.tableNumber);
+  
+  // Get game type from page (set in HTML template)
+  const gameType = typeof GAME_TYPE !== 'undefined' ? GAME_TYPE : 'silver';
+  
   // Redirect to actual game
-  window.location.href = `/play/${GAME_TYPE}`;
+  window.location.href = `/play/${gameType}`;
 }
 
-// Quick play (join first available table)
-document.getElementById('quickPlayBtn').addEventListener('click', () => {
-  const availableTable = availableTables.find(t => t.players < t.maxPlayers);
+// Quick play button - join first available table
+function setupQuickPlay() {
+  const quickPlayBtn = document.getElementById('quickPlayBtn');
   
-  if (availableTable) {
-    window.location.href = `/play/${GAME_TYPE}`;
-  } else {
-    alert('All tables are full! Please wait for a new table.');
+  if (quickPlayBtn) {
+    quickPlayBtn.addEventListener('click', () => {
+      const availableTable = availableTables.find(t => !t.isFull && t.players < t.maxPlayers);
+      
+      if (availableTable) {
+        const gameType = typeof GAME_TYPE !== 'undefined' ? GAME_TYPE : 'silver';
+        window.location.href = `/play/${gameType}`;
+      } else {
+        alert('All tables are full! Please wait for a new table.');
+      }
+    });
   }
-});
+}
 
-// Update timers every second
-function updateTimers() {
-  availableTables.forEach((table, index) => {
+// Update table timers and simulate player activity
+function updateTables() {
+  let needsUpdate = false;
+  
+  availableTables.forEach((table) => {
+    // Decrease timer
     table.timeRemaining--;
     
+    // Reset table if time runs out
     if (table.timeRemaining <= 0) {
-      // Table round ended, reset or remove
       table.players = Math.floor(Math.random() * 3) + 1;
       table.timeRemaining = 300; // 5 minutes
+      needsUpdate = true;
     }
-
-    // Simulate random player joins
+    
+    // Randomly add players (10% chance per second)
     if (Math.random() < 0.1 && table.players < table.maxPlayers) {
       table.players++;
+      needsUpdate = true;
     }
-
-    // Mark as full
+    
+    // Mark table as full
     table.isFull = table.players >= table.maxPlayers;
+    
+    // Remove full table and create new one (keep 6 tables always)
+    if (table.isFull && Math.random() < 0.05) {
+      needsUpdate = true;
+    }
   });
-
-  renderTables();
+  
+  if (needsUpdate) {
+    renderTables();
+  } else {
+    // Just update timers without full re-render
+    document.querySelectorAll('.table-timer span').forEach((span, index) => {
+      if (availableTables[index]) {
+        span.textContent = formatTime(availableTables[index].timeRemaining);
+      }
+    });
+  }
 }
 
-// Initialize
-initializeTables();
-setInterval(updateTimers, 1000);
+// Initialize everything when page loads
+document.addEventListener('DOMContentLoaded', () => {
+  console.log('DOM Content Loaded');
+  
+  // Initialize tables
+  initializeTables();
+  
+  // Setup quick play button
+  setupQuickPlay();
+  
+  // Update every second
+  setInterval(updateTables, 1000);
+});
+
+// Also try initializing if DOMContentLoaded already fired
+if (document.readyState === 'loading') {
+  // Still loading, wait for DOMContentLoaded
+  console.log('Waiting for DOM...');
+} else {
+  // DOM already loaded
+  console.log('DOM already ready, initializing now...');
+  initializeTables();
+  setupQuickPlay();
+  setInterval(updateTables, 1000);
+}
