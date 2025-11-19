@@ -511,6 +511,16 @@ def game_info(game_type):
     game = GAME_CONFIGS[game_type]
     return render_template('game-info.html', game_type=game_type, game=game)
 
+@app.route('/game/<game_type>')
+@login_required
+def game_lobby(game_type):
+    """Game lobby page with tables"""
+    if game_type not in GAME_CONFIGS:
+        return "Game not found", 404
+    
+    game = GAME_CONFIGS[game_type]
+    return render_template('game-lobby.html', game_type=game_type, game=game)
+
 
 @app.route('/play/<game_type>')
 @login_required
@@ -541,6 +551,8 @@ def register_game():
 def get_balance(user_id):
     balance = user_wallets.get(user_id, 0)
     return jsonify({'balance': balance})
+
+
 
 
 # ---------------------------------------------------
