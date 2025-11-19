@@ -133,10 +133,10 @@ document.getElementById("placeBetBtn").onclick = () => {
 };
 
 /* ---------------------------
-   Paratrooper Animation (SMOOTH)
+   CSS Paratrooper Animation
 ----------------------------*/
 
-function landParatrooper(winningNumber) {
+function landCSSParatrooper(winningNumber) {
     const boats = document.querySelectorAll(".boat");
     let targetBoat = null;
 
@@ -153,71 +153,117 @@ function landParatrooper(winningNumber) {
     }
 
     const rect = targetBoat.getBoundingClientRect();
-    const para = document.getElementById("paratrooper");
+    const para = document.getElementById("cssParatrooper");
 
-    // Calculate landing position (on top of boat)
-    const landingTop = rect.top - 80;
+    // Calculate precise landing position
+    const landingTop = rect.top - 70;
     const landingLeft = rect.left + rect.width / 2;
 
-    // Reset paratrooper to top
+    // Reset to top
     para.style.transition = "none";
-    para.style.top = "-260px";
+    para.style.top = "-300px";
     para.style.left = "50%";
     para.style.transform = "translateX(-50%)";
+    para.classList.remove("falling");
 
     // Force reflow
     void para.offsetWidth;
 
-    // Animate smooth landing
+    // Start falling with swing
     setTimeout(() => {
-        para.style.transition = "top 2.2s cubic-bezier(0.25, 0.46, 0.45, 0.94), left 2.2s cubic-bezier(0.25, 0.46, 0.45, 0.94), transform 2.2s ease-out";
+        para.classList.add("falling");
+        para.style.transition = "top 2.8s cubic-bezier(0.22, 0.61, 0.36, 1), left 2.8s cubic-bezier(0.22, 0.61, 0.36, 1)";
         para.style.top = landingTop + "px";
         para.style.left = landingLeft + "px";
-        para.style.transform = "translateX(-50%)";
 
-        // Mark winning boat with glow
+        // Landing effects
         setTimeout(() => {
             targetBoat.classList.add("win");
-        }, 2000);
-
-        // Create landing splash effect
-        setTimeout(() => {
-            const splash = document.createElement("div");
-            splash.style.position = "fixed";
-            splash.style.top = (rect.top + rect.height / 2) + "px";
-            splash.style.left = (rect.left + rect.width / 2) + "px";
-            splash.style.transform = "translate(-50%, -50%)";
-            splash.style.width = "200px";
-            splash.style.height = "200px";
-            splash.style.background = "radial-gradient(circle, rgba(34,197,94,0.6) 0%, rgba(34,197,94,0.3) 40%, transparent 70%)";
-            splash.style.borderRadius = "50%";
-            splash.style.pointerEvents = "none";
-            splash.style.animation = "splashEffect 0.8s ease-out";
-            splash.style.zIndex = "100";
-            document.body.appendChild(splash);
-
-            setTimeout(() => splash.remove(), 800);
-        }, 2100);
+            createLandingSplash(rect);
+            
+            // Stop swinging
+            setTimeout(() => {
+                para.classList.remove("falling");
+            }, 100);
+        }, 2600);
     }, 50);
 }
 
-// Splash animation CSS
-if (!document.getElementById("splash-animation")) {
+/* ---------------------------
+   Landing Splash Effect
+----------------------------*/
+
+function createLandingSplash(boatRect) {
+    const centerX = boatRect.left + boatRect.width / 2;
+    const centerY = boatRect.top + boatRect.height / 2;
+
+    // Main splash
+    const splash = document.createElement("div");
+    splash.style.position = "fixed";
+    splash.style.top = centerY + "px";
+    splash.style.left = centerX + "px";
+    splash.style.transform = "translate(-50%, -50%)";
+    splash.style.width = "250px";
+    splash.style.height = "250px";
+    splash.style.background = "radial-gradient(circle, rgba(34,197,94,0.7) 0%, rgba(34,197,94,0.4) 40%, transparent 70%)";
+    splash.style.borderRadius = "50%";
+    splash.style.pointerEvents = "none";
+    splash.style.animation = "splashPulse 1s ease-out";
+    splash.style.zIndex = "100";
+    document.body.appendChild(splash);
+
+    // Ripple waves
+    for (let i = 0; i < 3; i++) {
+        setTimeout(() => {
+            const ripple = document.createElement("div");
+            ripple.style.position = "fixed";
+            ripple.style.top = centerY + "px";
+            ripple.style.left = centerX + "px";
+            ripple.style.transform = "translate(-50%, -50%)";
+            ripple.style.width = "100px";
+            ripple.style.height = "100px";
+            ripple.style.border = "3px solid rgba(34, 197, 94, 0.6)";
+            ripple.style.borderRadius = "50%";
+            ripple.style.pointerEvents = "none";
+            ripple.style.animation = "rippleExpand 1.2s ease-out";
+            ripple.style.zIndex = "99";
+            document.body.appendChild(ripple);
+
+            setTimeout(() => ripple.remove(), 1200);
+        }, i * 200);
+    }
+
+    setTimeout(() => splash.remove(), 1000);
+}
+
+// Splash animations
+if (!document.getElementById("splash-animations")) {
     const style = document.createElement("style");
-    style.id = "splash-animation";
+    style.id = "splash-animations";
     style.textContent = `
-        @keyframes splashEffect {
+        @keyframes splashPulse {
             0% {
                 opacity: 0;
                 transform: translate(-50%, -50%) scale(0.3);
             }
-            50% {
+            40% {
                 opacity: 1;
                 transform: translate(-50%, -50%) scale(1);
             }
             100% {
                 opacity: 0;
-                transform: translate(-50%, -50%) scale(1.5);
+                transform: translate(-50%, -50%) scale(1.8);
+            }
+        }
+        
+        @keyframes rippleExpand {
+            0% {
+                opacity: 0.8;
+                transform: translate(-50%, -50%) scale(0.5);
+            }
+            100% {
+                opacity: 0;
+                transform: translate(-50%, -50%) scale(2.5);
             }
         }
     `;
@@ -258,14 +304,14 @@ socket.on("new_round", data => {
     updateMyBets(rd.bets || []);
     showStatus("New round started", false);
 
-    // Reset paratrooper to top
-    const para = document.getElementById("paratrooper");
+    // Reset paratrooper
+    const para = document.getElementById("cssParatrooper");
     para.style.transition = "none";
-    para.style.top = "-260px";
+    para.style.top = "-300px";
     para.style.left = "50%";
     para.style.transform = "translateX(-50%)";
+    para.classList.remove("falling");
 
-    // Remove urgent timer styling
     document.querySelector(".timer-pill").classList.remove("urgent");
 });
 
@@ -289,9 +335,8 @@ socket.on("round_result", data => {
     const winning = data.result;
     showStatus("Winning: " + winning + "! 🎉", false);
     
-    // Small delay before paratrooper animation
     setTimeout(() => {
-        landParatrooper(winning);
+        landCSSParatrooper(winning);
     }, 150);
 });
 
@@ -300,7 +345,6 @@ socket.on("timer_update", data => {
     document.getElementById("timerText").textContent = timeRemaining.toString().padStart(2, "0");
     document.getElementById("playerCount").textContent = data.players || 0;
     
-    // Add urgent styling at 10 seconds
     const pill = document.querySelector(".timer-pill");
     if (timeRemaining <= 10) {
         pill.classList.add("urgent");
@@ -311,7 +355,7 @@ socket.on("timer_update", data => {
 
 socket.on("betting_closed", data => {
     if (data.game_type !== GAME_TYPE) return;
-    showStatus("Betting closed for this round", true);
+    showStatus("Betting closed", true);
 });
 
 /* ---------------------------
