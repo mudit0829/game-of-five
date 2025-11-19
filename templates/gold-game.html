@@ -56,29 +56,19 @@
         </div>
       </div>
 
-<!-- EMOJI PLAYER + BALL -->
-<div class="player-area">
-  <!-- Emoji Player -->
-  <div id="cssPlayer" class="emoji-player">🤾</div>
-  
-  <!-- Ball -->
-  <img
-    id="ballSprite"
-    class="ball"
-    src="{{ url_for('static', filename='img/gold_ball.png') }}"
-    alt="Ball"
-  >
-</div>
-  
-  <!-- Ball -->
-  <img
-    id="ballSprite"
-    class="ball"
-    src="{{ url_for('static', filename='img/gold_ball.png') }}"
-    alt="Ball"
-  >
-</div>
-
+      <!-- EMOJI PLAYER + BALL -->
+      <div class="player-area">
+        <!-- Emoji Player -->
+        <div id="cssPlayer" class="emoji-player">🤾</div>
+        
+        <!-- Ball -->
+        <img
+          id="ballSprite"
+          class="ball"
+          src="{{ url_for('static', filename='img/gold_ball.png') }}"
+          alt="Ball"
+        >
+      </div>
     </section>
 
     <!-- CONTROLS -->
@@ -97,12 +87,12 @@
         {% endfor %}
       </div>
 
-      <!-- YOUR BETS DISPLAY (improved) -->
+      <!-- YOUR BETS DISPLAY -->
       <div class="my-bets-section">
         <div class="my-bets-title">Your bets: <span id="myBetsRow" class="my-bets-row"></span></div>
       </div>
 
-      <!-- PLACE BET BUTTON (no input field) -->
+      <!-- PLACE BET BUTTON -->
       <button id="placeBetBtn" class="bet-button">
         Place Bet (₹{{ game.bet_amount }})
       </button>
