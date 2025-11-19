@@ -18,14 +18,13 @@
       />
     </div>
 
-    <!-- TOP HUD -->
+    <!-- TOP HUD (FIXED LAYOUT) -->
     <header class="top-hud">
       <div class="hud-left">
         <div class="hud-game">GAME <span id="roundCode">--</span></div>
         <div class="hud-line"><span id="playerCount">0</span> PLAYERS</div>
-        <div class="hud-line">
-          You: <span id="userName"></span> · Bets: <span id="userBets">0</span>
-        </div>
+        <div class="hud-line">You: <span id="userName"></span></div>
+        <div class="hud-line">Bets: <span id="userBets">0</span></div>
       </div>
 
       <div class="hud-center">
@@ -42,59 +41,96 @@
       </div>
     </header>
 
-    <!-- PLAY AREA: BOATS + PARATROOPER -->
+    <!-- PLAY AREA: BOATS + CSS PARATROOPER -->
     <main class="play-layer">
       
-      <!-- BOATS (2 rows, 3 per row) -->
+      <!-- BOATS WITH WATER RIPPLES -->
       <div class="boats-container">
         <!-- Row 1 -->
         <div class="boat-row">
-          <div class="boat" data-boat="1">
-            <img src="{{ url_for('static', filename='img/boat1.png') }}" alt="Boat 1">
-            <span class="boat-number"></span>
-            <span class="boat-user"></span>
+          <div class="boat-wrapper">
+            <div class="boat" data-boat="1">
+              <img src="{{ url_for('static', filename='img/boat1.png') }}" alt="Boat 1">
+              <span class="boat-number"></span>
+              <span class="boat-user"></span>
+            </div>
+            <div class="water-ripple"></div>
           </div>
-          <div class="boat" data-boat="2">
-            <img src="{{ url_for('static', filename='img/boat2.png') }}" alt="Boat 2">
-            <span class="boat-number"></span>
-            <span class="boat-user"></span>
+          
+          <div class="boat-wrapper">
+            <div class="boat" data-boat="2">
+              <img src="{{ url_for('static', filename='img/boat2.png') }}" alt="Boat 2">
+              <span class="boat-number"></span>
+              <span class="boat-user"></span>
+            </div>
+            <div class="water-ripple"></div>
           </div>
-          <div class="boat" data-boat="3">
-            <img src="{{ url_for('static', filename='img/boat3.png') }}" alt="Boat 3">
-            <span class="boat-number"></span>
-            <span class="boat-user"></span>
+          
+          <div class="boat-wrapper">
+            <div class="boat" data-boat="3">
+              <img src="{{ url_for('static', filename='img/boat3.png') }}" alt="Boat 3">
+              <span class="boat-number"></span>
+              <span class="boat-user"></span>
+            </div>
+            <div class="water-ripple"></div>
           </div>
         </div>
 
         <!-- Row 2 -->
         <div class="boat-row">
-          <div class="boat" data-boat="4">
-            <img src="{{ url_for('static', filename='img/boat4.png') }}" alt="Boat 4">
-            <span class="boat-number"></span>
-            <span class="boat-user"></span>
+          <div class="boat-wrapper">
+            <div class="boat" data-boat="4">
+              <img src="{{ url_for('static', filename='img/boat4.png') }}" alt="Boat 4">
+              <span class="boat-number"></span>
+              <span class="boat-user"></span>
+            </div>
+            <div class="water-ripple"></div>
           </div>
-          <div class="boat" data-boat="5">
-            <img src="{{ url_for('static', filename='img/boat5.png') }}" alt="Boat 5">
-            <span class="boat-number"></span>
-            <span class="boat-user"></span>
+          
+          <div class="boat-wrapper">
+            <div class="boat" data-boat="5">
+              <img src="{{ url_for('static', filename='img/boat5.png') }}" alt="Boat 5">
+              <span class="boat-number"></span>
+              <span class="boat-user"></span>
+            </div>
+            <div class="water-ripple"></div>
           </div>
-          <div class="boat" data-boat="6">
-            <img src="{{ url_for('static', filename='img/boat6.png') }}" alt="Boat 6">
-            <span class="boat-number"></span>
-            <span class="boat-user"></span>
+          
+          <div class="boat-wrapper">
+            <div class="boat" data-boat="6">
+              <img src="{{ url_for('static', filename='img/boat6.png') }}" alt="Boat 6">
+              <span class="boat-number"></span>
+              <span class="boat-user"></span>
+            </div>
+            <div class="water-ripple"></div>
           </div>
         </div>
       </div>
 
-      <!-- PARATROOPER -->
-      <img
-        id="paratrooper"
-        src="{{ url_for('static', filename='img/paratrooper.png') }}"
-        alt="Paratrooper"
-      >
+      <!-- CSS ANIMATED PARATROOPER -->
+      <div id="cssParatrooper" class="css-paratrooper">
+        <!-- Parachute -->
+        <div class="parachute">
+          <div class="chute-canopy"></div>
+          <div class="chute-line chute-line-1"></div>
+          <div class="chute-line chute-line-2"></div>
+          <div class="chute-line chute-line-3"></div>
+          <div class="chute-line chute-line-4"></div>
+        </div>
+        
+        <!-- Person -->
+        <div class="para-person">
+          <div class="para-head"></div>
+          <div class="para-body"></div>
+          <div class="para-arm para-arm-left"></div>
+          <div class="para-arm para-arm-right"></div>
+          <div class="para-leg para-leg-left"></div>
+          <div class="para-leg para-leg-right"></div>
+        </div>
+      </div>
     </main>
 
-    <!-- BOTTOM CONTROLS (EXACT GOLD GAME STYLE) -->
+    <!-- BOTTOM CONTROLS -->
     <section class="controls">
       <h3>Select your number (0–9)</h3>
 
@@ -118,7 +154,7 @@
         <div id="myBetsContainer" class="my-bets"></div>
       </div>
 
-      <!-- Place Bet Button (no input field) -->
+      <!-- Place Bet Button -->
       <button id="placeBetBtn" class="bet-button">
         Place Bet (₹{{ game.bet_amount }})
       </button>
