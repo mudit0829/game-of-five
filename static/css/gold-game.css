@@ -244,7 +244,7 @@ body {
   }
 }
 
-/* ===== PROFESSIONAL REALISTIC PLAYER ===== */
+/* ===== EMOJI PLAYER (Simple & Professional) ===== */
 
 .player-area {
   position: absolute;
@@ -259,479 +259,54 @@ body {
   width: 200px;
 }
 
-.css-player {
-  position: relative;
-  width: 80px;
-  height: 120px;
+.emoji-player {
+  font-size: 68px;
   opacity: 0;
   transition: opacity 0.5s ease-in;
   filter: drop-shadow(0 12px 25px rgba(0, 0, 0, 0.8));
-  margin-right: -10px; /* Position closer to ball */
+  line-height: 1;
+  user-select: none;
+  margin-right: -10px;
 }
 
-.player-area.visible .css-player {
+.player-area.visible .emoji-player {
   opacity: 1;
   animation: playerIdle 3s ease-in-out infinite;
 }
 
-/* ===== HEAD (Looking towards goals) ===== */
-.player-head {
-  position: absolute;
-  top: 0;
-  left: 50%;
-  transform: translateX(-50%) rotate(-5deg); /* Slight tilt looking at goals */
-  width: 30px;
-  height: 32px;
-  background: radial-gradient(circle at 40% 35%, #f5c6a5, #e8a87c, #d89666);
-  border-radius: 50% 50% 45% 45%;
-  border: 2.5px solid #1a1a1a;
-  z-index: 5;
-  box-shadow: inset -2px -2px 4px rgba(0, 0, 0, 0.2);
-}
-
-/* Realistic Hair */
-.player-head::before {
-  content: "";
-  position: absolute;
-  top: -6px;
-  left: 50%;
-  transform: translateX(-50%);
-  width: 28px;
-  height: 16px;
-  background: linear-gradient(135deg, #2c3e50 0%, #34495e 50%, #2c3e50 100%);
-  border-radius: 50% 50% 0 0;
-  border: 2.5px solid #1a1a1a;
-  border-bottom: none;
-  box-shadow: inset 0 2px 4px rgba(255, 255, 255, 0.1);
-}
-
-/* Face details - Eyes and mouth */
-.player-head::after {
-  content: "";
-  position: absolute;
-  top: 13px;
-  left: 8px;
-  width: 4px;
-  height: 4px;
-  background: #1a1a1a;
-  border-radius: 50%;
-  box-shadow: 
-    10px 0 0 0 #1a1a1a,        /* Right eye */
-    5px 8px 0 0 #c0392b,        /* Mouth */
-    0 8px 0 0 #c0392b,
-    10px 8px 0 0 #c0392b;
-}
-
-/* Ears */
-.player-head .ear-left,
-.player-head .ear-right {
-  position: absolute;
-  top: 14px;
-  width: 6px;
-  height: 10px;
-  background: #e8a87c;
-  border-radius: 50%;
-  border: 1.5px solid #1a1a1a;
-}
-
-.player-head .ear-left {
-  left: -3px;
-}
-
-.player-head .ear-right {
-  right: -3px;
-}
-
-/* ===== NECK ===== */
-.player-neck {
-  position: absolute;
-  top: 30px;
-  left: 50%;
-  transform: translateX(-50%);
-  width: 14px;
-  height: 8px;
-  background: linear-gradient(180deg, #e8a87c 0%, #d89666 100%);
-  border-radius: 4px;
-  border: 2px solid #1a1a1a;
-  z-index: 4;
-}
-
-/* ===== PROFESSIONAL JERSEY (Red with details) ===== */
-.player-body {
-  position: absolute;
-  top: 36px;
-  left: 50%;
-  transform: translateX(-50%);
-  width: 42px;
-  height: 46px;
-  background: linear-gradient(135deg, #e74c3c 0%, #c0392b 30%, #e74c3c 60%, #c0392b 100%);
-  border-radius: 12px 12px 8px 8px;
-  border: 2.5px solid #1a1a1a;
-  z-index: 3;
-  box-shadow: 
-    inset 0 2px 8px rgba(255, 255, 255, 0.2),
-    inset 0 -2px 8px rgba(0, 0, 0, 0.3);
-}
-
-/* Jersey collar */
-.player-body::before {
-  content: "";
-  position: absolute;
-  top: 0;
-  left: 50%;
-  transform: translateX(-50%);
-  width: 20px;
-  height: 8px;
-  background: linear-gradient(180deg, #8e44ad 0%, #7d3c98 100%);
-  border-radius: 0 0 50% 50%;
-  border: 2px solid #1a1a1a;
-  border-top: none;
-}
-
-/* Jersey number badge */
-.player-body::after {
-  content: "9";
-  position: absolute;
-  top: 50%;
-  left: 50%;
-  transform: translate(-50%, -50%);
-  width: 22px;
-  height: 22px;
-  background: rgba(255, 255, 255, 0.15);
-  border-radius: 50%;
-  font-size: 15px;
-  font-weight: 900;
-  color: #fff;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  text-shadow: 
-    0 1px 2px rgba(0, 0, 0, 0.8),
-    0 0 4px rgba(255, 255, 255, 0.3);
-  font-family: Arial, sans-serif;
-  border: 1px solid rgba(255, 255, 255, 0.2);
-}
-
-/* Jersey side stripes */
-.player-body-stripe-left,
-.player-body-stripe-right {
-  position: absolute;
-  top: 8px;
-  width: 4px;
-  height: 30px;
-  background: linear-gradient(180deg, #fff 0%, rgba(255, 255, 255, 0.3) 100%);
-  border-radius: 2px;
-  opacity: 0.4;
-}
-
-.player-body-stripe-left {
-  left: 6px;
-}
-
-.player-body-stripe-right {
-  right: 6px;
-}
-
-/* ===== PROFESSIONAL ARMS ===== */
-.player-arm {
-  position: absolute;
-  width: 14px;
-  height: 38px;
-  border-radius: 8px;
-  border: 2.5px solid #1a1a1a;
-  z-index: 2;
-  background: linear-gradient(180deg, 
-    #e74c3c 0%, 
-    #e74c3c 55%, 
-    #e8a87c 55%, 
-    #d89666 100%);
-  box-shadow: inset -1px -1px 4px rgba(0, 0, 0, 0.3);
-}
-
-.player-arm-left {
-  top: 38px;
-  left: 2px;
-  transform-origin: top center;
-  animation: armSwingLeft 2.5s ease-in-out infinite;
-}
-
-.player-arm-right {
-  top: 38px;
-  right: 2px;
-  transform-origin: top center;
-  animation: armSwingRight 2.5s ease-in-out infinite;
-}
-
-/* Realistic hands */
-.player-arm::after {
-  content: "";
-  position: absolute;
-  bottom: -6px;
-  left: 50%;
-  transform: translateX(-50%);
-  width: 12px;
-  height: 12px;
-  background: radial-gradient(circle, #e8a87c, #d89666);
-  border-radius: 50%;
-  border: 2px solid #1a1a1a;
-  box-shadow: inset -1px -1px 3px rgba(0, 0, 0, 0.2);
-}
-
-/* ===== PROFESSIONAL SHORTS (Blue) ===== */
-.player-shorts {
-  position: absolute;
-  top: 80px;
-  left: 50%;
-  transform: translateX(-50%);
-  width: 40px;
-  height: 20px;
-  background: linear-gradient(135deg, #3498db 0%, #2980b9 50%, #3498db 100%);
-  border-radius: 6px 6px 12px 12px;
-  border: 2.5px solid #1a1a1a;
-  z-index: 2;
-  box-shadow: 
-    inset 0 2px 6px rgba(255, 255, 255, 0.2),
-    inset 0 -2px 6px rgba(0, 0, 0, 0.3);
-}
-
-/* Shorts details */
-.player-shorts::before {
-  content: "";
-  position: absolute;
-  top: 50%;
-  left: 50%;
-  transform: translate(-50%, -50%);
-  width: 3px;
-  height: 12px;
-  background: rgba(255, 255, 255, 0.3);
-  border-radius: 2px;
-}
-
-/* ===== PROFESSIONAL LEGS ===== */
-.player-leg {
-  position: absolute;
-  width: 16px;
-  height: 48px;
-  border-radius: 8px;
-  border: 2.5px solid #1a1a1a;
-  z-index: 1;
-  background: linear-gradient(180deg, 
-    #3498db 0%, 
-    #3498db 35%, 
-    #e8a87c 35%, 
-    #d89666 65%, 
-    #2c3e50 65%,
-    #1a1a1a 100%);
-  box-shadow: inset -1px -1px 4px rgba(0, 0, 0, 0.3);
-}
-
-.player-leg-left {
-  bottom: 0;
-  left: 18px;
-  transform-origin: top center;
-  animation: legSwingLeft 2.5s ease-in-out infinite;
-}
-
-.player-leg-right {
-  bottom: 0;
-  right: 18px;
-  transform-origin: top center;
-  animation: legSwingRight 2.5s ease-in-out infinite;
-}
-
-/* Professional football boots */
-.player-leg::after {
-  content: "";
-  position: absolute;
-  bottom: -8px;
-  left: 50%;
-  transform: translateX(-50%);
-  width: 20px;
-  height: 12px;
-  background: linear-gradient(135deg, #1a1a1a 0%, #2c3e50 50%, #1a1a1a 100%);
-  border-radius: 60% 60% 8px 8px;
-  border: 2px solid #000;
-  box-shadow: 
-    0 2px 4px rgba(0, 0, 0, 0.8),
-    inset 0 1px 2px rgba(255, 255, 255, 0.1);
-}
-
-/* Boot studs */
-.player-leg::before {
-  content: "";
-  position: absolute;
-  bottom: -10px;
-  left: 50%;
-  transform: translateX(-50%);
-  width: 16px;
-  height: 3px;
-  background: #000;
-  border-radius: 2px;
-  box-shadow: 
-    -5px 0 0 0 #000,
-    5px 0 0 0 #000;
-}
-
-/* ===== IDLE ANIMATIONS (Subtle and realistic) ===== */
+/* Idle bounce animation */
 @keyframes playerIdle {
   0%, 100% { 
     transform: translateY(0);
   }
   50% { 
-    transform: translateY(-6px);
+    transform: translateY(-8px);
   }
 }
 
-@keyframes armSwingLeft {
-  0%, 100% { 
-    transform: rotate(18deg);
-  }
-  50% { 
-    transform: rotate(-28deg);
-  }
+/* KICK ANIMATION (triggered by JS .kick class) */
+.emoji-player.kick {
+  animation: emojiKick 0.8s cubic-bezier(0.25, 0.46, 0.45, 0.94) !important;
 }
 
-@keyframes armSwingRight {
-  0%, 100% { 
-    transform: rotate(-18deg);
-  }
-  50% { 
-    transform: rotate(28deg);
-  }
-}
-
-@keyframes legSwingLeft {
-  0%, 100% { 
-    transform: rotate(-10deg);
-  }
-  50% { 
-    transform: rotate(15deg);
-  }
-}
-
-@keyframes legSwingRight {
-  0%, 100% { 
-    transform: rotate(10deg);
-  }
-  50% { 
-    transform: rotate(-15deg);
-  }
-}
-
-/* ===== POWERFUL REALISTIC KICK ANIMATION ===== */
-.css-player.kick {
-  animation: playerKickJump 0.8s cubic-bezier(0.25, 0.46, 0.45, 0.94) !important;
-}
-
-.css-player.kick .player-head {
-  animation: headKick 0.8s ease-out;
-}
-
-.css-player.kick .player-body {
-  animation: bodyLean 0.8s ease-out;
-}
-
-.css-player.kick .player-arm-left {
-  animation: armKickLeft 0.8s ease-out !important;
-}
-
-.css-player.kick .player-arm-right {
-  animation: armKickRight 0.8s ease-out !important;
-}
-
-.css-player.kick .player-leg-left {
-  animation: legKickSupport 0.8s ease-out !important;
-}
-
-.css-player.kick .player-leg-right {
-  animation: legKickSwing 0.8s cubic-bezier(0.6, 0.04, 0.98, 0.335) !important;
-}
-
-/* Kick animations */
-@keyframes playerKickJump {
+@keyframes emojiKick {
   0% { 
-    transform: translateY(0) rotate(0deg);
+    transform: translateY(0) rotate(0deg) scale(1);
   }
-  25% { 
-    transform: translateY(-15px) rotate(-5deg);
+  20% { 
+    transform: translateY(-12px) rotate(-8deg) scale(1.05);
   }
-  45% { 
-    transform: translateY(-30px) rotate(-12deg);
+  35% { 
+    transform: translateY(-25px) rotate(-15deg) scale(1.1);
   }
-  60% { 
-    transform: translateY(-25px) rotate(-10deg);
+  50% { 
+    transform: translateY(-20px) rotate(-12deg) scale(1.08);
   }
-  80% { 
-    transform: translateY(-10px) rotate(-4deg);
+  70% { 
+    transform: translateY(-8px) rotate(-5deg) scale(1.03);
   }
   100% { 
-    transform: translateY(0) rotate(0deg);
-  }
-}
-
-@keyframes headKick {
-  0%, 100% { 
-    transform: translateX(-50%) rotate(-5deg);
-  }
-  45% { 
-    transform: translateX(-50%) rotate(-20deg);
-  }
-}
-
-@keyframes bodyLean {
-  0%, 100% { 
-    transform: translateX(-50%) rotate(0deg);
-  }
-  45% { 
-    transform: translateX(-50%) rotate(-15deg);
-  }
-}
-
-@keyframes armKickLeft {
-  0%, 100% { 
-    transform: rotate(18deg);
-  }
-  45% { 
-    transform: rotate(-70deg);
-  }
-}
-
-@keyframes armKickRight {
-  0%, 100% { 
-    transform: rotate(-18deg);
-  }
-  45% { 
-    transform: rotate(60deg);
-  }
-}
-
-@keyframes legKickSupport {
-  0%, 100% { 
-    transform: rotate(-10deg);
-  }
-  45% { 
-    transform: rotate(-30deg);
-  }
-}
-
-@keyframes legKickSwing {
-  0% { 
-    transform: rotate(10deg);
-  }
-  25% { 
-    transform: rotate(-40deg);
-  }
-  45% { 
-    transform: rotate(-105deg);
-  }
-  55% { 
-    transform: rotate(-110deg);
-  }
-  75% { 
-    transform: rotate(-60deg);
-  }
-  100% { 
-    transform: rotate(10deg);
+    transform: translateY(0) rotate(0deg) scale(1);
   }
 }
 
