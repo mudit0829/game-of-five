@@ -148,7 +148,7 @@ body {
 .pitch {
   position: relative;
   flex: 0 0 auto;
-  height: 52vh;
+  height: 42vh;
   margin-bottom: 6px;
   padding: 0;
   background: transparent;
@@ -315,12 +315,18 @@ body {
   position: absolute;
   bottom: 18px;
   left: 50%;
-  transform: translateX(-20px); /* Right next to player's foot */
+  transform: translateX(-20px);
   width: 34px;
   height: 34px;
   z-index: 10;
   filter: drop-shadow(0 6px 10px rgba(0, 0, 0, 0.6));
   transition: transform 0.1s ease;
+}
+
+.ball img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
 }
 
 /* ===== CONTROLS ===== */
@@ -333,6 +339,8 @@ body {
   padding: 0 8px 6px;
   position: relative;
   z-index: 5;
+  min-height: 220px;
+  overflow-y: auto;
 }
 
 .numbers-title {
@@ -499,38 +507,92 @@ body {
 
 @media (max-height: 750px) {
   .pitch {
-    height: 48vh;
+    height: 38vh;
+  }
+
+  .goals-row {
+    margin-bottom: 14px;
+  }
+
+  .goal {
+    width: 90px;
+    height: 68px;
   }
 
   .player-area {
     bottom: 35px;
-    height: 95px;
+    height: 110px;
   }
 
-  .css-player {
-    width: 55px;
-    height: 90px;
-  }
-}
-
-@media (max-height: 680px) {
-  .pitch {
-    height: 44vh;
-  }
-
-  .player-area {
-    bottom: 30px;
-    height: 85px;
-  }
-
-  .css-player {
-    width: 50px;
-    height: 80px;
+  .emoji-player {
+    font-size: 60px;
   }
 
   .num-chip {
     width: 36px;
     height: 36px;
     font-size: 14px;
+  }
+}
+
+@media (max-height: 680px) {
+  .pitch {
+    height: 34vh;
+  }
+
+  .goals-row {
+    margin-bottom: 12px;
+  }
+
+  .goal {
+    width: 80px;
+    height: 60px;
+  }
+
+  .player-area {
+    bottom: 30px;
+    height: 100px;
+  }
+
+  .emoji-player {
+    font-size: 52px;
+  }
+
+  .controls {
+    min-height: 200px;
+  }
+}
+
+@media (max-height: 600px) {
+  .pitch {
+    height: 30vh;
+  }
+
+  .goals-row {
+    margin-bottom: 10px;
+  }
+
+  .goal {
+    width: 70px;
+    height: 52px;
+  }
+
+  .player-area {
+    bottom: 25px;
+    height: 90px;
+  }
+
+  .emoji-player {
+    font-size: 48px;
+  }
+
+  .controls {
+    min-height: 180px;
+  }
+
+  .num-chip {
+    width: 34px;
+    height: 34px;
+    font-size: 13px;
   }
 }
