@@ -12,58 +12,93 @@ html,
 body {
   height: 100%;
   font-family: 'Inter', -apple-system, BlinkMacSystemFont, "SF Pro Display", sans-serif;
-  overflow: hidden;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 }
 
 body {
-  background: #0b1929;
+  background: #020816;
 }
 
+/* ===== APP FRAME (like iPhone mock) ===== */
 .app-container {
   max-width: 480px;
   margin: 0 auto;
   height: 100vh;
   display: flex;
   flex-direction: column;
-  background: linear-gradient(180deg, #0b1929 0%, #0d1f35 50%, #0b1929 100%);
+  background: radial-gradient(circle at top, #020617 0%, #020617 55%, #000 100%);
+  color: #ffffff;
   position: relative;
   overflow: hidden;
 }
 
-/* ===== TOP HEADER - EXACT MATCH ===== */
+/* ===== STATUS BAR (time, icons) ===== */
+.status-bar {
+  height: 32px;
+  padding: 6px 18px 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 13px;
+  color: #e5e7eb;
+  opacity: 0.9;
+}
+
+.status-left {
+  font-weight: 600;
+}
+
+.status-right {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+}
+
+/* fake icons using simple shapes */
+.sb-icon {
+  width: 14px;
+  height: 10px;
+  border-radius: 3px;
+  border: 1.4px solid #e5e7eb;
+  position: relative;
+}
+
+.sb-icon::after {
+  content: '';
+  position: absolute;
+  inset: 2px;
+  border-radius: 2px;
+  background: #e5e7eb;
+}
+
+/* ===== TOP HEADER ===== */
 .top-header {
   display: flex;
   justify-content: space-between;
   align-items: flex-start;
-  padding: 16px 20px 12px;
-  background: transparent;
-  z-index: 10;
+  padding: 4px 20px 12px;
 }
 
 .brand-section {
   display: flex;
   flex-direction: column;
-  gap: 0;
+  gap: 2px;
 }
 
 .brand-name {
-  font-size: 28px;
+  font-size: 26px;
   font-weight: 900;
-  color: #ffffff;
   letter-spacing: -0.5px;
-  margin: 0;
-  line-height: 1;
   text-transform: uppercase;
+  color: #ffffff;
 }
 
 .brand-subtitle {
-  font-size: 16px;
-  color: #ffffff;
-  margin: 4px 0 0 0;
-  font-weight: 400;
-  letter-spacing: 0.2px;
+  font-size: 15px;
+  font-weight: 500;
+  color: #9ca3af;
 }
 
 .user-section {
@@ -72,362 +107,316 @@ body {
   gap: 10px;
 }
 
-.balance {
-  background: transparent;
-  padding: 0;
-  border-radius: 0;
+/* Wallet pill on top right */
+.balance-pill {
+  padding: 6px 14px;
+  border-radius: 999px;
+  background: rgba(15, 23, 42, 0.95);
   display: flex;
   align-items: center;
-  gap: 4px;
-  font-size: 18px;
-  font-weight: 600;
-  color: #ffffff;
-  border: none;
-}
-
-.rupee-symbol {
-  font-size: 16px;
+  gap: 6px;
+  font-size: 13px;
   font-weight: 600;
 }
 
-.profile-icon {
-  width: 36px;
-  height: 36px;
-  border-radius: 50%;
-  background: rgba(100, 149, 237, 0.25);
+.balance-pill span:first-child {
+  font-size: 12px;
+  opacity: 0.8;
+}
+
+.profile-circle {
+  width: 32px;
+  height: 32px;
+  border-radius: 999px;
+  background: rgba(15, 23, 42, 0.95);
   display: flex;
   align-items: center;
   justify-content: center;
   cursor: pointer;
-  transition: all 0.2s;
-  border: none;
 }
 
-.profile-icon:hover {
-  background: rgba(100, 149, 237, 0.35);
+.profile-circle svg {
+  width: 18px;
+  height: 18px;
+  color: #9ca3af;
 }
 
-.profile-icon svg {
-  color: #6495ed;
-  width: 20px;
-  height: 20px;
-}
-
-/* ===== MAIN CONTENT ===== */
+/* ===== MAIN CONTENT (scrollable) ===== */
 .main-content {
   flex: 1;
   overflow-y: auto;
-  padding: 8px 16px 90px;
+  padding: 4px 16px 96px;
 }
 
 .main-content::-webkit-scrollbar {
   width: 0;
 }
 
-/* ===== BONUS ROULETTE CARD - EXACT GRADIENT & GLOW ===== */
+/* ===== BONUS ROULETTE CARD ===== */
 .featured-card {
-  background: linear-gradient(135deg, #7b2cbf 0%, #9d4edd 30%, #c77dff 60%, #e0aaff 100%);
-  border-radius: 20px;
-  padding: 24px 20px;
-  margin-bottom: 20px;
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  box-shadow: 0 8px 24px rgba(123, 44, 191, 0.35),
-              0 0 40px rgba(157, 78, 221, 0.2);
   position: relative;
-  overflow: visible;
+  margin-top: 4px;
+  margin-bottom: 18px;
+  padding: 18px 18px;
+  border-radius: 22px;
+  background: radial-gradient(circle at left, #1f2937 0%, #020617 40%, #020617 100%);
+  border: 1px solid rgba(148, 163, 184, 0.2);
+  box-shadow:
+    0 18px 40px rgba(0, 0, 0, 0.7),
+    0 0 60px rgba(96, 165, 250, 0.2);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  overflow: hidden;
+}
+
+.featured-card::before {
+  content: '';
+  position: absolute;
+  inset: -40%;
+  background: radial-gradient(circle at right, rgba(59, 130, 246, 0.25), transparent 60%);
+  opacity: 0.9;
 }
 
 .bonus-content {
-  z-index: 2;
+  position: relative;
+  z-index: 1;
 }
 
 .bonus-title {
-  font-size: 36px;
-  font-weight: 900;
-  color: #ffffff;
-  line-height: 1;
-  margin-bottom: 6px;
-  letter-spacing: -1px;
+  font-size: 24px;
+  line-height: 1.15;
+  font-weight: 800;
+  margin-bottom: 4px;
 }
 
 .bonus-subtitle {
-  font-size: 15px;
-  color: rgba(255, 255, 255, 0.9);
-  margin-bottom: 14px;
-  font-weight: 400;
+  font-size: 13px;
+  color: #d1d5db;
+  margin-bottom: 10px;
 }
 
 .play-now-btn {
-  padding: 11px 30px;
-  background: #10b981;
-  color: #ffffff;
-  border: none;
+  padding: 9px 22px;
   border-radius: 999px;
-  font-size: 16px;
+  border: none;
+  font-size: 14px;
   font-weight: 700;
+  color: #022c22;
+  background: linear-gradient(90deg, #22c55e, #4ade80);
   cursor: pointer;
-  transition: all 0.2s;
-  box-shadow: 0 4px 12px rgba(16, 185, 129, 0.4);
+  box-shadow: 0 6px 14px rgba(34, 197, 94, 0.6);
 }
 
-.play-now-btn:hover {
-  background: #059669;
-  transform: translateY(-1px);
-  box-shadow: 0 6px 16px rgba(16, 185, 129, 0.5);
+.play-now-btn:active {
+  transform: translateY(1px) scale(0.99);
+  box-shadow: 0 3px 10px rgba(34, 197, 94, 0.4);
 }
 
 .bonus-icon {
-  z-index: 2;
+  position: relative;
+  z-index: 1;
+  margin-left: 8px;
 }
 
 .roulette-image {
-  width: 110px;
-  height: 110px;
-  animation: spin 10s linear infinite;
+  width: 120px;
+  height: 120px;
+  object-fit: contain;
+  filter: drop-shadow(0 0 18px rgba(239, 68, 68, 0.8));
 }
 
-@keyframes spin {
-  from { transform: rotate(0deg); }
-  to { transform: rotate(360deg); }
-}
-
-/* ===== GAMES SECTION ===== */
-.games-section {
-  margin-top: 4px;
-}
-
+/* ===== SECTION TITLE ===== */
 .section-title {
-  font-size: 22px;
+  font-size: 20px;
   font-weight: 700;
-  color: #ffffff;
-  margin-bottom: 14px;
-  letter-spacing: -0.3px;
+  margin-bottom: 10px;
 }
 
+/* ===== GAME CARDS GRID ===== */
 .games-grid {
   display: grid;
   grid-template-columns: repeat(2, 1fr);
   gap: 12px;
 }
 
-/* ===== GAME CARDS - EXACT COLORS & GLOWS ===== */
+/* ===== GAME CARD BASE ===== */
 .game-card {
-  border-radius: 16px;
-  padding: 18px 14px;
+  border-radius: 20px;
+  padding: 14px 12px;
+  min-height: 170px;
   display: flex;
   flex-direction: column;
   align-items: center;
-  justify-content: center;
+  justify-content: flex-end;
   cursor: pointer;
-  transition: all 0.2s;
   position: relative;
   overflow: hidden;
-  min-height: 170px;
+  box-shadow: 0 14px 30px rgba(0, 0, 0, 0.7);
+  transition: transform 0.15s ease-out, box-shadow 0.15s ease-out;
 }
 
 .game-card:active {
-  transform: scale(0.98);
+  transform: scale(0.97);
+  box-shadow: 0 10px 20px rgba(0, 0, 0, 0.6);
 }
 
-/* SILVER CARD - Dark Blue with subtle cyan glow */
+/* SILVER */
 .silver-card {
-  background: linear-gradient(135deg, #0c2840 0%, #0d3a5c 100%);
-  box-shadow: 0 6px 20px rgba(12, 40, 64, 0.6),
-              0 0 30px rgba(56, 189, 248, 0.15);
+  background: radial-gradient(circle at top, #0f172a 0%, #020617 60%, #020617 100%);
 }
 
-.silver-card:hover {
-  box-shadow: 0 8px 28px rgba(12, 40, 64, 0.7),
-              0 0 40px rgba(56, 189, 248, 0.25);
-  transform: translateY(-2px);
+.silver-card::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(circle at top, rgba(59, 130, 246, 0.45), transparent 60%);
+  opacity: 0.9;
 }
 
-/* GOLD CARD - Dark Green with golden glow */
+/* GOLD */
 .gold-card {
-  background: linear-gradient(135deg, #0f5132 0%, #166534 100%);
-  box-shadow: 0 6px 20px rgba(15, 81, 50, 0.6),
-              0 0 30px rgba(251, 191, 36, 0.2);
+  background: radial-gradient(circle at top, #022c22 0%, #052e16 55%, #020617 100%);
 }
 
-.gold-card:hover {
-  box-shadow: 0 8px 28px rgba(15, 81, 50, 0.7),
-              0 0 40px rgba(251, 191, 36, 0.3);
-  transform: translateY(-2px);
+.gold-card::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(circle at top, rgba(250, 204, 21, 0.4), transparent 60%);
 }
 
-/* DIAMOND CARD - Royal Blue with blue glow */
+/* DIAMOND */
 .diamond-card {
-  background: linear-gradient(135deg, #1e3a8a 0%, #1e40af 100%);
-  box-shadow: 0 6px 20px rgba(30, 58, 138, 0.6),
-              0 0 30px rgba(96, 165, 250, 0.2);
+  background: radial-gradient(circle at top, #0f172a 0%, #020617 60%, #020617 100%);
 }
 
-.diamond-card:hover {
-  box-shadow: 0 8px 28px rgba(30, 58, 138, 0.7),
-              0 0 40px rgba(96, 165, 250, 0.3);
-  transform: translateY(-2px);
+.diamond-card::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(circle at top, rgba(59, 130, 246, 0.4), transparent 60%);
 }
 
-/* PLATINUM CARD - Deep Purple with purple glow */
+/* PLATINUM */
 .platinum-card {
-  background: linear-gradient(135deg, #4c1d95 0%, #5b21b6 100%);
-  box-shadow: 0 6px 20px rgba(76, 29, 149, 0.6),
-              0 0 30px rgba(168, 85, 247, 0.2);
+  background: radial-gradient(circle at top, #111827 0%, #020617 60%, #020617 100%);
 }
 
-.platinum-card:hover {
-  box-shadow: 0 8px 28px rgba(76, 29, 149, 0.7),
-              0 0 40px rgba(168, 85, 247, 0.3);
-  transform: translateY(-2px);
+.platinum-card::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(circle at top, rgba(168, 85, 247, 0.45), transparent 60%);
 }
 
-.game-icon,
-.game-icon-large {
-  width: 90px;
-  height: 90px;
+/* game icon container */
+.game-icon {
+  width: 88px;
+  height: 88px;
   margin-bottom: 8px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
+  z-index: 1;
 }
 
-.game-icon-large {
-  width: 100px;
-  height: 100px;
-}
-
-.icon-image {
+.game-icon img {
   width: 100%;
   height: 100%;
   object-fit: contain;
-  filter: drop-shadow(0 4px 12px rgba(0, 0, 0, 0.4));
+  filter: drop-shadow(0 6px 14px rgba(0, 0, 0, 0.8));
 }
 
 .game-name {
-  font-size: 20px;
-  font-weight: 700;
-  color: #ffffff;
-  margin-bottom: 2px;
+  font-size: 18px;
+  font-weight: 800;
+  z-index: 1;
   text-align: center;
-  letter-spacing: -0.3px;
 }
 
-.gold-text {
+.game-name-silver {
+  color: #f9fafb;
+}
+
+.game-name-gold {
+  font-size: 17px;
+  text-transform: uppercase;
   color: #fbbf24;
-  font-size: 22px;
-  font-weight: 800;
-  text-transform: uppercase;
+  letter-spacing: 1px;
 }
 
-.diamond-text {
+.game-name-diamond {
+  font-size: 17px;
+  text-transform: uppercase;
+  letter-spacing: 1.2px;
   color: #60a5fa;
-  font-size: 18px;
-  font-weight: 800;
-  letter-spacing: 2px;
-  text-transform: uppercase;
 }
 
-.platinum-text {
-  color: #f59e0b;
-  font-size: 18px;
-  font-weight: 800;
-  letter-spacing: 2px;
+.game-name-platinum {
+  font-size: 17px;
   text-transform: uppercase;
+  letter-spacing: 1.2px;
+  color: #facc15;
 }
 
 .game-bet {
-  font-size: 15px;
-  color: rgba(255, 255, 255, 0.85);
+  margin-top: 2px;
+  font-size: 13px;
   font-weight: 600;
+  color: rgba(248, 250, 252, 0.85);
+  z-index: 1;
 }
 
-/* ===== BOTTOM NAVIGATION - EXACT MATCH ===== */
+/* ===== BOTTOM NAV BAR ===== */
 .bottom-nav {
   position: fixed;
-  bottom: 0;
   left: 50%;
   transform: translateX(-50%);
+  bottom: 0;
   width: 100%;
   max-width: 480px;
-  background: rgba(11, 25, 41, 0.98);
-  backdrop-filter: blur(20px);
-  border-top: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(3, 7, 18, 0.98);
+  border-top: 1px solid rgba(148, 163, 184, 0.2);
   display: flex;
   justify-content: space-around;
-  padding: 10px 0 16px;
-  z-index: 100;
-  box-shadow: 0 -4px 20px rgba(0, 0, 0, 0.5);
+  padding: 8px 0 12px;
+  z-index: 40;
+  box-shadow: 0 -8px 24px rgba(0, 0, 0, 0.9);
 }
 
 .nav-item {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 4px;
-  cursor: pointer;
-  transition: all 0.2s;
-  padding: 6px 20px;
-  border-radius: 10px;
+  gap: 3px;
+  font-size: 11px;
   color: #64748b;
+  cursor: pointer;
 }
 
-.nav-item:hover {
-  background: rgba(255, 255, 255, 0.03);
+.nav-item svg {
+  width: 22px;
+  height: 22px;
 }
 
 .nav-item.active {
   color: #38bdf8;
 }
 
-.nav-item svg {
-  width: 24px;
-  height: 24px;
-  stroke-width: 2;
-}
-
 .nav-item span {
-  font-size: 13px;
   font-weight: 600;
-  letter-spacing: -0.1px;
 }
 
-/* ===== RESPONSIVE ===== */
+/* ===== SMALL SCREEN TWEAKS ===== */
 @media (max-width: 480px) {
   .main-content {
-    padding: 6px 14px 90px;
-  }
-
-  .games-grid {
-    gap: 10px;
+    padding: 4px 14px 96px;
   }
 
   .game-card {
     min-height: 160px;
-    padding: 16px 12px;
   }
 
   .game-icon {
-    width: 75px;
-    height: 75px;
-  }
-
-  .game-icon-large {
-    width: 90px;
-    height: 90px;
-  }
-
-  .brand-name {
-    font-size: 26px;
-  }
-
-  .bonus-title {
-    font-size: 32px;
-  }
-
-  .roulette-image {
-    width: 100px;
-    height: 100px;
+    width: 80px;
+    height: 80px;
   }
 }
