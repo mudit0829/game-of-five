@@ -3,25 +3,36 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>PlayOn - Home</title>
+  <title>TRADEERA Roulette</title>
   <link rel="stylesheet" href="{{ url_for('static', filename='css/home.css') }}">
 </head>
 <body>
   <div class="app-container">
-    
+
+    <!-- STATUS BAR -->
+    <div class="status-bar">
+      <div class="status-left">9:41</div>
+      <div class="status-right">
+        <div class="sb-icon"></div>
+        <div class="sb-icon"></div>
+        <div class="sb-icon"></div>
+      </div>
+    </div>
+
     <!-- TOP HEADER -->
     <header class="top-header">
       <div class="brand-section">
-        <h1 class="brand-name">{{ username|upper }}</h1>
+        <h1 class="brand-name">TRADEERA</h1>
         <p class="brand-subtitle">Roulette</p>
       </div>
+
       <div class="user-section">
-        <div class="balance">
-          <span class="rupee-symbol">₹</span>
+        <div class="balance-pill">
+          <span>₹</span>
           <span id="walletBalance">0</span>
         </div>
-        <div class="profile-icon" onclick="window.location.href='/profile'">
-          <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <div class="profile-circle" onclick="window.location.href='/profile'">
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor">
             <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
             <circle cx="12" cy="7" r="4"></circle>
           </svg>
@@ -31,96 +42,101 @@
 
     <!-- MAIN CONTENT -->
     <main class="main-content">
-      
-      <!-- BONUS ROULETTE CARD (Featured) -->
-      <div class="featured-card bonus-roulette">
+
+      <!-- BONUS ROULETTE CARD -->
+      <section class="featured-card">
         <div class="bonus-content">
-          <h2 class="bonus-title">Bonus<br>Roulette</h2>
+          <h2 class="bonus-title">Bonus Roulette</h2>
           <p class="bonus-subtitle">Play every 60 minutes</p>
           <button class="play-now-btn" onclick="window.location.href='/play/roulette'">
             Play Now
           </button>
         </div>
         <div class="bonus-icon">
-          <img src="{{ url_for('static', filename='img/roulette_wheel.png') }}" alt="Roulette" class="roulette-image">
+          <img
+            src="{{ url_for('static', filename='img/roulette_wheel.png') }}"
+            alt="Roulette"
+            class="roulette-image"
+          >
         </div>
-      </div>
+      </section>
 
-      <!-- GAMES SECTION -->
+      <!-- GAME CARDS -->
       <section class="games-section">
         <h3 class="section-title">Silver</h3>
-        
-        <!-- GAME CARDS GRID -->
+
         <div class="games-grid">
-          
-          <!-- SILVER GAME -->
+
+          <!-- SILVER -->
           <div class="game-card silver-card" onclick="window.location.href='/play/silver'">
             <div class="game-icon">
-              <img src="{{ url_for('static', filename='img/frog_icon.png') }}" alt="Frog" class="icon-image">
+              <img src="{{ url_for('static', filename='img/frog_icon.png') }}" alt="Silver" />
             </div>
-            <h4 class="game-name">Silver</h4>
-            <p class="game-bet">Bet ₹ 200</p>
+            <div class="game-name game-name-silver">Silver</div>
+            <div class="game-bet">Bet ₹ 200</div>
           </div>
 
-          <!-- GOLD GAME -->
+          <!-- GOLD -->
           <div class="game-card gold-card" onclick="window.location.href='/play/gold'">
-            <div class="game-icon-large">
-              <img src="{{ url_for('static', filename='img/football_goal.png') }}" alt="Football" class="icon-image">
+            <div class="game-icon">
+              <img src="{{ url_for('static', filename='img/football_goal.png') }}" alt="Gold" />
             </div>
-            <h4 class="game-name gold-text">Gold</h4>
-            <p class="game-bet">Bet ₹ 250</p>
+            <div class="game-name game-name-gold">GOLD</div>
+            <div class="game-bet">Bet ₹ 250</div>
           </div>
 
-          <!-- DIAMOND GAME -->
+          <!-- DIAMOND -->
           <div class="game-card diamond-card" onclick="window.location.href='/play/diamond'">
             <div class="game-icon">
-              <img src="{{ url_for('static', filename='img/target_icon.png') }}" alt="Target" class="icon-image">
+              <img src="{{ url_for('static', filename='img/diamond_ball.png') }}" alt="Diamond" />
             </div>
-            <h4 class="game-name diamond-text">DIAMOND</h4>
-            <p class="game-bet">Bet ₹ 100</p>
+            <div class="game-name game-name-diamond">DIAMOND</div>
+            <div class="game-bet">Bet ₹ 100</div>
           </div>
 
-          <!-- PLATINUM GAME -->
+          <!-- PLATINUM -->
           <div class="game-card platinum-card" onclick="window.location.href='/play/platinum'">
             <div class="game-icon">
-              <img src="{{ url_for('static', filename='img/parachute_icon.png') }}" alt="Parachute" class="icon-image">
+              <img src="{{ url_for('static', filename='img/platinum_rider.png') }}" alt="Platinum" />
             </div>
-            <h4 class="game-name platinum-text">PLATINUM</h4>
-            <p class="game-bet">Bet ₹ 1000</p>
+            <div class="game-name game-name-platinum">PLATINUM</div>
+            <div class="game-bet">Bet ₹ 1000</div>
           </div>
 
         </div>
       </section>
-
     </main>
 
     <!-- BOTTOM NAVIGATION -->
     <nav class="bottom-nav">
       <div class="nav-item active" onclick="window.location.href='/home'">
-        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="currentColor">
-          <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path>
-          <polyline points="9 22 9 12 15 12 15 22" fill="none" stroke="currentColor" stroke-width="2"></polyline>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+          <path d="M3 10.5 12 4l9 6.5V20a1.5 1.5 0 0 1-1.5 1.5H4.5A1.5 1.5 0 0 1 3 20Z"/>
+          <path d="M9 21v-6h6v6" />
         </svg>
         <span>Home</span>
       </div>
+
       <div class="nav-item" onclick="window.location.href='/history'">
-        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-          <circle cx="12" cy="12" r="10"></circle>
-          <polyline points="12 6 12 12 16 14"></polyline>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+          <circle cx="12" cy="12" r="9" />
+          <polyline points="12 7 12 12 16 14" />
         </svg>
         <span>History</span>
       </div>
+
       <div class="nav-item" onclick="window.location.href='/profile'">
-        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor">
           <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
           <circle cx="12" cy="7" r="4"></circle>
         </svg>
         <span>Profile</span>
       </div>
+
       <div class="nav-item" onclick="window.location.href='/help'">
-        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-          <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"></path>
-          <circle cx="12" cy="12" r="10"></circle>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+          <circle cx="12" cy="12" r="9" />
+          <path d="M9.5 9a2.5 2.5 0 1 1 4.5 1.5c-.6.8-1.3 1.1-1.5 1.5v1" />
           <line x1="12" y1="17" x2="12.01" y2="17"></line>
         </svg>
         <span>Help</span>
