@@ -17,7 +17,7 @@ html, body {
   overflow: hidden;
 }
 
-/* ===== SIMPLE WATER BACKGROUND ===== */
+/* ===== WATER BACKGROUND ===== */
 .bg-wrapper {
   position: absolute;
   inset: 0;
@@ -32,63 +32,57 @@ html, body {
   object-fit: cover;
 }
 
-/* ===== TOP HUD (FIXED - COINS VISIBLE) ===== */
+/* ===== TOP HUD (FIXED - NO OVERLAP) ===== */
 .top-hud {
   position: absolute;
-  top: 10px;
-  left: 10px;
-  right: 10px;
+  top: 8px;
+  left: 8px;
+  right: 8px;
   z-index: 20;
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 6px;
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  align-items: start;
+  gap: 8px;
   color: #f9fafb;
   pointer-events: none;
 }
 
 .hud-left {
-  flex: 0 0 auto;
+  grid-column: 1;
+  justify-self: start;
   display: flex;
   flex-direction: column;
   gap: 2px;
   pointer-events: auto;
-  background: rgba(2, 6, 23, 0.6);
-  backdrop-filter: blur(8px);
+  background: rgba(2, 6, 23, 0.7);
+  backdrop-filter: blur(10px);
   padding: 6px 10px;
   border-radius: 10px;
   border: 1px solid rgba(56, 189, 248, 0.3);
-  max-width: 45%;
+  max-width: 100%;
 }
 
 .hud-game {
-  font-size: 13px;
+  font-size: 12px;
   font-weight: 800;
   color: #38bdf8;
   text-shadow: 0 0 10px rgba(56, 189, 248, 0.5);
   white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
 }
 
 .hud-line {
   color: #e5e7eb;
-  font-size: 11px;
+  font-size: 10px;
   white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
 }
 
 .hud-center {
-  flex: 0 1 auto;
-  display: flex;
-  justify-content: center;
+  grid-column: 2;
+  justify-self: center;
   pointer-events: auto;
-  min-width: 0;
 }
 
 .timer-pill {
-  min-width: 90px;
   padding: 6px 16px;
   border-radius: 999px;
   background: linear-gradient(135deg, #ec4899, #8b5cf6, #6366f1);
@@ -121,7 +115,8 @@ html, body {
 }
 
 .hud-right {
-  flex: 0 0 auto;
+  grid-column: 3;
+  justify-self: end;
   pointer-events: auto;
 }
 
@@ -131,8 +126,8 @@ html, body {
   gap: 5px;
   padding: 5px 10px;
   border-radius: 999px;
-  background: rgba(2, 6, 23, 0.8);
-  backdrop-filter: blur(8px);
+  background: rgba(2, 6, 23, 0.7);
+  backdrop-filter: blur(10px);
   border: 1px solid rgba(251, 191, 36, 0.5);
   font-size: 13px;
   font-weight: 700;
@@ -158,7 +153,7 @@ html, body {
   100% { transform: translateY(0) scale(1); }
 }
 
-/* ===== PLAY AREA: BOATS IN WATER ===== */
+/* ===== PLAY AREA ===== */
 .play-layer {
   position: absolute;
   inset: 0;
@@ -172,29 +167,38 @@ html, body {
   transform: translate(-50%, -50%);
   width: 90%;
   max-width: 420px;
-  margin-top: -30px;
+  margin-top: -20px;
   display: flex;
   flex-direction: column;
-  gap: 20px;
+  gap: 25px;
   z-index: 10;
 }
 
 .boat-row {
   display: flex;
   justify-content: center;
-  gap: 15px;
+  gap: 18px;
   width: 100%;
 }
 
-.boat {
+.boat-wrapper {
   position: relative;
   width: 100px;
   display: flex;
   flex-direction: column;
   align-items: center;
-  animation: floatBoat 3.2s ease-in-out infinite;
+}
+
+.boat {
+  position: relative;
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  animation: floatBoat 3.5s ease-in-out infinite;
   transition: transform 0.2s ease;
   cursor: pointer;
+  z-index: 12;
 }
 
 .boat:hover {
@@ -210,7 +214,56 @@ html, body {
 /* Floating animation */
 @keyframes floatBoat {
   0%, 100% { transform: translateY(0); }
-  50% { transform: translateY(-8px); }
+  50% { transform: translateY(-10px); }
+}
+
+/* ===== WATER RIPPLES (REALISTIC) ===== */
+.water-ripple {
+  position: absolute;
+  bottom: -15px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 120px;
+  height: 20px;
+  z-index: 11;
+}
+
+.water-ripple::before,
+.water-ripple::after {
+  content: "";
+  position: absolute;
+  left: 50%;
+  transform: translateX(-50%);
+  border-radius: 50%;
+  border: 2px solid rgba(255, 255, 255, 0.2);
+  animation: rippleExpand 3.5s ease-in-out infinite;
+}
+
+.water-ripple::before {
+  width: 80px;
+  height: 12px;
+  animation-delay: 0s;
+}
+
+.water-ripple::after {
+  width: 100px;
+  height: 15px;
+  animation-delay: 1.75s;
+}
+
+@keyframes rippleExpand {
+  0% {
+    opacity: 0.6;
+    transform: translateX(-50%) scale(0.7);
+  }
+  50% {
+    opacity: 0.3;
+    transform: translateX(-50%) scale(1);
+  }
+  100% {
+    opacity: 0;
+    transform: translateX(-50%) scale(1.3);
+  }
 }
 
 /* Boat number */
@@ -245,53 +298,181 @@ html, body {
   white-space: nowrap;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.6);
   color: #e5e7eb;
+  z-index: 13;
 }
 
 /* Winning boat */
 .boat.win {
-  animation: boatGlow 1.5s ease-out;
+  animation: boatWinPulse 1.5s ease-out;
 }
 
-@keyframes boatGlow {
+@keyframes boatWinPulse {
   0% { 
-    transform: scale(1); 
+    transform: scale(1) translateY(0); 
     filter: drop-shadow(0 0 0 rgba(34, 197, 94, 0));
   }
-  40% { 
-    transform: scale(1.2); 
-    filter: drop-shadow(0 0 30px rgba(34, 197, 94, 1));
+  25% { 
+    transform: scale(1.2) translateY(-15px); 
+    filter: drop-shadow(0 0 35px rgba(34, 197, 94, 1));
+  }
+  50% { 
+    transform: scale(1.15) translateY(-10px); 
+    filter: drop-shadow(0 0 30px rgba(34, 197, 94, 0.9));
   }
   100% { 
-    transform: scale(1.1); 
-    filter: drop-shadow(0 0 20px rgba(34, 197, 94, 0.8));
+    transform: scale(1.1) translateY(-5px); 
+    filter: drop-shadow(0 0 25px rgba(34, 197, 94, 0.7));
   }
 }
 
-/* ===== PARATROOPER ===== */
-/* ===== PARATROOPER (IMPROVED VISIBILITY) ===== */
-#paratrooper {
+/* ===== CSS ANIMATED PARATROOPER ===== */
+.css-paratrooper {
   position: fixed;
-  width: 140px;
-  height: auto;
-  top: -280px;
+  top: -300px;
   left: 50%;
   transform: translateX(-50%);
+  width: 100px;
+  height: 180px;
   z-index: 25;
   filter: drop-shadow(0 15px 30px rgba(0, 0, 0, 0.8));
   transition: none;
   pointer-events: none;
 }
 
-#paratrooper.falling {
-  animation: swingParachute 0.8s ease-in-out infinite;
+/* Parachute */
+.parachute {
+  position: absolute;
+  top: 0;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 100px;
+  height: 60px;
+}
+
+.chute-canopy {
+  position: absolute;
+  top: 0;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 100px;
+  height: 60px;
+  background: linear-gradient(135deg, #ef4444 0%, #dc2626 50%, #ef4444 100%);
+  border-radius: 50% 50% 30% 30%;
+  border: 3px solid #7f1d1d;
+  box-shadow: 
+    inset 0 -10px 20px rgba(0, 0, 0, 0.3),
+    0 8px 20px rgba(0, 0, 0, 0.5);
+}
+
+/* Parachute lines */
+.chute-line {
+  position: absolute;
+  top: 55px;
+  width: 2px;
+  height: 50px;
+  background: rgba(255, 255, 255, 0.8);
+  transform-origin: top center;
+}
+
+.chute-line-1 {
+  left: 15%;
+  transform: rotate(-15deg);
+}
+
+.chute-line-2 {
+  left: 35%;
+  transform: rotate(-5deg);
+}
+
+.chute-line-3 {
+  right: 35%;
+  transform: rotate(5deg);
+}
+
+.chute-line-4 {
+  right: 15%;
+  transform: rotate(15deg);
+}
+
+/* Person */
+.para-person {
+  position: absolute;
+  top: 105px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 30px;
+  height: 70px;
+}
+
+.para-head {
+  position: absolute;
+  top: 0;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 18px;
+  height: 18px;
+  background: #f4a582;
+  border-radius: 50%;
+  border: 2px solid #1a1a1a;
+}
+
+.para-body {
+  position: absolute;
+  top: 16px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 20px;
+  height: 25px;
+  background: linear-gradient(135deg, #2c3e50, #34495e);
+  border-radius: 6px 6px 4px 4px;
+  border: 2px solid #1a1a1a;
+}
+
+.para-arm {
+  position: absolute;
+  top: 18px;
+  width: 8px;
+  height: 20px;
+  background: #2c3e50;
+  border-radius: 4px;
+  border: 2px solid #1a1a1a;
+}
+
+.para-arm-left {
+  left: 4px;
+}
+
+.para-arm-right {
+  right: 4px;
+}
+
+.para-leg {
+  position: absolute;
+  top: 38px;
+  width: 10px;
+  height: 30px;
+  background: linear-gradient(180deg, #2980b9 0%, #2980b9 60%, #1a1a1a 60%, #1a1a1a 100%);
+  border-radius: 5px;
+  border: 2px solid #1a1a1a;
+}
+
+.para-leg-left {
+  left: 6px;
+}
+
+.para-leg-right {
+  right: 6px;
 }
 
 /* Swinging animation during fall */
-@keyframes swingParachute {
-  0%, 100% { transform: translateX(-50%) rotate(-3deg); }
-  50% { transform: translateX(-50%) rotate(3deg); }
+.css-paratrooper.falling {
+  animation: swingParachute 1s ease-in-out infinite;
 }
 
+@keyframes swingParachute {
+  0%, 100% { transform: translateX(-50%) rotate(-4deg); }
+  50% { transform: translateX(-50%) rotate(4deg); }
+}
 
 /* ===== CONTROLS (EXACT GOLD GAME STYLE) ===== */
 .controls {
@@ -466,10 +647,10 @@ html, body {
 
 @media (max-height: 750px) {
   .boats-container {
-    margin-top: -40px;
+    margin-top: -30px;
   }
 
-  .boat {
+  .boat-wrapper {
     width: 90px;
   }
 
@@ -478,14 +659,25 @@ html, body {
     height: 36px;
     font-size: 14px;
   }
+  
+  .css-paratrooper {
+    width: 90px;
+    height: 160px;
+  }
+  
+  .chute-canopy {
+    width: 90px;
+    height: 54px;
+  }
 }
 
 @media (max-height: 680px) {
   .boats-container {
-    margin-top: -50px;
+    margin-top: -40px;
+    gap: 20px;
   }
 
-  .boat {
+  .boat-wrapper {
     width: 80px;
   }
 
@@ -495,7 +687,27 @@ html, body {
     font-size: 13px;
   }
 
-  #paratrooper {
-    width: 110px;
+  .css-paratrooper {
+    width: 80px;
+    height: 140px;
+  }
+  
+  .chute-canopy {
+    width: 80px;
+    height: 48px;
+  }
+  
+  .hud-game {
+    font-size: 11px;
+  }
+  
+  .hud-line {
+    font-size: 9px;
+  }
+  
+  .timer-pill {
+    padding: 5px 14px;
+    font-size: 15px;
   }
 }
+
