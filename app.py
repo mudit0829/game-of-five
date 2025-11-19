@@ -1,4 +1,4 @@
-from flask import Flask, render_template, request, jsonify
+from flask import Flask, render_template, request, jsonify, redirect, url_for, session
 from flask_socketio import SocketIO, emit, join_room
 from flask_cors import CORS
 import random
@@ -6,10 +6,16 @@ import time
 from datetime import datetime, timedelta
 import threading
 import os
+import hashlib
+import secrets
 
 app = Flask(__name__)
-app.config['SECRET_KEY'] = 'your-secret-key-here'
+app.config['SECRET_KEY'] = 'your-secret-key-here-change-this-in-production'
 app.config['PROPAGATE_EXCEPTIONS'] = True
+app.config['SESSION_COOKIE_HTTPONLY'] = True
+app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'
+app.config['PERMANENT_SESSION_LIFETIME'] = timedelta(days=7)
+
 CORS(app, resources={r"/*": {"origins": "*"}})
 socketio = SocketIO(
     app,
@@ -23,7 +29,6 @@ socketio = SocketIO(
 # Game configurations
 # ---------------------------------------------------
 GAME_CONFIGS = {
-    # Frog game
     'silver': {
         'bet_amount': 10,
         'payout': 50,
@@ -69,6 +74,66 @@ GAME_CONFIGS = {
 game_rounds = {}
 user_wallets = {}
 
+# Simple in-memory user database (REPLACE WITH REAL DATABASE IN PRODUCTION)
+users_db = {
+    # Example: 'username': {'password_hash': 'hash', 'user_id': 'id'}
+}
+
+
+# ---------------------------------------------------
+# Authentication Helpers
+# ---------------------------------------------------
+def hash_password(password):
+    """Hash password using SHA-256"""
+    return hashlib.sha256(password.encode()).hexdigest()
+
+
+def verify_password(stored_hash, provided_password):
+    """Verify password against stored hash"""
+    return stored_hash == hash_password(provided_password)
+
+
+def create_user(username, password):
+    """Create new user account"""
+    if username in users_db:
+        return False, "Username already exists"
+    
+    user_id = f"user_{secrets.token_hex(8)}"
+    users_db[username] = {
+        'user_id': user_id,
+        'username': username,
+        'password_hash': hash_password(password),
+        'created_at': datetime.now().isoformat()
+    }
+    
+    # Initialize wallet
+    user_wallets[user_id] = 10000
+    
+    return True, user_id
+
+
+def authenticate_user(username, password):
+    """Authenticate user credentials"""
+    user = users_db.get(username)
+    if not user:
+        return False, None
+    
+    if verify_password(user['password_hash'], password):
+        return True, user['user_id']
+    
+    return False, None
+
+
+def login_required(f):
+    """Decorator to require login for routes"""
+    from functools import wraps
+    @wraps(f)
+    def decorated_function(*args, **kwargs):
+        if 'user_id' not in session:
+            return redirect(url_for('login_page'))
+        return f(*args, **kwargs)
+    return decorated_function
+
 
 # ---------------------------------------------------
 # Helpers
@@ -82,7 +147,7 @@ def generate_bot_name():
 class GameRound:
     def __init__(self, game_type, round_number):
         self.game_type = game_type
-        self.round_number = round_number  # simple counter
+        self.round_number = round_number
         self.round_code = self._make_round_code()
         self.config = GAME_CONFIGS[game_type]
         self.start_time = datetime.now()
@@ -97,10 +162,6 @@ class GameRound:
         self.last_bot_added_at = None
 
     def _make_round_code(self):
-        """
-        FYYYYMMDD1000+
-        Example: F202511171000, F202511171001 ...
-        """
         date_str = datetime.now().strftime('%Y%m%d')
         base = 1000 + self.round_number - 1
         return f"F{date_str}{base}"
@@ -131,7 +192,6 @@ class GameRound:
         return True, "Bet placed successfully"
 
     def add_bot_bet(self):
-        """Add one bot bet with a number that is not over-used."""
         if len(self.bets) >= 6:
             return False
 
@@ -157,7 +217,6 @@ class GameRound:
     def calculate_result(self):
         real_user_bets = [b for b in self.bets if not b['is_bot']]
 
-        # 16% chance to favour real user bet if available
         if random.random() < 0.16 and real_user_bets:
             winning_bet = random.choice(real_user_bets)
             self.result = winning_bet['number']
@@ -208,7 +267,6 @@ def get_round_data(game_type):
     if not current_round:
         return None
 
-    # Unique user_ids from all bets (real + bots)
     unique_players = len({b['user_id'] for b in current_round.bets})
 
     return {
@@ -226,14 +284,13 @@ def get_round_data(game_type):
 
 
 # ---------------------------------------------------
-# Game timer thread (per game type)
+# Game timer thread
 # ---------------------------------------------------
 def game_timer_thread(game_type):
     round_counter = 0
 
     while True:
         try:
-            # Start new round if none exists
             if game_type not in game_rounds or game_rounds[game_type] is None:
                 round_counter += 1
                 game_rounds[game_type] = GameRound(game_type, round_counter)
@@ -256,9 +313,7 @@ def game_timer_thread(game_type):
             now = datetime.now()
 
             time_remaining = current_round.get_time_remaining()
-            time_elapsed = (now - current_round.start_time).total_seconds()
 
-            # ---- BOT LOGIC: fill remaining slots between 150s and 30s ----
             if (
                 not current_round.is_betting_closed
                 and len(current_round.bets) < 6
@@ -280,7 +335,6 @@ def game_timer_thread(game_type):
                             namespace='/'
                         )
 
-            # ---- Close betting ----
             if now >= current_round.betting_close_time and not current_round.is_betting_closed:
                 current_round.is_betting_closed = True
                 print(f"Betting closed for {game_type}")
@@ -291,7 +345,6 @@ def game_timer_thread(game_type):
                     namespace='/'
                 )
 
-            # ---- Finish round ----
             if now >= current_round.end_time and not current_round.is_finished:
                 current_round.is_finished = True
                 result = current_round.calculate_result()
@@ -319,7 +372,6 @@ def game_timer_thread(game_type):
                 time.sleep(3)
                 game_rounds[game_type] = None
 
-            # ---- Timer update ----
             unique_players = len({b['user_id'] for b in current_round.bets})
 
             socketio.emit(
@@ -343,14 +395,116 @@ def game_timer_thread(game_type):
 
 
 # ---------------------------------------------------
-# Routes
+# Authentication Routes
 # ---------------------------------------------------
 @app.route('/')
+def index():
+    """Redirect to login or dashboard"""
+    if 'user_id' in session:
+        return redirect(url_for('home'))
+    return redirect(url_for('login_page'))
+
+
+@app.route('/login')
+def login_page():
+    """Render login page"""
+    if 'user_id' in session:
+        return redirect(url_for('home'))
+    return render_template('login.html')
+
+
+@app.route('/login', methods=['POST'])
+def login_post():
+    """Handle login"""
+    data = request.get_json()
+    username = data.get('username', '').strip()
+    password = data.get('password', '')
+    remember_me = data.get('remember_me', False)
+    
+    if not username or not password:
+        return jsonify({'success': False, 'message': 'Username and password required'}), 400
+    
+    # Authenticate
+    success, user_id = authenticate_user(username, password)
+    
+    if not success:
+        return jsonify({'success': False, 'message': 'Invalid username or password'}), 401
+    
+    # Set session
+    session['user_id'] = user_id
+    session['username'] = username
+    
+    if remember_me:
+        session.permanent = True
+    
+    # Generate token
+    token = secrets.token_urlsafe(32)
+    
+    return jsonify({
+        'success': True,
+        'user_id': user_id,
+        'username': username,
+        'token': token,
+        'redirect': url_for('home')
+    })
+
+
+@app.route('/register', methods=['GET', 'POST'])
+def register_page():
+    """Handle registration"""
+    if request.method == 'GET':
+        if 'user_id' in session:
+            return redirect(url_for('home'))
+        return render_template('register.html')
+    
+    # POST request
+    data = request.get_json()
+    username = data.get('username', '').strip()
+    password = data.get('password', '')
+    
+    if not username or not password:
+        return jsonify({'success': False, 'message': 'Username and password required'}), 400
+    
+    if len(password) < 6:
+        return jsonify({'success': False, 'message': 'Password must be at least 6 characters'}), 400
+    
+    success, result = create_user(username, password)
+    
+    if not success:
+        return jsonify({'success': False, 'message': result}), 400
+    
+    user_id = result
+    
+    # Auto-login after registration
+    session['user_id'] = user_id
+    session['username'] = username
+    
+    return jsonify({
+        'success': True,
+        'user_id': user_id,
+        'username': username,
+        'redirect': url_for('home')
+    })
+
+
+@app.route('/logout')
+def logout():
+    """Handle logout"""
+    session.clear()
+    return redirect(url_for('login_page'))
+
+
+# ---------------------------------------------------
+# Game Routes (Protected)
+# ---------------------------------------------------
+@app.route('/home')
+@login_required
 def home():
-    return render_template('home.html', games=GAME_CONFIGS)
+    return render_template('home.html', games=GAME_CONFIGS, username=session.get('username'))
 
 
 @app.route('/game/<game_type>')
+@login_required
 def game_info(game_type):
     if game_type not in GAME_CONFIGS:
         return "Game not found", 404
@@ -359,6 +513,7 @@ def game_info(game_type):
 
 
 @app.route('/play/<game_type>')
+@login_required
 def play_game(game_type):
     if game_type not in GAME_CONFIGS:
         return "Game not found", 404
@@ -366,8 +521,9 @@ def play_game(game_type):
     return render_template(f'{game_type}-game.html', game_type=game_type, game=game)
 
 
-@app.route('/register', methods=['POST'])
-def register():
+@app.route('/register_game', methods=['POST'])
+def register_game():
+    """Legacy register endpoint for games"""
     data = request.json
     user_id = data.get('user_id')
     username = data.get('username')
@@ -479,6 +635,10 @@ def start_game_timers():
 
 
 if __name__ == '__main__':
+    # Create demo user for testing
+    create_user('demo', 'demo123')
+    print("Demo user created: username='demo', password='demo123'")
+    
     start_game_timers()
     socketio.run(
         app,
