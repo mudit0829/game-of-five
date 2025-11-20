@@ -18,140 +18,50 @@
       <div class="top-spacer"></div>
     </header>
 
-    <!-- TABS LABEL (visual only, both on same page) -->
+    <!-- TABS -->
     <div class="section-tabs">
-      <div class="tab active">Current Games</div>
-      <div class="tab">Game History</div>
+      <!-- data-target is used by JS to know which section to show -->
+      <button class="tab active" data-target="current">Current Games</button>
+      <button class="tab" data-target="history">Game History</button>
     </div>
 
     <main class="content">
 
-      <!-- ================= CURRENT GAMES ================= -->
-      <section class="section-card">
+      <!-- ========== CURRENT GAMES SECTION ========== -->
+      <section class="section-card active-section" id="section-current">
         <div class="section-header">
           <h2>Current Games</h2>
           <span class="section-sub">Bets placed · Result pending</span>
         </div>
 
-        {% if current_games and current_games|length > 0 %}
-         <div id="currentGamesList" class="list"></div>
-            {% for g in current_games %}
-            <article class="item-card pending">
-              <div class="item-main">
-                <div class="item-icon">
-                  <!-- you can use game emoji or icon -->
-                  <span class="emoji">{{ g.emoji or "🎮" }}</span>
-                </div>
-                <div class="item-text">
-                  <div class="item-title">
-                    {{ g.game_title }} 
-                    <span class="badge badge-pill">{{ g.game_type|capitalize }}</span>
-                  </div>
-                  <div class="item-meta">
-                    Game ID: <span class="mono">{{ g.game_id }}</span>
-                  </div>
-                  <div class="item-meta">
-                    Placed on: {{ g.datetime }}
-                  </div>
-                  <div class="item-meta">
-                    Your bet(s): 
-                    <span class="mono">{{ g.your_bets_display }}</span>
-                  </div>
-                </div>
-              </div>
-              <div class="item-side">
-                <div class="status-pill status-pending">Pending</div>
-                {% if g.time_remaining is defined %}
-                <div class="timer-line">
-                  ⏳ <span class="mono">{{ g.time_remaining }}s</span>
-                </div>
-                {% endif %}
-                <div class="amount-line">
-                  Bet: <span class="mono">₹{{ g.total_bet_amount }}</span>
-                </div>
-              </div>
-            </article>
-            {% endfor %}
-          </div>
-        {% else %}
+        <!-- Container where in future we can inject real current games -->
+        <div id="currentGamesContainer" class="list">
           <div class="empty-state">
             No active games right now.<br>
             Place a bet to see it here.
           </div>
-        {% endif %}
+        </div>
       </section>
 
-      <!-- ================= GAME HISTORY ================= -->
-      <section class="section-card">
+      <!-- ========== GAME HISTORY SECTION ========== -->
+      <section class="section-card" id="section-history">
         <div class="section-header">
           <h2>Game History</h2>
           <span class="section-sub">Completed games · Last 7 days</span>
         </div>
 
-        {% if finished_games and finished_games|length > 0 %}
-          <div class="history-legend">
-            <span class="col col-game">Game</span>
-            <span class="col col-bet">Your Bets</span>
-            <span class="col col-win">Win No.</span>
-            <span class="col col-amount">P/L</span>
-          </div>
-
-     <div id="historyGamesList" class="list"></div>
-            {% for h in finished_games %}
-            <article class="item-card history">
-              <div class="row-line row-top">
-                <div class="game-info">
-                  <div class="game-name">
-                    {{ h.game_title }}
-                    <span class="badge badge-pill small">
-                      {{ h.game_type|capitalize }}
-                    </span>
-                  </div>
-                  <div class="game-id">
-                    ID: <span class="mono">{{ h.game_id }}</span>
-                  </div>
-                  <div class="game-date">
-                    {{ h.datetime }}
-                  </div>
-                </div>
-
-                <div class="bet-info">
-                  <div class="label">Your Bets</div>
-                  <div class="mono">{{ h.your_bets_display }}</div>
-                </div>
-
-                <div class="win-info">
-                  <div class="label">Winning</div>
-                  <div class="mono">{{ h.winning_number }}</div>
-                </div>
-
-                <div class="amount-info">
-                  <div class="label">P/L</div>
-                  {% if h.net_amount >= 0 %}
-                    <div class="amount win">+₹{{ h.net_amount }}</div>
-                  {% else %}
-                    <div class="amount lose">-₹{{ (h.net_amount * -1) }}</div>
-                  {% endif %}
-                </div>
-              </div>
-            </article>
-            {% endfor %}
-          </div>
-        {% else %}
+        <!-- Container where in future we can inject real history -->
+        <div id="historyGamesContainer" class="list">
           <div class="empty-state">
             No games played yet.<br>
             Your completed games will appear here.
           </div>
-        {% endif %}
+        </div>
       </section>
 
     </main>
   </div>
-  <script>
-    const USER_ID = "{{ session['user_id'] }}";
-</script>
 
-<script src="{{ url_for('static', filename='js/history.js') }}"></script>
-
+  <script src="{{ url_for('static', filename='js/history.js') }}"></script>
 </body>
 </html>
