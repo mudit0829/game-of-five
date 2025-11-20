@@ -1,11 +1,7 @@
-// profile.js – handles:
-// 1) switching main tabs (Profile / Transactions)
-// 2) switching coin sub-tabs (All / Added / Bet / Win / Balance)
-// 3) rendering transaction list & summary
-// 4) simple "Save Profile" success message (no backend yet)
+// profile.js
 
 document.addEventListener("DOMContentLoaded", () => {
-  // ===== MAIN TABS =====
+  // ===== MAIN TABS (Profile / Coin Transactions) =====
   const tabs = document.querySelectorAll(".section-tabs .tab");
   const sections = {
     profile: document.getElementById("section-profile"),
@@ -18,6 +14,7 @@ document.addEventListener("DOMContentLoaded", () => {
       sec.classList.remove("active-section");
     });
     if (sections[name]) {
+      sections[name].addClass = "active-section";
       sections[name].classList.add("active-section");
     }
 
@@ -34,30 +31,49 @@ document.addEventListener("DOMContentLoaded", () => {
 
   showSection("profile"); // default
 
-  // ===== SAVE PROFILE (dummy front-end only) =====
+  // ===== SAVE PROFILE (simple front-end message) =====
   const saveProfileBtn = document.getElementById("saveProfileBtn");
   const profileStatus = document.getElementById("profileStatus");
 
   if (saveProfileBtn && profileStatus) {
-    saveProfileBtn.addEventListener("click", () => {
-      profileStatus.textContent = "Profile saved locally (backend API not wired yet).";
+    saveProfileBtn.addEventListener("click", async () => {
+      const payload = {
+        displayName: document.getElementById("displayName").value || "",
+        email: document.getElementById("email").value || "",
+        country: document.getElementById("country").value || "",
+        phone: document.getElementById("phone").value || "",
+      };
+
+      try {
+        const res = await fetch("/profile/update", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload),
+        });
+        const data = await res.json();
+        if (data.success) {
+          profileStatus.textContent = "Profile saved successfully.";
+        } else {
+          profileStatus.textContent = data.message || "Unable to save profile.";
+        }
+      } catch (err) {
+        console.error(err);
+        profileStatus.textContent = "Network error while saving profile.";
+      }
     });
   }
 
-  // ===== TRANSACTIONS HANDLING =====
+  // ===== COIN TRANSACTIONS =====
   const txnList = document.getElementById("txnList");
   const subTabs = document.querySelectorAll(".sub-tabs .sub-tab");
 
-  // Summary elements
   const sumAddedEl = document.getElementById("sumAdded");
   const sumBetEl = document.getElementById("sumBet");
   const sumWinEl = document.getElementById("sumWin");
   const sumBalanceEl = document.getElementById("sumBalance");
 
-  // Global data injected from template, fallback to empty
   const txns = Array.isArray(window.TRANSACTIONS) ? window.TRANSACTIONS : [];
 
-  // Helper: format date/time
   function formatDate(dateString) {
     if (!dateString) return "";
     const d = new Date(dateString);
@@ -72,7 +88,6 @@ document.addEventListener("DOMContentLoaded", () => {
     });
   }
 
-  // Render list & summary
   function renderTransactions(filter = "all") {
     if (!txnList) return;
 
@@ -92,13 +107,11 @@ document.addEventListener("DOMContentLoaded", () => {
       return;
     }
 
-    // Filter
     const filtered = txns.filter(t => {
       if (filter === "all") return true;
       return (t.kind || "").toLowerCase() === filter;
     });
 
-    // Build rows
     const rows = filtered.map(t => {
       const kind = (t.kind || "other").toLowerCase();
       let amountClass = "balance";
@@ -123,7 +136,6 @@ document.addEventListener("DOMContentLoaded", () => {
 
     txnList.innerHTML = rows.join("");
 
-    // Summary totals (over *all* transactions)
     let sumAdded = 0, sumBet = 0, sumWin = 0;
     txns.forEach(t => {
       const kind = (t.kind || "").toLowerCase();
@@ -141,7 +153,6 @@ document.addEventListener("DOMContentLoaded", () => {
     }
   }
 
-  // Sub-tab click handling
   subTabs.forEach(tab => {
     tab.addEventListener("click", () => {
       const filter = tab.dataset.filter || "all";
@@ -153,6 +164,6 @@ document.addEventListener("DOMContentLoaded", () => {
     });
   });
 
-  // Initial render for "All"
+  // Initial render
   renderTransactions("all");
 });
