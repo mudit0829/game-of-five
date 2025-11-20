@@ -34,7 +34,7 @@
         </div>
 
         {% if current_games and current_games|length > 0 %}
-          <div class="list">
+         <div id="currentGamesList" class="list"></div>
             {% for g in current_games %}
             <article class="item-card pending">
               <div class="item-main">
@@ -96,7 +96,7 @@
             <span class="col col-amount">P/L</span>
           </div>
 
-          <div class="list">
+     <div id="historyGamesList" class="list"></div>
             {% for h in finished_games %}
             <article class="item-card history">
               <div class="row-line row-top">
@@ -147,5 +147,11 @@
 
     </main>
   </div>
+  <script>
+    const USER_ID = "{{ session['user_id'] }}";
+</script>
+
+<script src="{{ url_for('static', filename='js/history.js') }}"></script>
+
 </body>
 </html>
