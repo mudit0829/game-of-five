@@ -166,10 +166,13 @@
   </div>
 
   <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
-  <script>
-    const GAME_TYPE = "{{ game_type }}";
-    const FIXED_BET_AMOUNT = {{ game.bet_amount }};
-  </script>
+ <script>
+  const GAME_TYPE = "{{ game_type }}";
+  const FIXED_BET_AMOUNT = {{ game.bet_amount }};
+  const GAME_USER_ID = "{{ session.get('user_id') }}";
+  const GAME_USERNAME = "{{ session.get('username') }}";
+</script>
+
   <script src="{{ url_for('static', filename='js/platinum-game.js') }}"></script>
 </body>
 </html>
