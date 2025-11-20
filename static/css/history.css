@@ -1,136 +1,170 @@
-*,
-*::before,
-*::after {
-  box-sizing: border-box;
+// ======== DOM ELEMENTS ========
+const tabCurrent = document.getElementById("tabCurrent");
+const tabHistory = document.getElementById("tabHistory");
+
+const currentCard = document.getElementById("currentCard");
+const historyCard = document.getElementById("historyCard");
+
+const currentList = document.getElementById("currentList");
+const historyList = document.getElementById("historyList");
+
+// ======== TAB TOGGLE ========
+
+function showCurrent() {
+  tabCurrent.classList.add("active");
+  tabHistory.classList.remove("active");
+  currentCard.classList.remove("hidden");
+  historyCard.classList.add("hidden");
 }
 
-body {
-  margin: 0;
-  padding: 0;
-  font-family: system-ui, -apple-system, BlinkMacSystemFont, "SF Pro Display", sans-serif;
-  background: radial-gradient(circle at top, #020617 0, #020617 40%, #020314 100%);
-  color: #e5e7eb;
+function showHistory() {
+  tabHistory.classList.add("active");
+  tabCurrent.classList.remove("active");
+  historyCard.classList.remove("hidden");
+  currentCard.classList.add("hidden");
 }
 
-.page-root {
-  max-width: 480px;
-  margin: 0 auto;
-  min-height: 100vh;
-  padding: 10px 10px 16px;
+tabCurrent.addEventListener("click", showCurrent);
+tabHistory.addEventListener("click", showHistory);
+
+// ======== HELPERS ========
+
+function formatAmount(amount) {
+  const v = Number(amount || 0);
+  if (v === 0) return "₹0";
+  const prefix = v > 0 ? "+" : "−";
+  return prefix + "₹" + Math.abs(v).toString();
 }
 
-/* ===== TOP BAR ===== */
-
-.top-bar {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  margin-bottom: 8px;
+function gameTitle(gameType) {
+  if (!window.GAME_CONFIGS_JS) return gameType;
+  const cfg = GAME_CONFIGS_JS[gameType];
+  return cfg ? cfg.name : gameType;
 }
 
-.back-btn {
-  border: none;
-  background: rgba(15, 23, 42, 0.9);
-  color: #e5e7eb;
-  border-radius: 999px;
-  width: 32px;
-  height: 32px;
-  font-size: 16px;
-  cursor: pointer;
+// ======== RENDER FUNCTIONS ========
+
+function renderEmptyCurrent() {
+  currentList.innerHTML = `
+    <div class="empty-state">
+      <p>No active games right now.</p>
+      <p class="hint">Place a bet to see it here.</p>
+    </div>
+  `;
 }
 
-.top-title {
-  font-size: 18px;
-  font-weight: 800;
+function renderEmptyHistory() {
+  historyList.innerHTML = `
+    <div class="empty-state">
+      <p>No games played yet.</p>
+      <p class="hint">Your completed games will appear here.</p>
+    </div>
+  `;
 }
 
-.top-spacer {
-  width: 32px;
+function renderCurrentGames(games) {
+  if (!games || games.length === 0) {
+    renderEmptyCurrent();
+    return;
+  }
+
+  currentList.innerHTML = "";
+  games.forEach((g) => {
+    const div = document.createElement("div");
+    div.className = "game-row pending";
+
+    const bets = (g.user_bets || []).join(", ") || "—";
+
+    div.innerHTML = `
+      <div class="row-main">
+        <div class="row-top">
+          <span class="game-id">${g.round_code}</span>
+          <span class="status-pill pending">Pending</span>
+        </div>
+        <div class="row-sub">
+          <span class="game-name">${gameTitle(g.game_type)}</span>
+          <span class="date">${g.date_time || ""}</span>
+        </div>
+      </div>
+      <div class="row-detail">
+        <span class="label">Your bets:</span>
+        <span class="value">${bets}</span>
+      </div>
+    `;
+    currentList.appendChild(div);
+  });
 }
 
-/* ===== TABS ===== */
+function renderHistoryGames(games) {
+  if (!games || games.length === 0) {
+    renderEmptyHistory();
+    return;
+  }
 
-.section-tabs {
-  display: flex;
-  gap: 8px;
-  margin-bottom: 10px;
+  historyList.innerHTML = "";
+  games.forEach((g) => {
+    const isWin = g.status === "win";
+    const result = g.winning_number !== null && g.winning_number !== undefined
+      ? g.winning_number
+      : "—";
+    const bets = (g.user_bets || []).join(", ") || "—";
+
+    const div = document.createElement("div");
+    div.className = "game-row " + (isWin ? "win" : "lose");
+
+    div.innerHTML = `
+      <div class="row-main">
+        <div class="row-top">
+          <span class="game-id">${g.round_code}</span>
+          <span class="status-pill ${isWin ? "win" : "lose"}">
+            ${isWin ? "Win" : "Lose"}
+          </span>
+        </div>
+        <div class="row-sub">
+          <span class="game-name">${gameTitle(g.game_type)}</span>
+          <span class="date">${g.date_time || ""}</span>
+        </div>
+      </div>
+      <div class="row-detail">
+        <span class="label">Your bets:</span>
+        <span class="value">${bets}</span>
+      </div>
+      <div class="row-detail">
+        <span class="label">Winning number:</span>
+        <span class="value">${result}</span>
+      </div>
+      <div class="row-detail">
+        <span class="label">Net amount:</span>
+        <span class="value amount ${isWin ? "amt-win" : "amt-lose"}">
+          ${formatAmount(g.amount)}
+        </span>
+      </div>
+    `;
+    historyList.appendChild(div);
+  });
 }
 
-.section-tabs .tab {
-  flex: 1;
-  padding: 7px 0;
-  border-radius: 999px;
-  text-align: center;
-  font-size: 13px;
-  font-weight: 600;
-  background: rgba(15, 23, 42, 0.9);
-  color: #9ca3af;
-  border: none;
-  cursor: pointer;
-}
+// ======== LOAD DATA FROM BACKEND ========
 
-.section-tabs .tab.active {
-  background: linear-gradient(90deg, #6366f1, #ec4899);
-  color: #f9fafb;
-}
+async function fetchHistory() {
+  if (!GAME_USER_ID) {
+    renderEmptyCurrent();
+    renderEmptyHistory();
+    return;
+  }
 
-/* ===== SECTIONS (show/hide) ===== */
-
-.section-card {
-  display: none;  /* hidden by default */
-  background: rgba(15, 23, 42, 0.95);
-  border-radius: 18px;
-  padding: 12px 12px 10px;
-  box-shadow: 0 16px 30px rgba(0,0,0,0.55);
-}
-
-.section-card.active-section {
-  display: block; /* only this one is visible */
-}
-
-.content {
-  display: flex;
-  flex-direction: column;
-  gap: 14px;
-}
-
-.section-header h2 {
-  margin: 0;
-  font-size: 15px;
-  font-weight: 700;
-}
-
-.section-sub {
-  display: block;
-  font-size: 12px;
-  color: #9ca3af;
-  margin-top: 2px;
-}
-
-/* ===== LIST / EMPTY STATE ===== */
-
-.list {
-  margin-top: 16px;
-}
-
-.empty-state {
-  text-align: center;
-  font-size: 13px;
-  color: #9ca3af;
-  line-height: 1.5;
-}
-
-/* (Optional) If you later add individual history cards, you can style them like this */
-.item-card {
-  background: radial-gradient(circle at top, #020617, #020617 60%, #020314 100%);
-  border-radius: 14px;
-  padding: 10px;
-  margin-bottom: 8px;
-}
-
-/* Small screen tweak */
-@media (max-width: 380px) {
-  .top-title {
-    font-size: 17px;
+  try {
+    const res = await fetch(`/api/user-games?user_id=${GAME_USER_ID}`);
+    const data = await res.json();
+    renderCurrentGames(data.current_games || []);
+    renderHistoryGames(data.game_history || []);
+  } catch (err) {
+    console.error("history fetch error", err);
+    renderEmptyCurrent();
+    renderEmptyHistory();
   }
 }
+
+// ======== INIT ========
+showCurrent();
+fetchHistory();
