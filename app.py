@@ -9,6 +9,7 @@ import os
 import hashlib
 import secrets
 import json
+from werkzeug.utils import secure_filename
 
 app = Flask(__name__)
 app.config['SECRET_KEY'] = 'your-secret-key-here-change-this-in-production'
@@ -16,6 +17,11 @@ app.config['PROPAGATE_EXCEPTIONS'] = True
 app.config['SESSION_COOKIE_HTTPONLY'] = True
 app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'
 app.config['PERMANENT_SESSION_LIFETIME'] = timedelta(days=7)
+
+# Uploads for help attachments
+UPLOAD_FOLDER = os.path.join(os.path.dirname(__file__), 'uploads')
+os.makedirs(UPLOAD_FOLDER, exist_ok=True)
+app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
 
 CORS(app, resources={r"/*": {"origins": "*"}})
 socketio = SocketIO(
@@ -77,6 +83,7 @@ game_tables = {}
 user_wallets = {}
 users_db = {}             # {username: {... profile ...}}
 user_game_history = {}    # {user_id: [bet_dict, ...]}
+user_complaints = {}      # {user_id: [complaint_dict, ...]}
 
 # --------------------------
 # Auth helpers
@@ -108,6 +115,7 @@ def create_user(username, password):
 
     user_wallets[user_id] = 10000
     user_game_history[user_id] = []
+    user_complaints[user_id] = []
     return True, user_id
 
 
@@ -160,7 +168,7 @@ class GameTable:
         self.bets = []
         self.result = None
         self.is_betting_closed = False
-        self.is_finished = False
+               self.is_finished = False
         self.max_players = 6
         self.last_bot_added_at = None
 
@@ -497,6 +505,7 @@ def register_page():
         if user_id not in user_wallets:
             user_wallets[user_id] = 10000
             user_game_history[user_id] = []
+            user_complaints[user_id] = []
         return jsonify({'success': True, 'balance': user_wallets[user_id]})
 
     # Full user registration (from UI)
@@ -541,6 +550,7 @@ def home():
     if user_id and user_id not in user_wallets:
         user_wallets[user_id] = 10000
         user_game_history[user_id] = []
+        user_complaints[user_id] = []
 
     return render_template('home.html', games=GAME_CONFIGS, username=username)
 
@@ -603,11 +613,11 @@ def profile_page():
         cfg = GAME_CONFIGS.get(rec['game_type'], {})
         game_title = cfg.get('name', rec['game_type'])
         bet_amt = rec.get('bet_amount', cfg.get('bet_amount', 0))
-        dt = rec.get('bet_time', datetime.now())
-        if isinstance(dt, datetime):
-            dt_str = dt.isoformat()
+        dt_val = rec.get('bet_time', datetime.now())
+        if isinstance(dt_val, datetime):
+            dt_str = dt_val.isoformat()
         else:
-            dt_str = str(dt)
+            dt_str = str(dt_val)
 
         # Bet transaction
         txns.append({
@@ -648,7 +658,6 @@ def profile_page():
 @login_required
 def profile_update():
     """Save basic profile fields (in-memory only)."""
-    user_id = session.get('user_id')
     username = session.get('username')
     user = users_db.get(username)
 
@@ -662,6 +671,71 @@ def profile_update():
     user['phone'] = data.get('phone', user.get('phone', ''))
 
     return jsonify({'success': True, 'message': 'Profile updated'})
+
+# --------------------------
+# HELP / SUPPORT ROUTES
+# --------------------------
+@app.route('/help')
+@login_required
+def help_page():
+    """Help & support page."""
+    user_id = session.get('user_id')
+    username = session.get('username')
+    complaints = user_complaints.get(user_id, [])
+    return render_template('help.html', username=username, complaints=complaints)
+
+
+@app.route('/help/submit', methods=['POST'])
+@login_required
+def help_submit():
+    """Receive complaint with optional attachment."""
+    user_id = session.get('user_id')
+    username = session.get('username')
+
+    if user_id not in user_complaints:
+        user_complaints[user_id] = []
+
+    subject = request.form.get('subject', '').strip()
+    message = request.form.get('message', '').strip()
+    category = request.form.get('category', 'General')
+
+    if not subject:
+        return jsonify({'success': False, 'message': 'Please enter a subject'}), 400
+    if not message:
+        return jsonify({'success': False, 'message': 'Please enter a message'}), 400
+
+    file = request.files.get('attachment')
+    saved_name = None
+    original_name = None
+
+    if file and file.filename:
+        filename = secure_filename(file.filename)
+        timestamp = int(time.time())
+        saved_name = f"{user_id}_{timestamp}_{filename}"
+        file.save(os.path.join(app.config['UPLOAD_FOLDER'], saved_name))
+        original_name = file.filename
+
+    complaint_id = f"C{datetime.now().strftime('%Y%m%d%H%M%S')}{random.randint(100,999)}"
+    now_str = datetime.now().strftime("%Y-%m-%d %H:%M")
+
+    complaint = {
+        'id': complaint_id,
+        'subject': subject,
+        'message': message,
+        'category': category,
+        'status': 'Open',
+        'created_at': now_str,
+        'last_update': now_str,
+        'attachment_name': saved_name,
+        'original_filename': original_name,
+        'updates': [
+            {'time': now_str, 'text': 'Complaint created and sent to support.'}
+        ]
+    }
+
+    user_complaints[user_id].append(complaint)
+
+    return jsonify({'success': True, 'complaint': complaint})
 
 # --------------------------
 # Socket.IO handlers
