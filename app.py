@@ -75,9 +75,7 @@ game_rounds = {}
 user_wallets = {}
 
 # Simple in-memory user database (REPLACE WITH REAL DATABASE IN PRODUCTION)
-users_db = {
-    # Example: 'username': {'password_hash': 'hash', 'user_id': 'id'}
-}
+users_db = {}
 
 
 # ---------------------------------------------------
@@ -136,7 +134,7 @@ def login_required(f):
 
 
 # ---------------------------------------------------
-# Helpers
+# Game Helpers
 # ---------------------------------------------------
 def generate_bot_name():
     prefixes = ['Amit', 'Sanjay', 'Riya', 'Kunal', 'Anita', 'Rohit', 'Meera', 'Neeraj']
@@ -399,7 +397,7 @@ def game_timer_thread(game_type):
 # ---------------------------------------------------
 @app.route('/')
 def index():
-    """Redirect to login or dashboard"""
+    """Redirect to login or home"""
     if 'user_id' in session:
         return redirect(url_for('home'))
     return redirect(url_for('login_page'))
@@ -500,21 +498,21 @@ def logout():
 @app.route('/home')
 @login_required
 def home():
-    return render_template('home.html', games=GAME_CONFIGS, username=session.get('username'))
+    """Home page with game selection"""
+    username = session.get('username', 'Player')
+    user_id = session.get('user_id')
+    
+    # Initialize wallet if needed
+    if user_id and user_id not in user_wallets:
+        user_wallets[user_id] = 10000
+    
+    return render_template('home.html', games=GAME_CONFIGS, username=username)
 
-
-@app.route('/game/<game_type>')
-@login_required
-def game_info(game_type):
-    if game_type not in GAME_CONFIGS:
-        return "Game not found", 404
-    game = GAME_CONFIGS[game_type]
-    return render_template('game-info.html', game_type=game_type, game=game)
 
 @app.route('/game/<game_type>')
 @login_required
 def game_lobby(game_type):
-    """Game lobby page with tables"""
+    """Game lobby page with available tables"""
     if game_type not in GAME_CONFIGS:
         return "Game not found", 404
     
@@ -525,6 +523,7 @@ def game_lobby(game_type):
 @app.route('/play/<game_type>')
 @login_required
 def play_game(game_type):
+    """Actual game play page"""
     if game_type not in GAME_CONFIGS:
         return "Game not found", 404
     game = GAME_CONFIGS[game_type]
@@ -549,10 +548,9 @@ def register_game():
 
 @app.route('/balance/<user_id>')
 def get_balance(user_id):
+    """Get user wallet balance"""
     balance = user_wallets.get(user_id, 0)
     return jsonify({'balance': balance})
-
-
 
 
 # ---------------------------------------------------
