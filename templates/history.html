@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Game History</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/history.css') }}">
+</head>
+<body>
+  <div class="history-root">
+    <header class="history-header">
+      <h1>Your Game Records</h1>
+      <button onclick="window.location.href='/home'" class="back-btn">← Back</button>
+    </header>
+
+    <main>
+      <!-- CURRENT GAMES -->
+      <section class="history-section">
+        <h2>Current Games <span id="current-count" class="count-span">(0)</span></h2>
+        <div id="current-games-list" class="games-list"></div>
+      </section>
+
+      <!-- GAME HISTORY -->
+      <section class="history-section">
+        <h2>Game History <span id="history-count" class="count-span">(0)</span></h2>
+        <div id="history-games-list" class="games-list"></div>
+      </section>
+    </main>
+  </div>
+
+  <script>
+    // User ID (same logic as your game files)
+    let uid = localStorage.getItem("user_id");
+    if (!uid) {
+      uid = "user_" + Math.floor(Math.random() * 1e8);
+      localStorage.setItem("user_id", uid);
+    }
+    const USER_ID = uid;
+  </script>
+  <script src="{{ url_for('static', filename='js/history.js') }}"></script>
+</body>
+</html>
