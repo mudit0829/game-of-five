@@ -360,3 +360,19 @@ body {
     grid-template-columns: 1.6fr 0.9fr 1.2fr 0.8fr 0.9fr;
   }
 }
+.logout-btn {
+  border: none;
+  padding: 6px 12px;
+  border-radius: 999px;
+  background: linear-gradient(90deg, #ef4444, #f97316);
+  color: #f9fafb;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  box-shadow: 0 4px 10px rgba(0,0,0,0.4);
+}
+
+.logout-btn:active {
+  transform: translateY(1px) scale(0.98);
+  box-shadow: 0 2px 6px rgba(0,0,0,0.5);
+}
