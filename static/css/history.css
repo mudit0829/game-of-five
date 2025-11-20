@@ -48,7 +48,7 @@ body {
   width: 32px;
 }
 
-/* ===== TABS LABEL ===== */
+/* ===== TABS ===== */
 
 .section-tabs {
   display: flex;
@@ -58,13 +58,15 @@ body {
 
 .section-tabs .tab {
   flex: 1;
-  padding: 6px 0;
+  padding: 7px 0;
   border-radius: 999px;
   text-align: center;
   font-size: 13px;
   font-weight: 600;
   background: rgba(15, 23, 42, 0.9);
   color: #9ca3af;
+  border: none;
+  cursor: pointer;
 }
 
 .section-tabs .tab.active {
@@ -72,19 +74,24 @@ body {
   color: #f9fafb;
 }
 
-/* ===== SECTIONS ===== */
+/* ===== SECTIONS (show/hide) ===== */
+
+.section-card {
+  display: none;  /* hidden by default */
+  background: rgba(15, 23, 42, 0.95);
+  border-radius: 18px;
+  padding: 12px 12px 10px;
+  box-shadow: 0 16px 30px rgba(0,0,0,0.55);
+}
+
+.section-card.active-section {
+  display: block; /* only this one is visible */
+}
 
 .content {
   display: flex;
   flex-direction: column;
   gap: 14px;
-}
-
-.section-card {
-  background: rgba(15, 23, 42, 0.9);
-  border-radius: 18px;
-  padding: 12px 12px 10px;
-  box-shadow: 0 16px 30px rgba(0,0,0,0.55);
 }
 
 .section-header h2 {
@@ -100,212 +107,30 @@ body {
   margin-top: 2px;
 }
 
-/* ===== LIST / CARDS ===== */
+/* ===== LIST / EMPTY STATE ===== */
 
 .list {
-  margin-top: 10px;
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
+  margin-top: 16px;
 }
 
+.empty-state {
+  text-align: center;
+  font-size: 13px;
+  color: #9ca3af;
+  line-height: 1.5;
+}
+
+/* (Optional) If you later add individual history cards, you can style them like this */
 .item-card {
   background: radial-gradient(circle at top, #020617, #020617 60%, #020314 100%);
   border-radius: 14px;
   padding: 10px;
-  display: flex;
-  justify-content: space-between;
-  gap: 8px;
+  margin-bottom: 8px;
 }
 
-.item-card.pending {
-  border: 1px solid rgba(52, 211, 153, 0.35);
-}
-
-.item-card.history {
-  border: 1px solid rgba(148, 163, 184, 0.25);
-}
-
-.item-main {
-  display: flex;
-  gap: 8px;
-  flex: 1;
-}
-
-.item-icon {
-  width: 36px;
-  height: 36px;
-  border-radius: 11px;
-  background: radial-gradient(circle, #0f172a, #020617);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 20px;
-}
-
-.emoji {
-  display: block;
-}
-
-.item-text {
-  flex: 1;
-}
-
-.item-title {
-  font-size: 14px;
-  font-weight: 700;
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  margin-bottom: 2px;
-}
-
-.badge {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  border-radius: 999px;
-  padding: 1px 7px;
-  font-size: 10px;
-  font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.03em;
-}
-
-.badge-pill {
-  background: rgba(55, 65, 81, 0.8);
-  color: #e5e7eb;
-}
-
-.badge-pill.small {
-  font-size: 9px;
-  padding: 1px 6px;
-}
-
-.item-meta {
-  font-size: 11px;
-  color: #9ca3af;
-}
-
-.mono {
-  font-family: "SF Mono", ui-monospace, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
-}
-
-/* Right side of current games card */
-.item-side {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-end;
-  gap: 4px;
-  font-size: 11px;
-}
-
-.status-pill {
-  padding: 2px 8px;
-  border-radius: 999px;
-  font-size: 10px;
-  font-weight: 600;
-}
-
-.status-pending {
-  background: rgba(234, 179, 8, 0.18);
-  color: #facc15;
-}
-
-.timer-line {
-  color: #e5e7eb;
-}
-
-.amount-line {
-  color: #9ca3af;
-}
-
-/* ===== HISTORY ROW LAYOUT ===== */
-
-.row-line {
-  display: grid;
-  grid-template-columns: 1.7fr 1.2fr 0.7fr 0.9fr;
-  column-gap: 8px;
-  align-items: flex-start;
-}
-
-.game-info {
-  font-size: 11px;
-}
-
-.game-name {
-  font-size: 13px;
-  font-weight: 700;
-  margin-bottom: 2px;
-}
-
-.game-id,
-.game-date {
-  color: #9ca3af;
-  font-size: 11px;
-}
-
-.bet-info,
-.win-info,
-.amount-info {
-  font-size: 11px;
-}
-
-.bet-info .mono,
-.win-info .mono {
-  font-size: 12px;
-}
-
-.label {
-  color: #9ca3af;
-  font-size: 10px;
-  margin-bottom: 1px;
-}
-
-.amount {
-  font-weight: 700;
-  font-size: 12px;
-}
-
-.amount.win {
-  color: #4ade80;
-}
-
-.amount.lose {
-  color: #f97373;
-}
-
-/* legend above history list */
-.history-legend {
-  display: grid;
-  grid-template-columns: 1.7fr 1.2fr 0.7fr 0.9fr;
-  column-gap: 8px;
-  font-size: 10px;
-  text-transform: uppercase;
-  letter-spacing: 0.06em;
-  color: #9ca3af;
-  margin-top: 8px;
-  margin-bottom: 4px;
-}
-
-.history-legend .col-game { }
-.history-legend .col-bet { text-align: left; }
-.history-legend .col-win { text-align: left; }
-.history-legend .col-amount { text-align: left; }
-
-/* ===== EMPTY STATE ===== */
-
-.empty-state {
-  margin-top: 16px;
-  text-align: center;
-  font-size: 13px;
-  color: #9ca3af;
-}
-
-/* Mobile tweak */
+/* Small screen tweak */
 @media (max-width: 380px) {
-  .row-line,
-  .history-legend {
-    grid-template-columns: 1.6fr 1.1fr 0.7fr 0.9fr;
+  .top-title {
+    font-size: 17px;
   }
 }
