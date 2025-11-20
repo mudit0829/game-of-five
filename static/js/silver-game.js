@@ -10,6 +10,9 @@ const TABLE_CODE = urlParams.get("table") || null;
 const USER_ID = GAME_USER_ID;
 const USERNAME = GAME_USERNAME || "Player";
 
+// URLs for popup buttons (change HOME_URL if needed)
+const HOME_URL = "/home2"; // TODO: change if your home route is different
+
 // ================= DOM REFERENCES =================
 
 const frogImg = document.getElementById("frogSprite");
@@ -29,6 +32,13 @@ const userNameLabel = document.getElementById("userName");
 const userBetCountLabel = document.getElementById("userBetCount");
 const myBetsRow = document.getElementById("myBetsRow");
 
+// popup elements
+const popupEl = document.getElementById("resultPopup");
+const popupTitleEl = document.getElementById("popupTitle");
+const popupMsgEl = document.getElementById("popupMessage");
+const popupHomeBtn = document.getElementById("popupHomeBtn");
+const popupLobbyBtn = document.getElementById("popupLobbyBtn");
+
 if (userNameLabel) {
   userNameLabel.textContent = USERNAME;
 }
@@ -38,6 +48,10 @@ let selectedNumber = 0;
 
 let currentTable = null;
 let lastResultShown = null;
+
+// NEW: game finished flag and polling handle
+let gameFinished = false;
+let tablePollInterval = null;
 
 // ================= UI HELPERS =================
 
@@ -126,6 +140,50 @@ function updatePadsFromBets(bets) {
   });
 }
 
+function disableBettingUI() {
+  if (placeBetBtn) placeBetBtn.disabled = true;
+  numChips.forEach((chip) => {
+    chip.disabled = true;
+  });
+}
+
+// Determine if user won or lost this finished table
+function determineUserOutcome(table) {
+  const result = table.result;
+  const myBets = (table.bets || []).filter((b) => b.user_id === USER_ID);
+  if (!myBets.length) {
+    return { outcome: "none", result };
+  }
+  const won = myBets.some((b) => String(b.number) === String(result));
+  return { outcome: won ? "win" : "lose", result };
+}
+
+function showEndPopup(outcomeInfo) {
+  if (!popupEl) return;
+
+  const { outcome, result } = outcomeInfo;
+
+  let title = "Game Finished";
+  let message =
+    "This game has ended. Please keep playing to keep your winning chances high.";
+
+  if (outcome === "win") {
+    title = "Congratulations!";
+    message =
+      "You have won the game. Please keep playing to keep your winning chances high.";
+  } else if (outcome === "lose") {
+    title = "Hard Luck!";
+    message =
+      "You have lost the game. Please keep playing to keep your winning chances high.";
+  }
+
+  if (popupTitleEl) popupTitleEl.textContent = title;
+  if (popupMsgEl) popupMsgEl.textContent = message;
+
+  // show popup (simple inline style so we don't depend on CSS)
+  popupEl.style.display = "flex";
+}
+
 // ================= FROG ANIMATION =================
 
 function hopFrogToWinningNumber(winningNumber) {
@@ -204,6 +262,8 @@ function resetFrogPosition() {
 // ================= BACKEND POLLING (TABLE DATA) =================
 
 async function fetchTableData() {
+  if (gameFinished) return; // do nothing once game is done
+
   try {
     const res = await fetch("/api/tables/silver");
     const data = await res.json();
@@ -247,11 +307,11 @@ function updateGameUI(table) {
   updatePadsFromBets(table.bets || []);
   updateMyBets(table.bets || []);
 
-  if (placeBetBtn) {
+  if (placeBetBtn && !gameFinished) {
     placeBetBtn.disabled = !!table.is_betting_closed;
   }
 
-  // detect new finished result to trigger frog jump
+  // detect finished result to trigger frog jump + popup
   if (
     table.is_finished &&
     table.result !== null &&
@@ -261,13 +321,36 @@ function updateGameUI(table) {
     lastResultShown = table.result;
     setStatus(`Winning number: ${table.result}`, "ok");
     hopFrogToWinningNumber(table.result);
+
+    // mark game finished ONCE
+    if (!gameFinished) {
+      gameFinished = true;
+      disableBettingUI();
+      // stop polling
+      if (tablePollInterval) {
+        clearInterval(tablePollInterval);
+        tablePollInterval = null;
+      }
+
+      // show popup with win/lose message
+      const outcomeInfo = determineUserOutcome(table);
+      showEndPopup(outcomeInfo);
+    }
   } else if (!table.is_finished) {
     lastResultShown = null;
   }
 }
 
-// poll every 2 seconds
-setInterval(fetchTableData, 2000);
+// start polling loop
+function startPolling() {
+  fetchTableData(); // initial load
+  if (tablePollInterval) clearInterval(tablePollInterval);
+  tablePollInterval = setInterval(() => {
+    if (!gameFinished) {
+      fetchTableData();
+    }
+  }, 2000);
+}
 
 // ================= BALANCE / SOCKET =================
 
@@ -299,6 +382,8 @@ socket.on("connect", () => {
 });
 
 socket.on("bet_success", (payload) => {
+  if (gameFinished) return; // ignore if game over
+
   setStatus(payload.message || "Bet placed", "ok");
   if (typeof payload.new_balance === "number") {
     updateWallet(payload.new_balance);
@@ -308,13 +393,18 @@ socket.on("bet_success", (payload) => {
 });
 
 socket.on("bet_error", (payload) => {
+  if (gameFinished) return;
   setStatus(payload.message || "Bet error", "error");
 });
+
+// We intentionally do NOT listen for any "new_round" socket event here,
+// because this screen should only represent ONE finished game.
 
 // ================= UI EVENTS =================
 
 numChips.forEach((chip) => {
   chip.addEventListener("click", () => {
+    if (gameFinished) return; // no more selection after finish
     const n = parseInt(chip.dataset.number, 10);
     setSelectedNumber(n);
   });
@@ -322,6 +412,11 @@ numChips.forEach((chip) => {
 
 if (placeBetBtn) {
   placeBetBtn.addEventListener("click", () => {
+    if (gameFinished) {
+      setStatus("This game has already finished.", "error");
+      return;
+    }
+
     if (walletBalance < FIXED_BET_AMOUNT) {
       setStatus("Insufficient balance", "error");
       return;
@@ -340,9 +435,23 @@ if (placeBetBtn) {
   });
 }
 
+// popup buttons
+if (popupHomeBtn) {
+  popupHomeBtn.addEventListener("click", () => {
+    window.location.href = HOME_URL;
+  });
+}
+
+if (popupLobbyBtn) {
+  popupLobbyBtn.addEventListener("click", () => {
+    // Usually the user came from Silver game lobby, so go back.
+    window.history.back();
+  });
+}
+
 // ================= INIT =================
 
 fetchBalance();
-fetchTableData();
+startPolling();
 setSelectedNumber(0);
 setStatus("");
