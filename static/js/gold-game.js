@@ -1,24 +1,14 @@
-// ========== BASIC SETUP ==========
+// ========== BASIC SETUP (DB USER, multi-table) ==========
 
 const GAME = GAME_TYPE || "gold";
 
 // --- Get table code from URL (multi-table sync!) ---
 const urlParams = new URLSearchParams(window.location.search);
-const TABLE_CODE = urlParams.get('table');
+const TABLE_CODE = urlParams.get("table");
 
-let uid = localStorage.getItem("gold_user_id");
-if (!uid) {
-  uid = "user_" + Math.floor(Math.random() * 1e8);
-  localStorage.setItem("gold_user_id", uid);
-}
-const USER_ID = uid;
-
-let uname = localStorage.getItem("gold_username");
-if (!uname) {
-  uname = "Player" + Math.floor(Math.random() * 9999);
-  localStorage.setItem("gold_username", uname);
-}
-const USERNAME = uname;
+// REAL logged-in user from Flask session
+const USER_ID = GAME_USER_ID;
+const USERNAME = GAME_USERNAME || "Player";
 
 // ========== DOM SETUP ==========
 const pitch = document.querySelector(".pitch");
@@ -39,7 +29,9 @@ const userNameLabel = document.getElementById("userName");
 const userBetCountLabel = document.getElementById("userBetCount");
 const myBetsRow = document.getElementById("myBetsRow");
 
-userNameLabel && (userNameLabel.textContent = USERNAME);
+if (userNameLabel) {
+  userNameLabel.textContent = USERNAME;
+}
 
 let walletBalance = 0;
 let selectedNumber = 0;
@@ -49,6 +41,7 @@ let currentTableData = null;
 // ========== UI HELPERS ==========
 
 function setStatus(msg, type = "") {
+  if (!statusEl) return;
   statusEl.textContent = msg || "";
   statusEl.className = "status";
   if (type) statusEl.classList.add(type);
@@ -56,9 +49,13 @@ function setStatus(msg, type = "") {
 
 function updateWallet(balance) {
   walletBalance = balance;
-  walletBalanceSpan.textContent = walletBalance.toFixed(0);
-  coinsWrapper && coinsWrapper.classList.add("coin-bounce");
-  setTimeout(() => coinsWrapper && coinsWrapper.classList.remove("coin-bounce"), 500);
+  if (walletBalanceSpan) {
+    walletBalanceSpan.textContent = walletBalance.toFixed(0);
+  }
+  if (coinsWrapper) {
+    coinsWrapper.classList.add("coin-bounce");
+    setTimeout(() => coinsWrapper.classList.remove("coin-bounce"), 500);
+  }
 }
 
 function setSelectedNumber(n) {
@@ -71,11 +68,14 @@ function setSelectedNumber(n) {
 
 function updateMyBets(bets) {
   const myBets = (bets || []).filter((b) => b.user_id === USER_ID);
-  userBetCountLabel && (userBetCountLabel.textContent = myBets.length);
+  if (userBetCountLabel) {
+    userBetCountLabel.textContent = myBets.length;
+  }
 
   myBetsRow.innerHTML = "";
   if (myBets.length === 0) {
-    myBetsRow.innerHTML = '<span style="color: #6b7280; font-size: 11px;">none</span>';
+    myBetsRow.innerHTML =
+      '<span style="color: #6b7280; font-size: 11px;">none</span>';
     return;
   }
   myBets.forEach((b, index) => {
@@ -97,7 +97,6 @@ function updateGoalsFromBets(bets) {
     betsByNumber[b.number].push(b);
   });
 
-  // Get unique numbers (up to 6)
   const uniqueNumbers = Object.keys(betsByNumber).slice(0, 6);
 
   goals.forEach((goal, i) => {
@@ -149,7 +148,6 @@ function createTrajectoryLine(startX, startY, endX, endY, peak) {
   setTimeout(() => svg.parentNode && svg.parentNode.removeChild(svg), 1200);
 }
 
-// CSS ANIMATION INJECTION
 if (!document.getElementById("trajectory-styles")) {
   const style = document.createElement("style");
   style.id = "trajectory-styles";
@@ -169,7 +167,9 @@ if (!document.getElementById("trajectory-styles")) {
 function shootBallToWinningNumber(winningNumber) {
   const pitchRect = pitch.getBoundingClientRect();
   const ballRect = ballImg.getBoundingClientRect();
-  const targetGoal = goals.find((g) => g.dataset.number === String(winningNumber));
+  const targetGoal = goals.find(
+    (g) => g.dataset.number === String(winningNumber)
+  );
 
   if (!targetGoal) {
     console.log("Winning number not on a goal:", winningNumber);
@@ -188,7 +188,6 @@ function shootBallToWinningNumber(winningNumber) {
   const duration = 750;
   const startTime = performance.now();
 
-  // Trajectory line (relative to pitch)
   const pitchStartX = ballRect.left + ballRect.width / 2 - pitchRect.left;
   const pitchStartY = ballRect.top + ballRect.height / 2 - pitchRect.top;
   const pitchEndX = goalRect.left + goalRect.width / 2 - pitchRect.left;
@@ -196,10 +195,8 @@ function shootBallToWinningNumber(winningNumber) {
 
   createTrajectoryLine(pitchStartX, pitchStartY, pitchEndX, pitchEndY, peak);
 
-  // Player kick
   cssPlayer && cssPlayer.classList.add("kick");
 
-  // Wait for kick wind-up (280ms)
   setTimeout(() => {
     const originalTransform = ballImg.style.transform;
 
@@ -220,7 +217,7 @@ function shootBallToWinningNumber(winningNumber) {
       const yLinear = startY + deltaY * ease;
       const yArc = yLinear + peak * (4 * t * (1 - t));
       const rotation = t * (distance * 1.5);
-      const scale = 1 - (t * 0.12);
+      const scale = 1 - t * 0.12;
 
       ballImg.style.left = x + "px";
       ballImg.style.top = yArc + "px";
@@ -229,9 +226,7 @@ function shootBallToWinningNumber(winningNumber) {
       if (t < 1) {
         requestAnimationFrame(step);
       } else {
-        // Goal reached!
         targetGoal.classList.add("win");
-        // Goal flash
         const flash = document.createElement("div");
         flash.style.position = "absolute";
         flash.style.top = "50%";
@@ -239,7 +234,8 @@ function shootBallToWinningNumber(winningNumber) {
         flash.style.transform = "translate(-50%, -50%)";
         flash.style.width = "150%";
         flash.style.height = "150%";
-        flash.style.background = "radial-gradient(circle, rgba(34,197,94,0.6) 0%, transparent 70%)";
+        flash.style.background =
+          "radial-gradient(circle, rgba(34,197,94,0.6) 0%, transparent 70%)";
         flash.style.borderRadius = "50%";
         flash.style.pointerEvents = "none";
         flash.style.animation = "goalFlash 0.6s ease-out";
@@ -248,7 +244,6 @@ function shootBallToWinningNumber(winningNumber) {
 
         setTimeout(() => flash.remove(), 600);
 
-        // Return ball
         setTimeout(() => {
           ballImg.style.position = "";
           ballImg.style.left = "";
@@ -266,7 +261,7 @@ function shootBallToWinningNumber(winningNumber) {
   setTimeout(() => cssPlayer && cssPlayer.classList.remove("kick"), 800);
 }
 
-// ========== BACKEND API SYNC (Multi-table/game data) ==========
+// ========== BACKEND API SYNC (tables) ==========
 
 async function fetchTableData() {
   if (!TABLE_CODE) {
@@ -277,7 +272,7 @@ async function fetchTableData() {
     const response = await fetch(`/api/tables/gold`);
     const data = await response.json();
     if (data.tables) {
-      const table = data.tables.find(t => t.round_code === TABLE_CODE);
+      const table = data.tables.find((t) => t.round_code === TABLE_CODE);
       if (table) {
         currentTableData = table;
         updateGameUI(table);
@@ -286,7 +281,7 @@ async function fetchTableData() {
       }
     }
   } catch (e) {
-    console.error('fetchTableData error', e);
+    console.error("fetchTableData error", e);
   }
 }
 
@@ -295,13 +290,13 @@ function updateGameUI(table) {
   playerCountSpan.textContent = table.players || 0;
   const mins = Math.floor(table.time_remaining / 60);
   const secs = table.time_remaining % 60;
-  timerText.textContent = `${mins}:${secs.toString().padStart(2, '0')}`;
+  timerText.textContent = `${mins}:${secs.toString().padStart(2, "0")}`;
   updateGoalsFromBets(table.bets || []);
   updateMyBets(table.bets || []);
   placeBetBtn.disabled = !!table.is_betting_closed;
 
   if (table.is_betting_closed) {
-    setStatus('Betting closed for this round', 'error');
+    setStatus("Betting closed for this round", "error");
     placeBetBtn.disabled = true;
   }
   if (table.is_finished && table.result !== null && table.result !== undefined) {
@@ -310,7 +305,6 @@ function updateGameUI(table) {
   }
 }
 
-// Auto-refresh table every 2 seconds
 setInterval(fetchTableData, 2000);
 
 // ========== SOCKET.IO ==========
@@ -341,8 +335,12 @@ socket.on("connect", () => {
 
 socket.on("round_data", (payload) => {
   if (payload.game_type !== GAME) return;
-  // Only update if it's our table
-  if (TABLE_CODE && payload.round_data && payload.round_data.round_code !== TABLE_CODE) return;
+  if (
+    TABLE_CODE &&
+    payload.round_data &&
+    payload.round_data.round_code !== TABLE_CODE
+  )
+    return;
   const rd = payload.round_data || {};
   roundIdSpan.textContent = rd.round_code;
   timerText.textContent = rd.time_remaining ?? "--";
@@ -361,7 +359,6 @@ socket.on("new_round", (payload) => {
   updateMyBets(rd.bets || []);
   setStatus("New round started", "ok");
 
-  // Reset ball
   ballImg.style.position = "";
   ballImg.style.left = "";
   ballImg.style.top = "";
@@ -377,7 +374,6 @@ socket.on("timer_update", (payload) => {
   const timeRemaining = payload.time_remaining ?? 0;
   timerText.textContent = timeRemaining.toString().padStart(2, "0");
   playerCountSpan.textContent = payload.players ?? 0;
-  // Show CSS player at 15 sec
   if (timeRemaining <= 15 && !playerShown) {
     playerArea.classList.add("visible");
     playerShown = true;
@@ -397,7 +393,7 @@ socket.on("betting_closed", (payload) => {
 
 socket.on("bet_placed", (payload) => {
   if (payload.game_type !== GAME) return;
-  fetchTableData(); // live update
+  fetchTableData();
 });
 
 socket.on("bet_success", (payload) => {
@@ -450,4 +446,3 @@ fetchBalance();
 fetchTableData();
 setSelectedNumber(0);
 setStatus("");
-
