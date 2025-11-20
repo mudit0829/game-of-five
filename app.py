@@ -132,7 +132,9 @@ class Ticket(db.Model):
     message = db.Column(db.Text)
     status = db.Column(db.String(20), default="open")  # open / in_progress / closed
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
-    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    updated_at = db.Column(
+        db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow
+    )
     attachment_name = db.Column(db.String(255))
 
 
@@ -217,8 +219,22 @@ class GameTable:
         return list(range(10))
 
     def add_bet(self, user_id, username, number, is_bot=False):
+        """
+        Add a bet to this table.
+        We normalise real users' IDs to int so history keys match /api/user-games.
+        """
+
+        # Normalise user id for non-bots
+        if not is_bot:
+            try:
+                user_id_norm = int(user_id)
+            except (TypeError, ValueError):
+                user_id_norm = user_id
+        else:
+            user_id_norm = user_id
+
         # max 4 bets per user
-        user_bets = [b for b in self.bets if b["user_id"] == user_id]
+        user_bets = [b for b in self.bets if b["user_id"] == user_id_norm]
         if len(user_bets) >= 4:
             return False, "Maximum 4 bets per user"
 
@@ -226,7 +242,7 @@ class GameTable:
             return False, "All slots are full"
 
         bet_obj = {
-            "user_id": user_id,
+            "user_id": user_id_norm,
             "username": username,
             "number": number,
             "is_bot": is_bot,
@@ -237,9 +253,9 @@ class GameTable:
 
         # log into user history (non-bots)
         if not is_bot:
-            if user_id not in user_game_history:
-                user_game_history[user_id] = []
-            user_game_history[user_id].append(
+            if user_id_norm not in user_game_history:
+                user_game_history[user_id_norm] = []
+            user_game_history[user_id_norm].append(
                 {
                     "game_type": self.game_type,
                     "round_code": self.round_code,
@@ -422,7 +438,9 @@ def manage_game_table(table: GameTable):
                     table.is_finished = False
                     table.start_time = datetime.now()
                     table.end_time = table.start_time + timedelta(minutes=5)
-                    table.betting_close_time = table.end_time - timedelta(seconds=15)
+                    table.betting_close_time = table.end_time - timedelta(
+                        seconds=15
+                    )
                     table.round_code = table._make_round_code()
                     table.last_bot_added_at = None
                     print(
@@ -431,7 +449,9 @@ def manage_game_table(table: GameTable):
 
                 time.sleep(1)
             except Exception as e:
-                print(f"Error managing table {table.game_type} #{table.table_number}: {e}")
+                print(
+                    f"Error managing table {table.game_type} #{table.table_number}: {e}"
+                )
                 time.sleep(1)
 
 
@@ -544,7 +564,9 @@ def login_post():
 
     user = User.query.filter_by(username=username).first()
     if not user or not user.check_password(password):
-        return jsonify({"success": False, "message": "Invalid username or password"}), 401
+        return jsonify(
+            {"success": False, "message": "Invalid username or password"}
+        ), 401
 
     # ensure wallet
     ensure_wallet_for_user(user)
@@ -810,8 +832,6 @@ def get_balance(user_id):
     We IGNORE the id in the URL and always use the logged-in user
     from the Flask session, so calls like /balance/undefined still work.
     """
-    from flask import session
-
     real_user_id = session.get("user_id")
     if not real_user_id:
         return jsonify({"balance": 0})
@@ -850,14 +870,24 @@ def handle_join_game(data):
 
 @socketio.on("place_bet")
 def handle_place_bet(data):
+    """
+    Place bet from game clients.
+    We normalise user_id to int so it matches DB & history keys.
+    """
     game_type = data.get("game_type")
-    user_id = data.get("user_id")
+    raw_user_id = data.get("user_id")
     username = data.get("username")
     number = data.get("number")
 
     if game_type not in GAME_CONFIGS:
         emit("bet_error", {"message": "Invalid game type"})
         return
+
+    # Normalise user id
+    try:
+        user_id = int(raw_user_id)
+    except (TypeError, ValueError):
+        user_id = raw_user_id
 
     user = User.query.get(user_id)
     if not user:
@@ -894,10 +924,7 @@ def handle_place_bet(data):
     wallet.balance -= table.config["bet_amount"]
     db.session.commit()
 
-    emit(
-        "bet_success",
-        {"message": message, "new_balance": wallet.balance},
-    )
+    emit("bet_success", {"message": message, "new_balance": wallet.balance})
 
 
 # ---------------------------------------------------
