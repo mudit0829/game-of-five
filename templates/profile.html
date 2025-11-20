@@ -50,6 +50,7 @@
         </div>
 
         <form class="profile-form" id="profileForm">
+          <!-- Display name -->
           <div class="form-row">
             <label for="displayName">Display Name</label>
             <input
@@ -61,6 +62,7 @@
             >
           </div>
 
+          <!-- Email -->
           <div class="form-row">
             <label for="email">Email (optional)</label>
             <input
@@ -72,27 +74,28 @@
             >
           </div>
 
-          <div class="form-row inline">
-            <div>
-              <label for="country">Country</label>
-              <input
-                id="country"
-                name="country"
-                type="text"
-                value="{{ country or '' }}"
-                placeholder="India"
-              >
-            </div>
-            <div>
-              <label for="phone">Phone</label>
-              <input
-                id="phone"
-                name="phone"
-                type="tel"
-                value="{{ phone or '' }}"
-                placeholder="+91-"
-              >
-            </div>
+          <!-- Phone (now its own full-width row, below email) -->
+          <div class="form-row">
+            <label for="phone">Phone</label>
+            <input
+              id="phone"
+              name="phone"
+              type="tel"
+              value="{{ phone or '' }}"
+              placeholder="+91-"
+            >
+          </div>
+
+          <!-- Country (now below phone, full-width) -->
+          <div class="form-row">
+            <label for="country">Country</label>
+            <input
+              id="country"
+              name="country"
+              type="text"
+              value="{{ country or '' }}"
+              placeholder="India"
+            >
           </div>
 
           <button type="button" id="saveProfileBtn" class="save-btn">
@@ -111,8 +114,8 @@
           <button class="sub-tab active" data-filter="all">All</button>
           <button class="sub-tab" data-filter="added">Updated/Added</button>
           <button class="sub-tab" data-filter="bet">Betting</button>
-          <button class="sub-tab" data-filter="win">Winnings</button>
-          <button class="sub-tab" data-filter="balance">Adjustments</button>
+          <button class="sub-tab" data-filter="win">Winning</button>
+          <button class="sub-tab" data-filter="balance">Balance</button>
         </div>
 
         <!-- Summary row -->
@@ -135,7 +138,7 @@
           </div>
         </div>
 
-        <!-- Transactions list -->
+        <!-- header row -->
         <div class="txn-header-row">
           <span class="col col-date">Date &amp; Time</span>
           <span class="col col-type">Type</span>
@@ -144,20 +147,19 @@
           <span class="col col-after">Balance</span>
         </div>
 
+        <!-- Transactions list (filtered by JS) -->
         <div id="txnList" class="txn-list">
-          <!-- Filled by profile.js -->
           <div class="empty-state">
             No transactions yet.<br>
             Your deposits, bets and winnings will appear here.
           </div>
         </div>
-
       </section>
 
     </main>
   </div>
 
-  <!-- DATA from backend (safe if not provided) -->
+  <!-- DATA from backend (safe defaults) -->
   <script>
     const WALLET_BALANCE = {{ wallet_balance or 0 }};
     const TRANSACTIONS = {{ transactions|default([], true)|tojson }};
