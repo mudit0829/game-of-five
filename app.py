@@ -1,6 +1,9 @@
 from flask import Flask, render_template, request, jsonify, redirect, url_for, session
 from flask_socketio import SocketIO, emit, join_room
 from flask_cors import CORS
+from flask_sqlalchemy import SQLAlchemy
+from werkzeug.utils import secure_filename
+
 import random
 import time
 from datetime import datetime, timedelta
@@ -9,8 +12,10 @@ import os
 import hashlib
 import secrets
 import json
-from werkzeug.utils import secure_filename
 
+# -------------------------------------------------
+# FLASK + DB SETUP
+# -------------------------------------------------
 app = Flask(__name__)
 app.config['SECRET_KEY'] = 'your-secret-key-here-change-this-in-production'
 app.config['PROPAGATE_EXCEPTIONS'] = True
@@ -18,10 +23,16 @@ app.config['SESSION_COOKIE_HTTPONLY'] = True
 app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'
 app.config['PERMANENT_SESSION_LIFETIME'] = timedelta(days=7)
 
+# SQLite database file
+app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///game.db'
+app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
+
 # Uploads for help attachments
 UPLOAD_FOLDER = os.path.join(os.path.dirname(__file__), 'uploads')
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
+
+db = SQLAlchemy(app)
 
 CORS(app, resources={r"/*": {"origins": "*"}})
 socketio = SocketIO(
@@ -32,9 +43,9 @@ socketio = SocketIO(
     ping_interval=25
 )
 
-# --------------------------
-# Game configurations
-# --------------------------
+# -------------------------------------------------
+# GAME CONFIGURATIONS
+# -------------------------------------------------
 GAME_CONFIGS = {
     'silver': {
         'bet_amount': 200,
@@ -78,16 +89,75 @@ GAME_CONFIGS = {
     }
 }
 
-# Store all running tables etc.
-game_tables = {}
-user_wallets = {}
-users_db = {}             # {username: {... profile ...}}
-user_game_history = {}    # {user_id: [bet_dict, ...]}
-user_complaints = {}      # {user_id: [complaint_dict, ...]}
+# -------------------------------------------------
+# DATABASE MODELS
+# -------------------------------------------------
+class User(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.String(64), unique=True, index=True)  # external id used in game
+    username = db.Column(db.String(80), unique=True, nullable=False)
+    password_hash = db.Column(db.String(128), nullable=False)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
-# --------------------------
-# Auth helpers
-# --------------------------
+    display_name = db.Column(db.String(120))
+    email = db.Column(db.String(120))
+    country = db.Column(db.String(80))
+    phone = db.Column(db.String(40))
+
+    balance = db.Column(db.Integer, default=0)  # wallet balance in coins
+
+    def __repr__(self):
+        return f"<User {self.username} ({self.user_id})>"
+
+
+class BetHistory(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.String(64), index=True)   # matches User.user_id
+    game_type = db.Column(db.String(20))
+    round_code = db.Column(db.String(40))
+    table_number = db.Column(db.Integer)
+    bet_amount = db.Column(db.Integer)
+    number = db.Column(db.Integer)
+    bet_time = db.Column(db.DateTime, default=datetime.utcnow)
+
+    is_resolved = db.Column(db.Boolean, default=False)
+    winning_number = db.Column(db.Integer)
+    win = db.Column(db.Boolean)
+    status = db.Column(db.String(10))        # "win" / "lose"
+    amount = db.Column(db.Integer)           # net +/- amount
+    date_time = db.Column(db.DateTime)       # when result applied
+
+
+class Complaint(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    complaint_id = db.Column(db.String(40), unique=True, index=True)
+    user_id = db.Column(db.String(64), index=True)
+
+    subject = db.Column(db.String(200))
+    message = db.Column(db.Text)
+    category = db.Column(db.String(50))
+    status = db.Column(db.String(20), default='Open')
+
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    last_update = db.Column(db.DateTime, default=datetime.utcnow)
+
+    attachment_name = db.Column(db.String(200))
+    original_filename = db.Column(db.String(200))
+    updates_json = db.Column(db.Text)  # JSON list of {time, text}
+
+
+# -------------------------------------------------
+# IN-MEMORY STRUCTURES (still used by game threads)
+# -------------------------------------------------
+game_tables = {}
+user_wallets = {}        # {user_id: balance} – kept in sync with DB
+users_db = {}            # {username: {...}}  – quick cache for login/profile
+user_game_history = {}   # {user_id: [bet_dict, ...]} – used by existing APIs
+user_complaints = {}     # {user_id: [complaint_dict, ...]} – for help page
+
+# -------------------------------------------------
+# AUTH HELPERS
+# -------------------------------------------------
 def hash_password(password):
     return hashlib.sha256(password.encode()).hexdigest()
 
@@ -96,36 +166,75 @@ def verify_password(stored_hash, provided_password):
     return stored_hash == hash_password(provided_password)
 
 
-def create_user(username, password):
-    if username in users_db:
+def create_user(username, password, initial_balance=10000):
+    """
+    Create user in DB + in-memory dicts.
+    Returns (success, user_id_or_message).
+    """
+    existing = User.query.filter_by(username=username).first()
+    if existing:
         return False, "Username already exists"
 
     user_id = f"user_{secrets.token_hex(8)}"
-    users_db[username] = {
-        'user_id': user_id,
-        'username': username,
-        'password_hash': hash_password(password),
-        'created_at': datetime.now().isoformat(),
-        # profile fields
-        'display_name': username,
-        'email': '',
-        'country': '',
-        'phone': ''
-    }
 
-    user_wallets[user_id] = 10000
-    user_game_history[user_id] = []
-    user_complaints[user_id] = []
-    return True, user_id
+    user = User(
+        user_id=user_id,
+        username=username,
+        password_hash=hash_password(password),
+        created_at=datetime.utcnow(),
+        display_name=username,
+        email='',
+        country='',
+        phone='',
+        balance=initial_balance
+    )
+    db.session.add(user)
+    db.session.commit()
+
+    # mirror into in-memory structures
+    users_db[username] = {
+        'user_id': user.user_id,
+        'username': user.username,
+        'password_hash': user.password_hash,
+        'created_at': user.created_at.isoformat(),
+        'display_name': user.display_name,
+        'email': user.email,
+        'country': user.country,
+        'phone': user.phone
+    }
+    user_wallets[user.user_id] = user.balance
+    user_game_history[user.user_id] = []
+    user_complaints[user.user_id] = []
+
+    return True, user.user_id
 
 
 def authenticate_user(username, password):
-    user = users_db.get(username)
+    """
+    Use DB for auth but keep cache in users_db.
+    """
+    user = User.query.filter_by(username=username).first()
     if not user:
         return False, None
-    if verify_password(user['password_hash'], password):
-        return True, user['user_id']
-    return False, None
+    if not verify_password(user.password_hash, password):
+        return False, None
+    # ensure cache is filled
+    users_db[username] = {
+        'user_id': user.user_id,
+        'username': user.username,
+        'password_hash': user.password_hash,
+        'created_at': user.created_at.isoformat(),
+        'display_name': user.display_name or user.username,
+        'email': user.email or '',
+        'country': user.country or '',
+        'phone': user.phone or ''
+    }
+    user_wallets[user.user_id] = user.balance
+    if user.user_id not in user_game_history:
+        user_game_history[user.user_id] = []
+    if user.user_id not in user_complaints:
+        user_complaints[user.user_id] = []
+    return True, user.user_id
 
 
 def login_required(f):
@@ -141,15 +250,15 @@ def login_required(f):
 
 
 def find_user_by_id(user_id):
-    """Helper: find user record in users_db by user_id."""
-    for u in users_db.values():
-        if u['user_id'] == user_id:
-            return u
-    return None
+    """Look up user in DB, used by profile."""
+    if not user_id:
+        return None
+    return User.query.filter_by(user_id=user_id).first()
 
-# --------------------------
-# Game helpers & Table class
-# --------------------------
+
+# -------------------------------------------------
+# GAME HELPERS & TABLE CLASS
+# -------------------------------------------------
 def generate_bot_name():
     prefixes = ['Amit', 'Sanjay', 'Riya', 'Kunal', 'Anita', 'Rohit', 'Meera', 'Neeraj']
     suffix = random.randint(100, 999)
@@ -168,7 +277,7 @@ class GameTable:
         self.bets = []
         self.result = None
         self.is_betting_closed = False
-        self.is_finished = False   # <- fixed indentation here
+        self.is_finished = False
         self.max_players = 6
         self.last_bot_added_at = None
 
@@ -198,7 +307,7 @@ class GameTable:
         }
         self.bets.append(bet_obj)
 
-        # ---------- LOG INTO USER HISTORY (for real users) ----------
+        # ---------- LOG INTO USER HISTORY + DB (real users only) ----------
         if not is_bot:
             if user_id not in user_game_history:
                 user_game_history[user_id] = []
@@ -211,6 +320,20 @@ class GameTable:
                 'table_number': self.table_number,
                 'is_resolved': False  # pending
             })
+            # DB history
+            bh = BetHistory(
+                user_id=user_id,
+                game_type=self.game_type,
+                round_code=self.round_code,
+                table_number=self.table_number,
+                bet_amount=self.config['bet_amount'],
+                number=number,
+                bet_time=datetime.utcnow(),
+                is_resolved=False
+            )
+            db.session.add(bh)
+            db.session.commit()
+
         return True, "Bet placed successfully"
 
     def add_bot_bet(self):
@@ -282,9 +405,9 @@ class GameTable:
             'result': self.result
         }
 
-# --------------------------
-# Table setup & threading
-# --------------------------
+# -------------------------------------------------
+# TABLE SETUP & THREADING
+# -------------------------------------------------
 def initialize_game_tables():
     for game_type in GAME_CONFIGS.keys():
         game_tables[game_type] = []
@@ -296,74 +419,101 @@ def initialize_game_tables():
 
 
 def manage_game_table(table):
-    while True:
-        try:
-            now = datetime.now()
-            if now < table.start_time:
-                time.sleep(1)
-                continue
+    # need app context to use db in this thread
+    with app.app_context():
+        while True:
+            try:
+                now = datetime.now()
+                if now < table.start_time:
+                    time.sleep(1)
+                    continue
 
-            if (
-                not table.is_betting_closed
-                and len(table.bets) < table.max_players
-                and table.get_time_remaining() > 30
-            ):
                 if (
-                    table.last_bot_added_at is None
-                    or (now - table.last_bot_added_at).total_seconds() >= 15
+                    not table.is_betting_closed
+                    and len(table.bets) < table.max_players
+                    and table.get_time_remaining() > 30
                 ):
-                    if table.add_bot_bet():
-                        table.last_bot_added_at = now
+                    if (
+                        table.last_bot_added_at is None
+                        or (now - table.last_bot_added_at).total_seconds() >= 15
+                    ):
+                        if table.add_bot_bet():
+                            table.last_bot_added_at = now
 
-            # Close betting
-            if now >= table.betting_close_time and not table.is_betting_closed:
-                table.is_betting_closed = True
-                print(f"{table.game_type} Table {table.table_number}: Betting closed")
+                # Close betting
+                if now >= table.betting_close_time and not table.is_betting_closed:
+                    table.is_betting_closed = True
+                    print(f"{table.game_type} Table {table.table_number}: Betting closed")
 
-            # Finish game
-            if now >= table.end_time and not table.is_finished:
-                table.is_finished = True
-                result = table.calculate_result()
-                winners = table.get_winners()
-                print(f"{table.game_type} Table {table.table_number}: Game ended. Winner: {result}")
+                # Finish game
+                if now >= table.end_time and not table.is_finished:
+                    table.is_finished = True
+                    result = table.calculate_result()
+                    winners = table.get_winners()
+                    print(f"{table.game_type} Table {table.table_number}: Game ended. Winner: {result}")
 
-                # finalize history
-                for bet in table.bets:
-                    if bet.get('is_bot'):
-                        continue
-                    for rec in user_game_history.get(bet['user_id'], []):
-                        if (not rec.get('is_resolved') and
-                            rec['game_type'] == table.game_type and
-                            rec['round_code'] == table.round_code and
-                            rec['number'] == bet['number']):
-                            rec['winning_number'] = result
-                            rec['win'] = (bet['number'] == result)
-                            rec['status'] = "win" if bet['number'] == result else "lose"
-                            rec['amount'] = table.config['payout'] if rec['win'] else -table.config['bet_amount']
-                            rec['is_resolved'] = True
-                            rec['date_time'] = now.strftime("%Y-%m-%d %H:%M")
+                    # finalize history (in-memory + DB)
+                    for bet in table.bets:
+                        if bet.get('is_bot'):
+                            continue
+                        # in-memory history
+                        for rec in user_game_history.get(bet['user_id'], []):
+                            if (not rec.get('is_resolved') and
+                                rec['game_type'] == table.game_type and
+                                rec['round_code'] == table.round_code and
+                                rec['number'] == bet['number']):
+                                rec['winning_number'] = result
+                                rec['win'] = (bet['number'] == result)
+                                rec['status'] = "win" if bet['number'] == result else "lose"
+                                rec['amount'] = table.config['payout'] if rec['win'] else -table.config['bet_amount']
+                                rec['is_resolved'] = True
+                                rec['date_time'] = now.strftime("%Y-%m-%d %H:%M")
 
-                for winner in winners:
-                    if winner['user_id'] in user_wallets:
-                        user_wallets[winner['user_id']] += winner['payout']
+                        # DB history
+                        bh = BetHistory.query.filter_by(
+                            user_id=bet['user_id'],
+                            game_type=table.game_type,
+                            round_code=table.round_code,
+                            number=bet['number'],
+                            is_resolved=False
+                        ).first()
+                        if bh:
+                            bh.winning_number = result
+                            bh.win = (bet['number'] == result)
+                            bh.status = "win" if bh.win else "lose"
+                            bh.amount = table.config['payout'] if bh.win else -table.config['bet_amount']
+                            bh.is_resolved = True
+                            bh.date_time = datetime.utcnow()
+                            db.session.add(bh)
 
-                # Restart round
-                time.sleep(3)
-                table.bets = []
-                table.result = None
-                table.is_betting_closed = False
-                table.is_finished = False
-                table.start_time = datetime.now()
-                table.end_time = table.start_time + timedelta(minutes=5)
-                table.betting_close_time = table.end_time - timedelta(seconds=15)
-                table.round_code = table._make_round_code()
-                table.last_bot_added_at = None
-                print(f"{table.game_type} Table {table.table_number}: New round started - {table.round_code}")
+                    db.session.commit()
 
-            time.sleep(1)
-        except Exception as e:
-            print(f"Error managing table {table.game_type} #{table.table_number}: {e}")
-            time.sleep(1)
+                    # pay winners in DB + memory
+                    for winner in winners:
+                        u = User.query.filter_by(user_id=winner['user_id']).first()
+                        if u:
+                            u.balance += winner['payout']
+                            db.session.add(u)
+                            user_wallets[winner['user_id']] = u.balance
+                    db.session.commit()
+
+                    # Restart round
+                    time.sleep(3)
+                    table.bets = []
+                    table.result = None
+                    table.is_betting_closed = False
+                    table.is_finished = False
+                    table.start_time = datetime.now()
+                    table.end_time = table.start_time + timedelta(minutes=5)
+                    table.betting_close_time = table.end_time - timedelta(seconds=15)
+                    table.round_code = table._make_round_code()
+                    table.last_bot_added_at = None
+                    print(f"{table.game_type} Table {table.table_number}: New round started - {table.round_code}")
+
+                time.sleep(1)
+            except Exception as e:
+                print(f"Error managing table {table.game_type} #{table.table_number}: {e}")
+                time.sleep(1)
 
 
 def start_all_game_tables():
@@ -376,9 +526,9 @@ def start_all_game_tables():
             ).start()
     print("All game table threads started!")
 
-# --------------------------
-# API for tables
-# --------------------------
+# -------------------------------------------------
+# API FOR TABLES
+# -------------------------------------------------
 @app.route('/api/tables/<game_type>')
 def get_game_tables_api(game_type):
     if game_type not in GAME_CONFIGS:
@@ -398,11 +548,11 @@ def get_all_tables():
         all_tables[game_type] = [table.to_dict() for table in tables]
     return jsonify(all_tables)
 
-# --------------------------
-# GAME HISTORY API ENDPOINT
-# --------------------------
+# -------------------------------------------------
+# GAME HISTORY API (still using in-memory dict)
+# -------------------------------------------------
 @app.route('/api/user-games')
-def user_games_history():
+def user_games_history_api():
     user_id = request.args.get("user_id")
     user_bets = user_game_history.get(user_id, [])
 
@@ -436,9 +586,9 @@ def user_games_history():
     current_games = [g for g in all_games if not g.get('status')]
     return jsonify({"current_games": current_games, "game_history": game_history})
 
-# -------------
-# Auth routes
-# -------------
+# -------------------------------------------------
+# AUTH ROUTES
+# -------------------------------------------------
 @app.route('/')
 def index():
     if 'user_id' in session:
@@ -502,6 +652,7 @@ def register_page():
     if data.get('user_id') and not data.get('password'):
         user_id = data.get("user_id")
         username = data.get("username", "Player")
+        # ensure wallet + history structures exist; DB user is optional here
         if user_id not in user_wallets:
             user_wallets[user_id] = 10000
             user_game_history[user_id] = []
@@ -538,19 +689,23 @@ def logout():
     session.clear()
     return redirect(url_for('login_page'))
 
-# --------------------------
-# Game page routes
-# --------------------------
+# -------------------------------------------------
+# GAME PAGE ROUTES
+# -------------------------------------------------
 @app.route('/home')
 @login_required
 def home():
     username = session.get('username', 'Player')
     user_id = session.get('user_id')
 
-    if user_id and user_id not in user_wallets:
-        user_wallets[user_id] = 10000
-        user_game_history[user_id] = []
-        user_complaints[user_id] = []
+    # sync wallet from DB
+    u = find_user_by_id(user_id)
+    if u:
+        user_wallets[user_id] = u.balance
+        if user_id not in user_game_history:
+            user_game_history[user_id] = []
+        if user_id not in user_complaints:
+            user_complaints[user_id] = []
 
     return render_template('home.html', games=GAME_CONFIGS, username=username)
 
@@ -581,12 +736,16 @@ def game_history_page():
 
 @app.route('/balance/<user_id>')
 def get_balance(user_id):
+    # get from DB if possible
+    u = find_user_by_id(user_id)
+    if u:
+        user_wallets[user_id] = u.balance
     balance = user_wallets.get(user_id, 0)
     return jsonify({'balance': balance})
 
-# --------------------------
+# -------------------------------------------------
 # PROFILE ROUTES
-# --------------------------
+# -------------------------------------------------
 @app.route('/profile')
 @login_required
 def profile_page():
@@ -594,18 +753,20 @@ def profile_page():
     user_id = session.get('user_id')
     username = session.get('username')
 
-    user = find_user_by_id(user_id) or {}
-    joined_at = user.get('created_at')
-    if joined_at:
-        try:
-            dt = datetime.fromisoformat(joined_at)
-            joined_at_str = dt.strftime("%d %b %Y")
-        except Exception:
-            joined_at_str = joined_at
+    user_obj = find_user_by_id(user_id)
+    if user_obj:
+        joined_at = user_obj.created_at
+        joined_at_str = joined_at.strftime("%d %b %Y")
+        wallet_balance = user_obj.balance
+        email = user_obj.email or ''
+        country = user_obj.country or ''
+        phone = user_obj.phone or ''
     else:
         joined_at_str = "Just now"
-
-    wallet_balance = user_wallets.get(user_id, 0)
+        wallet_balance = user_wallets.get(user_id, 0)
+        email = ''
+        country = ''
+        phone = ''
 
     # Build simple coin transactions from user_game_history
     txns = []
@@ -647,9 +808,9 @@ def profile_page():
         username=username,
         joined_at=joined_at_str,
         wallet_balance=wallet_balance,
-        email=user.get('email', ''),
-        country=user.get('country', ''),
-        phone=user.get('phone', ''),
+        email=email,
+        country=country,
+        phone=phone,
         transactions=txns
     )
 
@@ -657,32 +818,62 @@ def profile_page():
 @app.route('/profile/update', methods=['POST'])
 @login_required
 def profile_update():
-    """Save basic profile fields (in-memory only)."""
-    username = session.get('username')
-    user = users_db.get(username)
+    """Save basic profile fields to DB."""
+    user_id = session.get('user_id')
+    user_obj = find_user_by_id(user_id)
 
-    if not user:
+    if not user_obj:
         return jsonify({'success': False, 'message': 'User not found'}), 404
 
     data = request.get_json() or {}
-    user['display_name'] = data.get('displayName', user.get('display_name', username))
-    user['email'] = data.get('email', user.get('email', ''))
-    user['country'] = data.get('country', user.get('country', ''))
-    user['phone'] = data.get('phone', user.get('phone', ''))
+    user_obj.display_name = data.get('displayName', user_obj.display_name or user_obj.username)
+    user_obj.email = data.get('email', user_obj.email or '')
+    user_obj.country = data.get('country', user_obj.country or '')
+    user_obj.phone = data.get('phone', user_obj.phone or '')
+
+    db.session.add(user_obj)
+    db.session.commit()
 
     return jsonify({'success': True, 'message': 'Profile updated'})
 
-# --------------------------
-# HELP / SUPPORT ROUTES
-# --------------------------
+# -------------------------------------------------
+# HELP / SUPPORT ROUTES (complaints still in memory + DB)
+# -------------------------------------------------
 @app.route('/help')
 @login_required
 def help_page():
     """Help & support page."""
     user_id = session.get('user_id')
     username = session.get('username')
-    complaints = user_complaints.get(user_id, [])
-    return render_template('help.html', username=username, complaints=complaints)
+    complaints_list = user_complaints.get(user_id, [])
+
+    # also load from DB (in case app restarted)
+    db_complaints = Complaint.query.filter_by(user_id=user_id).order_by(Complaint.created_at.desc()).all()
+    for c in db_complaints:
+        # convert DB row to dict like we used in template before
+        if not c.updates_json:
+            updates = []
+        else:
+            try:
+                updates = json.loads(c.updates_json)
+            except Exception:
+                updates = []
+        complaints_list.append({
+            'id': c.complaint_id,
+            'subject': c.subject,
+            'message': c.message,
+            'category': c.category,
+            'status': c.status,
+            'created_at': c.created_at.strftime("%Y-%m-%d %H:%M"),
+            'last_update': c.last_update.strftime("%Y-%m-%d %H:%M"),
+            'attachment_name': c.attachment_name,
+            'original_filename': c.original_filename,
+            'updates': updates
+        })
+
+    user_complaints[user_id] = complaints_list
+
+    return render_template('help.html', username=username, complaints=complaints_list)
 
 
 @app.route('/help/submit', methods=['POST'])
@@ -690,7 +881,6 @@ def help_page():
 def help_submit():
     """Receive complaint with optional attachment."""
     user_id = session.get('user_id')
-    username = session.get('username')
 
     if user_id not in user_complaints:
         user_complaints[user_id] = []
@@ -716,7 +906,27 @@ def help_submit():
         original_name = file.filename
 
     complaint_id = f"C{datetime.now().strftime('%Y%m%d%H%M%S')}{random.randint(100,999)}"
-    now_str = datetime.now().strftime("%Y-%m-%d %H:%M")
+    now_dt = datetime.utcnow()
+    now_str = now_dt.strftime("%Y-%m-%d %H:%M")
+
+    updates = [{'time': now_str, 'text': 'Complaint created and sent to support.'}]
+
+    # store in DB
+    comp_row = Complaint(
+        complaint_id=complaint_id,
+        user_id=user_id,
+        subject=subject,
+        message=message,
+        category=category,
+        status='Open',
+        created_at=now_dt,
+        last_update=now_dt,
+        attachment_name=saved_name,
+        original_filename=original_name,
+        updates_json=json.dumps(updates)
+    )
+    db.session.add(comp_row)
+    db.session.commit()
 
     complaint = {
         'id': complaint_id,
@@ -728,18 +938,16 @@ def help_submit():
         'last_update': now_str,
         'attachment_name': saved_name,
         'original_filename': original_name,
-        'updates': [
-            {'time': now_str, 'text': 'Complaint created and sent to support.'}
-        ]
+        'updates': updates
     }
 
     user_complaints[user_id].append(complaint)
 
     return jsonify({'success': True, 'complaint': complaint})
 
-# --------------------------
-# Socket.IO handlers
-# --------------------------
+# -------------------------------------------------
+# SOCKET.IO HANDLERS
+# -------------------------------------------------
 @socketio.on('connect')
 def handle_connect():
     print(f'Client connected: {request.sid}')
@@ -781,7 +989,7 @@ def handle_place_bet(data):
         emit('bet_error', {'message': 'No open game table'})
         return
 
-    # check wallet
+    # check wallet from memory (kept in sync with DB)
     if user_wallets.get(user_id, 0) < table.config['bet_amount']:
         emit('bet_error', {'message': 'Insufficient balance'})
         return
@@ -790,17 +998,72 @@ def handle_place_bet(data):
     if not success:
         emit('bet_error', {'message': message})
     else:
-        user_wallets[user_id] -= table.config['bet_amount']
+        # deduct from DB + memory
+        u = User.query.filter_by(user_id=user_id).first()
+        if u:
+            u.balance -= table.config['bet_amount']
+            db.session.add(u)
+            db.session.commit()
+            user_wallets[user_id] = u.balance
+        else:
+            user_wallets[user_id] -= table.config['bet_amount']
+
         emit('bet_success', {'message': message, 'new_balance': user_wallets[user_id]})
 
 
-if __name__ == '__main__':
-    # demo user
-    create_user('demo', 'demo123')
-    print("Demo user created: username='demo', password='demo123'")
+# -------------------------------------------------
+# DB INITIALISATION & DEMO USERS
+# -------------------------------------------------
+def load_users_from_db_into_memory():
+    """On startup, sync users & balances from DB to in-memory dicts."""
+    for u in User.query.all():
+        users_db[u.username] = {
+            'user_id': u.user_id,
+            'username': u.username,
+            'password_hash': u.password_hash,
+            'created_at': u.created_at.isoformat(),
+            'display_name': u.display_name or u.username,
+            'email': u.email or '',
+            'country': u.country or '',
+            'phone': u.phone or ''
+        }
+        user_wallets[u.user_id] = u.balance
+        if u.user_id not in user_game_history:
+            user_game_history[u.user_id] = []
+        if u.user_id not in user_complaints:
+            user_complaints[u.user_id] = []
 
-    initialize_game_tables()
-    start_all_game_tables()
+
+def seed_demo_users():
+    """
+    Create 6 demo users with 10,000 coins each if they don't exist yet.
+    usernames: demo1...demo6, password: demo123
+    """
+    for i in range(1, 7):
+        username = f"demo{i}"
+        password = "demo123"
+        existing = User.query.filter_by(username=username).first()
+        if existing:
+            # make sure they have at least 10k
+            if existing.balance < 10000:
+                existing.balance = 10000
+                db.session.add(existing)
+            continue
+        create_user(username, password, initial_balance=10000)
+    db.session.commit()
+    print("Seeded demo users demo1..demo6 (password demo123, 10,000 coins each).")
+
+
+# -------------------------------------------------
+# MAIN ENTRY
+# -------------------------------------------------
+if __name__ == '__main__':
+    with app.app_context():
+        db.create_all()
+        load_users_from_db_into_memory()
+        seed_demo_users()
+        initialize_game_tables()
+        start_all_game_tables()
 
     socketio.run(
         app,
