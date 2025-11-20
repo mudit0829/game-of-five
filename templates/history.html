@@ -2,64 +2,72 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>History</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <link
-    rel="stylesheet"
-    href="{{ url_for('static', filename='css/history.css') }}"
-  />
+  <link rel="stylesheet" href="history.css" />
 </head>
 <body>
-  <div class="screen-root">
-    <!-- Header -->
+  <div class="history-screen">
     <header class="history-header">
-      <button class="back-btn" onclick="window.location.href='{{ url_for('home') }}'">
-        ←
-      </button>
-      <h1 class="history-title">History</h1>
+      <button class="back-btn" onclick="window.location.href='home.html'">&#8592;</button>
+      <h1>History</h1>
     </header>
 
-    <!-- Tabs -->
-    <div class="history-tabs">
-      <button class="tab-btn active" id="tab-current">Current Games</button>
-      <button class="tab-btn" id="tab-history">Game History</button>
+    <div class="tabs">
+      <button class="tab active" data-tab="current">Current Games</button>
+      <button class="tab" data-tab="past">Game History</button>
     </div>
 
-    <!-- CURRENT GAMES PANEL -->
-    <section class="panel" id="current-section">
-      <div class="panel-header">
-        <div class="panel-title">Current Games</div>
-        <div class="panel-subtitle">Bets placed · Result pending</div>
+    <!-- CURRENT GAMES -->
+    <section class="current-games" id="currentGames">
+      <div class="section-title">
+        <h2>Current Games</h2>
+        <p>Bets placed · Result pending</p>
       </div>
 
-      <div id="current-empty" class="empty-state">
-        <p>No active games right now.</p>
-        <p class="hint">Place a bet to see it here.</p>
-      </div>
+      <!-- Example PENDING card -->
+      <!-- data-round-number should be set to this game’s round number / game id -->
+      <div class="game-card"
+           data-game-code="silver"
+           data-round-number="1"
+           data-status="pending">
+        <div class="game-card-header">
+          <span class="game-id">S17636561772</span>
+          <span class="status-pill status-pending">Pending</span>
+        </div>
 
-      <div id="currentList" class="cards-list"></div>
+        <div class="game-info">
+          <div class="game-name">silver</div>
+          <div class="game-bets">
+            <span>Your bets:</span>
+            <span class="bet-count">1</span>
+          </div>
+          <div class="game-result-text">Waiting for result...</div>
+
+          <div class="timer-row">
+            <span class="timer-label">Time left:</span>
+            <span class="timer-value">--:--</span>
+          </div>
+        </div>
+
+        <!-- Clicking a CURRENT game opens live game window for this game/round -->
+        <button class="open-game-btn">
+          Go to game
+        </button>
+      </div>
     </section>
 
-    <!-- GAME HISTORY PANEL -->
-    <section class="panel" id="history-section" style="display:none;">
-      <div class="panel-header">
-        <div class="panel-title">Game History</div>
-        <div class="panel-subtitle">Completed games · Last 7 days</div>
+    <!-- GAME HISTORY -->
+    <section class="history-games hidden" id="historyGames">
+      <div class="section-title">
+        <h2>Game History</h2>
+        <p>Completed games</p>
       </div>
-
-      <div id="history-empty" class="empty-state">
-        <p>No games played yet.</p>
-        <p class="hint">Your completed games will appear here.</p>
-      </div>
-
-      <div id="historyList" class="cards-list"></div>
+      <!-- Completed cards will be moved/added here by JS -->
     </section>
   </div>
 
-  <!-- Expose logged-in user id to JS -->
-  <script>
-    window.CURRENT_USER_ID = {{ session.get('user_id', 0) }};
-  </script>
-  <script src="{{ url_for('static', filename='js/history.js') }}"></script>
+  <script src="/socket.io/socket.io.js"></script>
+  <script src="history.js"></script>
 </body>
 </html>
