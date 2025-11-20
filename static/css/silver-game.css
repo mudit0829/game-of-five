@@ -626,3 +626,82 @@ body {
     padding: 4px 12px;
   }
 }
+
+/* ===== NEW: DISABLED STATES AFTER GAME ENDS ===== */
+
+.bet-button:disabled {
+  opacity: 0.6;
+  cursor: default;
+  box-shadow: none;
+  transform: none;
+}
+
+.num-chip:disabled {
+  opacity: 0.4;
+  cursor: default;
+  box-shadow: none;
+}
+
+/* ===== NEW: RESULT POPUP OVERLAY ===== */
+
+.result-popup {
+  position: fixed;
+  inset: 0;
+  background: rgba(15, 23, 42, 0.9);
+  display: none;           /* JS will set to flex when shown */
+  align-items: center;
+  justify-content: center;
+  z-index: 50;             /* above everything in this screen */
+}
+
+.popup-card {
+  width: 90%;
+  max-width: 340px;
+  background: #020617;
+  border-radius: 16px;
+  padding: 18px 16px 14px;
+  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.9);
+  border: 1px solid rgba(148, 163, 184, 0.4);
+  text-align: center;
+}
+
+.popup-card h2 {
+  margin: 0 0 6px;
+  font-size: 18px;
+  font-weight: 800;
+}
+
+.popup-card p {
+  margin: 0 0 16px;
+  font-size: 14px;
+  color: #e5e7eb;
+}
+
+.popup-actions {
+  display: flex;
+  gap: 10px;
+}
+
+.popup-actions button {
+  flex: 1;
+  border: none;
+  border-radius: 999px;
+  padding: 8px 0;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+/* primary button (Home) */
+#popupHomeBtn {
+  background: linear-gradient(135deg, #22c55e, #16a34a);
+  color: #ecfdf5;
+  box-shadow: 0 8px 20px rgba(34, 197, 94, 0.6);
+}
+
+/* secondary button (Lobby) */
+#popupLobbyBtn {
+  background: #111827;
+  color: #e5e7eb;
+  border: 1px solid rgba(148, 163, 184, 0.6);
+}
