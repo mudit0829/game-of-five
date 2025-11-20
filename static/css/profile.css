@@ -1,0 +1,374 @@
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  padding: 0;
+  font-family: system-ui, -apple-system, BlinkMacSystemFont, "SF Pro Display", sans-serif;
+  background: radial-gradient(circle at top, #020617 0, #020617 40%, #020314 100%);
+  color: #e5e7eb;
+}
+
+.page-root {
+  max-width: 480px;
+  margin: 0 auto;
+  min-height: 100vh;
+  padding: 10px 10px 16px;
+}
+
+/* ===== TOP BAR ===== */
+
+.top-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 8px;
+}
+
+.back-btn {
+  border: none;
+  background: rgba(15,23,42,0.9);
+  color: #e5e7eb;
+  border-radius: 999px;
+  width: 32px;
+  height: 32px;
+  font-size: 16px;
+  cursor: pointer;
+}
+
+.top-title {
+  font-size: 18px;
+  font-weight: 800;
+}
+
+.top-spacer {
+  width: 32px;
+}
+
+/* ===== MAIN TABS ===== */
+
+.section-tabs {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+
+.section-tabs .tab {
+  flex: 1;
+  padding: 7px 0;
+  border-radius: 999px;
+  text-align: center;
+  font-size: 13px;
+  font-weight: 600;
+  background: rgba(15,23,42,0.9);
+  color: #9ca3af;
+  border: none;
+  cursor: pointer;
+}
+
+.section-tabs .tab.active {
+  background: linear-gradient(90deg, #6366f1, #ec4899);
+  color: #f9fafb;
+}
+
+/* ===== SECTIONS (show/hide) ===== */
+
+.content {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.section-card {
+  display: none;
+  background: rgba(15,23,42,0.96);
+  border-radius: 18px;
+  padding: 12px 12px 12px;
+  box-shadow: 0 16px 30px rgba(0,0,0,0.55);
+}
+
+.section-card.active-section {
+  display: block;
+}
+
+/* ===== PROFILE SECTION ===== */
+
+.profile-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 14px;
+}
+
+.avatar-circle {
+  width: 52px;
+  height: 52px;
+  border-radius: 999px;
+  background: radial-gradient(circle at top, #1f2937, #020617);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.avatar-letter {
+  font-size: 24px;
+  font-weight: 800;
+}
+
+.profile-main {
+  flex: 1;
+}
+
+.profile-name {
+  font-size: 16px;
+  font-weight: 800;
+}
+
+.profile-id,
+.profile-joined {
+  font-size: 11px;
+  color: #9ca3af;
+}
+
+.profile-balance {
+  text-align: right;
+}
+
+.profile-balance .label {
+  font-size: 11px;
+  color: #9ca3af;
+}
+
+.profile-balance .amount {
+  font-size: 16px;
+  font-weight: 800;
+  color: #22c55e;
+}
+
+.mono {
+  font-family: "SF Mono", ui-monospace, Menlo, Monaco, Consolas, "Courier New", monospace;
+}
+
+/* Profile form */
+
+.profile-form {
+  margin-top: 4px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.form-row {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.form-row.inline {
+  flex-direction: row;
+  gap: 8px;
+}
+
+.form-row.inline > div {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.form-row label {
+  font-size: 12px;
+  color: #9ca3af;
+}
+
+.form-row input {
+  border-radius: 999px;
+  border: 1px solid #1d4ed8;
+  background: rgba(15,23,42,0.95);
+  padding: 8px 12px;
+  color: #f9fafb;
+  font-size: 13px;
+}
+
+.form-row input::placeholder {
+  color: #6b7280;
+}
+
+.save-btn {
+  margin-top: 4px;
+  border: none;
+  width: 100%;
+  padding: 10px 0;
+  border-radius: 999px;
+  background: linear-gradient(90deg, #22c55e, #38bdf8);
+  color: #020617;
+  font-weight: 800;
+  font-size: 14px;
+  cursor: pointer;
+  box-shadow: 0 8px 16px rgba(22,163,74,0.7);
+}
+
+.save-btn:active {
+  transform: translateY(1px) scale(0.99);
+  box-shadow: 0 4px 10px rgba(22,163,74,0.5);
+}
+
+.status-text {
+  margin-top: 4px;
+  font-size: 12px;
+  color: #9ca3af;
+}
+
+/* ===== TRANSACTIONS SECTION ===== */
+
+.sub-tabs {
+  display: flex;
+  gap: 6px;
+  margin-bottom: 10px;
+  overflow-x: auto;
+}
+
+.sub-tab {
+  flex: 1;
+  min-width: 80px;
+  padding: 6px 8px;
+  border-radius: 999px;
+  border: none;
+  background: rgba(15,23,42,0.9);
+  color: #9ca3af;
+  font-size: 11px;
+  font-weight: 600;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.sub-tab.active {
+  background: linear-gradient(90deg, #4f46e5, #6366f1);
+  color: #f9fafb;
+}
+
+.summary-row {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 6px;
+  margin-bottom: 10px;
+}
+
+.summary-card {
+  background: radial-gradient(circle at top, #020617, #020617 60%, #020314 100%);
+  border-radius: 12px;
+  padding: 6px 8px;
+}
+
+.summary-card .label {
+  font-size: 11px;
+  color: #9ca3af;
+}
+
+.summary-card .value {
+  font-size: 13px;
+  font-weight: 700;
+}
+
+/* Table-like header */
+
+.txn-header-row {
+  display: grid;
+  grid-template-columns: 1.4fr 0.9fr 1.2fr 0.8fr 0.9fr;
+  column-gap: 6px;
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: #9ca3af;
+  margin-bottom: 4px;
+}
+
+.col-date { }
+.col-type { }
+.col-game { }
+.col-amount { text-align: right; }
+.col-after { text-align: right; }
+
+/* Transactions list */
+
+.txn-list {
+  max-height: 360px;
+  overflow-y: auto;
+  padding-right: 2px;
+}
+
+.txn-row {
+  display: grid;
+  grid-template-columns: 1.4fr 0.9fr 1.2fr 0.8fr 0.9fr;
+  column-gap: 6px;
+  align-items: flex-start;
+  font-size: 11px;
+  padding: 6px 6px;
+  border-radius: 10px;
+  background: radial-gradient(circle at top, #020617, #020314);
+  margin-bottom: 4px;
+}
+
+.txn-date {
+  color: #e5e7eb;
+}
+
+.txn-type {
+  color: #e5e7eb;
+}
+
+.txn-game {
+  color: #9ca3af;
+}
+
+.txn-amount {
+  text-align: right;
+  font-weight: 700;
+}
+
+.txn-after {
+  text-align: right;
+  font-size: 11px;
+  color: #9ca3af;
+}
+
+.txn-amount.added {
+  color: #22c55e;
+}
+
+.txn-amount.win {
+  color: #4ade80;
+}
+
+.txn-amount.bet {
+  color: #f97373;
+}
+
+.txn-amount.balance {
+  color: #38bdf8;
+}
+
+/* Empty state */
+
+.empty-state {
+  text-align: center;
+  font-size: 13px;
+  color: #9ca3af;
+  margin-top: 16px;
+}
+
+/* Small screen tweaks */
+
+@media (max-width: 380px) {
+  .summary-row {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .txn-header-row,
+  .txn-row {
+    grid-template-columns: 1.6fr 0.9fr 1.2fr 0.8fr 0.9fr;
+  }
+}
