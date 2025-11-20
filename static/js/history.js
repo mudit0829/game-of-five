@@ -1,172 +1,158 @@
-// static/js/history.js
+// For same-domain backend:
+const socket = io();
+
+// Helper: format seconds as MM:SS
+function formatTime(sec) {
+  const s = Math.max(0, parseInt(sec, 10) || 0);
+  const minutes = Math.floor(s / 60);
+  const seconds = s % 60;
+  return (
+    String(minutes).padStart(2, "0") +
+    ":" +
+    String(seconds).padStart(2, "0")
+  );
+}
+
+function getCard(gameCode, roundNumber) {
+  return document.querySelector(
+    `.game-card[data-game-code="${gameCode}"][data-round-number="${roundNumber}"]`
+  );
+}
+
+function updateTimerForGame(gameCode, roundNumber, remainingSeconds) {
+  const card = getCard(gameCode, roundNumber);
+  if (!card) return;
+  if (card.dataset.status !== "pending") return; // ignore finished games
+
+  const timerEl = card.querySelector(".timer-value");
+  if (!timerEl) return;
+
+  timerEl.textContent = formatTime(remainingSeconds);
+}
+
+function moveCardToHistory(gameCode, roundNumber, result, userOutcome) {
+  const card = getCard(gameCode, roundNumber);
+  if (!card) return;
+
+  // Update UI inside card
+  card.dataset.status = "completed";
+  const statusPill = card.querySelector(".status-pill");
+  if (statusPill) {
+    statusPill.textContent = "Completed";
+    statusPill.classList.remove("status-pending");
+    statusPill.classList.add("status-completed");
+  }
+
+  const resultText = card.querySelector(".game-result-text");
+  if (resultText) {
+    if (userOutcome === "win") {
+      resultText.textContent = `You won · Result: ${result}`;
+    } else if (userOutcome === "lose") {
+      resultText.textContent = `You lost · Result: ${result}`;
+    } else {
+      resultText.textContent = `Result: ${result}`;
+    }
+  }
+
+  const timerRow = card.querySelector(".timer-row");
+  if (timerRow) {
+    timerRow.style.opacity = 0.6;
+  }
+
+  const btn = card.querySelector(".open-game-btn");
+  if (btn) {
+    btn.textContent = "View result";
+    btn.disabled = true; // IMPORTANT: cannot open a new live game from history
+  }
+
+  // Remove from Current section and place into History section
+  const historyContainer = document.getElementById("historyGames");
+  card.parentNode.removeChild(card);
+  historyContainer.appendChild(card);
+}
+
+// Tabs: switch visibility between current & past
+function setupTabs() {
+  const tabs = document.querySelectorAll(".tab");
+  const currentSection = document.getElementById("currentGames");
+  const historySection = document.getElementById("historyGames");
+
+  tabs.forEach((tab) => {
+    tab.addEventListener("click", () => {
+      tabs.forEach((t) => t.classList.remove("active"));
+      tab.classList.add("active");
+
+      const target = tab.dataset.tab;
+      if (target === "current") {
+        currentSection.classList.remove("hidden");
+        historySection.classList.add("hidden");
+      } else {
+        currentSection.classList.add("hidden");
+        historySection.classList.remove("hidden");
+      }
+    });
+  });
+}
+
+// Current-game button clicks → open live game window for that game/round
+function setupOpenButtons() {
+  document.querySelectorAll(".game-card[data-status='pending']").forEach((card) => {
+    const btn = card.querySelector(".open-game-btn");
+    if (!btn) return;
+    btn.addEventListener("click", () => {
+      const gameCode = card.dataset.gameCode;
+      // This opens the live window for that game.
+      // If your live page is different, change the URL here:
+      window.location.href = `/game/${gameCode}`;
+    });
+  });
+}
+
+socket.on("connect", () => {
+  console.log("✅ Connected to server", socket.id);
+
+  // Join room for each gameCode once (for timers)
+  const uniqueGameCodes = new Set();
+  document
+    .querySelectorAll(".game-card[data-game-code]")
+    .forEach((card) => {
+      uniqueGameCodes.add(card.dataset.gameCode);
+    });
+
+  uniqueGameCodes.forEach((gameCode) => {
+    socket.emit("join_game", { game_code: gameCode });
+    socket.emit("request_state", { game_code: gameCode });
+  });
+});
+
+// Full round state when requested / on join
+socket.on("round_state", (data) => {
+  if (!data || !data.game_code) return;
+  const { game_code, round_number, remaining_seconds } = data;
+
+  // Only update cards that belong to this exact round number
+  updateTimerForGame(game_code, String(round_number), remaining_seconds);
+});
+
+// Per-second updates
+socket.on("timer_update", (data) => {
+  if (!data || !data.game_code) return;
+  const { game_code, round_number, remaining_seconds } = data;
+  updateTimerForGame(game_code, String(round_number), remaining_seconds);
+});
+
+// When round finishes
+socket.on("round_result", (data) => {
+  if (!data || !data.game_code) return;
+  const { game_code, round_number, result, user_outcome } = data;
+
+  moveCardToHistory(game_code, String(round_number), result, user_outcome);
+});
+
+// We ignore "new_round" here on purpose, because a card represents
+// ONE specific game/round only and must not change to the next round.
 
 document.addEventListener("DOMContentLoaded", () => {
-  const CURRENT_USER_ID = window.CURRENT_USER_ID || 0;
-
-  // ---- Grab DOM elements ----
-  const tabCurrentBtn = document.getElementById("tab-current");
-  const tabHistoryBtn = document.getElementById("tab-history");
-  const currentSection = document.getElementById("current-section");
-  const historySection = document.getElementById("history-section");
-
-  const currentList = document.getElementById("currentList");
-  const historyList = document.getElementById("historyList");
-
-  const currentEmpty = document.getElementById("current-empty");
-  const historyEmpty = document.getElementById("history-empty");
-
-  if (!tabCurrentBtn || !tabHistoryBtn) {
-    console.warn("History tabs not found in DOM.");
-    return;
-  }
-
-  // -------- TAB SWITCHING --------
-  function setActiveTab(which) {
-    if (!currentSection || !historySection) return;
-
-    if (which === "current") {
-      tabCurrentBtn.classList.add("active");
-      tabHistoryBtn.classList.remove("active");
-      currentSection.style.display = "block";
-      historySection.style.display = "none";
-    } else {
-      tabCurrentBtn.classList.remove("active");
-      tabHistoryBtn.classList.add("active");
-      currentSection.style.display = "block"; // keep height stable
-      currentSection.style.display = "none";
-      historySection.style.display = "block";
-    }
-  }
-
-  tabCurrentBtn.addEventListener("click", () => setActiveTab("current"));
-  tabHistoryBtn.addEventListener("click", () => setActiveTab("history"));
-
-  // -------- CARD RENDERING --------
-  function createGameCard(game, isCurrent) {
-    const card = document.createElement("div");
-    card.className = "history-card";
-
-    const status = game.status || "pending";
-    const statusLabel =
-      status === "win" ? "Won" : status === "lose" ? "Lost" : "Pending";
-
-    const betsCount = Array.isArray(game.user_bets) ? game.user_bets.length : 0;
-    const amountText =
-      status === "pending"
-        ? ""
-        : game.amount >= 0
-        ? `+₹${game.amount}`
-        : `-₹${Math.abs(game.amount)}`;
-
-    card.innerHTML = `
-      <div class="card-header">
-        <div class="card-title-code">
-          <div class="game-code">${game.round_code}</div>
-          <div class="game-type">${game.game_type}</div>
-        </div>
-        <div class="status-pill status-${status}">
-          ${statusLabel}
-        </div>
-      </div>
-
-      <div class="card-body">
-        <div class="card-row">
-          <span class="label">Your bets:</span>
-          <span class="value">${betsCount}</span>
-        </div>
-        ${
-          status === "pending"
-            ? `<div class="card-row subtle">Waiting for result…</div>`
-            : `
-              <div class="card-row">
-                <span class="label">Winning number:</span>
-                <span class="value">${game.winning_number ?? "-"}</span>
-              </div>
-              <div class="card-row">
-                <span class="label">Result:</span>
-                <span class="value amount ${
-                  game.amount >= 0 ? "amount-win" : "amount-lose"
-                }">
-                  ${amountText}
-                </span>
-              </div>
-            `
-        }
-        ${
-          game.date_time
-            ? `<div class="card-row subtle small">${game.date_time}</div>`
-            : ""
-        }
-      </div>
-    `;
-
-    // Make CURRENT cards clickable → go to that game window with table code
-    if (isCurrent) {
-      card.classList.add("clickable");
-      card.addEventListener("click", () => {
-        const gt = game.game_type;
-        const rc = game.round_code;
-        if (!gt || !rc) return;
-        const url = `/play/${gt}?table=${encodeURIComponent(rc)}`;
-        window.location.href = url;
-      });
-    }
-
-    return card;
-  }
-
-  function renderCurrentGames(list) {
-    if (!currentList || !currentEmpty) return;
-    currentList.innerHTML = "";
-
-    if (!list || list.length === 0) {
-      currentEmpty.style.display = "block";
-      return;
-    }
-    currentEmpty.style.display = "none";
-
-    list.forEach((g) => {
-      const card = createGameCard(g, true);
-      currentList.appendChild(card);
-    });
-  }
-
-  function renderGameHistory(list) {
-    if (!historyList || !historyEmpty) return;
-    historyList.innerHTML = "";
-
-    if (!list || list.length === 0) {
-      historyEmpty.style.display = "block";
-      return;
-    }
-    historyEmpty.style.display = "none";
-
-    list.forEach((g) => {
-      const card = createGameCard(g, false);
-      historyList.appendChild(card);
-    });
-  }
-
-  // -------- LOAD DATA --------
-  async function loadHistory() {
-    if (!CURRENT_USER_ID) {
-      console.warn("No CURRENT_USER_ID; cannot load history.");
-      return;
-    }
-    try {
-      const res = await fetch(`/api/user-games?user_id=${CURRENT_USER_ID}`);
-      if (!res.ok) throw new Error("Failed to fetch history");
-      const data = await res.json();
-      renderCurrentGames(data.current_games || []);
-      renderGameHistory(data.game_history || []);
-    } catch (err) {
-      console.error("History fetch error:", err);
-      currentEmpty && (currentEmpty.style.display = "block");
-      historyEmpty && (historyEmpty.style.display = "block");
-    }
-  }
-
-  // -------- INIT --------
-  setActiveTab("current");
-  loadHistory();
+  setupTabs();
+  setupOpenButtons();
 });
