@@ -1,103 +1,211 @@
-// ========== Fetch and Display History Data ==========
+// ===============================
+// HISTORY PAGE CONTROLLER
+// ===============================
 
-// EXAMPLE DUMMY API ENDPOINTS
-// Replace with real endpoints in backend
-const HISTORY_API = "/api/user-games";
+document.addEventListener("DOMContentLoaded", () => {
+    console.log("History page loaded");
 
-const USER_ID = window.USER_ID;
+    const currentListEl = document.querySelector("#currentGamesList");
+    const historyListEl = document.querySelector("#historyGamesList");
 
-// Fetch games for this user, split by current and full history
-async function fetchUserHistory() {
-  let res = await fetch(`${HISTORY_API}?user_id=${encodeURIComponent(USER_ID)}`);
-  let data = await res.json();
-  return data;
-}
+    // These IDs exist in your HTML:
+    // <div id="currentGamesList"></div>
+    // <div id="historyGamesList"></div>
 
-function renderBetChips(numbers) {
-  return numbers.map(n => `<span class="bet-chip">${n}</span>`).join(' ');
-}
+    // ------ SETTINGS ------
+    const USER_ID = window.USER_ID || null;     // Set in history.html
+    const FETCH_INTERVAL = 4000;                // 4 seconds = lightweight
 
-// status can be "pending", "win", "lose"
-function renderAmount(amount, status) {
-  if (status === "win") return `<span class="win">+₹${amount}</span>`;
-  if (status === "lose") return `<span class="lose">-₹${Math.abs(amount)}</span>`;
-  return `<span class="pending">Pending</span>`;
-}
+    // If backend not ready → use mock mode
+    let mockMode = false;
 
-function renderCurrentGames(current) {
-  const root = document.getElementById("current-games-list");
-  if (!current || !current.length) {
-    root.innerHTML = '<div class="no-record">No current games in progress.</div>';
-    document.getElementById('current-count').textContent = "(0)";
-    return;
-  }
-  document.getElementById('current-count').textContent = "(" + current.length + ")";
-  root.innerHTML = current.map((g, i) => `
-    <div class="game-card${i === current.length-1 ? ' last-card' : ''}">
-      <div class="card-head">
-        <span>${g.game_type?.toUpperCase() || "--"} #${g.round_code || '--'}</span>
-        <span>${g.date_time}</span>
-      </div>
-      <div class="card-main">
-        <div>Bets: ${renderBetChips(g.user_bets || [])}</div>
-        <div>Bet Amount: ₹${g.bet_amount || "--"}</div>
-        <div>Status: <span class="pending">Pending Result</span></div>
-      </div>
-      <div class="card-foot">
-        Waiting for result...
-      </div>
-    </div>
-  `).join("");
-}
+    // ===============================
+    //  HELPER: Format Date
+    // ===============================
+    function formatDate(dateString) {
+        const d = new Date(dateString);
+        return d.toLocaleString("en-IN", {
+            hour12: true,
+            hour: "2-digit",
+            minute: "2-digit",
+            year: "numeric",
+            month: "short",
+            day: "numeric"
+        });
+    }
 
-function renderGameHistory(history) {
-  const root = document.getElementById("history-games-list");
-  if (!history || !history.length) {
-    root.innerHTML = '<div class="no-record">No game history.</div>';
-    document.getElementById('history-count').textContent = "(0)";
-    return;
-  }
-  document.getElementById('history-count').textContent = "(" + history.length + ")";
-  root.innerHTML = history.map((g,i) => `
-    <div class="game-card${i === history.length-1 ? ' last-card' : ''}">
-      <div class="card-head">
-        <span>${g.game_type?.toUpperCase() || "--"} #${g.round_code || '--'}</span>
-        <span>${g.date_time}</span>
-      </div>
-      <div class="card-main">
-        <div>
-          Your Bets: ${renderBetChips(g.user_bets || [])}
-        </div>
-        <div>
-          Result: 
-          <span class="result-chip">${g.winning_number ?? '--'}</span>
-        </div>
-        <div>
-          Win/Lose: ${renderAmount(g.amount, g.status)}
-        </div>
-        <div>
-          Bet Amount: ₹${g.bet_amount || "--"}
-        </div>
-      </div>
-      <div class="card-foot">
-        Game ID: ${g.round_code}
-      </div>
-    </div>
-  `).join("");
-}
+    // ===============================
+    //  HELPER: Create Current Game Card
+    // ===============================
+    function makeCurrentGameCard(g) {
+        return `
+            <article class="item-card pending">
+              <div class="item-main">
+                <div class="item-icon">
+                  <span class="emoji">${g.emoji || "🎮"}</span>
+                </div>
+                <div class="item-text">
+                  <div class="item-title">
+                    ${g.game_title}
+                    <span class="badge badge-pill">${g.game_type}</span>
+                  </div>
 
-async function main() {
-  try {
-    let { current_games, game_history } = await fetchUserHistory();
+                  <div class="item-meta">
+                    Game ID: <span class="mono">${g.game_id}</span>
+                  </div>
 
-    renderCurrentGames(current_games);
-    renderGameHistory(game_history);
-  } catch (e) {
-    document.getElementById("current-games-list").innerHTML = '<div class="no-record">Could not load.</div>';
-    document.getElementById("history-games-list").innerHTML = '<div class="no-record">Could not load.</div>';
-    console.error(e);
-  }
-}
-// Auto-load on page load
-main();
+                  <div class="item-meta">
+                    Placed: ${formatDate(g.datetime)}
+                  </div>
 
+                  <div class="item-meta">
+                    Your bets: <span class="mono">${g.your_bets.join(", ")}</span>
+                  </div>
+                </div>
+              </div>
+
+              <div class="item-side">
+                <div class="status-pill status-pending">Pending</div>
+                <div class="timer-line">⏳ <span class="mono">${g.timer}s</span></div>
+                <div class="amount-line">Bet: ₹${g.total_bet_amount}</div>
+              </div>
+            </article>
+        `;
+    }
+
+    // ===============================
+    //  HELPER: Create Finished Game Card
+    // ===============================
+    function makeHistoryCard(h) {
+        const profitClass = h.net_amount >= 0 ? "win" : "lose";
+        const profitValue = h.net_amount >= 0 ? `+₹${h.net_amount}` : `-₹${Math.abs(h.net_amount)}`;
+
+        return `
+          <article class="item-card history">
+            <div class="row-line row-top">
+
+              <div class="game-info">
+                <div class="game-name">
+                  ${h.game_title}
+                  <span class="badge badge-pill small">${h.game_type}</span>
+                </div>
+                <div class="game-id">ID: <span class="mono">${h.game_id}</span></div>
+                <div class="game-date">${formatDate(h.datetime)}</div>
+              </div>
+
+              <div class="bet-info">
+                <div class="label">Your Bets</div>
+                <div class="mono">${h.your_bets.join(", ")}</div>
+              </div>
+
+              <div class="win-info">
+                <div class="label">Winning</div>
+                <div class="mono">${h.winning_number}</div>
+              </div>
+
+              <div class="amount-info">
+                <div class="label">P/L</div>
+                <div class="amount ${profitClass}">${profitValue}</div>
+              </div>
+
+            </div>
+          </article>
+        `;
+    }
+
+    // ===============================
+    //  MOCK DATA (for testing if backend not ready)
+    // ===============================
+    function loadMockData() {
+        return {
+            current_games: [
+                {
+                    game_id: "F202511211234",
+                    game_title: "Silver Game",
+                    game_type: "Silver",
+                    emoji: "🐸",
+                    datetime: new Date().toISOString(),
+                    your_bets: [2, 8],
+                    timer: 41,
+                    total_bet_amount: 20
+                }
+            ],
+            history_games: [
+                {
+                    game_id: "F202511208010",
+                    game_title: "Gold Game",
+                    game_type: "Gold",
+                    emoji: "⚽",
+                    datetime: "2025-11-18T16:00:00",
+                    winning_number: 4,
+                    your_bets: [1, 4],
+                    net_amount: 200
+                },
+                {
+                    game_id: "F202511209876",
+                    game_title: "Diamond Game",
+                    game_type: "Diamond",
+                    emoji: "🎯",
+                    datetime: "2025-11-18T12:30:00",
+                    winning_number: 7,
+                    your_bets: [3],
+                    net_amount: -100
+                }
+            ]
+        };
+    }
+
+    // ===============================
+    //  RENDER FUNCTION
+    // ===============================
+    function renderHistory(data) {
+        const { current_games, history_games } = data;
+
+        // ---- CURRENT GAMES ----
+        if (current_games.length === 0) {
+            currentListEl.innerHTML = `
+                <div class="empty-state">No active games.</div>
+            `;
+        } else {
+            currentListEl.innerHTML = current_games.map(makeCurrentGameCard).join("");
+        }
+
+        // ---- HISTORY ----
+        if (history_games.length === 0) {
+            historyListEl.innerHTML = `
+                <div class="empty-state">No completed games yet.</div>
+            `;
+        } else {
+            historyListEl.innerHTML = history_games.map(makeHistoryCard).join("");
+        }
+    }
+
+    // ===============================
+    //  FETCH LIVE DATA FROM BACKEND
+    // ===============================
+    async function fetchHistory() {
+        try {
+            const res = await fetch(`/history-data?user_id=${USER_ID}`);
+            
+            if (!res.ok) {
+                console.warn("History endpoint missing → using mock mode");
+                mockMode = true;
+                renderHistory(loadMockData());
+                return;
+            }
+
+            const data = await res.json();
+            renderHistory(data);
+        } catch (e) {
+            console.error("History fetch failed:", e);
+            mockMode = true;
+            renderHistory(loadMockData());
+        }
+    }
+
+    // Initial load
+    fetchHistory();
+
+    // Auto refresh every few seconds
+    setInterval(fetchHistory, FETCH_INTERVAL);
+});
