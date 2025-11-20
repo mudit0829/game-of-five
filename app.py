@@ -168,7 +168,7 @@ class GameTable:
         self.bets = []
         self.result = None
         self.is_betting_closed = False
-               self.is_finished = False
+        self.is_finished = False   # <- fixed indentation here
         self.max_players = 6
         self.last_bot_added_at = None
 
