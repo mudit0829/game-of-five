@@ -1,33 +1,18 @@
-// ======== BASIC SETUP ========
+// ======== BASIC SETUP (DB-BASED USER) ========
 
+// GAME_TYPE and FIXED_BET_AMOUNT, GAME_USER_ID, GAME_USERNAME
+// are defined in the HTML template just before this script.
 const GAME = GAME_TYPE || "silver";
 
-// Get table code from URL parameter
-const urlParams = new URLSearchParams(window.location.search);
-const TABLE_CODE = urlParams.get('table');
-
-console.log('Game loaded. Table code:', TABLE_CODE);
-
-// User ID and name
-let uid = localStorage.getItem("user_id");
-if (!uid) {
-  uid = "user_" + Math.floor(Math.random() * 1e8);
-  localStorage.setItem("user_id", uid);
-}
-const USER_ID = uid;
-
-let uname = localStorage.getItem("username");
-if (!uname) {
-  uname = "Player" + Math.floor(Math.random() * 9999);
-  localStorage.setItem("username", uname);
-}
-const USERNAME = uname;
+// Use the real logged-in user/account from Flask session
+const USER_ID = GAME_USER_ID;
+const USERNAME = GAME_USERNAME || "Player";
 
 // ======== DOM REFERENCES ========
 
 const frogImg = document.getElementById("frogSprite");
-const pondEl = document.querySelector(".pond");
-const pads = Array.from(document.querySelectorAll(".pad"));
+const pondEl = frogImg ? frogImg.parentElement : document.body;
+const pads = Array.from(document.querySelectorAll(".pad")); // lily pads
 
 const numChips = Array.from(document.querySelectorAll(".num-chip"));
 const betInput = document.getElementById("betAmount");
@@ -43,80 +28,12 @@ const userNameLabel = document.getElementById("userName");
 const userBetCountLabel = document.getElementById("userBetCount");
 const myBetsRow = document.getElementById("myBetsRow");
 
-userNameLabel.textContent = USERNAME;
+if (userNameLabel) {
+  userNameLabel.textContent = USERNAME;
+}
 
 let walletBalance = 0;
 let selectedNumber = 0;
-let currentTableData = null;
-
-// ======== FETCH TABLE DATA FROM BACKEND ========
-
-async function fetchTableData() {
-  if (!TABLE_CODE) {
-    console.warn('No table code provided in URL');
-    setStatus('No table selected', 'error');
-    return;
-  }
-
-  try {
-    const response = await fetch(`/api/tables/${GAME}`);
-    const data = await response.json();
-
-    if (data.tables) {
-      // Find specific table by round_code
-      const table = data.tables.find(t => t.round_code === TABLE_CODE);
-
-      if (table) {
-        currentTableData = table;
-        updateGameUI(table);
-      } else {
-        console.error('Table not found:', TABLE_CODE);
-        setStatus('Table not found', 'error');
-      }
-    }
-  } catch (error) {
-    console.error('Error fetching table data:', error);
-  }
-}
-
-// Update UI with backend table data
-function updateGameUI(table) {
-  // Update round code
-  if (table.round_code) {
-    roundIdSpan.textContent = table.round_code;
-  }
-
-  // Update player count
-  playerCountSpan.textContent = table.players || 0;
-
-  // Update timer
-  const mins = Math.floor(table.time_remaining / 60);
-  const secs = table.time_remaining % 60;
-  timerText.textContent = `${mins}:${secs.toString().padStart(2, '0')}`;
-
-  // Update lily pads with bets
-  updatePadsFromBets(table.bets || []);
-
-  // Update user's bets display
-  updateMyBets(table.bets || []);
-
-  // Check if betting is closed
-  if (table.is_betting_closed) {
-    setStatus('Betting closed for this round', 'error');
-    placeBetBtn.disabled = true;
-  } else {
-    placeBetBtn.disabled = false;
-  }
-
-  // Show result if game is finished
-  if (table.is_finished && table.result !== null && table.result !== undefined) {
-    hopFrogToWinningNumber(table.result);
-    setStatus(`Winning number: ${table.result}`, 'ok');
-  }
-}
-
-// Auto-refresh table data every 2 seconds
-setInterval(fetchTableData, 2000);
 
 // ======== UI HELPERS ========
 
@@ -129,7 +46,9 @@ function setStatus(msg, type = "") {
 
 function updateWallet(balance) {
   walletBalance = balance;
-  walletBalanceSpan.textContent = walletBalance.toFixed(0);
+  if (walletBalanceSpan) {
+    walletBalanceSpan.textContent = walletBalance.toFixed(0);
+  }
   if (coinsWrapper) {
     coinsWrapper.classList.add("coin-bounce");
     setTimeout(() => coinsWrapper.classList.remove("coin-bounce"), 500);
@@ -144,11 +63,14 @@ function setSelectedNumber(n) {
   });
 }
 
-// Update "Your bets in this game" row
+// update "Your bets in this game" row
 function updateMyBets(bets) {
   const myBets = (bets || []).filter((b) => b.user_id === USER_ID);
-  userBetCountLabel.textContent = myBets.length;
+  if (userBetCountLabel) {
+    userBetCountLabel.textContent = myBets.length;
+  }
 
+  if (!myBetsRow) return;
   myBetsRow.innerHTML = "";
   myBets.forEach((b) => {
     const chip = document.createElement("div");
@@ -158,45 +80,35 @@ function updateMyBets(bets) {
   });
 }
 
-// Show one username + number per lily pad
+// show one username + number per pad
 function updatePadsFromBets(bets) {
-  // Group bets by number
-  const betsByNumber = {};
+  const uniqueBets = [];
   (bets || []).forEach((b) => {
-    if (!betsByNumber[b.number]) {
-      betsByNumber[b.number] = [];
+    if (!uniqueBets.find((x) => x.number === b.number)) {
+      uniqueBets.push(b);
     }
-    betsByNumber[b.number].push(b);
   });
-
-  // Get unique numbers (up to 6)
-  const uniqueNumbers = Object.keys(betsByNumber).slice(0, 6);
 
   pads.forEach((pad, i) => {
     const numSpan = pad.querySelector(".pad-number");
     const userSpan = pad.querySelector(".pad-user");
     pad.classList.remove("win");
 
-    if (i < uniqueNumbers.length) {
-      const number = uniqueNumbers[i];
-      const betsOnNumber = betsByNumber[number];
-      
-      // Show number
-      pad.dataset.number = number;
-      numSpan.textContent = number;
-      
-      // Show first user who bet on this number
-      userSpan.textContent = betsOnNumber[0].username;
-    } else {
-      // Empty pad
+    const bet = uniqueBets[i];
+
+    if (!bet) {
       pad.dataset.number = "";
-      numSpan.textContent = "";
-      userSpan.textContent = "";
+      if (numSpan) numSpan.textContent = "";
+      if (userSpan) userSpan.textContent = "";
+    } else {
+      pad.dataset.number = String(bet.number);
+      if (numSpan) numSpan.textContent = bet.number;
+      if (userSpan) userSpan.textContent = bet.username;
     }
   });
 }
 
-// ======== FROG ANIMATION ========
+// ======== FROG ANIMATION (unchanged) ========
 
 function hopFrogToWinningNumber(winningNumber) {
   if (!frogImg || !pondEl) return;
@@ -206,7 +118,7 @@ function hopFrogToWinningNumber(winningNumber) {
   );
 
   if (!targetPad) {
-    console.log("No pad showing number", winningNumber);
+    console.log("No pad currently showing number", winningNumber);
     return;
   }
 
@@ -232,7 +144,6 @@ function hopFrogToWinningNumber(winningNumber) {
 
   frogImg.style.transition = "none";
   frogImg.style.zIndex = "6";
-  frogImg.style.willChange = "transform";
 
   function step(now) {
     const tRaw = (now - startTime) / duration;
@@ -243,7 +154,6 @@ function hopFrogToWinningNumber(winningNumber) {
     const x = startX + deltaX * ease;
     const yLinear = startY + deltaY * ease;
     const yArc = yLinear + peak * (4 * t * (1 - t));
-
     const scale = 1 + 0.08 * Math.sin(Math.PI * t);
 
     const relX = x - baseCenterX;
@@ -258,7 +168,6 @@ function hopFrogToWinningNumber(winningNumber) {
         endY - baseCenterY
       }px) scale(1)`;
       targetPad.classList.add("win");
-      frogImg.style.willChange = "auto";
     }
   }
 
@@ -279,15 +188,16 @@ function resetFrogPosition() {
 
 const socket = io();
 
-async function fetchBalance() {
+// NEW: just read balance from DB via /balance/<USER_ID>
+async function registerUser() {
   try {
     const res = await fetch(`/balance/${USER_ID}`);
     const data = await res.json();
-    if (data && typeof data.balance === 'number') {
-      updateWallet(data.balance);
-    }
+    const bal =
+      data && typeof data.balance === "number" ? data.balance : 0;
+    updateWallet(bal);
   } catch (err) {
-    console.error("balance fetch error", err);
+    console.error("balance error", err);
   }
 }
 
@@ -299,10 +209,7 @@ function joinGameRoom() {
 }
 
 socket.on("connect", () => {
-  console.log('Socket connected');
   joinGameRoom();
-  fetchBalance();
-  fetchTableData(); // Initial fetch
 });
 
 socket.on("connection_response", (data) => {
@@ -311,16 +218,12 @@ socket.on("connection_response", (data) => {
 
 socket.on("round_data", (payload) => {
   if (payload.game_type !== GAME) return;
-  
-  // Only update if it's our table
-  if (TABLE_CODE && payload.round_data && payload.round_data.round_code !== TABLE_CODE) {
-    return;
-  }
-  
   const rd = payload.round_data || {};
 
   if (rd.round_code) {
     roundIdSpan.textContent = rd.round_code;
+  } else if (rd.round_number) {
+    roundIdSpan.textContent = rd.round_number;
   }
 
   timerText.textContent = rd.time_remaining ?? "--";
@@ -332,11 +235,12 @@ socket.on("round_data", (payload) => {
 
 socket.on("new_round", (payload) => {
   if (payload.game_type !== GAME) return;
-  
   const rd = payload.round_data || {};
 
   if (payload.round_code) {
     roundIdSpan.textContent = payload.round_code;
+  } else if (payload.round_number) {
+    roundIdSpan.textContent = payload.round_number;
   }
 
   timerText.textContent = rd.time_remaining ?? "--";
@@ -359,14 +263,14 @@ socket.on("timer_update", (payload) => {
 socket.on("betting_closed", (payload) => {
   if (payload.game_type !== GAME) return;
   setStatus("Betting closed for this round", "error");
-  placeBetBtn.disabled = true;
 });
 
 socket.on("bet_placed", (payload) => {
   if (payload.game_type !== GAME) return;
-  
-  // Refresh table data to get updated bets
-  fetchTableData();
+  const rd = payload.round_data || {};
+  updatePadsFromBets(rd.bets || []);
+  updateMyBets(rd.bets || []);
+  playerCountSpan.textContent = rd.players ?? 0;
 });
 
 socket.on("bet_success", (payload) => {
@@ -374,9 +278,6 @@ socket.on("bet_success", (payload) => {
   if (typeof payload.new_balance === "number") {
     updateWallet(payload.new_balance);
   }
-  
-  // Refresh table data
-  fetchTableData();
 });
 
 socket.on("bet_error", (payload) => {
@@ -385,21 +286,10 @@ socket.on("bet_error", (payload) => {
 
 socket.on("round_result", (payload) => {
   if (payload.game_type !== GAME) return;
-  
   const winning = payload.result;
   if (winning === undefined || winning === null) return;
-  
   setStatus(`Winning number: ${winning}`, "ok");
   hopFrogToWinningNumber(winning);
-  
-  // Check if user won
-  const userWinner = (payload.winners || []).find(w => w.user_id === USER_ID);
-  if (userWinner) {
-    setTimeout(() => {
-      setStatus(`🎉 YOU WON ₹${userWinner.payout}!`, "ok");
-      fetchBalance(); // Update wallet
-    }, 1500);
-  }
 });
 
 // ======== UI EVENTS ========
@@ -411,27 +301,28 @@ numChips.forEach((chip) => {
   });
 });
 
-placeBetBtn.addEventListener("click", () => {
-  if (walletBalance < FIXED_BET_AMOUNT) {
-    setStatus("Insufficient balance", "error");
-    return;
-  }
-  if (selectedNumber === null || selectedNumber === undefined) {
-    setStatus("Select a number first", "error");
-    return;
-  }
+if (placeBetBtn) {
+  placeBetBtn.addEventListener("click", () => {
+    if (walletBalance < FIXED_BET_AMOUNT) {
+      setStatus("Insufficient balance", "error");
+      return;
+    }
+    if (selectedNumber === null || selectedNumber === undefined) {
+      setStatus("Select a number first", "error");
+      return;
+    }
 
-  socket.emit("place_bet", {
-    game_type: GAME,
-    user_id: USER_ID,
-    username: USERNAME,
-    number: selectedNumber,
+    socket.emit("place_bet", {
+      game_type: GAME,
+      user_id: USER_ID,
+      username: USERNAME,
+      number: selectedNumber,
+    });
   });
-});
+}
 
 // ======== INIT ========
 
-fetchBalance();
-fetchTableData();
+registerUser().then(joinGameRoom);
 setSelectedNumber(0);
 setStatus("");
