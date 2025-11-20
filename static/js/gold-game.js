@@ -1,5 +1,10 @@
-// ========= Basics =========
+// ========== BASIC SETUP ==========
+
 const GAME = GAME_TYPE || "gold";
+
+// --- Get table code from URL (multi-table sync!) ---
+const urlParams = new URLSearchParams(window.location.search);
+const TABLE_CODE = urlParams.get('table');
 
 let uid = localStorage.getItem("gold_user_id");
 if (!uid) {
@@ -15,7 +20,7 @@ if (!uname) {
 }
 const USERNAME = uname;
 
-// ========= DOM =========
+// ========== DOM SETUP ==========
 const pitch = document.querySelector(".pitch");
 const ballImg = document.getElementById("ballSprite");
 const cssPlayer = document.getElementById("cssPlayer");
@@ -34,13 +39,15 @@ const userNameLabel = document.getElementById("userName");
 const userBetCountLabel = document.getElementById("userBetCount");
 const myBetsRow = document.getElementById("myBetsRow");
 
-userNameLabel.textContent = USERNAME;
+userNameLabel && (userNameLabel.textContent = USERNAME);
 
 let walletBalance = 0;
 let selectedNumber = 0;
 let playerShown = false;
+let currentTableData = null;
 
-// ========= UI helpers =========
+// ========== UI HELPERS ==========
+
 function setStatus(msg, type = "") {
   statusEl.textContent = msg || "";
   statusEl.className = "status";
@@ -50,8 +57,8 @@ function setStatus(msg, type = "") {
 function updateWallet(balance) {
   walletBalance = balance;
   walletBalanceSpan.textContent = walletBalance.toFixed(0);
-  coinsWrapper.classList.add("coin-bounce");
-  setTimeout(() => coinsWrapper.classList.remove("coin-bounce"), 500);
+  coinsWrapper && coinsWrapper.classList.add("coin-bounce");
+  setTimeout(() => coinsWrapper && coinsWrapper.classList.remove("coin-bounce"), 500);
 }
 
 function setSelectedNumber(n) {
@@ -62,60 +69,57 @@ function setSelectedNumber(n) {
   });
 }
 
-// ---- my bets inline display ----
 function updateMyBets(bets) {
   const myBets = (bets || []).filter((b) => b.user_id === USER_ID);
-  userBetCountLabel.textContent = myBets.length;
+  userBetCountLabel && (userBetCountLabel.textContent = myBets.length);
 
   myBetsRow.innerHTML = "";
-  
   if (myBets.length === 0) {
     myBetsRow.innerHTML = '<span style="color: #6b7280; font-size: 11px;">none</span>';
     return;
   }
-
   myBets.forEach((b, index) => {
     const chip = document.createElement("span");
     chip.className = "my-bet-chip";
     chip.textContent = b.number;
     myBetsRow.appendChild(chip);
-    
-    // Add comma separator except for last item
     if (index < myBets.length - 1) {
       myBetsRow.appendChild(document.createTextNode(", "));
     }
   });
 }
 
-// ---- goals from bets ----
+// ---- GOALS FROM BETS ====
 function updateGoalsFromBets(bets) {
-  const uniqueBets = [];
+  const betsByNumber = {};
   (bets || []).forEach((b) => {
-    if (!uniqueBets.find((x) => x.number === b.number)) {
-      uniqueBets.push(b);
-    }
+    if (!betsByNumber[b.number]) betsByNumber[b.number] = [];
+    betsByNumber[b.number].push(b);
   });
+
+  // Get unique numbers (up to 6)
+  const uniqueNumbers = Object.keys(betsByNumber).slice(0, 6);
 
   goals.forEach((goal, i) => {
     const numSpan = goal.querySelector(".pad-number");
     const userSpan = goal.querySelector(".pad-user");
     goal.classList.remove("win");
 
-    const bet = uniqueBets[i];
-
-    if (!bet) {
+    if (i < uniqueNumbers.length) {
+      const number = uniqueNumbers[i];
+      const betsOnNumber = betsByNumber[number];
+      goal.dataset.number = number;
+      numSpan.textContent = number;
+      userSpan.textContent = betsOnNumber[0].username;
+    } else {
       goal.dataset.number = "";
       numSpan.textContent = "";
       userSpan.textContent = "";
-    } else {
-      goal.dataset.number = String(bet.number);
-      numSpan.textContent = bet.number;
-      userSpan.textContent = bet.username;
     }
   });
 }
 
-// ========= DOTTED LINE TRAJECTORY =========
+// ======== DOTTED LINE TRAJECTORY ========
 function createTrajectoryLine(startX, startY, endX, endY, peak) {
   const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
   svg.setAttribute("class", "trajectory-line");
@@ -128,10 +132,8 @@ function createTrajectoryLine(startX, startY, endX, endY, peak) {
   svg.style.zIndex = "5";
 
   const path = document.createElementNS("http://www.w3.org/2000/svg", "path");
-  
   const midX = (startX + endX) / 2;
   const midY = (startY + endY) / 2 + peak;
-
   const pathData = `M ${startX} ${startY} Q ${midX} ${midY} ${endX} ${endY}`;
   path.setAttribute("d", pathData);
   path.setAttribute("stroke", "#fbbf24");
@@ -139,21 +141,15 @@ function createTrajectoryLine(startX, startY, endX, endY, peak) {
   path.setAttribute("stroke-dasharray", "8 6");
   path.setAttribute("fill", "none");
   path.setAttribute("opacity", "0.9");
-  
   path.style.strokeDashoffset = "1000";
   path.style.animation = "drawPath 0.6s ease-out forwards";
-
   svg.appendChild(path);
   pitch.appendChild(svg);
 
-  setTimeout(() => {
-    if (svg.parentNode) {
-      svg.parentNode.removeChild(svg);
-    }
-  }, 1200);
+  setTimeout(() => svg.parentNode && svg.parentNode.removeChild(svg), 1200);
 }
 
-// CSS animations
+// CSS ANIMATION INJECTION
 if (!document.getElementById("trajectory-styles")) {
   const style = document.createElement("style");
   style.id = "trajectory-styles";
@@ -162,49 +158,32 @@ if (!document.getElementById("trajectory-styles")) {
       to { stroke-dashoffset: 0; }
     }
     @keyframes goalFlash {
-      0% {
-        opacity: 0;
-        transform: translate(-50%, -50%) scale(0.5);
-      }
-      50% {
-        opacity: 1;
-        transform: translate(-50%, -50%) scale(1);
-      }
-      100% {
-        opacity: 0;
-        transform: translate(-50%, -50%) scale(1.2);
-      }
-    }
-  `;
+      0% { opacity: 0; transform: translate(-50%, -50%) scale(0.5);}
+      50% { opacity:1; transform: translate(-50%, -50%) scale(1);}
+      100% { opacity:0; transform: translate(-50%, -50%) scale(1.2);}
+    }`;
   document.head.appendChild(style);
 }
 
-// ========= PROFESSIONAL BALL SHOOTING =========
-// ========= PROFESSIONAL BALL SHOOTING WITH KICK =========
+// ========== BALL SHOOTING ANIMATION ==========
 function shootBallToWinningNumber(winningNumber) {
   const pitchRect = pitch.getBoundingClientRect();
   const ballRect = ballImg.getBoundingClientRect();
-  const targetGoal = goals.find(
-    (g) => g.dataset.number === String(winningNumber)
-  );
+  const targetGoal = goals.find((g) => g.dataset.number === String(winningNumber));
 
   if (!targetGoal) {
-    console.log("Winning number not on any goal:", winningNumber);
+    console.log("Winning number not on a goal:", winningNumber);
     return;
   }
 
   const goalRect = targetGoal.getBoundingClientRect();
-
-  // Viewport coordinates
   const startX = ballRect.left + ballRect.width / 2;
   const startY = ballRect.top + ballRect.height / 2;
   const endX = goalRect.left + goalRect.width / 2;
   const endY = goalRect.top + goalRect.height / 2;
-
   const deltaX = endX - startX;
   const deltaY = endY - startY;
   const distance = Math.sqrt(deltaX * deltaX + deltaY * deltaY);
-
   const peak = -Math.min(100, distance * 0.3);
   const duration = 750;
   const startTime = performance.now();
@@ -214,16 +193,16 @@ function shootBallToWinningNumber(winningNumber) {
   const pitchStartY = ballRect.top + ballRect.height / 2 - pitchRect.top;
   const pitchEndX = goalRect.left + goalRect.width / 2 - pitchRect.left;
   const pitchEndY = goalRect.top + goalRect.height / 2 - pitchRect.top;
-  
+
   createTrajectoryLine(pitchStartX, pitchStartY, pitchEndX, pitchEndY, peak);
 
-  // TRIGGER KICK ANIMATION
-  cssPlayer.classList.add("kick");
-  
-  // Wait for kick wind-up (280ms - when foot hits ball)
+  // Player kick
+  cssPlayer && cssPlayer.classList.add("kick");
+
+  // Wait for kick wind-up (280ms)
   setTimeout(() => {
     const originalTransform = ballImg.style.transform;
-    
+
     ballImg.style.position = "fixed";
     ballImg.style.transition = "none";
     ballImg.style.zIndex = "1000";
@@ -236,16 +215,13 @@ function shootBallToWinningNumber(winningNumber) {
       const tRaw = elapsed / duration;
       const t = Math.min(Math.max(tRaw, 0), 1);
 
-      // Ease-out cubic for smooth deceleration
       const ease = 1 - Math.pow(1 - t, 3);
-
       const x = startX + deltaX * ease;
       const yLinear = startY + deltaY * ease;
       const yArc = yLinear + peak * (4 * t * (1 - t));
-
       const rotation = t * (distance * 1.5);
       const scale = 1 - (t * 0.12);
-      
+
       ballImg.style.left = x + "px";
       ballImg.style.top = yArc + "px";
       ballImg.style.transform = `translate(-50%, -50%) rotate(${rotation}deg) scale(${scale})`;
@@ -255,7 +231,6 @@ function shootBallToWinningNumber(winningNumber) {
       } else {
         // Goal reached!
         targetGoal.classList.add("win");
-        
         // Goal flash
         const flash = document.createElement("div");
         flash.style.position = "absolute";
@@ -270,7 +245,7 @@ function shootBallToWinningNumber(winningNumber) {
         flash.style.animation = "goalFlash 0.6s ease-out";
         flash.style.zIndex = "100";
         targetGoal.appendChild(flash);
-        
+
         setTimeout(() => flash.remove(), 600);
 
         // Return ball
@@ -279,67 +254,99 @@ function shootBallToWinningNumber(winningNumber) {
           ballImg.style.left = "";
           ballImg.style.top = "";
           ballImg.style.transition = "transform 0.5s ease-out";
-          ballImg.style.transform = originalTransform || "translate(0, 0)";
+          ballImg.style.transform = originalTransform || "translate(0,0)";
           ballImg.style.zIndex = "10";
         }, 900);
       }
     }
 
     requestAnimationFrame(step);
-  }, 280); // Ball launches when foot makes contact
+  }, 280);
 
-  // Remove kick class after animation completes
-  setTimeout(() => cssPlayer.classList.remove("kick"), 800);
+  setTimeout(() => cssPlayer && cssPlayer.classList.remove("kick"), 800);
 }
 
+// ========== BACKEND API SYNC (Multi-table/game data) ==========
 
-// ========= Socket.IO / backend =========
+async function fetchTableData() {
+  if (!TABLE_CODE) {
+    setStatus("No table selected", "error");
+    return;
+  }
+  try {
+    const response = await fetch(`/api/tables/gold`);
+    const data = await response.json();
+    if (data.tables) {
+      const table = data.tables.find(t => t.round_code === TABLE_CODE);
+      if (table) {
+        currentTableData = table;
+        updateGameUI(table);
+      } else {
+        setStatus("Table not found", "error");
+      }
+    }
+  } catch (e) {
+    console.error('fetchTableData error', e);
+  }
+}
+
+function updateGameUI(table) {
+  roundIdSpan.textContent = table.round_code;
+  playerCountSpan.textContent = table.players || 0;
+  const mins = Math.floor(table.time_remaining / 60);
+  const secs = table.time_remaining % 60;
+  timerText.textContent = `${mins}:${secs.toString().padStart(2, '0')}`;
+  updateGoalsFromBets(table.bets || []);
+  updateMyBets(table.bets || []);
+  placeBetBtn.disabled = !!table.is_betting_closed;
+
+  if (table.is_betting_closed) {
+    setStatus('Betting closed for this round', 'error');
+    placeBetBtn.disabled = true;
+  }
+  if (table.is_finished && table.result !== null && table.result !== undefined) {
+    shootBallToWinningNumber(table.result);
+    setStatus(`Winning number: ${table.result}`, "ok");
+  }
+}
+
+// Auto-refresh table every 2 seconds
+setInterval(fetchTableData, 2000);
+
+// ========== SOCKET.IO ==========
 const socket = io();
 
-async function registerUser() {
+async function fetchBalance() {
   try {
-    const res = await fetch("/register", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ user_id: USER_ID, username: USERNAME })
-    });
+    const res = await fetch(`/balance/${USER_ID}`);
     const data = await res.json();
-    if (data && data.success) {
-      updateWallet(data.balance || 0);
-    }
+    if (typeof data.balance === "number") updateWallet(data.balance);
   } catch (err) {
-    console.error("register error", err);
+    console.error("balance fetch error", err);
   }
 }
 
 function joinGameRoom() {
   socket.emit("join_game", {
     game_type: GAME,
-    user_id: USER_ID
+    user_id: USER_ID,
   });
 }
 
 socket.on("connect", () => {
   joinGameRoom();
-});
-
-socket.on("connection_response", (data) => {
-  console.log("server:", data);
+  fetchBalance();
+  fetchTableData();
 });
 
 socket.on("round_data", (payload) => {
   if (payload.game_type !== GAME) return;
+  // Only update if it's our table
+  if (TABLE_CODE && payload.round_data && payload.round_data.round_code !== TABLE_CODE) return;
   const rd = payload.round_data || {};
-
-  if (rd.round_code) {
-    roundIdSpan.textContent = rd.round_code;
-  } else if (rd.round_number) {
-    roundIdSpan.textContent = rd.round_number;
-  }
-
+  roundIdSpan.textContent = rd.round_code;
   timerText.textContent = rd.time_remaining ?? "--";
   playerCountSpan.textContent = rd.players ?? 0;
-
   updateGoalsFromBets(rd.bets || []);
   updateMyBets(rd.bets || []);
 });
@@ -347,27 +354,19 @@ socket.on("round_data", (payload) => {
 socket.on("new_round", (payload) => {
   if (payload.game_type !== GAME) return;
   const rd = payload.round_data || {};
-
-  if (payload.round_code) {
-    roundIdSpan.textContent = payload.round_code;
-  } else if (payload.round_number) {
-    roundIdSpan.textContent = payload.round_number;
-  }
-
+  roundIdSpan.textContent = rd.round_code;
   timerText.textContent = rd.time_remaining ?? "--";
   playerCountSpan.textContent = rd.players ?? 0;
   updateGoalsFromBets(rd.bets || []);
   updateMyBets(rd.bets || []);
   setStatus("New round started", "ok");
-  
+
   // Reset ball
   ballImg.style.position = "";
   ballImg.style.left = "";
   ballImg.style.top = "";
   ballImg.style.transform = "";
   ballImg.style.zIndex = "10";
-  
-  // Hide player
   playerArea.classList.remove("visible");
   playerShown = false;
   timerPill.classList.remove("urgent");
@@ -376,17 +375,13 @@ socket.on("new_round", (payload) => {
 socket.on("timer_update", (payload) => {
   if (payload.game_type !== GAME) return;
   const timeRemaining = payload.time_remaining ?? 0;
-  
   timerText.textContent = timeRemaining.toString().padStart(2, "0");
   playerCountSpan.textContent = payload.players ?? 0;
-  
-  // Show CSS player at 15 seconds
+  // Show CSS player at 15 sec
   if (timeRemaining <= 15 && !playerShown) {
     playerArea.classList.add("visible");
     playerShown = true;
   }
-  
-  // Urgent timer
   if (timeRemaining <= 10) {
     timerPill.classList.add("urgent");
   } else {
@@ -397,14 +392,12 @@ socket.on("timer_update", (payload) => {
 socket.on("betting_closed", (payload) => {
   if (payload.game_type !== GAME) return;
   setStatus("Betting closed", "error");
+  placeBetBtn.disabled = true;
 });
 
 socket.on("bet_placed", (payload) => {
   if (payload.game_type !== GAME) return;
-  const rd = payload.round_data || {};
-  updateGoalsFromBets(rd.bets || []);
-  updateMyBets(rd.bets || []);
-  playerCountSpan.textContent = rd.players ?? 0;
+  fetchTableData(); // live update
 });
 
 socket.on("bet_success", (payload) => {
@@ -412,6 +405,7 @@ socket.on("bet_success", (payload) => {
   if (typeof payload.new_balance === "number") {
     updateWallet(payload.new_balance);
   }
+  fetchTableData();
 });
 
 socket.on("bet_error", (payload) => {
@@ -422,14 +416,11 @@ socket.on("round_result", (payload) => {
   if (payload.game_type !== GAME) return;
   const winning = payload.result;
   if (winning === undefined || winning === null) return;
-  setStatus(`Winner: ${winning}! 🎉`, "ok");
-  
-  setTimeout(() => {
-    shootBallToWinningNumber(winning);
-  }, 100);
+  setStatus(`Winning number: ${winning}`, "ok");
+  shootBallToWinningNumber(winning);
 });
 
-// ========= UI events =========
+// ========== UI EVENTS ==========
 numChips.forEach((chip) => {
   chip.addEventListener("click", () => {
     const n = parseInt(chip.dataset.number, 10);
@@ -442,20 +433,21 @@ placeBetBtn.addEventListener("click", () => {
     setStatus("Insufficient balance", "error");
     return;
   }
-  if (selectedNumber === null || selectedNumber === undefined) {
+  if (selectedNumber == null) {
     setStatus("Select a number first", "error");
     return;
   }
-
   socket.emit("place_bet", {
     game_type: GAME,
     user_id: USER_ID,
     username: USERNAME,
-    number: selectedNumber
+    number: selectedNumber,
   });
 });
 
-// ========= init =========
-registerUser().then(joinGameRoom);
+// ========== INIT ==========
+fetchBalance();
+fetchTableData();
 setSelectedNumber(0);
 setStatus("");
+
