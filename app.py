@@ -803,11 +803,23 @@ def help_tickets_api():
 # ---------------------------------------------------
 
 
-@app.route("/balance/<int:user_id>")
+@app.route("/balance/<user_id>")
 def get_balance(user_id):
-    user = User.query.get(user_id)
+    """
+    Balance API used by the game pages.
+    We IGNORE the id in the URL and always use the logged-in user
+    from the Flask session, so calls like /balance/undefined still work.
+    """
+    from flask import session
+
+    real_user_id = session.get("user_id")
+    if not real_user_id:
+        return jsonify({"balance": 0})
+
+    user = User.query.get(real_user_id)
     if not user:
         return jsonify({"balance": 0})
+
     wallet = ensure_wallet_for_user(user)
     return jsonify({"balance": wallet.balance})
 
