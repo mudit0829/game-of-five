@@ -1,62 +1,97 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="UTF-8">
-<title>{{ game.title }} Lobby</title>
-<meta name="viewport" content="width=device-width, initial-scale=1">
-
-<link rel="stylesheet" href="{{ url_for('static', filename='css/game-lobby.css') }}">
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>{{ game.title }} - Select Table</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/game-lobby.css') }}">
 </head>
 <body>
 
-<div class="page">
+<div class="lobby-container">
 
   <!-- HEADER -->
-  <header class="top-bar">
-    <div class="logo-area">
-      <img src="{{ url_for('static', filename='img/logo.png') }}" class="logo">
-      <span class="brand">{{ game.title }}</span>
-    </div>
-    <div class="profile-icon">
-      <img src="{{ url_for('static', filename='img/user.png') }}">
-    </div>
+  <header class="top-header">
+    <button class="back-btn" onclick="window.location.href='/home'">
+      <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <path d="M19 12H5M12 19l-7-7 7-7"/>
+      </svg>
+    </button>
+    <h1 class="lobby-title">{{ game.title }}</h1>
+    <div class="header-spacer"></div>
   </header>
 
-  <!-- MAIN GAME CARD (banner) -->
-  <section class="featured-card">
-    <img src="{{ url_for('static', filename='img/silver_banner.png') }}">
-    <div class="featured-title">{{ game.name }}</div>
-  </section>
-
-  <!-- RULES -->
-  <section class="rules-box">
-    <h3>How to Play</h3>
-    <ul>
-      <li>Choose a number between 0–9.</li>
-      <li>Place your bet before timer ends.</li>
-      <li>Frog jumps to a lily pad to reveal winning number.</li>
-      <li>You win if your number matches the frog’s landing pad.</li>
-    </ul>
-  </section>
-
-  <!-- PLAY BUTTON -->
-  <button class="play-main-btn" id="playNowBtn">
-    ▶ Play Now
-  </button>
-
-  <!-- GAME ROOMS -->
-  <section class="room-section">
-    <h3>Available Rooms</h3>
-
-    <div id="roomList" class="room-list">
-      <!-- Rooms will be generated automatically -->
+  <!-- GAME BANNER -->
+  <section class="game-banner">
+    <div class="banner-image">
+      <img src="{{ url_for('static', filename='img/' + game_type + '_banner.png') }}" alt="{{ game.title }}" onerror="this.style.display='none'">
     </div>
+    <div class="game-info">
+      <h2 class="game-name">{{ game.name }}</h2>
+      <div class="game-meta">
+        <div class="rating">
+          <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="#fbbf24">
+            <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/>
+          </svg>
+          <span>8.1/10</span>
+        </div>
+        <div class="category">
+          <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <circle cx="12" cy="12" r="10"/>
+            <path d="M12 6v6l4 2"/>
+          </svg>
+          <span>Casual</span>
+        </div>
+      </div>
+    </div>
+  </section>
 
+  <!-- PLAY NOW BUTTON -->
+  <div class="play-now-section">
+    <button class="play-now-btn-large" id="quickPlayBtn">
+      <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="currentColor">
+        <path d="M8 5v14l11-7z"/>
+      </svg>
+      <span>Play now</span>
+    </button>
+  </div>
+
+  <!-- GAME RULES -->
+  <section class="game-rules">
+    <h3 class="section-heading">How to Play</h3>
+    <div class="rules-content">
+      <p><strong>Bet Amount:</strong> ₹{{ game.bet_amount }}</p>
+      <p><strong>Winning Prize:</strong> ₹{{ game.payout }}</p>
+      <p><strong>Players per Game:</strong> Up to 6 players</p>
+      <p><strong>Game Duration:</strong> 5 minutes per round</p>
+      
+      <div class="rules-list">
+        <h4>Rules:</h4>
+        <ul>
+          <li>Select a number (0-9) to bet on</li>
+          <li>You can place up to 4 bets per round</li>
+          <li>Betting closes 15 seconds before round ends</li>
+          <li>If your number matches the winning number, you win!</li>
+          <li>Results are announced immediately after round ends</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <!-- AVAILABLE TABLES -->
+  <section class="tables-section">
+    <h3 class="section-heading">Available Tables</h3>
+    <div id="tablesGrid" class="tables-grid">
+      <!-- Tables dynamically loaded by JavaScript -->
+    </div>
   </section>
 
 </div>
 
+<script>
+  const GAME_TYPE = "{{ game_type }}";
+  const GAME_CONFIG = {{ game|tojson }};
+</script>
 <script src="{{ url_for('static', filename='js/game-lobby.js') }}"></script>
-
 </body>
 </html>
