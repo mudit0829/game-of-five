@@ -30,16 +30,16 @@ socketio = SocketIO(
 # ---------------------------------------------------
 GAME_CONFIGS = {
     'silver': {
-        'bet_amount': 10,
-        'payout': 50,
+        'bet_amount': 200,
+        'payout': 1000,
         'name': 'Silver Game',
         'type': 'number',
         'title': 'Frog Leap',
         'emoji': '🐸'
     },
     'gold': {
-        'bet_amount': 50,
-        'payout': 250,
+        'bet_amount': 250,
+        'payout': 1250,
         'name': 'Gold Game',
         'type': 'number',
         'title': 'Football Goal',
@@ -54,8 +54,8 @@ GAME_CONFIGS = {
         'emoji': '🏹'
     },
     'platinum': {
-        'bet_amount': 200,
-        'payout': 1000,
+        'bet_amount': 1000,
+        'payout': 5000,
         'name': 'Platinum Game',
         'type': 'number',
         'title': 'Parachute Drop',
@@ -71,12 +71,10 @@ GAME_CONFIGS = {
     }
 }
 
-game_rounds = {}
+# Store all running games - each game type has 6 parallel tables
+game_tables = {}  # Format: {game_type: [table1, table2, ...]}
 user_wallets = {}
-
-# Simple in-memory user database (REPLACE WITH REAL DATABASE IN PRODUCTION)
 users_db = {}
-
 
 # ---------------------------------------------------
 # Authentication Helpers
@@ -142,27 +140,29 @@ def generate_bot_name():
     return f"{random.choice(prefixes)}{suffix}"
 
 
-class GameRound:
-    def __init__(self, game_type, round_number):
+class GameTable:
+    """Individual game table - 6 tables per game type"""
+    def __init__(self, game_type, table_number, initial_delay=0):
         self.game_type = game_type
-        self.round_number = round_number
+        self.table_number = table_number
         self.round_code = self._make_round_code()
         self.config = GAME_CONFIGS[game_type]
-        self.start_time = datetime.now()
+        
+        # Start time with staggered delay (60 seconds per table)
+        self.start_time = datetime.now() + timedelta(seconds=initial_delay)
         self.end_time = self.start_time + timedelta(minutes=5)
-        self.betting_close_time = self.start_time + timedelta(minutes=4, seconds=45)
+        self.betting_close_time = self.end_time - timedelta(seconds=15)
+        
         self.bets = []
         self.result = None
         self.is_betting_closed = False
         self.is_finished = False
-        self.real_users = set()
-        self.bot_addition_started = False
+        self.max_players = 6
         self.last_bot_added_at = None
 
     def _make_round_code(self):
-        date_str = datetime.now().strftime('%Y%m%d')
-        base = 1000 + self.round_number - 1
-        return f"F{date_str}{base}"
+        timestamp = int(time.time())
+        return f"{self.game_type[0].upper()}{timestamp}{self.table_number}"
 
     def get_number_range(self):
         if self.game_type == 'roulette':
@@ -174,11 +174,8 @@ class GameRound:
         if len(user_bets) >= 4:
             return False, "Maximum 4 bets per user"
 
-        if len(self.bets) >= 6:
+        if len(self.bets) >= self.max_players:
             return False, "All slots are full"
-
-        if not is_bot:
-            self.real_users.add(user_id)
 
         self.bets.append({
             'user_id': user_id,
@@ -190,18 +187,12 @@ class GameRound:
         return True, "Bet placed successfully"
 
     def add_bot_bet(self):
-        if len(self.bets) >= 6:
+        if len(self.bets) >= self.max_players:
             return False
 
         all_numbers = self.get_number_range()
-        used_numbers = [b['number'] for b in self.bets]
-        available_numbers = [n for n in all_numbers if used_numbers.count(n) < 1]
-
-        if not available_numbers:
-            available_numbers = all_numbers
-
         bot_name = generate_bot_name()
-        bot_number = random.choice(available_numbers)
+        bot_number = random.choice(all_numbers)
 
         self.bets.append({
             'user_id': f'bot_{bot_name}',
@@ -219,19 +210,8 @@ class GameRound:
             winning_bet = random.choice(real_user_bets)
             self.result = winning_bet['number']
         else:
-            bot_bets = [b for b in self.bets if b['is_bot']]
-            if bot_bets and random.random() < 0.5:
-                winning_bet = random.choice(bot_bets)
-                self.result = winning_bet['number']
-            else:
-                all_numbers = self.get_number_range()
-                used_numbers = [b['number'] for b in self.bets]
-                available_numbers = [n for n in all_numbers if n not in used_numbers]
-
-                if available_numbers:
-                    self.result = random.choice(available_numbers)
-                else:
-                    self.result = random.choice(all_numbers)
+            all_numbers = self.get_number_range()
+            self.result = random.choice(all_numbers)
         return self.result
 
     def get_winners(self):
@@ -249,147 +229,161 @@ class GameRound:
 
     def get_time_remaining(self):
         now = datetime.now()
+        if now < self.start_time:
+            return int((self.end_time - self.start_time).total_seconds())
         if now >= self.end_time:
             return 0
         return int((self.end_time - now).total_seconds())
 
-    def get_betting_time_remaining(self):
-        now = datetime.now()
-        if now >= self.betting_close_time:
-            return 0
-        return int((self.betting_close_time - now).total_seconds())
+    def get_slots_available(self):
+        """Return available slots"""
+        return self.max_players - len(self.bets)
 
+    def is_started(self):
+        """Check if game has started"""
+        return datetime.now() >= self.start_time
 
-def get_round_data(game_type):
-    current_round = game_rounds.get(game_type)
-    if not current_round:
-        return None
-
-    unique_players = len({b['user_id'] for b in current_round.bets})
-
-    return {
-        'round_number': current_round.round_number,
-        'round_code': current_round.round_code,
-        'bets': current_round.bets,
-        'time_remaining': current_round.get_time_remaining(),
-        'betting_time_remaining': current_round.get_betting_time_remaining(),
-        'is_betting_closed': current_round.is_betting_closed,
-        'is_finished': current_round.is_finished,
-        'config': current_round.config,
-        'result': current_round.result,
-        'players': unique_players
-    }
+    def to_dict(self):
+        """Convert table to dictionary for API"""
+        return {
+            'table_number': self.table_number,
+            'round_code': self.round_code,
+            'game_type': self.game_type,
+            'players': len(self.bets),
+            'max_players': self.max_players,
+            'slots_available': self.get_slots_available(),
+            'time_remaining': self.get_time_remaining(),
+            'is_betting_closed': self.is_betting_closed,
+            'is_finished': self.is_finished,
+            'is_started': self.is_started(),
+            'bets': self.bets,
+            'result': self.result
+        }
 
 
 # ---------------------------------------------------
-# Game timer thread
+# Initialize Game Tables
 # ---------------------------------------------------
-def game_timer_thread(game_type):
-    round_counter = 0
+def initialize_game_tables():
+    """Initialize 6 tables for each game type with staggered start times"""
+    for game_type in GAME_CONFIGS.keys():
+        game_tables[game_type] = []
+        
+        for i in range(6):
+            # Each table starts 60 seconds after the previous one
+            initial_delay = i * 60
+            table = GameTable(game_type, i + 1, initial_delay)
+            game_tables[game_type].append(table)
+        
+        print(f"Initialized 6 tables for {game_type}")
 
+
+# ---------------------------------------------------
+# Game Table Management Thread
+# ---------------------------------------------------
+def manage_game_table(table):
+    """Manage individual game table lifecycle"""
     while True:
         try:
-            if game_type not in game_rounds or game_rounds[game_type] is None:
-                round_counter += 1
-                game_rounds[game_type] = GameRound(game_type, round_counter)
-                current_round = game_rounds[game_type]
-                print(f"New round started for {game_type} - {current_round.round_code}")
-
-                socketio.emit(
-                    'new_round',
-                    {
-                        'game_type': game_type,
-                        'round_number': current_round.round_number,
-                        'round_code': current_round.round_code,
-                        'round_data': get_round_data(game_type)
-                    },
-                    room=game_type,
-                    namespace='/'
-                )
-
-            current_round = game_rounds[game_type]
             now = datetime.now()
-
-            time_remaining = current_round.get_time_remaining()
-
+            
+            # Wait if game hasn't started yet
+            if now < table.start_time:
+                time.sleep(1)
+                continue
+            
+            # Add bot bets randomly
             if (
-                not current_round.is_betting_closed
-                and len(current_round.bets) < 6
-                and 30 < time_remaining <= 150
+                not table.is_betting_closed
+                and len(table.bets) < table.max_players
+                and table.get_time_remaining() > 30
             ):
                 if (
-                    current_round.last_bot_added_at is None
-                    or (now - current_round.last_bot_added_at).total_seconds() >= 15
+                    table.last_bot_added_at is None
+                    or (now - table.last_bot_added_at).total_seconds() >= 15
                 ):
-                    if current_round.add_bot_bet():
-                        current_round.last_bot_added_at = now
-                        socketio.emit(
-                            'bet_placed',
-                            {
-                                'game_type': game_type,
-                                'round_data': get_round_data(game_type)
-                            },
-                            room=game_type,
-                            namespace='/'
-                        )
+                    if table.add_bot_bet():
+                        table.last_bot_added_at = now
 
-            if now >= current_round.betting_close_time and not current_round.is_betting_closed:
-                current_round.is_betting_closed = True
-                print(f"Betting closed for {game_type}")
-                socketio.emit(
-                    'betting_closed',
-                    {'game_type': game_type},
-                    room=game_type,
-                    namespace='/'
-                )
+            # Close betting
+            if now >= table.betting_close_time and not table.is_betting_closed:
+                table.is_betting_closed = True
+                print(f"{table.game_type} Table {table.table_number}: Betting closed")
 
-            if now >= current_round.end_time and not current_round.is_finished:
-                current_round.is_finished = True
-                result = current_round.calculate_result()
-                winners = current_round.get_winners()
-
-                print(f"Game ended for {game_type}. Winning number: {result}")
-
+            # Finish game
+            if now >= table.end_time and not table.is_finished:
+                table.is_finished = True
+                result = table.calculate_result()
+                winners = table.get_winners()
+                
+                print(f"{table.game_type} Table {table.table_number}: Game ended. Winner: {result}")
+                
+                # Pay winners
                 for winner in winners:
                     if winner['user_id'] in user_wallets:
                         user_wallets[winner['user_id']] += winner['payout']
-
-                socketio.emit(
-                    'round_result',
-                    {
-                        'game_type': game_type,
-                        'round_code': current_round.round_code,
-                        'result': result,
-                        'winners': winners,
-                        'all_bets': current_round.bets
-                    },
-                    room=game_type,
-                    namespace='/'
-                )
-
+                
+                # Wait 3 seconds then reset
                 time.sleep(3)
-                game_rounds[game_type] = None
-
-            unique_players = len({b['user_id'] for b in current_round.bets})
-
-            socketio.emit(
-                'timer_update',
-                {
-                    'game_type': game_type,
-                    'time_remaining': current_round.get_time_remaining(),
-                    'betting_time_remaining': current_round.get_betting_time_remaining(),
-                    'total_bets': len(current_round.bets),
-                    'players': unique_players
-                },
-                room=game_type,
-                namespace='/'
-            )
+                
+                # Reset table for new round
+                table.bets = []
+                table.result = None
+                table.is_betting_closed = False
+                table.is_finished = False
+                table.start_time = datetime.now()
+                table.end_time = table.start_time + timedelta(minutes=5)
+                table.betting_close_time = table.end_time - timedelta(seconds=15)
+                table.round_code = table._make_round_code()
+                table.last_bot_added_at = None
+                
+                print(f"{table.game_type} Table {table.table_number}: New round started - {table.round_code}")
 
             time.sleep(1)
 
         except Exception as e:
-            print(f"Error in game timer thread for {game_type}: {e}")
+            print(f"Error managing table {table.game_type} #{table.table_number}: {e}")
             time.sleep(1)
+
+
+def start_all_game_tables():
+    """Start management threads for all tables"""
+    for game_type, tables in game_tables.items():
+        for table in tables:
+            threading.Thread(
+                target=manage_game_table,
+                args=(table,),
+                daemon=True
+            ).start()
+    print("All game table threads started!")
+
+
+# ---------------------------------------------------
+# API Endpoints for Game Tables
+# ---------------------------------------------------
+@app.route('/api/tables/<game_type>')
+def get_game_tables(game_type):
+    """Get all tables for a specific game type"""
+    if game_type not in GAME_CONFIGS:
+        return jsonify({'error': 'Invalid game type'}), 404
+    
+    tables = game_tables.get(game_type, [])
+    tables_data = [table.to_dict() for table in tables]
+    
+    return jsonify({
+        'game_type': game_type,
+        'tables': tables_data
+    })
+
+
+@app.route('/api/tables')
+def get_all_tables():
+    """Get all tables for all game types"""
+    all_tables = {}
+    for game_type, tables in game_tables.items():
+        all_tables[game_type] = [table.to_dict() for table in tables]
+    
+    return jsonify(all_tables)
 
 
 # ---------------------------------------------------
@@ -422,20 +416,17 @@ def login_post():
     if not username or not password:
         return jsonify({'success': False, 'message': 'Username and password required'}), 400
     
-    # Authenticate
     success, user_id = authenticate_user(username, password)
     
     if not success:
         return jsonify({'success': False, 'message': 'Invalid username or password'}), 401
     
-    # Set session
     session['user_id'] = user_id
     session['username'] = username
     
     if remember_me:
         session.permanent = True
     
-    # Generate token
     token = secrets.token_urlsafe(32)
     
     return jsonify({
@@ -455,7 +446,6 @@ def register_page():
             return redirect(url_for('home'))
         return render_template('register.html')
     
-    # POST request
     data = request.get_json()
     username = data.get('username', '').strip()
     password = data.get('password', '')
@@ -472,8 +462,6 @@ def register_page():
         return jsonify({'success': False, 'message': result}), 400
     
     user_id = result
-    
-    # Auto-login after registration
     session['user_id'] = user_id
     session['username'] = username
     
@@ -493,7 +481,7 @@ def logout():
 
 
 # ---------------------------------------------------
-# Game Routes (Protected)
+# Game Routes
 # ---------------------------------------------------
 @app.route('/home')
 @login_required
@@ -502,7 +490,6 @@ def home():
     username = session.get('username', 'Player')
     user_id = session.get('user_id')
     
-    # Initialize wallet if needed
     if user_id and user_id not in user_wallets:
         user_wallets[user_id] = 10000
     
@@ -530,22 +517,6 @@ def play_game(game_type):
     return render_template(f'{game_type}-game.html', game_type=game_type, game=game)
 
 
-@app.route('/register_game', methods=['POST'])
-def register_game():
-    """Legacy register endpoint for games"""
-    data = request.json
-    user_id = data.get('user_id')
-    username = data.get('username')
-
-    if user_id not in user_wallets:
-        user_wallets[user_id] = 10000
-
-    return jsonify({
-        'success': True,
-        'balance': user_wallets[user_id]
-    })
-
-
 @app.route('/balance/<user_id>')
 def get_balance(user_id):
     """Get user wallet balance"""
@@ -567,89 +538,18 @@ def handle_disconnect():
     print(f'Client disconnected: {request.sid}')
 
 
-@socketio.on('join_game')
-def handle_join_game(data):
-    game_type = data.get('game_type')
-    user_id = data.get('user_id')
-
-    print(f"User {user_id} joining {game_type}")
-    join_room(game_type)
-
-    current_round = game_rounds.get(game_type)
-    if current_round:
-        round_data = get_round_data(game_type)
-        emit('round_data', {
-            'game_type': game_type,
-            'round_data': round_data
-        })
-
-
-@socketio.on('place_bet')
-def handle_place_bet(data):
-    game_type = data.get('game_type')
-    user_id = data.get('user_id')
-    username = data.get('username')
-    number = data.get('number')
-
-    print(f"Bet received: {username} betting on {number} in {game_type}")
-
-    current_round = game_rounds.get(game_type)
-
-    if not current_round or current_round.is_betting_closed:
-        emit('bet_error', {'message': 'Betting is closed'})
-        return
-
-    bet_amount = GAME_CONFIGS[game_type]['bet_amount']
-    if user_wallets.get(user_id, 0) < bet_amount:
-        emit('bet_error', {'message': 'Insufficient balance'})
-        return
-
-    user_bets = [b for b in current_round.bets if b['user_id'] == user_id]
-    if len(user_bets) >= 4:
-        emit('bet_error', {'message': 'Maximum 4 bets per user'})
-        return
-
-    success, message = current_round.add_bet(user_id, username, number)
-
-    if success:
-        user_wallets[user_id] -= bet_amount
-
-        socketio.emit(
-            'bet_placed',
-            {
-                'game_type': game_type,
-                'round_data': get_round_data(game_type)
-            },
-            room=game_type,
-            namespace='/'
-        )
-
-        emit('bet_success', {
-            'message': message,
-            'new_balance': user_wallets[user_id]
-        })
-    else:
-        emit('bet_error', {'message': message})
-
-
-# ---------------------------------------------------
-# Start game timers
-# ---------------------------------------------------
-def start_game_timers():
-    for game_type in GAME_CONFIGS.keys():
-        threading.Thread(
-            target=game_timer_thread,
-            args=(game_type,),
-            daemon=True
-        ).start()
-
-
 if __name__ == '__main__':
-    # Create demo user for testing
+    # Create demo user
     create_user('demo', 'demo123')
     print("Demo user created: username='demo', password='demo123'")
     
-    start_game_timers()
+    # Initialize all game tables
+    initialize_game_tables()
+    
+    # Start table management threads
+    start_all_game_tables()
+    
+    # Run server
     socketio.run(
         app,
         host='0.0.0.0',
