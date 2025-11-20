@@ -1,0 +1,167 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Profile – TRADEERA</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/profile.css') }}">
+</head>
+<body>
+  <div class="page-root">
+
+    <!-- TOP BAR -->
+    <header class="top-bar">
+      <button class="back-btn" onclick="window.history.back()">
+        ←
+      </button>
+      <div class="top-title">Profile</div>
+      <div class="top-spacer"></div>
+    </header>
+
+    <!-- MAIN TABS -->
+    <div class="section-tabs">
+      <button class="tab active" data-target="profile">Profile</button>
+      <button class="tab" data-target="transactions">Coin Transactions</button>
+    </div>
+
+    <main class="content">
+
+      <!-- ========== BASIC PROFILE SECTION ========== -->
+      <section class="section-card active-section" id="section-profile">
+        <div class="profile-header">
+          <div class="avatar-circle">
+            <span class="avatar-letter">
+              {{ username[0]|upper if username else 'U' }}
+            </span>
+          </div>
+          <div class="profile-main">
+            <div class="profile-name">{{ username or 'User' }}</div>
+            <div class="profile-id">
+              ID: <span class="mono">{{ session.get('user_id', '—') }}</span>
+            </div>
+            <div class="profile-joined">
+              Joined: {{ joined_at or 'Just now' }}
+            </div>
+          </div>
+          <div class="profile-balance">
+            <div class="label">Balance</div>
+            <div class="amount">₹{{ wallet_balance or 0 }}</div>
+          </div>
+        </div>
+
+        <form class="profile-form" id="profileForm">
+          <div class="form-row">
+            <label for="displayName">Display Name</label>
+            <input
+              id="displayName"
+              name="displayName"
+              type="text"
+              value="{{ username or '' }}"
+              placeholder="Enter name to show in games"
+            >
+          </div>
+
+          <div class="form-row">
+            <label for="email">Email (optional)</label>
+            <input
+              id="email"
+              name="email"
+              type="email"
+              value="{{ email or '' }}"
+              placeholder="example@mail.com"
+            >
+          </div>
+
+          <div class="form-row inline">
+            <div>
+              <label for="country">Country</label>
+              <input
+                id="country"
+                name="country"
+                type="text"
+                value="{{ country or '' }}"
+                placeholder="India"
+              >
+            </div>
+            <div>
+              <label for="phone">Phone</label>
+              <input
+                id="phone"
+                name="phone"
+                type="tel"
+                value="{{ phone or '' }}"
+                placeholder="+91-"
+              >
+            </div>
+          </div>
+
+          <button type="button" id="saveProfileBtn" class="save-btn">
+            Save Profile
+          </button>
+
+          <div id="profileStatus" class="status-text"></div>
+        </form>
+      </section>
+
+      <!-- ========== COIN TRANSACTIONS SECTION ========== -->
+      <section class="section-card" id="section-transactions">
+
+        <!-- Sub-tabs inside Coin Transactions -->
+        <div class="sub-tabs">
+          <button class="sub-tab active" data-filter="all">All</button>
+          <button class="sub-tab" data-filter="added">Updated/Added</button>
+          <button class="sub-tab" data-filter="bet">Betting</button>
+          <button class="sub-tab" data-filter="win">Winnings</button>
+          <button class="sub-tab" data-filter="balance">Adjustments</button>
+        </div>
+
+        <!-- Summary row -->
+        <div class="summary-row">
+          <div class="summary-card">
+            <div class="label">Total Added</div>
+            <div class="value" id="sumAdded">₹0</div>
+          </div>
+          <div class="summary-card">
+            <div class="label">Total Betting</div>
+            <div class="value" id="sumBet">₹0</div>
+          </div>
+          <div class="summary-card">
+            <div class="label">Total Winnings</div>
+            <div class="value" id="sumWin">₹0</div>
+          </div>
+          <div class="summary-card">
+            <div class="label">Current Balance</div>
+            <div class="value" id="sumBalance">₹{{ wallet_balance or 0 }}</div>
+          </div>
+        </div>
+
+        <!-- Transactions list -->
+        <div class="txn-header-row">
+          <span class="col col-date">Date &amp; Time</span>
+          <span class="col col-type">Type</span>
+          <span class="col col-game">Game / Note</span>
+          <span class="col col-amount">Amount</span>
+          <span class="col col-after">Balance</span>
+        </div>
+
+        <div id="txnList" class="txn-list">
+          <!-- Filled by profile.js -->
+          <div class="empty-state">
+            No transactions yet.<br>
+            Your deposits, bets and winnings will appear here.
+          </div>
+        </div>
+
+      </section>
+
+    </main>
+  </div>
+
+  <!-- DATA from backend (safe if not provided) -->
+  <script>
+    const WALLET_BALANCE = {{ wallet_balance or 0 }};
+    const TRANSACTIONS = {{ transactions|default([], true)|tojson }};
+  </script>
+  <script src="{{ url_for('static', filename='js/profile.js') }}"></script>
+</body>
+</html>
