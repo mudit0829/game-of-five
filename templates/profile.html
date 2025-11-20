@@ -10,13 +10,18 @@
   <div class="page-root">
 
     <!-- TOP BAR -->
-    <header class="top-bar">
-      <button class="back-btn" onclick="window.history.back()">
-        ←
-      </button>
-      <div class="top-title">Profile</div>
-      <div class="top-spacer"></div>
-    </header>
+   <header class="top-bar">
+  <button class="back-btn" onclick="window.history.back()">
+    ←
+  </button>
+  <div class="top-title">Profile</div>
+  <button
+    class="logout-btn"
+    onclick="window.location.href='{{ url_for('logout') }}'">
+    Logout
+  </button>
+</header>
+
 
     <!-- MAIN TABS -->
     <div class="section-tabs">
