@@ -1,21 +1,22 @@
-// ======== BASIC SETUP (DB-BASED USER) ========
+// ================= BASIC SETUP (DB USER) =================
 
-// GAME_TYPE and FIXED_BET_AMOUNT, GAME_USER_ID, GAME_USERNAME
-// are defined in the HTML template just before this script.
 const GAME = GAME_TYPE || "silver";
 
-// Use the real logged-in user/account from Flask session
+// optional: support multi-table via ?table=ROUND_CODE
+const urlParams = new URLSearchParams(window.location.search);
+const TABLE_CODE = urlParams.get("table") || null;
+
+// Real logged-in user from Flask session (passed in HTML)
 const USER_ID = GAME_USER_ID;
 const USERNAME = GAME_USERNAME || "Player";
 
-// ======== DOM REFERENCES ========
+// ================= DOM REFERENCES =================
 
 const frogImg = document.getElementById("frogSprite");
 const pondEl = frogImg ? frogImg.parentElement : document.body;
-const pads = Array.from(document.querySelectorAll(".pad")); // lily pads
+const pads = Array.from(document.querySelectorAll(".pad"));
 
 const numChips = Array.from(document.querySelectorAll(".num-chip"));
-const betInput = document.getElementById("betAmount");
 const placeBetBtn = document.getElementById("placeBetBtn");
 
 const roundIdSpan = document.getElementById("roundId");
@@ -35,7 +36,10 @@ if (userNameLabel) {
 let walletBalance = 0;
 let selectedNumber = 0;
 
-// ======== UI HELPERS ========
+let currentTable = null;
+let lastResultShown = null;
+
+// ================= UI HELPERS =================
 
 function setStatus(msg, type = "") {
   if (!statusEl) return;
@@ -63,52 +67,66 @@ function setSelectedNumber(n) {
   });
 }
 
-// update "Your bets in this game" row
 function updateMyBets(bets) {
   const myBets = (bets || []).filter((b) => b.user_id === USER_ID);
+
   if (userBetCountLabel) {
     userBetCountLabel.textContent = myBets.length;
   }
 
   if (!myBetsRow) return;
   myBetsRow.innerHTML = "";
-  myBets.forEach((b) => {
-    const chip = document.createElement("div");
+
+  if (myBets.length === 0) {
+    const span = document.createElement("span");
+    span.style.color = "#6b7280";
+    span.style.fontSize = "11px";
+    span.textContent = "none";
+    myBetsRow.appendChild(span);
+    return;
+  }
+
+  myBets.forEach((b, index) => {
+    const chip = document.createElement("span");
     chip.className = "my-bet-chip";
     chip.textContent = b.number;
     myBetsRow.appendChild(chip);
+    if (index < myBets.length - 1) {
+      myBetsRow.appendChild(document.createTextNode(", "));
+    }
   });
 }
 
-// show one username + number per pad
+// use up to 6 unique numbers into pads
 function updatePadsFromBets(bets) {
-  const uniqueBets = [];
+  const betsByNumber = {};
   (bets || []).forEach((b) => {
-    if (!uniqueBets.find((x) => x.number === b.number)) {
-      uniqueBets.push(b);
-    }
+    if (!betsByNumber[b.number]) betsByNumber[b.number] = [];
+    betsByNumber[b.number].push(b);
   });
+
+  const uniqueNumbers = Object.keys(betsByNumber).slice(0, 6);
 
   pads.forEach((pad, i) => {
     const numSpan = pad.querySelector(".pad-number");
     const userSpan = pad.querySelector(".pad-user");
     pad.classList.remove("win");
 
-    const bet = uniqueBets[i];
-
-    if (!bet) {
+    if (i < uniqueNumbers.length) {
+      const number = uniqueNumbers[i];
+      const betsOnNumber = betsByNumber[number];
+      pad.dataset.number = number;
+      if (numSpan) numSpan.textContent = number;
+      if (userSpan) userSpan.textContent = betsOnNumber[0].username;
+    } else {
       pad.dataset.number = "";
       if (numSpan) numSpan.textContent = "";
       if (userSpan) userSpan.textContent = "";
-    } else {
-      pad.dataset.number = String(bet.number);
-      if (numSpan) numSpan.textContent = bet.number;
-      if (userSpan) userSpan.textContent = bet.username;
     }
   });
 }
 
-// ======== FROG ANIMATION (unchanged) ========
+// ================= FROG ANIMATION =================
 
 function hopFrogToWinningNumber(winningNumber) {
   if (!frogImg || !pondEl) return;
@@ -134,7 +152,6 @@ function hopFrogToWinningNumber(winningNumber) {
 
   const startX = baseCenterX;
   const startY = baseCenterY;
-
   const deltaX = endX - startX;
   const deltaY = endY - startY;
 
@@ -184,20 +201,87 @@ function resetFrogPosition() {
   }, 400);
 }
 
-// ======== SOCKET.IO / BACKEND ========
+// ================= BACKEND POLLING (TABLE DATA) =================
+
+async function fetchTableData() {
+  try {
+    const res = await fetch("/api/tables/silver");
+    const data = await res.json();
+
+    if (!data.tables || !data.tables.length) {
+      setStatus("No active tables", "error");
+      return;
+    }
+
+    let table = null;
+
+    // If we have TABLE_CODE in URL, try to use that table
+    if (TABLE_CODE) {
+      table = data.tables.find((t) => t.round_code === TABLE_CODE) || null;
+    }
+
+    // Otherwise use the first table as default
+    if (!table) {
+      table = data.tables[0];
+    }
+
+    currentTable = table;
+    updateGameUI(table);
+  } catch (err) {
+    console.error("fetchTableData error", err);
+  }
+}
+
+function updateGameUI(table) {
+  if (!table) return;
+
+  if (roundIdSpan) roundIdSpan.textContent = table.round_code || "-";
+  if (playerCountSpan) playerCountSpan.textContent = table.players || 0;
+
+  if (timerText) {
+    const mins = Math.floor((table.time_remaining || 0) / 60);
+    const secs = (table.time_remaining || 0) % 60;
+    timerText.textContent = `${mins}:${secs.toString().padStart(2, "0")}`;
+  }
+
+  updatePadsFromBets(table.bets || []);
+  updateMyBets(table.bets || []);
+
+  if (placeBetBtn) {
+    placeBetBtn.disabled = !!table.is_betting_closed;
+  }
+
+  // detect new finished result to trigger frog jump
+  if (
+    table.is_finished &&
+    table.result !== null &&
+    table.result !== undefined &&
+    table.result !== lastResultShown
+  ) {
+    lastResultShown = table.result;
+    setStatus(`Winning number: ${table.result}`, "ok");
+    hopFrogToWinningNumber(table.result);
+  } else if (!table.is_finished) {
+    lastResultShown = null;
+  }
+}
+
+// poll every 2 seconds
+setInterval(fetchTableData, 2000);
+
+// ================= BALANCE / SOCKET =================
 
 const socket = io();
 
-// NEW: just read balance from DB via /balance/<USER_ID>
-async function registerUser() {
+async function fetchBalance() {
   try {
     const res = await fetch(`/balance/${USER_ID}`);
     const data = await res.json();
-    const bal =
-      data && typeof data.balance === "number" ? data.balance : 0;
-    updateWallet(bal);
+    if (typeof data.balance === "number") {
+      updateWallet(data.balance);
+    }
   } catch (err) {
-    console.error("balance error", err);
+    console.error("balance fetch error", err);
   }
 }
 
@@ -210,67 +294,8 @@ function joinGameRoom() {
 
 socket.on("connect", () => {
   joinGameRoom();
-});
-
-socket.on("connection_response", (data) => {
-  console.log("server:", data);
-});
-
-socket.on("round_data", (payload) => {
-  if (payload.game_type !== GAME) return;
-  const rd = payload.round_data || {};
-
-  if (rd.round_code) {
-    roundIdSpan.textContent = rd.round_code;
-  } else if (rd.round_number) {
-    roundIdSpan.textContent = rd.round_number;
-  }
-
-  timerText.textContent = rd.time_remaining ?? "--";
-  playerCountSpan.textContent = rd.players ?? 0;
-
-  updatePadsFromBets(rd.bets || []);
-  updateMyBets(rd.bets || []);
-});
-
-socket.on("new_round", (payload) => {
-  if (payload.game_type !== GAME) return;
-  const rd = payload.round_data || {};
-
-  if (payload.round_code) {
-    roundIdSpan.textContent = payload.round_code;
-  } else if (payload.round_number) {
-    roundIdSpan.textContent = payload.round_number;
-  }
-
-  timerText.textContent = rd.time_remaining ?? "--";
-  playerCountSpan.textContent = rd.players ?? 0;
-  updatePadsFromBets(rd.bets || []);
-  updateMyBets(rd.bets || []);
-  setStatus("New round started", "ok");
-
-  resetFrogPosition();
-});
-
-socket.on("timer_update", (payload) => {
-  if (payload.game_type !== GAME) return;
-  timerText.textContent = (payload.time_remaining ?? 0)
-    .toString()
-    .padStart(2, "0");
-  playerCountSpan.textContent = payload.players ?? 0;
-});
-
-socket.on("betting_closed", (payload) => {
-  if (payload.game_type !== GAME) return;
-  setStatus("Betting closed for this round", "error");
-});
-
-socket.on("bet_placed", (payload) => {
-  if (payload.game_type !== GAME) return;
-  const rd = payload.round_data || {};
-  updatePadsFromBets(rd.bets || []);
-  updateMyBets(rd.bets || []);
-  playerCountSpan.textContent = rd.players ?? 0;
+  fetchBalance();
+  fetchTableData();
 });
 
 socket.on("bet_success", (payload) => {
@@ -278,21 +303,15 @@ socket.on("bet_success", (payload) => {
   if (typeof payload.new_balance === "number") {
     updateWallet(payload.new_balance);
   }
+  // refresh table data to see new bets
+  fetchTableData();
 });
 
 socket.on("bet_error", (payload) => {
   setStatus(payload.message || "Bet error", "error");
 });
 
-socket.on("round_result", (payload) => {
-  if (payload.game_type !== GAME) return;
-  const winning = payload.result;
-  if (winning === undefined || winning === null) return;
-  setStatus(`Winning number: ${winning}`, "ok");
-  hopFrogToWinningNumber(winning);
-});
-
-// ======== UI EVENTS ========
+// ================= UI EVENTS =================
 
 numChips.forEach((chip) => {
   chip.addEventListener("click", () => {
@@ -321,8 +340,9 @@ if (placeBetBtn) {
   });
 }
 
-// ======== INIT ========
+// ================= INIT =================
 
-registerUser().then(joinGameRoom);
+fetchBalance();
+fetchTableData();
 setSelectedNumber(0);
 setStatus("");
