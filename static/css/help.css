@@ -1,0 +1,336 @@
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  padding: 0;
+  font-family: system-ui, -apple-system, BlinkMacSystemFont, "SF Pro Display", sans-serif;
+  background: radial-gradient(circle at top, #020617 0, #020617 40%, #020314 100%);
+  color: #e5e7eb;
+}
+
+.page-root {
+  max-width: 480px;
+  margin: 0 auto;
+  min-height: 100vh;
+  padding: 10px 10px 16px;
+}
+
+/* ===== TOP BAR ===== */
+
+.top-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 8px;
+}
+
+.back-btn {
+  border: none;
+  background: rgba(15,23,42,0.9);
+  color: #e5e7eb;
+  border-radius: 999px;
+  width: 32px;
+  height: 32px;
+  font-size: 16px;
+  cursor: pointer;
+}
+
+.top-title {
+  font-size: 18px;
+  font-weight: 800;
+}
+
+.top-spacer {
+  width: 32px;
+}
+
+/* ===== MAIN TABS ===== */
+
+.section-tabs {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+
+.section-tabs .tab {
+  flex: 1;
+  padding: 7px 0;
+  border-radius: 999px;
+  text-align: center;
+  font-size: 13px;
+  font-weight: 600;
+  background: rgba(15,23,42,0.9);
+  color: #9ca3af;
+  border: none;
+  cursor: pointer;
+}
+
+.section-tabs .tab.active {
+  background: linear-gradient(90deg, #6366f1, #ec4899);
+  color: #f9fafb;
+}
+
+/* ===== SECTIONS ===== */
+
+.content {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.section-card {
+  display: none;
+  background: rgba(15,23,42,0.96);
+  border-radius: 18px;
+  padding: 12px;
+  box-shadow: 0 16px 30px rgba(0,0,0,0.55);
+}
+
+.section-card.active-section {
+  display: block;
+}
+
+/* ===== CONTACT FORM ===== */
+
+.help-intro h2 {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 700;
+}
+
+.help-intro p {
+  margin: 4px 0 8px;
+  font-size: 12px;
+  color: #9ca3af;
+}
+
+.help-form {
+  margin-top: 6px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.form-row {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.form-row label {
+  font-size: 12px;
+  color: #9ca3af;
+}
+
+.form-row input[type="text"],
+.form-row select,
+.form-row textarea,
+.form-row input[type="file"] {
+  border-radius: 12px;
+  border: 1px solid #1d4ed8;
+  background: rgba(15,23,42,0.96);
+  padding: 8px 10px;
+  color: #f9fafb;
+  font-size: 13px;
+}
+
+.form-row textarea {
+  border-radius: 16px;
+  resize: vertical;
+}
+
+.form-row input::placeholder,
+.form-row textarea::placeholder {
+  color: #6b7280;
+}
+
+.file-hint {
+  font-size: 11px;
+  color: #6b7280;
+}
+
+.submit-btn {
+  margin-top: 4px;
+  border: none;
+  width: 100%;
+  padding: 10px 0;
+  border-radius: 999px;
+  background: linear-gradient(90deg, #22c55e, #38bdf8);
+  color: #020617;
+  font-weight: 800;
+  font-size: 14px;
+  cursor: pointer;
+  box-shadow: 0 8px 16px rgba(22,163,74,0.7);
+}
+
+.submit-btn:active {
+  transform: translateY(1px) scale(0.99);
+  box-shadow: 0 4px 10px rgba(22,163,74,0.5);
+}
+
+.status-text {
+  margin-top: 4px;
+  font-size: 12px;
+  color: #9ca3af;
+}
+
+/* ===== COMPLAINTS LIST ===== */
+
+.section-header h2 {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 700;
+}
+
+.section-sub {
+  display: block;
+  margin-top: 2px;
+  font-size: 12px;
+  color: #9ca3af;
+}
+
+.complaints-list {
+  margin-top: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.complaint-card {
+  background: radial-gradient(circle at top, #020617, #020617 60%, #020314 100%);
+  border-radius: 14px;
+  padding: 8px 10px;
+}
+
+.complaint-card > .complaint-main,
+.complaint-card > .complaint-side {
+  display: inline-block;
+  vertical-align: top;
+}
+
+.complaint-main {
+  width: 60%;
+}
+
+.complaint-side {
+  width: 40%;
+  text-align: right;
+}
+
+.complaint-id {
+  font-size: 11px;
+  color: #9ca3af;
+}
+
+.mono {
+  font-family: "SF Mono", ui-monospace, Menlo, Monaco, Consolas, "Courier New", monospace;
+}
+
+.complaint-subject {
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.complaint-meta {
+  font-size: 11px;
+  color: #9ca3af;
+}
+
+.status-pill {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.status-open {
+  background: rgba(234, 179, 8, 0.18);
+  color: #facc15;
+}
+
+.status-closed {
+  background: rgba(34, 197, 94, 0.18);
+  color: #4ade80;
+}
+
+.complaint-updated {
+  font-size: 11px;
+  color: #9ca3af;
+  margin-top: 2px;
+}
+
+.details-btn {
+  margin-top: 4px;
+  padding: 3px 8px;
+  border-radius: 999px;
+  border: 1px solid rgba(148,163,184,0.6);
+  background: transparent;
+  color: #e5e7eb;
+  font-size: 11px;
+  cursor: pointer;
+}
+
+/* Details area (collapsible) */
+
+.complaint-details {
+  margin-top: 6px;
+  padding-top: 6px;
+  border-top: 1px solid rgba(31,41,55,0.8);
+  display: none;
+}
+
+.complaint-card.show-details .complaint-details {
+  display: block;
+}
+
+.details-label {
+  font-size: 11px;
+  color: #9ca3af;
+  margin-top: 4px;
+}
+
+.details-text {
+  font-size: 12px;
+}
+
+.updates-list {
+  list-style: none;
+  margin: 4px 0 0;
+  padding: 0;
+  font-size: 11px;
+}
+
+.updates-list li {
+  margin-bottom: 2px;
+}
+
+.update-time {
+  color: #9ca3af;
+  margin-right: 4px;
+}
+
+.empty-state {
+  text-align: center;
+  font-size: 13px;
+  color: #9ca3af;
+  margin-top: 12px;
+}
+
+/* Small screens */
+
+@media (max-width: 380px) {
+  .complaint-main,
+  .complaint-side {
+    width: 100%;
+    text-align: left;
+  }
+
+  .complaint-side {
+    margin-top: 4px;
+  }
+}
