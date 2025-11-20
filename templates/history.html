@@ -2,69 +2,64 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <title>History – TRADEERA</title>
+  <title>History</title>
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <link
-    href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800;900&display=swap"
     rel="stylesheet"
+    href="{{ url_for('static', filename='css/history.css') }}"
   />
-  <link rel="stylesheet" href="{{ url_for('static', filename='css/history.css') }}" />
 </head>
 <body>
-<div class="page-root">
-  <!-- Top Bar -->
-  <header class="top-bar">
-    <button class="back-btn" onclick="window.location.href='{{ url_for('home') }}'">
-      ←
-    </button>
-    <h1 class="page-title">History</h1>
-    <div class="top-spacer"></div>
-  </header>
+  <div class="screen-root">
+    <!-- Header -->
+    <header class="history-header">
+      <button class="back-btn" onclick="window.location.href='{{ url_for('home') }}'">
+        ←
+      </button>
+      <h1 class="history-title">History</h1>
+    </header>
 
-  <!-- Tabs -->
-  <div class="tab-strip">
-    <button id="tabCurrent" class="tab-btn active">Current Games</button>
-    <button id="tabHistory" class="tab-btn">Game History</button>
+    <!-- Tabs -->
+    <div class="history-tabs">
+      <button class="tab-btn active" id="tab-current">Current Games</button>
+      <button class="tab-btn" id="tab-history">Game History</button>
+    </div>
+
+    <!-- CURRENT GAMES PANEL -->
+    <section class="panel" id="current-section">
+      <div class="panel-header">
+        <div class="panel-title">Current Games</div>
+        <div class="panel-subtitle">Bets placed · Result pending</div>
+      </div>
+
+      <div id="current-empty" class="empty-state">
+        <p>No active games right now.</p>
+        <p class="hint">Place a bet to see it here.</p>
+      </div>
+
+      <div id="currentList" class="cards-list"></div>
+    </section>
+
+    <!-- GAME HISTORY PANEL -->
+    <section class="panel" id="history-section" style="display:none;">
+      <div class="panel-header">
+        <div class="panel-title">Game History</div>
+        <div class="panel-subtitle">Completed games · Last 7 days</div>
+      </div>
+
+      <div id="history-empty" class="empty-state">
+        <p>No games played yet.</p>
+        <p class="hint">Your completed games will appear here.</p>
+      </div>
+
+      <div id="historyList" class="cards-list"></div>
+    </section>
   </div>
 
-  <!-- Content -->
-  <main class="content">
-    <!-- CURRENT GAMES CARD -->
-    <section id="currentCard" class="card">
-      <div class="card-header">
-        <div class="card-title">Current Games</div>
-        <div class="card-subtitle">Bets placed · Result pending</div>
-      </div>
-
-      <div id="currentList" class="list">
-        <div class="empty-state">
-          <p>No active games right now.</p>
-          <p class="hint">Place a bet to see it here.</p>
-        </div>
-      </div>
-    </section>
-
-    <!-- GAME HISTORY CARD -->
-    <section id="historyCard" class="card hidden">
-      <div class="card-header">
-        <div class="card-title">Game History</div>
-        <div class="card-subtitle">Completed games · Last 7 days</div>
-      </div>
-
-      <div id="historyList" class="list">
-        <div class="empty-state">
-          <p>No games played yet.</p>
-          <p class="hint">Your completed games will appear here.</p>
-        </div>
-      </div>
-    </section>
-  </main>
-</div>
-
-<script>
-  // Logged-in DB user id from Flask session
-  const GAME_USER_ID = {{ session.get('user_id')|tojson }};
-</script>
-<script src="{{ url_for('static', filename='js/history.js') }}"></script>
+  <!-- Expose logged-in user id to JS -->
+  <script>
+    window.CURRENT_USER_ID = {{ session.get('user_id', 0) }};
+  </script>
+  <script src="{{ url_for('static', filename='js/history.js') }}"></script>
 </body>
 </html>
