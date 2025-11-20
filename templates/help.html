@@ -1,0 +1,163 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Help – TRADEERA</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/help.css') }}">
+</head>
+<body>
+  <div class="page-root">
+
+    <!-- TOP BAR -->
+    <header class="top-bar">
+      <button class="back-btn" onclick="window.history.back()">
+        ←
+      </button>
+      <div class="top-title">Help &amp; Support</div>
+      <div class="top-spacer"></div>
+    </header>
+
+    <!-- MAIN TABS -->
+    <div class="section-tabs">
+      <button class="tab active" data-target="contact">Contact Support</button>
+      <button class="tab" data-target="complaints">My Complaints</button>
+    </div>
+
+    <main class="content">
+
+      <!-- ========== CONTACT SUPPORT SECTION ========== -->
+      <section class="section-card active-section" id="section-contact">
+        <div class="help-intro">
+          <h2>Send us a message</h2>
+          <p>
+            Describe your issue in any language and attach a screenshot if needed.
+            We’ll respond to your registered email.
+          </p>
+        </div>
+
+        <form id="helpForm" class="help-form" enctype="multipart/form-data">
+          <div class="form-row">
+            <label for="subject">Subject</label>
+            <input
+              id="subject"
+              name="subject"
+              type="text"
+              placeholder="Payment issue, game problem, feedback..."
+              required
+            >
+          </div>
+
+          <div class="form-row">
+            <label for="category">Category</label>
+            <select id="category" name="category">
+              <option value="General">General</option>
+              <option value="Payment">Payment / Coins</option>
+              <option value="Game Issue">Game Issue</option>
+              <option value="Account">Account / Login</option>
+              <option value="Feedback">Feedback / Suggestion</option>
+            </select>
+          </div>
+
+          <div class="form-row">
+            <label for="message">Message (any language)</label>
+            <textarea
+              id="message"
+              name="message"
+              rows="4"
+              placeholder="Please describe your issue..."
+              required
+            ></textarea>
+          </div>
+
+          <div class="form-row">
+            <label for="attachment">Attachment (optional)</label>
+            <input
+              id="attachment"
+              name="attachment"
+              type="file"
+              accept="image/*,.pdf,.txt,.zip,.rar"
+            >
+            <div class="file-hint">You can attach screenshot or document (max few MB).</div>
+          </div>
+
+          <button type="submit" class="submit-btn">
+            Submit Complaint
+          </button>
+
+          <div id="helpStatus" class="status-text"></div>
+        </form>
+      </section>
+
+      <!-- ========== MY COMPLAINTS SECTION ========== -->
+      <section class="section-card" id="section-complaints">
+        <div class="section-header">
+          <h2>My Complaints</h2>
+          <span class="section-sub">Track your complaint IDs and status</span>
+        </div>
+
+        <div id="complaintsList" class="complaints-list">
+          {% if complaints and complaints|length > 0 %}
+            {% for c in complaints %}
+            <article class="complaint-card" data-id="{{ c.id }}">
+              <div class="complaint-main">
+                <div class="complaint-id">
+                  ID: <span class="mono">{{ c.id }}</span>
+                </div>
+                <div class="complaint-subject">
+                  {{ c.subject }}
+                </div>
+                <div class="complaint-meta">
+                  {{ c.category }} • {{ c.created_at }}
+                </div>
+              </div>
+              <div class="complaint-side">
+                <div class="status-pill status-{{ c.status|lower }}">
+                  {{ c.status }}
+                </div>
+                <div class="complaint-updated">
+                  Last update: {{ c.last_update }}
+                </div>
+                <button class="details-btn" type="button">
+                  Details
+                </button>
+              </div>
+
+              <div class="complaint-details">
+                <div class="details-label">Message</div>
+                <div class="details-text">
+                  {{ c.message }}
+                </div>
+                {% if c.original_filename %}
+                <div class="details-label">Attachment</div>
+                <div class="details-text">
+                  {{ c.original_filename }}
+                </div>
+                {% endif %}
+                <div class="details-label">Updates</div>
+                <ul class="updates-list">
+                  {% for u in c.updates %}
+                  <li>
+                    <span class="update-time">{{ u.time }}</span>
+                    <span class="update-text">{{ u.text }}</span>
+                  </li>
+                  {% endfor %}
+                </ul>
+              </div>
+            </article>
+            {% endfor %}
+          {% else %}
+            <div class="empty-state">
+              No complaints yet.<br>
+              Submit a complaint and it will appear here.
+            </div>
+          {% endif %}
+        </div>
+      </section>
+
+    </main>
+  </div>
+
+  <script src="{{ url_for('static', filename='js/help.js') }}"></script>
+</body>
+</html>
