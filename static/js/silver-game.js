@@ -10,8 +10,8 @@ const TABLE_CODE = urlParams.get("table") || null;
 const USER_ID = GAME_USER_ID;
 const USERNAME = GAME_USERNAME || "Player";
 
-// URLs for popup buttons (change HOME_URL if needed)
-const HOME_URL = "/home2"; // TODO: change if your home route is different
+// Where popup "Home" button goes
+const HOME_URL = "/home";
 
 // ================= DOM REFERENCES =================
 
@@ -120,10 +120,16 @@ function updateMyBets(bets) {
     const span = document.createElement("span");
     span.style.color = "#6b7280";
     span.style.fontSize = "11px";
-    span.textContent = "none";
+    span.textContent = "Your bets: none";
     myBetsRow.appendChild(span);
     return;
   }
+
+  const label = document.createElement("span");
+  label.style.color = "#9ca3af";
+  label.style.fontSize = "11px";
+  label.textContent = "Your bets: ";
+  myBetsRow.appendChild(label);
 
   myBets.forEach((b, index) => {
     const chip = document.createElement("span");
@@ -155,7 +161,7 @@ function updatePadsFromBets(bets) {
     } else {
       pad.dataset.number = "";
       if (numSpan) numSpan.textContent = "";
-      if (userSpan) numSpan && (userSpan.textContent = "");
+      if (userSpan) userSpan.textContent = "";
     }
   });
 }
@@ -515,7 +521,7 @@ if (placeBetBtn) {
       return;
     }
 
-    // ===== NEW: one number can be used only once in this game =====
+    // one number can be used only once in this game
     if (
       currentTable &&
       Array.isArray(currentTable.bets) &&
