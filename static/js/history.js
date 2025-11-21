@@ -1,89 +1,24 @@
-// For same-domain backend:
-const socket = io();
+// Simple History page logic: tabs + fetch from /api/user-games
 
-// Helper: format seconds as MM:SS
 function formatTime(sec) {
-  const s = Math.max(0, parseInt(sec, 10) || 0);
-  const minutes = Math.floor(s / 60);
-  const seconds = s % 60;
-  return (
-    String(minutes).padStart(2, "0") +
-    ":" +
-    String(seconds).padStart(2, "0")
-  );
+  const s = Math.max(0, parseInt(sec || 0, 10));
+  const m = Math.floor(s / 60);
+  const r = s % 60;
+  return `${String(m).padStart(2, "0")}:${String(r).padStart(2, "0")}`;
 }
 
-function getCard(gameCode, roundNumber) {
-  return document.querySelector(
-    `.game-card[data-game-code="${gameCode}"][data-round-number="${roundNumber}"]`
-  );
-}
-
-function updateTimerForGame(gameCode, roundNumber, remainingSeconds) {
-  const card = getCard(gameCode, roundNumber);
-  if (!card) return;
-  if (card.dataset.status !== "pending") return; // ignore finished games
-
-  const timerEl = card.querySelector(".timer-value");
-  if (!timerEl) return;
-
-  timerEl.textContent = formatTime(remainingSeconds);
-}
-
-function moveCardToHistory(gameCode, roundNumber, result, userOutcome) {
-  const card = getCard(gameCode, roundNumber);
-  if (!card) return;
-
-  // Update UI inside card
-  card.dataset.status = "completed";
-  const statusPill = card.querySelector(".status-pill");
-  if (statusPill) {
-    statusPill.textContent = "Completed";
-    statusPill.classList.remove("status-pending");
-    statusPill.classList.add("status-completed");
-  }
-
-  const resultText = card.querySelector(".game-result-text");
-  if (resultText) {
-    if (userOutcome === "win") {
-      resultText.textContent = `You won · Result: ${result}`;
-    } else if (userOutcome === "lose") {
-      resultText.textContent = `You lost · Result: ${result}`;
-    } else {
-      resultText.textContent = `Result: ${result}`;
-    }
-  }
-
-  const timerRow = card.querySelector(".timer-row");
-  if (timerRow) {
-    timerRow.style.opacity = 0.6;
-  }
-
-  const btn = card.querySelector(".open-game-btn");
-  if (btn) {
-    btn.textContent = "View result";
-    btn.disabled = true; // IMPORTANT: cannot open a new live game from history
-  }
-
-  // Remove from Current section and place into History section
-  const historyContainer = document.getElementById("historyGames");
-  card.parentNode.removeChild(card);
-  historyContainer.appendChild(card);
-}
-
-// Tabs: switch visibility between current & past
 function setupTabs() {
   const tabs = document.querySelectorAll(".tab");
-  const currentSection = document.getElementById("currentGames");
-  const historySection = document.getElementById("historyGames");
+  const currentSection = document.getElementById("currentSection");
+  const historySection = document.getElementById("historySection");
 
   tabs.forEach((tab) => {
     tab.addEventListener("click", () => {
       tabs.forEach((t) => t.classList.remove("active"));
       tab.classList.add("active");
 
-      const target = tab.dataset.tab;
-      if (target === "current") {
+      const which = tab.dataset.tab;
+      if (which === "current") {
         currentSection.classList.remove("hidden");
         historySection.classList.add("hidden");
       } else {
@@ -94,65 +29,133 @@ function setupTabs() {
   });
 }
 
-// Current-game button clicks → open live game window for that game/round
-function setupOpenButtons() {
-  document.querySelectorAll(".game-card[data-status='pending']").forEach((card) => {
-    const btn = card.querySelector(".open-game-btn");
-    if (!btn) return;
+function renderGameCard(game, isCurrent) {
+  // game structure comes from /api/user-games in app.py
+  const card = document.createElement("div");
+  card.className = "game-card";
+
+  const gameType = game.game_type || "silver";
+  const roundCode = game.round_code || "-";
+  const bets = game.user_bets || [];
+  const betCount = bets.length;
+  const status = game.status || (isCurrent ? "pending" : "completed");
+  const winningNumber =
+    typeof game.winning_number === "number" ? game.winning_number : null;
+  const amount = game.amount || 0;
+
+  const isWin = status === "win" || amount > 0;
+  const isLose = status === "lose" || amount < 0;
+
+  if (!isCurrent) {
+    if (isWin) card.classList.add("win");
+    else if (isLose) card.classList.add("lose");
+  }
+
+  const statusClass = isCurrent ? "status-pending" : "status-completed";
+  const statusLabel = isCurrent ? "Pending" : "Completed";
+
+  card.innerHTML = `
+    <div class="game-card-header">
+      <span class="game-id">${roundCode}</span>
+      <span class="status-pill ${statusClass}">${statusLabel}</span>
+    </div>
+
+    <div class="game-info">
+      <div class="game-name">${gameType}</div>
+      <div class="game-bets">
+        <span>Your bets:</span>
+        <span class="bet-count">${betCount}</span>
+      </div>
+      <div class="game-result-text">
+        ${
+          isCurrent
+            ? "Waiting for result..."
+            : isWin
+            ? `You won · Result: ${winningNumber}`
+            : isLose
+            ? `You lost · Result: ${winningNumber}`
+            : `Result: ${winningNumber ?? "--"}`
+        }
+      </div>
+      <div class="timer-row">
+        <span class="timer-label">Time:</span>
+        <span class="timer-value">${
+          game.time_remaining != null
+            ? formatTime(game.time_remaining)
+            : "--:--"
+        }</span>
+      </div>
+    </div>
+  `;
+
+  const btn = document.createElement("button");
+  btn.className = "open-game-btn";
+
+  if (isCurrent) {
+    btn.textContent = "Go to game";
+    btn.disabled = false;
     btn.addEventListener("click", () => {
-      const gameCode = card.dataset.gameCode;
-      // This opens the live window for that game.
-      // If your live page is different, change the URL here:
-      window.location.href = `/game/${gameCode}`;
+      // open the correct game + table
+      window.location.href = `/play/${gameType}?table=${encodeURIComponent(
+        roundCode
+      )}`;
     });
-  });
+  } else {
+    btn.textContent = "View result";
+    btn.disabled = true; // just info, no new game
+  }
+
+  card.appendChild(btn);
+  return card;
 }
 
-socket.on("connect", () => {
-  console.log("✅ Connected to server", socket.id);
+async function loadHistory() {
+  const currentWrap = document.getElementById("currentGames");
+  const historyWrap = document.getElementById("historyGames");
 
-  // Join room for each gameCode once (for timers)
-  const uniqueGameCodes = new Set();
-  document
-    .querySelectorAll(".game-card[data-game-code]")
-    .forEach((card) => {
-      uniqueGameCodes.add(card.dataset.gameCode);
-    });
+  currentWrap.innerHTML =
+    '<div class="empty-message">Loading your games…</div>';
+  historyWrap.innerHTML =
+    '<div class="empty-message">Loading your games…</div>';
 
-  uniqueGameCodes.forEach((gameCode) => {
-    socket.emit("join_game", { game_code: gameCode });
-    socket.emit("request_state", { game_code: gameCode });
-  });
-});
+  try {
+    const res = await fetch(`/api/user-games?user_id=${CURRENT_USER_ID}`);
+    const data = await res.json();
 
-// Full round state when requested / on join
-socket.on("round_state", (data) => {
-  if (!data || !data.game_code) return;
-  const { game_code, round_number, remaining_seconds } = data;
+    const currentGames = data.current_games || [];
+    const historyGames = data.game_history || [];
 
-  // Only update cards that belong to this exact round number
-  updateTimerForGame(game_code, String(round_number), remaining_seconds);
-});
+    // CURRENT
+    currentWrap.innerHTML = "";
+    if (!currentGames.length) {
+      currentWrap.innerHTML =
+        '<div class="empty-message">No current games. Place a bet to start playing!</div>';
+    } else {
+      currentGames.forEach((g) => {
+        currentWrap.appendChild(renderGameCard(g, true));
+      });
+    }
 
-// Per-second updates
-socket.on("timer_update", (data) => {
-  if (!data || !data.game_code) return;
-  const { game_code, round_number, remaining_seconds } = data;
-  updateTimerForGame(game_code, String(round_number), remaining_seconds);
-});
-
-// When round finishes
-socket.on("round_result", (data) => {
-  if (!data || !data.game_code) return;
-  const { game_code, round_number, result, user_outcome } = data;
-
-  moveCardToHistory(game_code, String(round_number), result, user_outcome);
-});
-
-// We ignore "new_round" here on purpose, because a card represents
-// ONE specific game/round only and must not change to the next round.
+    // HISTORY
+    historyWrap.innerHTML = "";
+    if (!historyGames.length) {
+      historyWrap.innerHTML =
+        '<div class="empty-message">No completed games yet.</div>';
+    } else {
+      historyGames.forEach((g) => {
+        historyWrap.appendChild(renderGameCard(g, false));
+      });
+    }
+  } catch (err) {
+    console.error("Error loading history:", err);
+    currentWrap.innerHTML =
+      '<div class="empty-message">Could not load history.</div>';
+    historyWrap.innerHTML =
+      '<div class="empty-message">Could not load history.</div>';
+  }
+}
 
 document.addEventListener("DOMContentLoaded", () => {
   setupTabs();
-  setupOpenButtons();
+  loadHistory();
 });
