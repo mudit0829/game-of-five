@@ -850,6 +850,67 @@ def help_tickets_api():
 
 
 # ---------------------------------------------------
+# Coins / Redeem
+# ---------------------------------------------------
+
+
+@app.route("/coins")
+@login_required
+def coins_page():
+    """Coins / redeem page."""
+    user_id = session.get("user_id")
+    user = User.query.get(user_id)
+    if not user:
+        return redirect(url_for("logout"))
+
+    wallet = ensure_wallet_for_user(user)
+    return render_template(
+        "coins.html",
+        username=user.username,
+        balance=wallet.balance,
+    )
+
+
+@app.route("/api/coins/redeem", methods=["POST"])
+@login_required
+def redeem_coins():
+    """Redeem coins from wallet (simple demo – just subtracts balance)."""
+    user_id = session.get("user_id")
+    user = User.query.get(user_id)
+    if not user:
+        return jsonify({"success": False, "message": "User not found"}), 404
+
+    wallet = ensure_wallet_for_user(user)
+
+    data = request.get_json() or {}
+    try:
+        amount = int(data.get("amount", 0))
+    except (TypeError, ValueError):
+        amount = 0
+
+    if amount <= 0:
+        return jsonify(
+            {"success": False, "message": "Enter a valid integer amount"}
+        ), 400
+
+    if amount > wallet.balance:
+        return jsonify(
+            {"success": False, "message": "You don’t have that many coins"}
+        ), 400
+
+    wallet.balance -= amount
+    db.session.commit()
+
+    return jsonify(
+        {
+            "success": True,
+            "message": f"{amount} coins redeemed successfully.",
+            "new_balance": wallet.balance,
+        }
+    )
+
+
+# ---------------------------------------------------
 # Balance API
 # ---------------------------------------------------
 
