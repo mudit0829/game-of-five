@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Redeem Coins – TRADEERA</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <link
+    rel="stylesheet"
+    href="{{ url_for('static', filename='css/coins.css') }}"
+  />
+</head>
+<body>
+  <div class="coins-screen">
+    <!-- HEADER -->
+    <header class="coins-header">
+      <button
+        type="button"
+        class="back-btn"
+        onclick="window.location.href='{{ url_for('home') }}'"
+      >
+        &#8592;
+      </button>
+      <h1>Coins</h1>
+    </header>
+
+    <!-- BALANCE CARD -->
+    <section class="balance-card">
+      <div class="balance-label">Total Coins Available</div>
+      <div class="balance-value" id="coinsAvailable">
+        {{ balance }}
+      </div>
+      <div class="balance-sub">
+        Total Redeemable Coins: <span id="coinsRedeemable">{{ balance }}</span>
+      </div>
+    </section>
+
+    <!-- REDEEM FORM -->
+    <section class="redeem-section">
+      <h2>Redeem Coins</h2>
+      <p class="redeem-help">
+        Enter how many coins you want to redeem. Only whole numbers are allowed.
+      </p>
+
+      <form id="redeemForm" class="redeem-form">
+        <label for="redeemAmount">Coins to redeem</label>
+        <input
+          id="redeemAmount"
+          name="redeemAmount"
+          type="number"
+          min="1"
+          step="1"
+          placeholder="Enter coins (e.g. 500)"
+          required
+        />
+
+        <button type="submit" class="redeem-btn">
+          Redeem
+        </button>
+      </form>
+
+      <div id="redeemStatus" class="redeem-status"></div>
+    </section>
+  </div>
+
+  <script>
+    const INITIAL_BALANCE = {{ balance|int }};
+  </script>
+  <script src="{{ url_for('static', filename='js/coins.js') }}"></script>
+</body>
+</html>
