@@ -309,7 +309,6 @@ function dropParatrooperToWinningNumber(winningNumber) {
   }
 
   const boatRect = targetBoat.getBoundingClientRect();
-  const viewportHeight = window.innerHeight;
 
   const targetX = boatRect.left + boatRect.width / 2;
   const targetY = boatRect.top + boatRect.height * 0.3;
@@ -439,13 +438,14 @@ function updateGameUI(table) {
   );
   const hasUserBet = myBets.length > 0;
 
-  // if slots are full / betting closed / finished AND user has no bet, auto back
   const slotsFull =
     (typeof table.slots_available === "number" &&
       table.slots_available <= 0) ||
     (typeof table.max_players === "number" &&
-      table.players >= table.max_players);
+      table.players >= table.max_players) ||
+    table.is_full === true;
 
+  // if slots are full / betting closed / finished AND user has no bet, auto back
   if (
     !hasUserBet &&
     (slotsFull || table.is_betting_closed || table.is_finished) &&
@@ -461,11 +461,11 @@ function updateGameUI(table) {
     return;
   }
 
-  // Disable betting when betting closed / finished
-  if (table.is_betting_closed || table.is_finished) {
+  // Disable betting when betting closed / finished / slots full
+  if (table.is_betting_closed || table.is_finished || slotsFull) {
     disableBettingUI();
   } else {
-    // enable if still open
+    // enable if still open and not full
     placeBetBtn.disabled = false;
     document.querySelectorAll(".num-chip").forEach((chip) => {
       chip.disabled = false;
@@ -573,6 +573,20 @@ if (placeBetBtn) {
       return;
     }
 
+    const slotsFull =
+      (typeof currentTable.slots_available === "number" &&
+        currentTable.slots_available <= 0) ||
+      (typeof currentTable.max_players === "number" &&
+        currentTable.players >= currentTable.max_players) ||
+      currentTable.is_full === true;
+
+    // HARD STOP: once all 6 slots are full, no more bets from anyone
+    if (slotsFull) {
+      setStatus("All slots are full for this game.", "error");
+      disableBettingUI();
+      return;
+    }
+
     if (walletBalance < FIXED_BET_AMOUNT) {
       setStatus("Insufficient balance", "error");
       return;
@@ -583,7 +597,7 @@ if (placeBetBtn) {
       return;
     }
 
-    // no duplicate bet on the same number for this user
+    // per-user duplicate prevention (safe, uses only this user's bets)
     const myBets =
       (currentTable.bets || []).filter(
         (b) => String(b.user_id) === String(USER_ID)
