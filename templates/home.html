@@ -3,38 +3,30 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>TRADEERA Roulette</title>
+  <title>PlayOn – Home</title>
   <link rel="stylesheet" href="{{ url_for('static', filename='css/home.css') }}">
 </head>
 <body>
   <div class="app-container">
 
-    <!-- STATUS BAR -->
-    <div class="status-bar">
-      <div class="status-left">9:41</div>
-      <div class="status-right">
-        <div class="sb-icon"></div>
-        <div class="sb-icon"></div>
-        <div class="sb-icon"></div>
-      </div>
-    </div>
-
     <!-- TOP HEADER -->
     <header class="top-header">
       <div class="brand-section">
-        <h1 class="brand-name">TRADEERA</h1>
-        <p class="brand-subtitle">Roulette</p>
+        <!-- Replace TRADEERA with logo image -->
+        <img src="{{ url_for('static', filename='img/playon-logo.png') }}" alt="PlayOn" class="brand-logo" style="height:36px;"/>
+        <!-- Underline subtitle with logged-in user -->
+        <p class="brand-subtitle" style="font-size:15px;font-weight:700;color:#60a5fa;">
+          Roulette &nbsp;|&nbsp;
+          <span id="homeUsername">{{ username }}</span>
+        </p>
       </div>
-
       <div class="user-section">
-        <!-- COINS PILL (CLICKABLE → /coins) -->
         <div class="balance-pill" id="coinsPill">
           <div class="coin-icon">
             <img src="{{ url_for('static', filename='img/coin.png') }}" alt="Coins">
           </div>
           <span id="walletBalance">0</span>
         </div>
-
         <div class="profile-circle" onclick="window.location.href='/profile'">
           <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor">
             <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
@@ -65,13 +57,9 @@
         </div>
       </section>
 
-      <!-- GAME CARDS -->
       <section class="games-section">
         <h3 class="section-title">Silver</h3>
-
         <div class="games-grid">
-
-          <!-- SILVER -->
           <div class="game-card silver-card" onclick="window.location.href='/game/silver'">
             <div class="game-icon">
               <img src="{{ url_for('static', filename='img/frog_icon.png') }}" alt="Silver" />
@@ -79,8 +67,6 @@
             <div class="game-name game-name-silver">Silver</div>
             <div class="game-bet">Bet ₹ 200</div>
           </div>
-
-          <!-- GOLD -->
           <div class="game-card gold-card" onclick="window.location.href='/game/gold'">
             <div class="game-icon">
               <img src="{{ url_for('static', filename='img/football_goal.png') }}" alt="Gold" />
@@ -88,8 +74,6 @@
             <div class="game-name game-name-gold">GOLD</div>
             <div class="game-bet">Bet ₹ 250</div>
           </div>
-
-          <!-- DIAMOND -->
           <div class="game-card diamond-card" onclick="window.location.href='/game/diamond'">
             <div class="game-icon">
               <img src="{{ url_for('static', filename='img/diamond_ball.png') }}" alt="Diamond" />
@@ -97,8 +81,6 @@
             <div class="game-name game-name-diamond">DIAMOND</div>
             <div class="game-bet">Bet ₹ 100</div>
           </div>
-
-          <!-- PLATINUM -->
           <div class="game-card platinum-card" onclick="window.location.href='/game/platinum'">
             <div class="game-icon">
               <img src="{{ url_for('static', filename='img/platinum_rider.png') }}" alt="Platinum" />
@@ -106,12 +88,10 @@
             <div class="game-name game-name-platinum">PLATINUM</div>
             <div class="game-bet">Bet ₹ 1000</div>
           </div>
-
         </div>
       </section>
     </main>
 
-    <!-- BOTTOM NAVIGATION -->
     <nav class="bottom-nav">
       <div class="nav-item active" onclick="window.location.href='/home'">
         <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor">
@@ -120,7 +100,6 @@
         </svg>
         <span>Home</span>
       </div>
-
       <div class="nav-item" onclick="window.location.href='/history'">
         <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor">
           <circle cx="12" cy="12" r="9" />
@@ -128,7 +107,6 @@
         </svg>
         <span>History</span>
       </div>
-
       <div class="nav-item" onclick="window.location.href='/profile'">
         <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor">
           <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
@@ -136,7 +114,6 @@
         </svg>
         <span>Profile</span>
       </div>
-
       <div class="nav-item" onclick="window.location.href='/help'">
         <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor">
           <circle cx="12" cy="12" r="9" />
@@ -148,7 +125,6 @@
     </nav>
 
   </div>
-
   <script src="{{ url_for('static', filename='js/home.js') }}"></script>
 </body>
 </html>
