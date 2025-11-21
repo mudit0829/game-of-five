@@ -183,6 +183,20 @@ function showEndPopup(outcomeInfo) {
   popupEl.style.display = "flex";
 }
 
+// NEW: keep URL's ?table= in sync with the actual table we're using
+function syncUrlWithTable(roundCode) {
+  if (!roundCode) return;
+  try {
+    const url = new URL(window.location.href);
+    const currentParam = url.searchParams.get("table");
+    if (currentParam === roundCode) return;
+    url.searchParams.set("table", roundCode);
+    window.history.replaceState({}, "", url.toString());
+  } catch (err) {
+    console.warn("Unable to sync URL with table code", err);
+  }
+}
+
 // ================= FROG ANIMATION =================
 
 function hopFrogToWinningNumber(winningNumber) {
@@ -279,10 +293,13 @@ async function fetchTableData() {
       table = data.tables.find((t) => t.round_code === TABLE_CODE) || null;
     }
 
-    // Otherwise use the first table as default
+    // Otherwise (or if not found) use the first table as default
     if (!table) {
       table = data.tables[0];
     }
+
+    // IMPORTANT: keep address bar in sync with the table we are actually using
+    syncUrlWithTable(table.round_code);
 
     currentTable = table;
     updateGameUI(table);
