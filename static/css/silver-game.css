@@ -192,6 +192,7 @@ body {
   width: 100%;
   max-width: 360px;
   z-index: 2;
+  margin-top: 40px;
 }
 
 .pads-row {
