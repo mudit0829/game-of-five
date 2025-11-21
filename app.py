@@ -221,8 +221,26 @@ class GameTable:
     def add_bet(self, user_id, username, number, is_bot=False):
         """
         Add a bet to this table.
+        RULES:
+        - Each NUMBER can be used only once in this table (real users + bots).
+        - Max 4 bets per user.
+        - Max players = self.max_players.
         We normalise real users' IDs to int so history keys match /api/user-games.
         """
+        # normalise number to int
+        try:
+            number_int = int(number)
+        except (TypeError, ValueError):
+            return False, "Invalid number"
+        number = number_int
+
+        # --- NEW: one bet per number in this game ---
+        for bet in self.bets:
+            if bet["number"] == number:
+                return (
+                    False,
+                    "This number is already taken in this game. Please choose another.",
+                )
 
         # Normalise user id for non-bots
         if not is_bot:
@@ -270,23 +288,34 @@ class GameTable:
         return True, "Bet placed successfully"
 
     def add_bot_bet(self):
+        """
+        Add a bot bet, respecting the SAME rules:
+        - table not full
+        - number not already used by any bet in this table
+        """
         if len(self.bets) >= self.max_players:
             return False
 
+        # numbers already taken (by users or bots)
+        taken_numbers = {b["number"] for b in self.bets}
         all_numbers = self.get_number_range()
+        available_numbers = [n for n in all_numbers if n not in taken_numbers]
+
+        if not available_numbers:
+            # No numbers left to choose from
+            return False
+
         bot_name = generate_bot_name()
-        bot_number = random.choice(all_numbers)
-        self.bets.append(
-            {
-                "user_id": f"bot_{bot_name}",
-                "username": bot_name,
-                "number": bot_number,
-                "is_bot": True,
-                "bet_amount": self.config["bet_amount"],
-                "bet_time": datetime.now(),
-            }
+        bot_number = random.choice(available_numbers)
+
+        # reuse add_bet so rules remain consistent
+        success, _ = self.add_bet(
+            user_id=f"bot_{bot_name}",
+            username=bot_name,
+            number=bot_number,
+            is_bot=True,
         )
-        return True
+        return success
 
     def calculate_result(self):
         real_user_bets = [b for b in self.bets if not b["is_bot"]]
@@ -873,6 +902,9 @@ def handle_place_bet(data):
     """
     Place bet from game clients.
     We normalise user_id to int so it matches DB & history keys.
+    Enforces:
+    - one bet per number per table (via GameTable.add_bet)
+    - max 4 bets per user
     """
     game_type = data.get("game_type")
     raw_user_id = data.get("user_id")
