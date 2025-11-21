@@ -9,7 +9,7 @@
 </head>
 <body>
   <div class="diamond-page">
-    <!-- TOP BAR (same info as other games) -->
+    <!-- TOP BAR -->
     <header class="top-bar">
       <div class="top-left">
         <div class="game-label">GAME <span id="roundId">–</span></div>
@@ -36,7 +36,6 @@
     <!-- MIDDLE: ARCHERY RANGE -->
     <main class="range-wrapper">
       <section class="range">
-        <!-- Background image -->
         <div class="range-bg"></div>
 
         <!-- 6 targets (3 x 2) -->
@@ -60,7 +59,7 @@
           {% endfor %}
         </div>
 
-        <!-- Archer & arrow at bottom-left -->
+        <!-- Archer & arrow -->
         <div class="archer-layer">
           <img
             id="archerSprite"
@@ -115,16 +114,29 @@
 
       <div id="statusMessage" class="status"></div>
     </section>
+
+    <!-- RESULT / SLOTS POPUP -->
+    <div id="resultPopup" class="result-popup">
+      <div class="result-popup-card">
+        <h2 id="popupTitle">Game Finished</h2>
+        <p id="popupMessage">
+          This game has ended. Please keep playing to keep your winning chances high.
+        </p>
+        <div class="popup-buttons">
+          <button id="popupHomeBtn" class="popup-btn primary">Home</button>
+          <button id="popupLobbyBtn" class="popup-btn secondary">Back to Lobby</button>
+        </div>
+      </div>
+    </div>
   </div>
 
   <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
- <script>
-  const GAME_TYPE = "{{ game_type }}";
-  const FIXED_BET_AMOUNT = {{ game.bet_amount }};
-  const GAME_USER_ID = "{{ session.get('user_id') }}";
-  const GAME_USERNAME = "{{ session.get('username') }}";
-</script>
-
+  <script>
+    const GAME_TYPE = "{{ game_type }}";
+    const FIXED_BET_AMOUNT = {{ game.bet_amount }};
+    const GAME_USER_ID = "{{ session.get('user_id') }}";
+    const GAME_USERNAME = "{{ session.get('username') }}";
+  </script>
   <script src="{{ url_for('static', filename='js/diamond-game.js') }}"></script>
 </body>
 </html>
