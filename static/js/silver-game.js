@@ -2,16 +2,20 @@
 
 const GAME = GAME_TYPE || "silver";
 
+// optional: support multi-table via ?table=ROUND_CODE
 const urlParams = new URLSearchParams(window.location.search);
 const TABLE_CODE = urlParams.get("table") || null;
 
+// Real logged-in user from Flask session (passed in HTML)
 const USER_ID = GAME_USER_ID;
 const USERNAME = GAME_USERNAME || "Player";
 
+// Where popup "Home" button goes
 const HOME_URL = "/home";
 
 // ================= DOM REFERENCES =================
 
+// IMPORTANT: use the pond container for coordinates
 const pondEl = document.querySelector(".pond");
 const frogImg = document.getElementById("frogSprite");
 const pads = Array.from(document.querySelectorAll(".pad"));
@@ -29,6 +33,7 @@ const userNameLabel = document.getElementById("userName");
 const userBetCountLabel = document.getElementById("userBetCount");
 const myBetsRow = document.getElementById("myBetsRow");
 
+// popup elements (used both for result + "slots full")
 const popupEl = document.getElementById("resultPopup");
 const popupTitleEl = document.getElementById("popupTitle");
 const popupMsgEl = document.getElementById("popupMessage");
@@ -45,11 +50,13 @@ let selectedNumber = 0;
 let currentTable = null;
 let lastResultShown = null;
 
+// flags / intervals
 let gameFinished = false;
 let tablePollInterval = null;
 let localTimerInterval = null;
-let displayRemainingSeconds = 0;
+let displayRemainingSeconds = 0; // what we show on screen
 
+// IMPORTANT: persistent flag – once true, never set back to false
 let userHasBet = false;
 
 // ================= UI HELPERS =================
@@ -97,6 +104,7 @@ function updateMyBets(bets) {
     (b) => String(b.user_id) === String(USER_ID)
   );
 
+  // do NOT set userHasBet = false here – only ever turn it true
   if (myBets.length > 0) {
     userHasBet = true;
   }
@@ -128,7 +136,9 @@ function updateMyBets(bets) {
   });
 }
 
-// pads show first 6 bets
+/**
+ * One pad = one bet (first 6 bets).
+ */
 function updatePadsFromBets(bets) {
   const list = (bets || []).slice(0, 6);
 
@@ -150,6 +160,9 @@ function updatePadsFromBets(bets) {
   });
 }
 
+/**
+ * Ensure at least one pad shows winning number.
+ */
 function ensurePadForWinningNumber(winningNumber) {
   if (winningNumber === null || winningNumber === undefined) return;
 
@@ -243,68 +256,61 @@ function syncUrlWithTable(roundCode) {
 
 // ================= FROG ANIMATION =================
 
-// make sure frog is movable
-if (frogImg) {
-  if (!frogImg.style.position || frogImg.style.position === "static") {
-    frogImg.style.position = "fixed";
-  }
+// Pre-calc frog's base center inside pond so all hops use same origin
+let frogBaseCenter = null;
+if (frogImg && pondEl) {
+  const pondRect0 = pondEl.getBoundingClientRect();
+  const frogRect0 = frogImg.getBoundingClientRect();
+  frogBaseCenter = {
+    x: frogRect0.left + frogRect0.width / 2 - pondRect0.left,
+    y: frogRect0.top + frogRect0.height / 2 - pondRect0.top,
+  };
+  frogImg.style.transformOrigin = "center center";
 }
 
-// find pad for number using dataset or visible text
+// find a pad whose data-number OR visible text equals winningNumber
 function findPadForNumber(winningNumber) {
   const targetStr = String(winningNumber);
-
-  let pad = pads.find(
-    (p) =>
-      p.dataset.number === targetStr ||
-      (p.querySelector(".pad-number") &&
-        p.querySelector(".pad-number").textContent.trim() === targetStr)
-  );
+  const pad = pads.find((p) => {
+    const dataMatch = p.dataset.number === targetStr;
+    const label = p.querySelector(".pad-number");
+    const textMatch =
+      label && label.textContent && label.textContent.trim() === targetStr;
+    return dataMatch || textMatch;
+  });
 
   if (!pad) {
-    console.log(
-      "[frog] No pad via dataset/text, dumping pads:",
-      pads.map((p) => ({
-        data: p.dataset.number,
-        text:
-          p.querySelector(".pad-number")?.textContent.trim() || "(empty-text)",
-      }))
-    );
+    console.log("[frog] No pad for number", winningNumber, "pads:", pads);
   }
 
   return pad;
 }
 
 function hopFrogToWinningNumber(winningNumber) {
-  if (!frogImg) {
-    console.log("[frog] Missing frogImg");
+  if (!frogImg || !pondEl || !frogBaseCenter) {
+    console.log("[frog] Missing frog or base center");
     return;
   }
 
   const targetPad = findPadForNumber(winningNumber);
-  if (!targetPad) {
-    console.log("[frog] No pad currently showing number", winningNumber);
-    return;
-  }
+  if (!targetPad) return;
 
   console.log("[frog] Hopping to pad number:", winningNumber);
 
+  const pondRect = pondEl.getBoundingClientRect();
   const padRect = targetPad.getBoundingClientRect();
-  const frogRect = frogImg.getBoundingClientRect();
 
-  const startX = frogRect.left;
-  const startY = frogRect.top;
+  // target center inside pond coordinates
+  const targetCenterX =
+    padRect.left + padRect.width / 2 - pondRect.left;
+  const targetCenterY =
+    padRect.top + padRect.height * 0.25 - pondRect.top;
 
-  const endX = padRect.left + padRect.width / 2 - frogRect.width / 2;
-  const endY = padRect.top + padRect.height * 0.25 - frogRect.height / 2;
+  // movement from frog's ORIGINAL center to target center
+  const deltaX = targetCenterX - frogBaseCenter.x;
+  const deltaY = targetCenterY - frogBaseCenter.y;
 
-  // anchor frog to its current screen position
-  frogImg.style.position = "fixed";
-  frogImg.style.left = `${startX}px`;
-  frogImg.style.top = `${startY}px`;
-  frogImg.style.zIndex = "999";
-
-  const duration = 800;
+  const duration = 750;
   const peak = -40;
   const startTime = performance.now();
 
@@ -312,20 +318,21 @@ function hopFrogToWinningNumber(winningNumber) {
     const tRaw = (now - startTime) / duration;
     const t = Math.min(Math.max(tRaw, 0), 1);
 
+    // ease in-out
     const ease = t < 0.5 ? 2 * t * t : -1 + (4 - 2 * t) * t;
 
-    const x = startX + (endX - startX) * ease;
-    const yLinear = startY + (endY - startY) * ease;
+    const x = deltaX * ease;
+    const yLinear = deltaY * ease;
     const yArc = yLinear + peak * (4 * t * (1 - t));
+    const scale = 1 + 0.08 * Math.sin(Math.PI * t);
 
-    frogImg.style.left = `${x}px`;
-    frogImg.style.top = `${yArc}px`;
+    // start from base center (0,0) and move towards (deltaX, deltaY)
+    frogImg.style.transform = `translate(${x}px, ${yArc}px) scale(${scale})`;
 
     if (t < 1) {
       requestAnimationFrame(step);
     } else {
-      frogImg.style.left = `${endX}px`;
-      frogImg.style.top = `${endY}px`;
+      frogImg.style.transform = `translate(${deltaX}px, ${deltaY}px) scale(1)`;
       targetPad.classList.add("win");
       console.log("[frog] Hop complete");
     }
@@ -334,7 +341,7 @@ function hopFrogToWinningNumber(winningNumber) {
   requestAnimationFrame(step);
 }
 
-// ================= TIMER =================
+// ================= TIMER (LOCAL 1-SECOND COUNTDOWN) =================
 
 function startLocalTimer() {
   if (localTimerInterval) clearInterval(localTimerInterval);
@@ -347,7 +354,7 @@ function startLocalTimer() {
   }, 1000);
 }
 
-// ================= BACKEND POLLING =================
+// ================= BACKEND POLLING (TABLE DATA) =================
 
 async function fetchTableData() {
   if (gameFinished) return;
@@ -398,6 +405,7 @@ function updateGameUI(table) {
         table.players >= table.max_players);
   }
 
+  // ==== SLOTS FULL CHECK (only if userHasBet is still false) ====
   const maxPlayers =
     typeof table.max_players === "number" ? table.max_players : null;
   const isFull =
@@ -419,6 +427,7 @@ function updateGameUI(table) {
     return;
   }
 
+  // ===== Result handling =====
   const hasResult =
     table.result !== null && table.result !== undefined && table.result !== "";
 
@@ -443,13 +452,17 @@ function updateGameUI(table) {
       }
 
       const outcomeInfo = determineUserOutcome(table);
+      // small delay so hop is visible
       setTimeout(() => {
         showEndPopup(outcomeInfo);
-      }, 1800);
+      }, 1000);
     }
   } else if (!hasResult) {
     lastResultShown = null;
     pads.forEach((p) => p.classList.remove("win"));
+    if (frogImg) {
+      frogImg.style.transform = "translate(0px, 0px) scale(1)";
+    }
   }
 }
 
@@ -495,6 +508,7 @@ socket.on("connect", () => {
 socket.on("bet_success", (payload) => {
   if (gameFinished) return;
 
+  // As soon as backend confirms bet, lock this as a betting user
   userHasBet = true;
 
   setStatus(payload.message || "Bet placed", "ok");
@@ -531,6 +545,7 @@ if (placeBetBtn) {
       return;
     }
 
+    // hard stop: no bet if all 6 slots are full
     const maxPlayers =
       typeof currentTable.max_players === "number"
         ? currentTable.max_players
@@ -550,6 +565,9 @@ if (placeBetBtn) {
       return;
     }
 
+    // ⚠️ Duplicate-number rule is enforced on backend.
+    // We do NOT block here to avoid false “already taken” errors.
+
     socket.emit("place_bet", {
       game_type: GAME,
       user_id: USER_ID,
@@ -557,8 +575,9 @@ if (placeBetBtn) {
       number: selectedNumber,
     });
   });
-});
+}
 
+// popup buttons
 if (popupHomeBtn) {
   popupHomeBtn.addEventListener("click", () => {
     window.location.href = HOME_URL;
