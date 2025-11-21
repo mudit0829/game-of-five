@@ -21,7 +21,7 @@ const archerImg = document.getElementById("archerSprite");
 const targets = Array.from(document.querySelectorAll(".target.pad"));
 
 const numChips = Array.from(document.querySelectorAll(".num-chip"));
-const betInput = document.getElementById("betAmount");
+const betInput = document.getElementById("betAmount"); // visual only
 const placeBetBtn = document.getElementById("placeBetBtn");
 
 const roundIdSpan = document.getElementById("roundId");
@@ -378,8 +378,16 @@ function updateGameUI(table) {
   updateTargetsFromBets(table.bets || []);
   updateMyBets(table.bets || []);
 
+  // disable button also when slots are full
   if (placeBetBtn && !gameFinished) {
-    placeBetBtn.disabled = !!table.is_betting_closed;
+    const maxPlayers =
+      typeof table.max_players === "number" ? table.max_players : null;
+    const slotsFull =
+      !!table.is_full ||
+      (maxPlayers !== null && table.players >= maxPlayers);
+
+    placeBetBtn.disabled =
+      !!table.is_betting_closed || !!table.is_finished || slotsFull;
   }
 
   // urgent timer style
@@ -394,4 +402,191 @@ function updateGameUI(table) {
     typeof table.max_players === "number" ? table.max_players : null;
   const isFull =
     table.is_full === true ||
-    (maxPlayers !== null && table.players >= ma
+    (maxPlayers !== null && table.players >= maxPlayers);
+
+  if (!gameFinished && !userHasBet && isFull) {
+    gameFinished = true;
+    disableBettingUI();
+    if (tablePollInterval) {
+      clearInterval(tablePollInterval);
+      tablePollInterval = null;
+    }
+    if (localTimerInterval) {
+      clearInterval(localTimerInterval);
+      localTimerInterval = null;
+    }
+    showSlotsFullPopup();
+    return;
+  }
+
+  // ===== Result handling =====
+  const hasResult =
+    table.result !== null && table.result !== undefined && table.result !== "";
+
+  if (hasResult && table.result !== lastResultShown) {
+    lastResultShown = table.result;
+    setStatus(`Winning number: ${table.result}`, "ok");
+
+    ensureTargetForWinningNumber(table.result);
+    shootArrowToWinningNumber(table.result);
+
+    if (!gameFinished) {
+      gameFinished = true;
+      disableBettingUI();
+
+      if (tablePollInterval) {
+        clearInterval(tablePollInterval);
+        tablePollInterval = null;
+      }
+      if (localTimerInterval) {
+        clearInterval(localTimerInterval);
+        localTimerInterval = null;
+      }
+
+      const outcomeInfo = determineUserOutcome(table);
+      setTimeout(() => {
+        showEndPopup(outcomeInfo);
+      }, 1000);
+    }
+  } else if (!hasResult) {
+    lastResultShown = null;
+  }
+}
+
+function startPolling() {
+  fetchTableData();
+  if (tablePollInterval) clearInterval(tablePollInterval);
+  tablePollInterval = setInterval(() => {
+    if (!gameFinished) {
+      fetchTableData();
+    }
+  }, 2000);
+}
+
+// ================= BALANCE / SOCKET =================
+
+const socket = io();
+
+async function fetchBalance() {
+  try {
+    const res = await fetch(`/balance/${USER_ID}`);
+    const data = await res.json();
+    if (typeof data.balance === "number") {
+      updateWallet(data.balance);
+    }
+  } catch (err) {
+    console.error("balance fetch error", err);
+  }
+}
+
+function joinGameRoom() {
+  socket.emit("join_game", {
+    game_type: GAME,
+    user_id: USER_ID,
+  });
+}
+
+socket.on("connect", () => {
+  joinGameRoom();
+  fetchBalance();
+  fetchTableData();
+});
+
+socket.on("bet_success", (payload) => {
+  if (gameFinished) return;
+
+  userHasBet = true;
+
+  setStatus(payload.message || "Bet placed", "ok");
+  if (typeof payload.new_balance === "number") {
+    updateWallet(payload.new_balance);
+  }
+  fetchTableData();
+});
+
+socket.on("bet_error", (payload) => {
+  if (gameFinished) return;
+  setStatus(payload.message || "Bet error", "error");
+});
+
+// ================= UI EVENTS =================
+
+numChips.forEach((chip) => {
+  chip.addEventListener("click", () => {
+    if (gameFinished) return;
+    const n = parseInt(chip.dataset.number, 10);
+    setSelectedNumber(n);
+  });
+});
+
+if (placeBetBtn) {
+  placeBetBtn.addEventListener("click", () => {
+    if (gameFinished) {
+      setStatus("This game has already finished.", "error");
+      return;
+    }
+
+    if (!currentTable) {
+      setStatus("Game is not ready yet. Please wait...", "error");
+      return;
+    }
+
+    // HARD STOP: no bet once all slots are full (for everyone)
+    const maxPlayers =
+      typeof currentTable.max_players === "number"
+        ? currentTable.max_players
+        : null;
+    const slotsFull =
+      currentTable.is_full === true ||
+      (maxPlayers !== null && currentTable.players >= maxPlayers);
+
+    if (slotsFull) {
+      setStatus("All slots are full for this game.", "error");
+      disableBettingUI();
+      return;
+    }
+
+    if (walletBalance < FIXED_BET_AMOUNT) {
+      setStatus("Insufficient balance", "error");
+      return;
+    }
+
+    if (selectedNumber === null || selectedNumber === undefined) {
+      setStatus("Select a number first", "error");
+      return;
+    }
+
+    // IMPORTANT:
+    // We do NOT try to detect "number already taken" on the frontend
+    // because that was causing false errors when list was out of sync.
+    // Backend will enforce uniqueness and send bet_error if needed.
+
+    socket.emit("place_bet", {
+      game_type: GAME,
+      user_id: USER_ID,
+      username: USERNAME,
+      number: selectedNumber,
+    });
+  });
+}
+
+// popup buttons
+if (popupHomeBtn) {
+  popupHomeBtn.addEventListener("click", () => {
+    window.location.href = HOME_URL;
+  });
+}
+
+if (popupLobbyBtn) {
+  popupLobbyBtn.addEventListener("click", () => {
+    window.history.back();
+  });
+}
+
+// ================= INIT =================
+
+fetchBalance();
+startPolling();
+startLocalTimer();
+setSelectedNumber(0);
+setStatus("");
