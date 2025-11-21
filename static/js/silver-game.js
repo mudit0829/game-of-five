@@ -10,14 +10,10 @@ const TABLE_CODE = urlParams.get("table") || null;
 const USER_ID = GAME_USER_ID;
 const USERNAME = GAME_USERNAME || "Player";
 
-// URLs for popup buttons (change HOME_URL if needed)
-const HOME_URL = "/home2"; // TODO: change if your home route is different
-
 // ================= DOM REFERENCES =================
 
-// use the pond container for coordinates
-const pondEl = document.querySelector(".pond");
 const frogImg = document.getElementById("frogSprite");
+const pondEl = document.querySelector(".pond") || (frogImg ? frogImg.parentElement : document.body);
 const pads = Array.from(document.querySelectorAll(".pad"));
 
 const numChips = Array.from(document.querySelectorAll(".num-chip"));
@@ -33,12 +29,15 @@ const userNameLabel = document.getElementById("userName");
 const userBetCountLabel = document.getElementById("userBetCount");
 const myBetsRow = document.getElementById("myBetsRow");
 
-// popup elements
+// popup elements (from HTML we added)
 const popupEl = document.getElementById("resultPopup");
 const popupTitleEl = document.getElementById("popupTitle");
 const popupMsgEl = document.getElementById("popupMessage");
 const popupHomeBtn = document.getElementById("popupHomeBtn");
 const popupLobbyBtn = document.getElementById("popupLobbyBtn");
+
+// change if your home route is different
+const HOME_URL = "/home2";
 
 if (userNameLabel) {
   userNameLabel.textContent = USERNAME;
@@ -50,14 +49,9 @@ let selectedNumber = 0;
 let currentTable = null;
 let lastResultShown = null;
 
-// flags / intervals
+// NEW: control flags
 let gameFinished = false;
 let tablePollInterval = null;
-let localTimerInterval = null;
-let displayRemainingSeconds = 0;
-
-// IMPORTANT: once true, never back to false
-let userHasBet = false;
 
 // ================= UI HELPERS =================
 
@@ -79,18 +73,6 @@ function updateWallet(balance) {
   }
 }
 
-function formatTime(seconds) {
-  const s = Math.max(0, parseInt(seconds || 0, 10));
-  const mins = Math.floor(s / 60);
-  const secs = s % 60;
-  return `${mins}:${secs.toString().padStart(2, "0")}`;
-}
-
-function renderTimer() {
-  if (!timerText) return;
-  timerText.textContent = formatTime(displayRemainingSeconds);
-}
-
 function setSelectedNumber(n) {
   selectedNumber = n;
   numChips.forEach((chip) => {
@@ -99,14 +81,53 @@ function setSelectedNumber(n) {
   });
 }
 
+/**
+ * Determine if this user won or lost, based on final result and bets.
+ */
+function determineUserOutcome(table) {
+  const result = table.result;
+  const myBets = (table.bets || []).filter(
+    (b) => String(b.user_id) === String(USER_ID)
+  );
+  if (!myBets.length) {
+    return { outcome: "none", result };
+  }
+  const won = myBets.some((b) => String(b.number) === String(result));
+  return { outcome: won ? "win" : "lose", result };
+}
+
+/**
+ * Show final popup after frog jump.
+ */
+function showEndPopup(outcomeInfo) {
+  if (!popupEl) return;
+
+  const { outcome } = outcomeInfo;
+
+  let title = "Game Finished";
+  let message =
+    "This game has ended. Please keep playing to keep your winning chances high.";
+
+  if (outcome === "win") {
+    title = "Congratulations!";
+    message =
+      "You have won the game. Please keep playing to keep your winning chances high.";
+  } else if (outcome === "lose") {
+    title = "Hard Luck!";
+    message =
+      "You have lost the game. Please keep playing to keep your winning chances high.";
+  }
+
+  if (popupTitleEl) popupTitleEl.textContent = title;
+  if (popupMsgEl) popupMsgEl.textContent = message;
+
+  popupEl.style.display = "flex";
+}
+
 function updateMyBets(bets) {
   const myBets = (bets || []).filter(
     (b) => String(b.user_id) === String(USER_ID)
   );
-
-  if (myBets.length > 0) {
-    userHasBet = true; // once true, stays true
-  }
 
   if (userBetCountLabel) {
     userBetCountLabel.textContent = myBets.length;
@@ -137,8 +158,7 @@ function updateMyBets(bets) {
 
 /**
  * One pad = one bet (first 6 bets).
- * Your backend already ensures a number is unique per game,
- * so you'll never see the same number twice here.
+ * (Backend already makes sure each number is unique.)
  */
 function updatePadsFromBets(bets) {
   const list = (bets || []).slice(0, 6);
@@ -162,7 +182,7 @@ function updatePadsFromBets(bets) {
 }
 
 /**
- * Ensure at least one pad shows winning number.
+ * Ensure at least one pad has the winning number (so frog always has a target).
  */
 function ensurePadForWinningNumber(winningNumber) {
   if (winningNumber === null || winningNumber === undefined) return;
@@ -181,78 +201,6 @@ function ensurePadForWinningNumber(winningNumber) {
   pad.dataset.number = String(winningNumber);
   if (numSpan) numSpan.textContent = winningNumber;
   if (userSpan) userSpan.textContent = "";
-}
-
-function disableBettingUI() {
-  if (placeBetBtn) placeBetBtn.disabled = true;
-  numChips.forEach((chip) => {
-    chip.disabled = true;
-  });
-}
-
-function determineUserOutcome(table) {
-  const result = table.result;
-  const myBets = (table.bets || []).filter(
-    (b) => String(b.user_id) === String(USER_ID)
-  );
-  if (!myBets.length) {
-    return { outcome: "none", result };
-  }
-  const won = myBets.some((b) => String(b.number) === String(result));
-  return { outcome: won ? "win" : "lose", result };
-}
-
-function showEndPopup(outcomeInfo) {
-  if (!popupEl) return;
-
-  const { outcome } = outcomeInfo;
-
-  let title = "Game Finished";
-  let message =
-    "This game has ended. Please keep playing to keep your winning chances high.";
-
-  if (outcome === "win") {
-    title = "Congratulations!";
-    message =
-      "You have won the game. Please keep playing to keep your winning chances high.";
-  } else if (outcome === "lose") {
-    title = "Hard Luck!";
-    message =
-      "You have lost the game. Please keep playing to keep your winning chances high.";
-  }
-
-  if (popupTitleEl) popupTitleEl.textContent = title;
-  if (popupMsgEl) popupMsgEl.textContent = message;
-
-  popupEl.style.display = "flex";
-}
-
-function showSlotsFullPopup() {
-  if (!popupEl) return;
-
-  if (popupTitleEl) popupTitleEl.textContent = "All slots are full";
-  if (popupMsgEl)
-    popupMsgEl.textContent =
-      "This game is already full. You will be redirected to lobby to join another table.";
-
-  popupEl.style.display = "flex";
-
-  setTimeout(() => {
-    window.history.back();
-  }, 2000);
-}
-
-function syncUrlWithTable(roundCode) {
-  if (!roundCode) return;
-  try {
-    const url = new URL(window.location.href);
-    const currentParam = url.searchParams.get("table");
-    if (currentParam === roundCode) return;
-    url.searchParams.set("table", roundCode);
-    window.history.replaceState({}, "", url.toString());
-  } catch (err) {
-    console.warn("Unable to sync URL with table code", err);
-  }
 }
 
 // ================= FROG ANIMATION =================
@@ -316,23 +264,10 @@ function hopFrogToWinningNumber(winningNumber) {
   requestAnimationFrame(step);
 }
 
-// ================= TIMER (LOCAL 1-SECOND COUNTDOWN) =================
-
-function startLocalTimer() {
-  if (localTimerInterval) clearInterval(localTimerInterval);
-  localTimerInterval = setInterval(() => {
-    if (gameFinished) return;
-    if (displayRemainingSeconds > 0) {
-      displayRemainingSeconds -= 1;
-      renderTimer();
-    }
-  }, 1000);
-}
-
 // ================= BACKEND POLLING (TABLE DATA) =================
 
 async function fetchTableData() {
-  if (gameFinished) return;
+  if (gameFinished) return; // once finished, no more updates
 
   try {
     const res = await fetch("/api/tables/silver");
@@ -348,11 +283,10 @@ async function fetchTableData() {
     if (TABLE_CODE) {
       table = data.tables.find((t) => t.round_code === TABLE_CODE) || null;
     }
+
     if (!table) {
       table = data.tables[0];
     }
-
-    syncUrlWithTable(table.round_code);
 
     currentTable = table;
     updateGameUI(table);
@@ -367,8 +301,12 @@ function updateGameUI(table) {
   if (roundIdSpan) roundIdSpan.textContent = table.round_code || "-";
   if (playerCountSpan) playerCountSpan.textContent = table.players || 0;
 
-  displayRemainingSeconds = table.time_remaining || 0;
-  renderTimer();
+  if (timerText) {
+    const secsTotal = table.time_remaining || 0;
+    const mins = Math.floor(secsTotal / 60);
+    const secs = secsTotal % 60;
+    timerText.textContent = `${mins}:${secs.toString().padStart(2, "0")}`;
+  }
 
   updatePadsFromBets(table.bets || []);
   updateMyBets(table.bets || []);
@@ -377,29 +315,7 @@ function updateGameUI(table) {
     placeBetBtn.disabled = !!table.is_betting_closed;
   }
 
-  // === SLOTS FULL CHECK (spectators only) ===
-  const maxPlayers =
-    typeof table.max_players === "number" ? table.max_players : null;
-  const isFull =
-    table.is_full === true ||
-    (maxPlayers !== null && table.players >= maxPlayers);
-
-  if (!gameFinished && !userHasBet && isFull) {
-    gameFinished = true;
-    disableBettingUI();
-    if (tablePollInterval) {
-      clearInterval(tablePollInterval);
-      tablePollInterval = null;
-    }
-    if (localTimerInterval) {
-      clearInterval(localTimerInterval);
-      localTimerInterval = null;
-    }
-    showSlotsFullPopup();
-    return;
-  }
-
-  // === RESULT HANDLING (NO is_finished CHECK – ONLY RESULT VALUE) ===
+  // === NEW: when result appears first time, end this game window ===
   const hasResult =
     table.result !== null && table.result !== undefined && table.result !== "";
 
@@ -407,22 +323,25 @@ function updateGameUI(table) {
     lastResultShown = table.result;
     setStatus(`Winning number: ${table.result}`, "ok");
 
+    // make sure frog has a target, then jump
     ensurePadForWinningNumber(table.result);
     hopFrogToWinningNumber(table.result);
 
+    // mark game finished ONCE
     if (!gameFinished) {
       gameFinished = true;
-      disableBettingUI();
 
+      // stop further polling
       if (tablePollInterval) {
         clearInterval(tablePollInterval);
         tablePollInterval = null;
       }
-      if (localTimerInterval) {
-        clearInterval(localTimerInterval);
-        localTimerInterval = null;
-      }
 
+      // disable betting UI
+      if (placeBetBtn) placeBetBtn.disabled = true;
+      numChips.forEach((chip) => (chip.disabled = true));
+
+      // after small delay, show popup
       const outcomeInfo = determineUserOutcome(table);
       setTimeout(() => {
         showEndPopup(outcomeInfo);
@@ -433,9 +352,9 @@ function updateGameUI(table) {
   }
 }
 
+// start polling every 2 seconds (like your original code)
 function startPolling() {
-  fetchTableData();
-  if (tablePollInterval) clearInterval(tablePollInterval);
+  fetchTableData(); // initial load
   tablePollInterval = setInterval(() => {
     if (!gameFinished) {
       fetchTableData();
@@ -474,13 +393,11 @@ socket.on("connect", () => {
 
 socket.on("bet_success", (payload) => {
   if (gameFinished) return;
-
-  userHasBet = true; // as soon as our bet is accepted
-
   setStatus(payload.message || "Bet placed", "ok");
   if (typeof payload.new_balance === "number") {
     updateWallet(payload.new_balance);
   }
+  // refresh table data to see new bets
   fetchTableData();
 });
 
@@ -505,7 +422,6 @@ if (placeBetBtn) {
       setStatus("This game has already finished.", "error");
       return;
     }
-
     if (walletBalance < FIXED_BET_AMOUNT) {
       setStatus("Insufficient balance", "error");
       return;
@@ -522,7 +438,7 @@ if (placeBetBtn) {
       number: selectedNumber,
     });
   });
-});
+}
 
 // popup buttons
 if (popupHomeBtn) {
@@ -541,6 +457,5 @@ if (popupLobbyBtn) {
 
 fetchBalance();
 startPolling();
-startLocalTimer();
 setSelectedNumber(0);
 setStatus("");
