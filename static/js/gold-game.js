@@ -4,7 +4,8 @@ const GAME = GAME_TYPE || "gold";
 
 // optional: support multi-table via ?table=ROUND_CODE
 const urlParams = new URLSearchParams(window.location.search);
-const TABLE_CODE = urlParams.get("table") || null;
+// mutable so we can keep it in sync
+let tableCodeFromUrl = urlParams.get("table") || null;
 
 // Real logged-in user from Flask session (passed in HTML)
 const USER_ID = GAME_USER_ID;
@@ -247,6 +248,7 @@ function syncUrlWithTable(roundCode) {
     if (currentParam === roundCode) return;
     url.searchParams.set("table", roundCode);
     window.history.replaceState({}, "", url.toString());
+    tableCodeFromUrl = roundCode;
   } catch (err) {
     console.warn("Unable to sync URL with table code", err);
   }
@@ -429,14 +431,38 @@ async function fetchTableData() {
 
     let table = null;
 
-    if (TABLE_CODE) {
-      table = data.tables.find((t) => t.round_code === TABLE_CODE) || null;
-    }
-    if (!table) {
-      table = data.tables[0];
-    }
+    if (tableCodeFromUrl) {
+      // strict: only use the table that matches what lobby gave us
+      table =
+        data.tables.find((t) => t.round_code === tableCodeFromUrl) || null;
 
-    syncUrlWithTable(table.round_code);
+      if (!table) {
+        // that game finished and disappeared – don't silently switch to another
+        gameFinished = true;
+        disableBettingUI();
+        if (tablePollInterval) {
+          clearInterval(tablePollInterval);
+          tablePollInterval = null;
+        }
+        if (localTimerInterval) {
+          clearInterval(localTimerInterval);
+          localTimerInterval = null;
+        }
+
+        setStatus(
+          "This game has finished. You'll be taken back to lobby to join a new one.",
+          "error"
+        );
+        setTimeout(() => {
+          window.history.back();
+        }, 2000);
+        return;
+      }
+    } else {
+      // no ?table= in URL – pick first table and lock URL to it
+      table = data.tables[0];
+      syncUrlWithTable(table.round_code);
+    }
 
     currentTable = table;
     updateGameUI(table);
