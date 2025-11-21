@@ -15,7 +15,7 @@ const HOME_URL = "/home2"; // TODO: change if your home route is different
 
 // ================= DOM REFERENCES =================
 
-// IMPORTANT: use the pond container, not frog's own wrapper, for coordinates
+// IMPORTANT: use the pond container for coordinates
 const pondEl = document.querySelector(".pond");
 const frogImg = document.getElementById("frogSprite");
 const pads = Array.from(document.querySelectorAll(".pad"));
@@ -55,7 +55,9 @@ let gameFinished = false;
 let tablePollInterval = null;
 let localTimerInterval = null;
 let displayRemainingSeconds = 0; // what we show on screen
-let userHasBet = false;          // has this user placed any bet in this table?
+
+// IMPORTANT: persistent flag – once true, never set back to false
+let userHasBet = false;
 
 // ================= UI HELPERS =================
 
@@ -98,9 +100,14 @@ function setSelectedNumber(n) {
 }
 
 function updateMyBets(bets) {
-  const myBets = (bets || []).filter((b) => b.user_id === USER_ID);
+  const myBets = (bets || []).filter(
+    (b) => String(b.user_id) === String(USER_ID)
+  );
 
-  userHasBet = myBets.length > 0;
+  // do NOT set userHasBet = false here – only ever turn it true
+  if (myBets.length > 0) {
+    userHasBet = true;
+  }
 
   if (userBetCountLabel) {
     userBetCountLabel.textContent = myBets.length;
@@ -131,7 +138,6 @@ function updateMyBets(bets) {
 
 /**
  * One pad = one bet (first 6 bets).
- * This keeps all pads filled if there are up to 6 players.
  */
 function updatePadsFromBets(bets) {
   const list = (bets || []).slice(0, 6);
@@ -155,9 +161,7 @@ function updatePadsFromBets(bets) {
 }
 
 /**
- * Ensure there is at least one pad that shows the winning number.
- * If nobody bet that number, overwrite the first pad so frog has
- * a target to jump to.
+ * Ensure at least one pad shows winning number.
  */
 function ensurePadForWinningNumber(winningNumber) {
   if (winningNumber === null || winningNumber === undefined) return;
@@ -175,7 +179,7 @@ function ensurePadForWinningNumber(winningNumber) {
 
   pad.dataset.number = String(winningNumber);
   if (numSpan) numSpan.textContent = winningNumber;
-  if (userSpan) userSpan.textContent = ""; // no specific user
+  if (userSpan) userSpan.textContent = "";
 }
 
 function disableBettingUI() {
@@ -185,10 +189,11 @@ function disableBettingUI() {
   });
 }
 
-// Determine if user won or lost this finished table
 function determineUserOutcome(table) {
   const result = table.result;
-  const myBets = (table.bets || []).filter((b) => b.user_id === USER_ID);
+  const myBets = (table.bets || []).filter(
+    (b) => String(b.user_id) === String(USER_ID)
+  );
   if (!myBets.length) {
     return { outcome: "none", result };
   }
@@ -221,10 +226,6 @@ function showEndPopup(outcomeInfo) {
   popupEl.style.display = "flex";
 }
 
-/**
- * Show popup when user has NOT bet and table is full.
- * Then redirect them back to lobby (history back).
- */
 function showSlotsFullPopup() {
   if (!popupEl) return;
 
@@ -235,13 +236,11 @@ function showSlotsFullPopup() {
 
   popupEl.style.display = "flex";
 
-  // After a short delay, send back to lobby
   setTimeout(() => {
     window.history.back();
   }, 2000);
 }
 
-// Keep URL's ?table= in sync with the actual table we're using
 function syncUrlWithTable(roundCode) {
   if (!roundCode) return;
   try {
@@ -273,11 +272,9 @@ function hopFrogToWinningNumber(winningNumber) {
   const frogRect = frogImg.getBoundingClientRect();
   const padRect = targetPad.getBoundingClientRect();
 
-  // Frog center relative to pond
   const frogCenterX = frogRect.left + frogRect.width / 2 - pondRect.left;
   const frogCenterY = frogRect.top + frogRect.height / 2 - pondRect.top;
 
-  // Target position (slightly above pad)
   const padTargetX = padRect.left + padRect.width / 2 - pondRect.left;
   const padTargetY = padRect.top + padRect.height * 0.25 - pondRect.top;
 
@@ -334,7 +331,7 @@ function startLocalTimer() {
 // ================= BACKEND POLLING (TABLE DATA) =================
 
 async function fetchTableData() {
-  if (gameFinished) return; // do nothing once game is done
+  if (gameFinished) return;
 
   try {
     const res = await fetch("/api/tables/silver");
@@ -347,12 +344,9 @@ async function fetchTableData() {
 
     let table = null;
 
-    // If we have TABLE_CODE in URL, try to use that table
     if (TABLE_CODE) {
       table = data.tables.find((t) => t.round_code === TABLE_CODE) || null;
     }
-
-    // Otherwise (or if not found) use the first table as default
     if (!table) {
       table = data.tables[0];
     }
@@ -372,7 +366,6 @@ function updateGameUI(table) {
   if (roundIdSpan) roundIdSpan.textContent = table.round_code || "-";
   if (playerCountSpan) playerCountSpan.textContent = table.players || 0;
 
-  // set local countdown base from backend
   displayRemainingSeconds = table.time_remaining || 0;
   renderTimer();
 
@@ -383,8 +376,9 @@ function updateGameUI(table) {
     placeBetBtn.disabled = !!table.is_betting_closed;
   }
 
-  // ===== NEW: KICK OUT SPECTATORS IF TABLE FULL & THEY DIDN'T BET =====
-  const maxPlayers = typeof table.max_players === "number" ? table.max_players : null;
+  // ==== SLOTS FULL CHECK (only if userHasBet is still false) ====
+  const maxPlayers =
+    typeof table.max_players === "number" ? table.max_players : null;
   const isFull =
     table.is_full === true ||
     (maxPlayers !== null && table.players >= maxPlayers);
@@ -414,7 +408,6 @@ function updateGameUI(table) {
     lastResultShown = table.result;
     setStatus(`Winning number: ${table.result}`, "ok");
 
-    // ensure there is a pad with the winning number, then jump
     ensurePadForWinningNumber(table.result);
     hopFrogToWinningNumber(table.result);
 
@@ -422,13 +415,10 @@ function updateGameUI(table) {
       gameFinished = true;
       disableBettingUI();
 
-      // stop polling
       if (tablePollInterval) {
         clearInterval(tablePollInterval);
         tablePollInterval = null;
       }
-
-      // stop local timer
       if (localTimerInterval) {
         clearInterval(localTimerInterval);
         localTimerInterval = null;
@@ -437,16 +427,15 @@ function updateGameUI(table) {
       const outcomeInfo = determineUserOutcome(table);
       setTimeout(() => {
         showEndPopup(outcomeInfo);
-      }, 1000); // wait so jump is visible
+      }, 1000);
     }
   } else if (!table.is_finished) {
     lastResultShown = null;
   }
 }
 
-// start polling loop – keep it at 2s, local timer handles smooth countdown
 function startPolling() {
-  fetchTableData(); // initial load
+  fetchTableData();
   if (tablePollInterval) clearInterval(tablePollInterval);
   tablePollInterval = setInterval(() => {
     if (!gameFinished) {
@@ -485,7 +474,10 @@ socket.on("connect", () => {
 });
 
 socket.on("bet_success", (payload) => {
-  if (gameFinished) return; // ignore if game over
+  if (gameFinished) return;
+
+  // As soon as backend confirms bet, lock this as a betting user
+  userHasBet = true;
 
   setStatus(payload.message || "Bet placed", "ok");
   if (typeof payload.new_balance === "number") {
@@ -499,14 +491,11 @@ socket.on("bet_error", (payload) => {
   setStatus(payload.message || "Bet error", "error");
 });
 
-// We intentionally do NOT listen for any "new_round" socket event here,
-// because this screen should only represent ONE finished game.
-
 // ================= UI EVENTS =================
 
 numChips.forEach((chip) => {
   chip.addEventListener("click", () => {
-    if (gameFinished) return; // no more selection after finish
+    if (gameFinished) return;
     const n = parseInt(chip.dataset.number, 10);
     setSelectedNumber(n);
   });
