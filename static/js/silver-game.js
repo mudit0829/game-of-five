@@ -59,13 +59,6 @@ let displayRemainingSeconds = 0; // what we show on screen
 // IMPORTANT: persistent flag – once true, never set back to false
 let userHasBet = false;
 
-// remember frog's initial transform so we can reset each round
-let frogInitialTransform = null;
-if (frogImg) {
-  const cs = window.getComputedStyle(frogImg);
-  frogInitialTransform = cs.transform === "none" ? "" : cs.transform;
-}
-
 // ================= UI HELPERS =================
 
 function setStatus(msg, type = "") {
@@ -263,6 +256,11 @@ function syncUrlWithTable(roundCode) {
 
 // ================= FROG ANIMATION =================
 
+// Make sure frog can move via left/top
+if (frogImg) {
+  frogImg.style.position = frogImg.style.position || "absolute";
+}
+
 // Helper: find a pad whose data-number OR visible text matches the winning number
 function findPadForNumber(winningNumber) {
   const targetStr = String(winningNumber);
@@ -303,45 +301,55 @@ function hopFrogToWinningNumber(winningNumber) {
   console.log("[frog] Hopping to pad number:", winningNumber);
 
   const pondRect = pondEl.getBoundingClientRect();
-  const frogRect = frogImg.getBoundingClientRect();
   const padRect = targetPad.getBoundingClientRect();
+  const frogRect = frogImg.getBoundingClientRect();
 
-  const frogCenterX = frogRect.left + frogRect.width / 2 - pondRect.left;
-  const frogCenterY = frogRect.top + frogRect.height / 2 - pondRect.top;
+  // current frog position relative to pond
+  let currentLeft = frogRect.left - pondRect.left;
+  let currentTop = frogRect.top - pondRect.top;
 
-  const padTargetX = padRect.left + padRect.width / 2 - pondRect.left;
-  const padTargetY = padRect.top + padRect.height * 0.25 - pondRect.top;
+  // target position: center of pad (slightly towards top)
+  const targetLeft =
+    padRect.left +
+    padRect.width / 2 -
+    pondRect.left -
+    frogRect.width / 2;
+  const targetTop =
+    padRect.top +
+    padRect.height * 0.25 -
+    pondRect.top -
+    frogRect.height / 2;
 
-  const deltaX = padTargetX - frogCenterX;
-  const deltaY = padTargetY - frogCenterY;
+  const deltaX = targetLeft - currentLeft;
+  const deltaY = targetTop - currentTop;
+
+  // make sure starting left/top are set so animation is visible
+  frogImg.style.left = `${currentLeft}px`;
+  frogImg.style.top = `${currentTop}px`;
 
   const duration = 750;
-  const peak = -80;
+  const peak = -40; // height of hop
   const startTime = performance.now();
-
-  frogImg.style.transition = "none";
-  frogImg.style.zIndex = "6";
 
   function step(now) {
     const tRaw = (now - startTime) / duration;
     const t = Math.min(Math.max(tRaw, 0), 1);
 
+    // ease in-out
     const ease = t < 0.5 ? 2 * t * t : -1 + (4 - 2 * t) * t;
 
-    const x = frogCenterX + deltaX * ease;
-    const yLinear = frogCenterY + deltaY * ease;
-    const yArc = yLinear + peak * (4 * t * (1 - t));
-    const scale = 1 + 0.08 * Math.sin(Math.PI * t);
+    const x = currentLeft + deltaX * ease;
+    const yLinear = currentTop + deltaY * ease;
+    const yArc = yLinear + peak * (4 * t * (1 - t)); // little jump
 
-    const relX = x - frogCenterX;
-    const relY = yArc - frogCenterY;
-
-    frogImg.style.transform = `translate(${relX}px, ${relY}px) scale(${scale})`;
+    frogImg.style.left = `${x}px`;
+    frogImg.style.top = `${yArc}px`;
 
     if (t < 1) {
       requestAnimationFrame(step);
     } else {
-      frogImg.style.transform = `translate(${deltaX}px, ${deltaY}px) scale(1)`;
+      frogImg.style.left = `${targetLeft}px`;
+      frogImg.style.top = `${targetTop}px`;
       targetPad.classList.add("win");
       console.log("[frog] Hop complete");
     }
@@ -461,18 +469,14 @@ function updateGameUI(table) {
       }
 
       const outcomeInfo = determineUserOutcome(table);
-      // ⏱️ give the frog time to clearly hop BEFORE popup
+      // give frog time to hop before popup shows
       setTimeout(() => {
         showEndPopup(outcomeInfo);
       }, 1800);
     }
   } else if (!hasResult) {
-    // new round: clear result + reset frog + remove win highlights
     lastResultShown = null;
     pads.forEach((p) => p.classList.remove("win"));
-    if (frogImg && frogInitialTransform !== null) {
-      frogImg.style.transform = frogInitialTransform;
-    }
   }
 }
 
