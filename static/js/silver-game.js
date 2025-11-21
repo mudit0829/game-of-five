@@ -49,9 +49,11 @@ let selectedNumber = 0;
 let currentTable = null;
 let lastResultShown = null;
 
-// NEW: game finished flag and polling handle
+// flags / intervals
 let gameFinished = false;
 let tablePollInterval = null;
+let localTimerInterval = null;
+let displayRemainingSeconds = 0; // what we show on screen
 
 // ================= UI HELPERS =================
 
@@ -71,6 +73,18 @@ function updateWallet(balance) {
     coinsWrapper.classList.add("coin-bounce");
     setTimeout(() => coinsWrapper.classList.remove("coin-bounce"), 500);
   }
+}
+
+function formatTime(seconds) {
+  const s = Math.max(0, parseInt(seconds || 0, 10));
+  const mins = Math.floor(s / 60);
+  const secs = s % 60;
+  return `${mins}:${secs.toString().padStart(2, "0")}`;
+}
+
+function renderTimer() {
+  if (!timerText) return;
+  timerText.textContent = formatTime(displayRemainingSeconds);
 }
 
 function setSelectedNumber(n) {
@@ -111,33 +125,56 @@ function updateMyBets(bets) {
   });
 }
 
-// use up to 6 unique numbers into pads
+/**
+ * OLD behaviour grouped pads by number. That meant:
+ * - last pads could be empty even with many players
+ * - frog often had no pad with winning number
+ *
+ * NEW behaviour: one pad = one bet (first 6 bets in list)
+ */
 function updatePadsFromBets(bets) {
-  const betsByNumber = {};
-  (bets || []).forEach((b) => {
-    if (!betsByNumber[b.number]) betsByNumber[b.number] = [];
-    betsByNumber[b.number].push(b);
-  });
-
-  const uniqueNumbers = Object.keys(betsByNumber).slice(0, 6);
+  const list = (bets || []).slice(0, 6); // first 6 bets
 
   pads.forEach((pad, i) => {
     const numSpan = pad.querySelector(".pad-number");
     const userSpan = pad.querySelector(".pad-user");
     pad.classList.remove("win");
 
-    if (i < uniqueNumbers.length) {
-      const number = uniqueNumbers[i];
-      const betsOnNumber = betsByNumber[number];
-      pad.dataset.number = number;
-      if (numSpan) numSpan.textContent = number;
-      if (userSpan) userSpan.textContent = betsOnNumber[0].username;
+    if (i < list.length) {
+      const b = list[i];
+      pad.dataset.number = b.number;
+      if (numSpan) numSpan.textContent = b.number;
+      if (userSpan) userSpan.textContent = b.username;
     } else {
       pad.dataset.number = "";
       if (numSpan) numSpan.textContent = "";
       if (userSpan) userSpan.textContent = "";
     }
   });
+}
+
+/**
+ * Ensure there is at least one pad that shows the winning number.
+ * If nobody bet that number, we overwrite the first pad to show it
+ * so the frog has somewhere to jump.
+ */
+function ensurePadForWinningNumber(winningNumber, bets) {
+  if (winningNumber === null || winningNumber === undefined) return;
+
+  const existing = pads.find(
+    (p) => p.dataset.number === String(winningNumber)
+  );
+  if (existing) return;
+
+  const pad = pads[0];
+  if (!pad) return;
+
+  const numSpan = pad.querySelector(".pad-number");
+  const userSpan = pad.querySelector(".pad-user");
+
+  pad.dataset.number = String(winningNumber);
+  if (numSpan) numSpan.textContent = winningNumber;
+  if (userSpan) userSpan.textContent = ""; // no specific user
 }
 
 function disableBettingUI() {
@@ -183,7 +220,7 @@ function showEndPopup(outcomeInfo) {
   popupEl.style.display = "flex";
 }
 
-// NEW: keep URL's ?table= in sync with the actual table we're using
+// Keep URL's ?table= in sync with the actual table we're using
 function syncUrlWithTable(roundCode) {
   if (!roundCode) return;
   try {
@@ -262,14 +299,17 @@ function hopFrogToWinningNumber(winningNumber) {
   requestAnimationFrame(step);
 }
 
-function resetFrogPosition() {
-  if (!frogImg) return;
-  frogImg.style.transition = "transform 0.4s ease-out";
-  frogImg.style.transform = "translate(0, 0) scale(1)";
-  frogImg.style.zIndex = "5";
-  setTimeout(() => {
-    frogImg.style.transition = "none";
-  }, 400);
+// ================= TIMER (LOCAL 1-SECOND COUNTDOWN) =================
+
+function startLocalTimer() {
+  if (localTimerInterval) clearInterval(localTimerInterval);
+  localTimerInterval = setInterval(() => {
+    if (gameFinished) return;
+    if (displayRemainingSeconds > 0) {
+      displayRemainingSeconds -= 1;
+      renderTimer();
+    }
+  }, 1000);
 }
 
 // ================= BACKEND POLLING (TABLE DATA) =================
@@ -298,7 +338,6 @@ async function fetchTableData() {
       table = data.tables[0];
     }
 
-    // IMPORTANT: keep address bar in sync with the table we are actually using
     syncUrlWithTable(table.round_code);
 
     currentTable = table;
@@ -314,11 +353,9 @@ function updateGameUI(table) {
   if (roundIdSpan) roundIdSpan.textContent = table.round_code || "-";
   if (playerCountSpan) playerCountSpan.textContent = table.players || 0;
 
-  if (timerText) {
-    const mins = Math.floor((table.time_remaining || 0) / 60);
-    const secs = (table.time_remaining || 0) % 60;
-    timerText.textContent = `${mins}:${secs.toString().padStart(2, "0")}`;
-  }
+  // set local countdown base from backend
+  displayRemainingSeconds = table.time_remaining || 0;
+  renderTimer();
 
   updatePadsFromBets(table.bets || []);
   updateMyBets(table.bets || []);
@@ -337,10 +374,10 @@ function updateGameUI(table) {
     lastResultShown = table.result;
     setStatus(`Winning number: ${table.result}`, "ok");
 
-    // 1) Frog jump animation
+    // make sure there is a pad with that number, then jump
+    ensurePadForWinningNumber(table.result, table.bets || []);
     hopFrogToWinningNumber(table.result);
 
-    // 2) Mark game finished only once
     if (!gameFinished) {
       gameFinished = true;
       disableBettingUI();
@@ -351,7 +388,12 @@ function updateGameUI(table) {
         tablePollInterval = null;
       }
 
-      // 3) Wait a bit so jump is visible, then show popup
+      // stop local timer
+      if (localTimerInterval) {
+        clearInterval(localTimerInterval);
+        localTimerInterval = null;
+      }
+
       const outcomeInfo = determineUserOutcome(table);
       setTimeout(() => {
         showEndPopup(outcomeInfo);
@@ -362,7 +404,7 @@ function updateGameUI(table) {
   }
 }
 
-// start polling loop
+// start polling loop – keep it at 2s, local timer handles smooth countdown
 function startPolling() {
   fetchTableData(); // initial load
   if (tablePollInterval) clearInterval(tablePollInterval);
@@ -409,7 +451,6 @@ socket.on("bet_success", (payload) => {
   if (typeof payload.new_balance === "number") {
     updateWallet(payload.new_balance);
   }
-  // refresh table data to see new bets
   fetchTableData();
 });
 
@@ -474,5 +515,6 @@ if (popupLobbyBtn) {
 
 fetchBalance();
 startPolling();
+startLocalTimer();
 setSelectedNumber(0);
 setStatus("");
