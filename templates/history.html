@@ -4,70 +4,64 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>History</title>
-  <link rel="stylesheet" href="history.css" />
+
+  <!-- Use Flask static paths -->
+  <link
+    rel="stylesheet"
+    href="{{ url_for('static', filename='css/history.css') }}"
+  />
 </head>
 <body>
-  <div class="history-screen">
+  <div class="history-root">
+    <!-- HEADER -->
     <header class="history-header">
-      <button class="back-btn" onclick="window.location.href='home.html'">&#8592;</button>
+      <button
+        class="back-btn"
+        onclick="window.location.href='{{ url_for('home') }}'"
+      >
+        &#8592;
+      </button>
       <h1>History</h1>
     </header>
 
+    <!-- TABS -->
     <div class="tabs">
       <button class="tab active" data-tab="current">Current Games</button>
       <button class="tab" data-tab="past">Game History</button>
     </div>
 
     <!-- CURRENT GAMES -->
-    <section class="current-games" id="currentGames">
+    <section id="currentSection" class="section">
       <div class="section-title">
         <h2>Current Games</h2>
         <p>Bets placed · Result pending</p>
       </div>
 
-      <!-- Example PENDING card -->
-      <!-- data-round-number should be set to this game’s round number / game id -->
-      <div class="game-card"
-           data-game-code="silver"
-           data-round-number="1"
-           data-status="pending">
-        <div class="game-card-header">
-          <span class="game-id">S17636561772</span>
-          <span class="status-pill status-pending">Pending</span>
-        </div>
-
-        <div class="game-info">
-          <div class="game-name">silver</div>
-          <div class="game-bets">
-            <span>Your bets:</span>
-            <span class="bet-count">1</span>
-          </div>
-          <div class="game-result-text">Waiting for result...</div>
-
-          <div class="timer-row">
-            <span class="timer-label">Time left:</span>
-            <span class="timer-value">--:--</span>
-          </div>
-        </div>
-
-        <!-- Clicking a CURRENT game opens live game window for this game/round -->
-        <button class="open-game-btn">
-          Go to game
-        </button>
+      <div id="currentGames" class="games-list">
+        <!-- filled by JS -->
+        <div class="empty-message">Loading your games…</div>
       </div>
     </section>
 
-    <!-- GAME HISTORY -->
-    <section class="history-games hidden" id="historyGames">
+    <!-- PAST GAMES -->
+    <section id="historySection" class="section hidden">
       <div class="section-title">
         <h2>Game History</h2>
         <p>Completed games</p>
       </div>
-      <!-- Completed cards will be moved/added here by JS -->
+
+      <div id="historyGames" class="games-list">
+        <!-- filled by JS -->
+        <div class="empty-message">No completed games yet.</div>
+      </div>
     </section>
   </div>
 
-  <script src="/socket.io/socket.io.js"></script>
-  <script src="history.js"></script>
+  <!-- Pass current user id from Flask session -->
+  <script>
+    const CURRENT_USER_ID = {{ session.get("user_id", 0) }};
+  </script>
+
+  <script src="{{ url_for('static', filename='js/history.js') }}"></script>
 </body>
 </html>
