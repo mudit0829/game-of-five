@@ -372,3 +372,235 @@ async function fetchTableData() {
   try {
     const res = await fetch("/api/tables/silver");
     const data = await res.json();
+
+    if (!data.tables || !data.tables.length) {
+      setStatus("No active tables", "error");
+      return;
+    }
+
+    let table = null;
+
+    if (TABLE_CODE) {
+      table = data.tables.find((t) => t.round_code === TABLE_CODE) || null;
+    }
+    if (!table) {
+      table = data.tables[0];
+    }
+
+    syncUrlWithTable(table.round_code);
+
+    currentTable = table;
+    updateGameUI(table);
+  } catch (err) {
+    console.error("fetchTableData error", err);
+  }
+}
+
+function updateGameUI(table) {
+  if (!table) return;
+
+  if (roundIdSpan) roundIdSpan.textContent = table.round_code || "-";
+  if (playerCountSpan) playerCountSpan.textContent = table.players || 0;
+
+  displayRemainingSeconds = table.time_remaining || 0;
+  renderTimer();
+
+  updatePadsFromBets(table.bets || []);
+  updateMyBets(table.bets || []);
+
+  if (placeBetBtn && !gameFinished) {
+    placeBetBtn.disabled =
+      !!table.is_betting_closed ||
+      (typeof table.max_players === "number" &&
+        table.players >= table.max_players);
+  }
+
+  // ==== SLOTS FULL CHECK (only if userHasBet is still false) ====
+  const maxPlayers =
+    typeof table.max_players === "number" ? table.max_players : null;
+  const isFull =
+    table.is_full === true ||
+    (maxPlayers !== null && table.players >= maxPlayers);
+
+  if (!gameFinished && !userHasBet && isFull) {
+    gameFinished = true;
+    disableBettingUI();
+    if (tablePollInterval) {
+      clearInterval(tablePollInterval);
+      tablePollInterval = null;
+    }
+    if (localTimerInterval) {
+      clearInterval(localTimerInterval);
+      localTimerInterval = null;
+    }
+    showSlotsFullPopup();
+    return;
+  }
+
+  // ===== Result handling =====
+  const hasResult =
+    table.result !== null && table.result !== undefined && table.result !== "";
+
+  if (hasResult && table.result !== lastResultShown) {
+    lastResultShown = table.result;
+    setStatus(`Winning number: ${table.result}`, "ok");
+
+    ensurePadForWinningNumber(table.result);
+    hopFrogToWinningNumber(table.result);
+
+    if (!gameFinished) {
+      gameFinished = true;
+      disableBettingUI();
+
+      if (tablePollInterval) {
+        clearInterval(tablePollInterval);
+        tablePollInterval = null;
+      }
+      if (localTimerInterval) {
+        clearInterval(localTimerInterval);
+        localTimerInterval = null;
+      }
+
+      const outcomeInfo = determineUserOutcome(table);
+      // give frog time to hop before popup shows
+      setTimeout(() => {
+        showEndPopup(outcomeInfo);
+      }, 1800);
+    }
+  } else if (!hasResult) {
+    lastResultShown = null;
+    pads.forEach((p) => p.classList.remove("win"));
+  }
+}
+
+function startPolling() {
+  fetchTableData();
+  if (tablePollInterval) clearInterval(tablePollInterval);
+  tablePollInterval = setInterval(() => {
+    if (!gameFinished) {
+      fetchTableData();
+    }
+  }, 2000);
+}
+
+// ================= BALANCE / SOCKET =================
+
+const socket = io();
+
+async function fetchBalance() {
+  try {
+    const res = await fetch(`/balance/${USER_ID}`);
+    const data = await res.json();
+    if (typeof data.balance === "number") {
+      updateWallet(data.balance);
+    }
+  } catch (err) {
+    console.error("balance fetch error", err);
+  }
+}
+
+function joinGameRoom() {
+  socket.emit("join_game", {
+    game_type: GAME,
+    user_id: USER_ID,
+  });
+}
+
+socket.on("connect", () => {
+  joinGameRoom();
+  fetchBalance();
+  fetchTableData();
+});
+
+socket.on("bet_success", (payload) => {
+  if (gameFinished) return;
+
+  // As soon as backend confirms bet, lock this as a betting user
+  userHasBet = true;
+
+  setStatus(payload.message || "Bet placed", "ok");
+  if (typeof payload.new_balance === "number") {
+    updateWallet(payload.new_balance);
+  }
+  fetchTableData();
+});
+
+socket.on("bet_error", (payload) => {
+  if (gameFinished) return;
+  setStatus(payload.message || "Bet error", "error");
+});
+
+// ================= UI EVENTS =================
+
+numChips.forEach((chip) => {
+  chip.addEventListener("click", () => {
+    if (gameFinished) return;
+    const n = parseInt(chip.dataset.number, 10);
+    setSelectedNumber(n);
+  });
+});
+
+if (placeBetBtn) {
+  placeBetBtn.addEventListener("click", () => {
+    if (gameFinished) {
+      setStatus("This game has already finished.", "error");
+      return;
+    }
+
+    if (!currentTable) {
+      setStatus("Game is not ready yet. Please wait...", "error");
+      return;
+    }
+
+    // hard stop: no bet if all 6 slots are full
+    const maxPlayers =
+      typeof currentTable.max_players === "number"
+        ? currentTable.max_players
+        : null;
+    if (maxPlayers !== null && currentTable.players >= maxPlayers) {
+      setStatus("All slots are full for this game.", "error");
+      disableBettingUI();
+      return;
+    }
+
+    if (walletBalance < FIXED_BET_AMOUNT) {
+      setStatus("Insufficient balance", "error");
+      return;
+    }
+    if (selectedNumber === null || selectedNumber === undefined) {
+      setStatus("Select a number first", "error");
+      return;
+    }
+
+    // ⚠️ Duplicate-number rule is enforced on backend.
+    // We do NOT block here to avoid false “already taken” errors.
+
+    socket.emit("place_bet", {
+      game_type: GAME,
+      user_id: USER_ID,
+      username: USERNAME,
+      number: selectedNumber,
+    });
+  });
+}
+
+// popup buttons
+if (popupHomeBtn) {
+  popupHomeBtn.addEventListener("click", () => {
+    window.location.href = HOME_URL;
+  });
+}
+
+if (popupLobbyBtn) {
+  popupLobbyBtn.addEventListener("click", () => {
+    window.history.back();
+  });
+}
+
+// ================= INIT =================
+
+fetchBalance();
+startPolling();
+startLocalTimer();
+setSelectedNumber(0);
+setStatus("");
