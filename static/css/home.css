@@ -87,6 +87,13 @@ body {
   gap: 2px;
 }
 
+.brand-logo {
+  height: 36px;
+  vertical-align: middle;
+  margin-right: 6px;
+}
+
+
 .brand-name {
   font-size: 26px;
   font-weight: 900;
