@@ -120,16 +120,10 @@ function updateMyBets(bets) {
     const span = document.createElement("span");
     span.style.color = "#6b7280";
     span.style.fontSize = "11px";
-    span.textContent = "Your bets: none";
+    span.textContent = "none";
     myBetsRow.appendChild(span);
     return;
   }
-
-  const label = document.createElement("span");
-  label.style.color = "#9ca3af";
-  label.style.fontSize = "11px";
-  label.textContent = "Your bets: ";
-  myBetsRow.appendChild(label);
 
   myBets.forEach((b, index) => {
     const chip = document.createElement("span");
@@ -379,7 +373,10 @@ function updateGameUI(table) {
   updateMyBets(table.bets || []);
 
   if (placeBetBtn && !gameFinished) {
-    placeBetBtn.disabled = !!table.is_betting_closed;
+    placeBetBtn.disabled =
+      !!table.is_betting_closed ||
+      (typeof table.max_players === "number" &&
+        table.players >= table.max_players);
   }
 
   // ==== SLOTS FULL CHECK (only if userHasBet is still false) ====
@@ -512,6 +509,22 @@ if (placeBetBtn) {
       return;
     }
 
+    if (!currentTable) {
+      setStatus("Game is not ready yet. Please wait...", "error");
+      return;
+    }
+
+    // hard stop: no bet if all 6 slots are full
+    const maxPlayers =
+      typeof currentTable.max_players === "number"
+        ? currentTable.max_players
+        : null;
+    if (maxPlayers !== null && currentTable.players >= maxPlayers) {
+      setStatus("All slots are full for this game.", "error");
+      disableBettingUI();
+      return;
+    }
+
     if (walletBalance < FIXED_BET_AMOUNT) {
       setStatus("Insufficient balance", "error");
       return;
@@ -521,20 +534,8 @@ if (placeBetBtn) {
       return;
     }
 
-    // one number can be used only once in this game
-    if (
-      currentTable &&
-      Array.isArray(currentTable.bets) &&
-      currentTable.bets.some(
-        (b) => String(b.number) === String(selectedNumber)
-      )
-    ) {
-      setStatus(
-        "This number is already taken in this game. Please choose another.",
-        "error"
-      );
-      return;
-    }
+    // ⚠️ Duplicate-number rule is enforced on backend.
+    // We do NOT block here to avoid false “already taken” errors.
 
     socket.emit("place_bet", {
       game_type: GAME,
