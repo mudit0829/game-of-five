@@ -317,7 +317,7 @@ body {
 /* Ball positioned next to player */
 .ball {
   position: absolute;
-  bottom: 18px;
+  bottom: 30px;
   left: 50%;
   transform: translateX(-20px);
   width: 34px;
