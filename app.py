@@ -47,44 +47,44 @@ socketio = SocketIO(
 )
 
 # ---------------------------------------------------
-# Game configurations
+# Game configurations  (UPDATED BET / PAYOUT VALUES)
 # ---------------------------------------------------
 GAME_CONFIGS = {
     "silver": {
-        "bet_amount": 200,
-        "payout": 1000,
+        "bet_amount": 10,      # You bet 10
+        "payout": 50,          # You get 50
         "name": "Silver Game",
         "type": "number",
         "title": "Frog Leap",
         "emoji": "🐸",
     },
     "gold": {
-        "bet_amount": 250,
-        "payout": 1250,
+        "bet_amount": 50,      # You bet 50
+        "payout": 250,         # You get 250
         "name": "Gold Game",
         "type": "number",
         "title": "Football Goal",
         "emoji": "⚽",
     },
     "diamond": {
-        "bet_amount": 100,
-        "payout": 500,
+        "bet_amount": 100,     # You bet 100
+        "payout": 500,         # You get 500
         "name": "Diamond Game",
         "type": "number",
         "title": "Archer Hit",
         "emoji": "🏹",
     },
     "platinum": {
-        "bet_amount": 1000,
-        "payout": 5000,
+        "bet_amount": 200,     # You bet 200
+        "payout": 1000,        # You get 1000
         "name": "Platinum Game",
         "type": "number",
         "title": "Parachute Drop",
         "emoji": "🪂",
     },
     "roulette": {
-        "bet_amount": 200,
-        "payout": 2000,
+        "bet_amount": 200,     # You bet 200
+        "payout": 2000,        # You get 2000
         "name": "Roulette Game",
         "type": "roulette",
         "title": "Roulette Spin",
@@ -224,7 +224,7 @@ class GameTable:
         RULES:
         - Each NUMBER can be used only once in this table (real users + bots).
         - Max 4 bets per user.
-        - Max players = self.max_players.
+        - Max players = self.max_players (6).
         We normalise real users' IDs to int so history keys match /api/user-games.
         """
         # normalise number to int
@@ -234,7 +234,7 @@ class GameTable:
             return False, "Invalid number"
         number = number_int
 
-        # --- NEW: one bet per number in this game ---
+        # one bet per number in this game
         for bet in self.bets:
             if bet["number"] == number:
                 return (
@@ -256,6 +256,7 @@ class GameTable:
         if len(user_bets) >= 4:
             return False, "Maximum 4 bets per user"
 
+        # table full
         if len(self.bets) >= self.max_players:
             return False, "All slots are full"
 
@@ -296,19 +297,16 @@ class GameTable:
         if len(self.bets) >= self.max_players:
             return False
 
-        # numbers already taken (by users or bots)
         taken_numbers = {b["number"] for b in self.bets}
         all_numbers = self.get_number_range()
         available_numbers = [n for n in all_numbers if n not in taken_numbers]
 
         if not available_numbers:
-            # No numbers left to choose from
             return False
 
         bot_name = generate_bot_name()
         bot_number = random.choice(available_numbers)
 
-        # reuse add_bet so rules remain consistent
         success, _ = self.add_bet(
             user_id=f"bot_{bot_name}",
             username=bot_name,
@@ -850,67 +848,6 @@ def help_tickets_api():
 
 
 # ---------------------------------------------------
-# Coins / Redeem
-# ---------------------------------------------------
-
-
-@app.route("/coins")
-@login_required
-def coins_page():
-    """Coins / redeem page."""
-    user_id = session.get("user_id")
-    user = User.query.get(user_id)
-    if not user:
-        return redirect(url_for("logout"))
-
-    wallet = ensure_wallet_for_user(user)
-    return render_template(
-        "coins.html",
-        username=user.username,
-        balance=wallet.balance,
-    )
-
-
-@app.route("/api/coins/redeem", methods=["POST"])
-@login_required
-def redeem_coins():
-    """Redeem coins from wallet (simple demo – just subtracts balance)."""
-    user_id = session.get("user_id")
-    user = User.query.get(user_id)
-    if not user:
-        return jsonify({"success": False, "message": "User not found"}), 404
-
-    wallet = ensure_wallet_for_user(user)
-
-    data = request.get_json() or {}
-    try:
-        amount = int(data.get("amount", 0))
-    except (TypeError, ValueError):
-        amount = 0
-
-    if amount <= 0:
-        return jsonify(
-            {"success": False, "message": "Enter a valid integer amount"}
-        ), 400
-
-    if amount > wallet.balance:
-        return jsonify(
-            {"success": False, "message": "You don’t have that many coins"}
-        ), 400
-
-    wallet.balance -= amount
-    db.session.commit()
-
-    return jsonify(
-        {
-            "success": True,
-            "message": f"{amount} coins redeemed successfully.",
-            "new_balance": wallet.balance,
-        }
-    )
-
-
-# ---------------------------------------------------
 # Balance API
 # ---------------------------------------------------
 
@@ -958,19 +895,34 @@ def handle_join_game(data):
     join_room(game_type)
 
 
+# ---------------------------------------------------
+# PLACE BET  (UPDATED: tie to round_code + block full games)
+# ---------------------------------------------------
+
+
 @socketio.on("place_bet")
 def handle_place_bet(data):
     """
     Place bet from game clients.
-    We normalise user_id to int so it matches DB & history keys.
-    Enforces:
-    - one bet per number per table (via GameTable.add_bet)
-    - max 4 bets per user
+
+    NEW behaviour:
+    - If 'round_code' is provided, we place the bet ONLY on that round/table.
+      (So user always bets on the game they see on screen.)
+    - If no 'round_code' is provided (older JS), we fall back to the first
+      open table for that game_type.
+    - We block bets if:
+        * game_type invalid
+        * user not found
+        * wallet < bet amount
+        * table is finished or betting_closed
+        * table is full (6 slots including bots)
+        * GameTable.add_bet rejects (duplicate number, >4 bets per user, etc.)
     """
     game_type = data.get("game_type")
     raw_user_id = data.get("user_id")
     username = data.get("username")
     number = data.get("number")
+    round_code = data.get("round_code")  # optional – sent from new JS
 
     if game_type not in GAME_CONFIGS:
         emit("bet_error", {"message": "Invalid game type"})
@@ -994,30 +946,67 @@ def handle_place_bet(data):
         emit("bet_error", {"message": "No tables for this game"})
         return
 
-    # find open table
+    # --- Find the exact table by round_code if provided ---
     table = None
-    for t in tables:
-        if not t.is_betting_closed and not t.is_finished and len(t.bets) < t.max_players:
-            table = t
-            break
+    if round_code:
+        for t in tables:
+            if t.round_code == round_code:
+                table = t
+                break
+        if not table:
+            emit(
+                "bet_error",
+                {
+                    "message": "This game round is no longer available. Please join a new game."
+                },
+            )
+            return
+    else:
+        # fallback: first open table
+        for t in tables:
+            if not t.is_betting_closed and not t.is_finished and len(t.bets) < t.max_players:
+                table = t
+                break
+        if not table:
+            emit("bet_error", {"message": "No open game table"})
+            return
 
-    if not table:
-        emit("bet_error", {"message": "No open game table"})
+    # Block if table already finished / closed
+    if table.is_finished or table.is_betting_closed:
+        emit("bet_error", {"message": "Betting is closed for this game"})
         return
 
-    if wallet.balance < table.config["bet_amount"]:
+    # Block if all 6 slots are full, for everyone (even existing players)
+    if len(table.bets) >= table.max_players:
+        emit("bet_error", {"message": "All slots are full"})
+        return
+
+    bet_amount = table.config["bet_amount"]
+
+    if wallet.balance < bet_amount:
         emit("bet_error", {"message": "Insufficient balance"})
         return
 
+    # This enforces:
+    # - one number per game (for all users)
+    # - max 4 bets per user
+    # - table full check again
     success, message = table.add_bet(user_id, username, number)
     if not success:
         emit("bet_error", {"message": message})
         return
 
-    wallet.balance -= table.config["bet_amount"]
+    wallet.balance -= bet_amount
     db.session.commit()
 
-    emit("bet_success", {"message": message, "new_balance": wallet.balance})
+    emit(
+        "bet_success",
+        {
+            "message": message,
+            "new_balance": wallet.balance,
+            "round_code": table.round_code,
+        },
+    )
 
 
 # ---------------------------------------------------
