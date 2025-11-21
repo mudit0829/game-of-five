@@ -27,10 +27,14 @@
       </div>
 
       <div class="user-section">
-        <div class="balance-pill">
-          <span>₹</span>
+        <!-- COINS PILL (CLICKABLE → /coins) -->
+        <div class="balance-pill" id="coinsPill">
+          <div class="coin-icon">
+            <img src="{{ url_for('static', filename='img/coin.png') }}" alt="Coins">
+          </div>
           <span id="walletBalance">0</span>
         </div>
+
         <div class="profile-circle" onclick="window.location.href='/profile'">
           <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor">
             <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
