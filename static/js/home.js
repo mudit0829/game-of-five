@@ -7,8 +7,22 @@ function updateBalance() {
   fetch(`/balance/${USER_ID}`)
     .then(res => res.json())
     .then(data => {
+      const pill = document.getElementById('coinsPill');
       walletBalance = data.balance || 0;
-      document.getElementById('walletBalance').textContent = walletBalance.toLocaleString('en-IN');
+
+      const display = document.getElementById('walletBalance');
+      if (display) {
+        display.textContent = walletBalance.toLocaleString('en-IN');
+      }
+
+      // small bounce animation when value updates
+      if (pill) {
+        pill.classList.add('bounce');
+        setTimeout(() => pill.classList.remove('bounce'), 450);
+      }
+    })
+    .catch(err => {
+      console.error('Balance fetch error', err);
     });
 }
 
@@ -16,13 +30,22 @@ function updateBalance() {
 updateBalance();
 setInterval(updateBalance, 10000);
 
+// --- Coins pill click → Redeem page ---
+const coinsPill = document.getElementById('coinsPill');
+if (coinsPill) {
+  coinsPill.addEventListener('click', () => {
+    window.location.href = '/coins';
+  });
+}
+
 // --- Ripple effect for card clicks (for pro touch) ---
 document.querySelectorAll('.game-card, .featured-card').forEach(card => {
-  card.addEventListener('click', function(e) {
+  card.addEventListener('click', function (e) {
+    const rect = this.getBoundingClientRect();
     const ripple = document.createElement('span');
     ripple.className = 'ripple';
-    ripple.style.left = `${e.offsetX}px`;
-    ripple.style.top = `${e.offsetY}px`;
+    ripple.style.left = `${e.clientX - rect.left}px`;
+    ripple.style.top = `${e.clientY - rect.top}px`;
     this.appendChild(ripple);
     setTimeout(() => ripple.remove(), 600);
   });
@@ -40,25 +63,8 @@ navItems.forEach((item, idx) => {
   }
 });
 
-// Optional: Smooth scroll for main-content
-document.querySelector('.main-content').scrollTo({ top: 0, behavior: 'smooth' });
-
-/* --- Optional: Add .ripple CSS to your home.css ---
-.ripple {
-  position: absolute;
-  width: 90px;
-  height: 90px;
-  background: rgba(56,189,248,0.18);
-  border-radius: 50%;
-  transform: translate(-50%, -50%) scale(0.5);
-  pointer-events: none;
-  animation: ripple-grow 0.6s linear;
-  z-index: 9;
+// Optional: Smooth scroll for main-content on load
+const mainContent = document.querySelector('.main-content');
+if (mainContent) {
+  mainContent.scrollTo({ top: 0, behavior: 'smooth' });
 }
-@keyframes ripple-grow {
-  to {
-    transform: translate(-50%, -50%) scale(2.2);
-    opacity: 0;
-  }
-}
-*/
