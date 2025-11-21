@@ -59,6 +59,13 @@ let displayRemainingSeconds = 0; // what we show on screen
 // IMPORTANT: persistent flag – once true, never set back to false
 let userHasBet = false;
 
+// remember frog's initial transform so we can reset each round
+let frogInitialTransform = null;
+if (frogImg) {
+  const cs = window.getComputedStyle(frogImg);
+  frogInitialTransform = cs.transform === "none" ? "" : cs.transform;
+}
+
 // ================= UI HELPERS =================
 
 function setStatus(msg, type = "") {
@@ -336,6 +343,7 @@ function hopFrogToWinningNumber(winningNumber) {
     } else {
       frogImg.style.transform = `translate(${deltaX}px, ${deltaY}px) scale(1)`;
       targetPad.classList.add("win");
+      console.log("[frog] Hop complete");
     }
   }
 
@@ -453,12 +461,18 @@ function updateGameUI(table) {
       }
 
       const outcomeInfo = determineUserOutcome(table);
+      // ⏱️ give the frog time to clearly hop BEFORE popup
       setTimeout(() => {
         showEndPopup(outcomeInfo);
-      }, 1000);
+      }, 1800);
     }
   } else if (!hasResult) {
+    // new round: clear result + reset frog + remove win highlights
     lastResultShown = null;
+    pads.forEach((p) => p.classList.remove("win"));
+    if (frogImg && frogInitialTransform !== null) {
+      frogImg.style.transform = frogInitialTransform;
+    }
   }
 }
 
