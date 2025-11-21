@@ -161,7 +161,7 @@ function determineUserOutcome(table) {
 function showEndPopup(outcomeInfo) {
   if (!popupEl) return;
 
-  const { outcome, result } = outcomeInfo;
+  const { outcome } = outcomeInfo;
 
   let title = "Game Finished";
   let message =
@@ -180,7 +180,6 @@ function showEndPopup(outcomeInfo) {
   if (popupTitleEl) popupTitleEl.textContent = title;
   if (popupMsgEl) popupMsgEl.textContent = message;
 
-  // show popup (simple inline style so we don't depend on CSS)
   popupEl.style.display = "flex";
 }
 
@@ -311,7 +310,7 @@ function updateGameUI(table) {
     placeBetBtn.disabled = !!table.is_betting_closed;
   }
 
-  // detect finished result to trigger frog jump + popup
+  // detect finished result to trigger frog jump + delayed popup
   if (
     table.is_finished &&
     table.result !== null &&
@@ -320,21 +319,26 @@ function updateGameUI(table) {
   ) {
     lastResultShown = table.result;
     setStatus(`Winning number: ${table.result}`, "ok");
+
+    // 1) Frog jump animation
     hopFrogToWinningNumber(table.result);
 
-    // mark game finished ONCE
+    // 2) Mark game finished only once
     if (!gameFinished) {
       gameFinished = true;
       disableBettingUI();
+
       // stop polling
       if (tablePollInterval) {
         clearInterval(tablePollInterval);
         tablePollInterval = null;
       }
 
-      // show popup with win/lose message
+      // 3) Wait a bit so jump is visible, then show popup
       const outcomeInfo = determineUserOutcome(table);
-      showEndPopup(outcomeInfo);
+      setTimeout(() => {
+        showEndPopup(outcomeInfo);
+      }, 1000); // 1 second after jump starts
     }
   } else if (!table.is_finished) {
     lastResultShown = null;
