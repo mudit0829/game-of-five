@@ -1,23 +1,29 @@
-// ========== BASIC SETUP (DB USER, multi-table) ==========
+// ================= BASIC SETUP (DB USER) =================
 
 const GAME = GAME_TYPE || "gold";
 
-// --- Get table code from URL (multi-table sync!) ---
+// optional: support multi-table via ?table=ROUND_CODE
 const urlParams = new URLSearchParams(window.location.search);
-const TABLE_CODE = urlParams.get("table");
+const TABLE_CODE = urlParams.get("table") || null;
 
-// REAL logged-in user from Flask session
+// Real logged-in user from Flask session (passed in HTML)
 const USER_ID = GAME_USER_ID;
 const USERNAME = GAME_USERNAME || "Player";
 
-// ========== DOM SETUP ==========
+// Where "Home" button on popup goes
+const HOME_URL = "/home";
+
+// ================= DOM REFERENCES =================
+
 const pitch = document.querySelector(".pitch");
 const ballImg = document.getElementById("ballSprite");
 const cssPlayer = document.getElementById("cssPlayer");
 const playerArea = document.querySelector(".player-area");
 const goals = Array.from(document.querySelectorAll(".goal.pad"));
+
 const numChips = Array.from(document.querySelectorAll(".num-chip"));
 const placeBetBtn = document.getElementById("placeBetBtn");
+
 const roundIdSpan = document.getElementById("roundId");
 const playerCountSpan = document.getElementById("playerCount");
 const timerText = document.getElementById("timerText");
@@ -29,16 +35,33 @@ const userNameLabel = document.getElementById("userName");
 const userBetCountLabel = document.getElementById("userBetCount");
 const myBetsRow = document.getElementById("myBetsRow");
 
+// popup elements
+const popupEl = document.getElementById("resultPopup");
+const popupTitleEl = document.getElementById("popupTitle");
+const popupMsgEl = document.getElementById("popupMessage");
+const popupHomeBtn = document.getElementById("popupHomeBtn");
+const popupLobbyBtn = document.getElementById("popupLobbyBtn");
+
 if (userNameLabel) {
   userNameLabel.textContent = USERNAME;
 }
 
 let walletBalance = 0;
 let selectedNumber = 0;
-let playerShown = false;
-let currentTableData = null;
 
-// ========== UI HELPERS ==========
+let currentTable = null;
+let lastResultShown = null;
+
+// flags / intervals
+let gameFinished = false;
+let tablePollInterval = null;
+let localTimerInterval = null;
+let displayRemainingSeconds = 0;
+
+// once true, never false – used for "slots full" logic
+let userHasBet = false;
+
+// ================= UI HELPERS =================
 
 function setStatus(msg, type = "") {
   if (!statusEl) return;
@@ -58,6 +81,18 @@ function updateWallet(balance) {
   }
 }
 
+function formatTime(seconds) {
+  const s = Math.max(0, parseInt(seconds || 0, 10));
+  const mins = Math.floor(s / 60);
+  const secs = s % 60;
+  return `${mins}:${secs.toString().padStart(2, "0")}`;
+}
+
+function renderTimer() {
+  if (!timerText) return;
+  timerText.textContent = formatTime(displayRemainingSeconds);
+}
+
 function setSelectedNumber(n) {
   selectedNumber = n;
   numChips.forEach((chip) => {
@@ -67,17 +102,27 @@ function setSelectedNumber(n) {
 }
 
 function updateMyBets(bets) {
-  const myBets = (bets || []).filter((b) => b.user_id === USER_ID);
+  const myBets = (bets || []).filter(
+    (b) => String(b.user_id) === String(USER_ID)
+  );
+
+  if (myBets.length > 0) {
+    userHasBet = true; // lock as betting user
+  }
+
   if (userBetCountLabel) {
     userBetCountLabel.textContent = myBets.length;
   }
 
+  if (!myBetsRow) return;
   myBetsRow.innerHTML = "";
+
   if (myBets.length === 0) {
     myBetsRow.innerHTML =
-      '<span style="color: #6b7280; font-size: 11px;">none</span>';
+      '<span style="color:#6b7280;font-size:11px;">none</span>';
     return;
   }
+
   myBets.forEach((b, index) => {
     const chip = document.createElement("span");
     chip.className = "my-bet-chip";
@@ -89,37 +134,144 @@ function updateMyBets(bets) {
   });
 }
 
-// ---- GOALS FROM BETS ====
+/**
+ * Use up to 6 bets, one per goal.
+ */
 function updateGoalsFromBets(bets) {
-  const betsByNumber = {};
-  (bets || []).forEach((b) => {
-    if (!betsByNumber[b.number]) betsByNumber[b.number] = [];
-    betsByNumber[b.number].push(b);
-  });
-
-  const uniqueNumbers = Object.keys(betsByNumber).slice(0, 6);
+  const list = (bets || []).slice(0, 6);
 
   goals.forEach((goal, i) => {
     const numSpan = goal.querySelector(".pad-number");
     const userSpan = goal.querySelector(".pad-user");
     goal.classList.remove("win");
 
-    if (i < uniqueNumbers.length) {
-      const number = uniqueNumbers[i];
-      const betsOnNumber = betsByNumber[number];
-      goal.dataset.number = number;
-      numSpan.textContent = number;
-      userSpan.textContent = betsOnNumber[0].username;
+    if (i < list.length) {
+      const b = list[i];
+      goal.dataset.number = String(b.number);
+      if (numSpan) numSpan.textContent = b.number;
+      if (userSpan) userSpan.textContent = b.username;
     } else {
       goal.dataset.number = "";
-      numSpan.textContent = "";
-      userSpan.textContent = "";
+      if (numSpan) numSpan.textContent = "";
+      if (userSpan) userSpan.textContent = "";
     }
   });
 }
 
-// ======== DOTTED LINE TRAJECTORY ========
+/**
+ * Ensure at least one goal shows winning number so the ball can target it.
+ */
+function ensureGoalForWinningNumber(winningNumber) {
+  if (winningNumber === null || winningNumber === undefined) return;
+
+  const existing = goals.find(
+    (g) => g.dataset.number === String(winningNumber)
+  );
+  if (existing) return;
+
+  const goal = goals[0];
+  if (!goal) return;
+
+  const numSpan = goal.querySelector(".pad-number");
+  const userSpan = goal.querySelector(".pad-user");
+
+  goal.dataset.number = String(winningNumber);
+  if (numSpan) numSpan.textContent = winningNumber;
+  if (userSpan) userSpan.textContent = "";
+}
+
+function disableBettingUI() {
+  if (placeBetBtn) placeBetBtn.disabled = true;
+  numChips.forEach((chip) => {
+    chip.disabled = true;
+  });
+}
+
+function determineUserOutcome(table) {
+  const result = table.result;
+  const myBets = (table.bets || []).filter(
+    (b) => String(b.user_id) === String(USER_ID)
+  );
+  if (!myBets.length) {
+    return { outcome: "none", result };
+  }
+  const won = myBets.some((b) => String(b.number) === String(result));
+  return { outcome: won ? "win" : "lose", result };
+}
+
+function showEndPopup(outcomeInfo) {
+  if (!popupEl) return;
+
+  const { outcome } = outcomeInfo;
+
+  let title = "Game Finished";
+  let message =
+    "This game has ended. Please keep playing to keep your winning chances high.";
+
+  if (outcome === "win") {
+    title = "Congratulations!";
+    message =
+      "You have won the game. Please keep playing to keep your winning chances high.";
+  } else if (outcome === "lose") {
+    title = "Hard Luck!";
+    message =
+      "You have lost the game. Please keep playing to keep your winning chances high.";
+  }
+
+  if (popupTitleEl) popupTitleEl.textContent = title;
+  if (popupMsgEl) popupMsgEl.textContent = message;
+
+  popupEl.style.display = "flex";
+}
+
+function showSlotsFullPopup() {
+  if (!popupEl) return;
+
+  if (popupTitleEl) popupTitleEl.textContent = "All slots are full";
+  if (popupMsgEl)
+    popupMsgEl.textContent =
+      "This game is already full. You will be redirected to lobby to join another table.";
+
+  popupEl.style.display = "flex";
+
+  setTimeout(() => {
+    window.history.back();
+  }, 2000);
+}
+
+function syncUrlWithTable(roundCode) {
+  if (!roundCode) return;
+  try {
+    const url = new URL(window.location.href);
+    const currentParam = url.searchParams.get("table");
+    if (currentParam === roundCode) return;
+    url.searchParams.set("table", roundCode);
+    window.history.replaceState({}, "", url.toString());
+  } catch (err) {
+    console.warn("Unable to sync URL with table code", err);
+  }
+}
+
+// ================= BALL SHOOTING ANIMATION =================
+
+function ensureTrajectoryStyles() {
+  if (document.getElementById("trajectory-styles")) return;
+  const style = document.createElement("style");
+  style.id = "trajectory-styles";
+  style.textContent = `
+    @keyframes drawPath {
+      to { stroke-dashoffset: 0; }
+    }
+    @keyframes goalFlash {
+      0% { opacity: 0; transform: translate(-50%, -50%) scale(0.5);}
+      50% { opacity:1; transform: translate(-50%, -50%) scale(1);}
+      100% { opacity:0; transform: translate(-50%, -50%) scale(1.2);}
+    }`;
+  document.head.appendChild(style);
+}
+
 function createTrajectoryLine(startX, startY, endX, endY, peak) {
+  ensureTrajectoryStyles();
   const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
   svg.setAttribute("class", "trajectory-line");
   svg.style.position = "absolute";
@@ -143,40 +295,26 @@ function createTrajectoryLine(startX, startY, endX, endY, peak) {
   path.style.strokeDashoffset = "1000";
   path.style.animation = "drawPath 0.6s ease-out forwards";
   svg.appendChild(path);
-  pitch.appendChild(svg);
+  if (pitch) pitch.appendChild(svg);
 
   setTimeout(() => svg.parentNode && svg.parentNode.removeChild(svg), 1200);
 }
 
-if (!document.getElementById("trajectory-styles")) {
-  const style = document.createElement("style");
-  style.id = "trajectory-styles";
-  style.textContent = `
-    @keyframes drawPath {
-      to { stroke-dashoffset: 0; }
-    }
-    @keyframes goalFlash {
-      0% { opacity: 0; transform: translate(-50%, -50%) scale(0.5);}
-      50% { opacity:1; transform: translate(-50%, -50%) scale(1);}
-      100% { opacity:0; transform: translate(-50%, -50%) scale(1.2);}
-    }`;
-  document.head.appendChild(style);
-}
-
-// ========== BALL SHOOTING ANIMATION ==========
 function shootBallToWinningNumber(winningNumber) {
-  const pitchRect = pitch.getBoundingClientRect();
-  const ballRect = ballImg.getBoundingClientRect();
+  if (!pitch || !ballImg) return;
+
   const targetGoal = goals.find(
     (g) => g.dataset.number === String(winningNumber)
   );
-
   if (!targetGoal) {
     console.log("Winning number not on a goal:", winningNumber);
     return;
   }
 
+  const pitchRect = pitch.getBoundingClientRect();
+  const ballRect = ballImg.getBoundingClientRect();
   const goalRect = targetGoal.getBoundingClientRect();
+
   const startX = ballRect.left + ballRect.width / 2;
   const startY = ballRect.top + ballRect.height / 2;
   const endX = goalRect.left + goalRect.width / 2;
@@ -195,7 +333,7 @@ function shootBallToWinningNumber(winningNumber) {
 
   createTrajectoryLine(pitchStartX, pitchStartY, pitchEndX, pitchEndY, peak);
 
-  cssPlayer && cssPlayer.classList.add("kick");
+  if (cssPlayer) cssPlayer.classList.add("kick");
 
   setTimeout(() => {
     const originalTransform = ballImg.style.transform;
@@ -227,6 +365,7 @@ function shootBallToWinningNumber(winningNumber) {
         requestAnimationFrame(step);
       } else {
         targetGoal.classList.add("win");
+
         const flash = document.createElement("div");
         flash.style.position = "absolute";
         flash.style.top = "50%";
@@ -261,60 +400,160 @@ function shootBallToWinningNumber(winningNumber) {
   setTimeout(() => cssPlayer && cssPlayer.classList.remove("kick"), 800);
 }
 
-// ========== BACKEND API SYNC (tables) ==========
+// ================= TIMER (LOCAL 1-SECOND COUNTDOWN) =================
+
+function startLocalTimer() {
+  if (localTimerInterval) clearInterval(localTimerInterval);
+  localTimerInterval = setInterval(() => {
+    if (gameFinished) return;
+    if (displayRemainingSeconds > 0) {
+      displayRemainingSeconds -= 1;
+      renderTimer();
+    }
+  }, 1000);
+}
+
+// ================= BACKEND POLLING (TABLE DATA) =================
 
 async function fetchTableData() {
-  if (!TABLE_CODE) {
-    setStatus("No table selected", "error");
-    return;
-  }
+  if (gameFinished) return;
+
   try {
-    const response = await fetch(`/api/tables/gold`);
-    const data = await response.json();
-    if (data.tables) {
-      const table = data.tables.find((t) => t.round_code === TABLE_CODE);
-      if (table) {
-        currentTableData = table;
-        updateGameUI(table);
-      } else {
-        setStatus("Table not found", "error");
-      }
+    const res = await fetch("/api/tables/gold");
+    const data = await res.json();
+
+    if (!data.tables || !data.tables.length) {
+      setStatus("No active tables", "error");
+      return;
     }
-  } catch (e) {
-    console.error("fetchTableData error", e);
+
+    let table = null;
+
+    if (TABLE_CODE) {
+      table = data.tables.find((t) => t.round_code === TABLE_CODE) || null;
+    }
+    if (!table) {
+      table = data.tables[0];
+    }
+
+    syncUrlWithTable(table.round_code);
+
+    currentTable = table;
+    updateGameUI(table);
+  } catch (err) {
+    console.error("fetchTableData error", err);
   }
 }
 
 function updateGameUI(table) {
-  roundIdSpan.textContent = table.round_code;
-  playerCountSpan.textContent = table.players || 0;
-  const mins = Math.floor(table.time_remaining / 60);
-  const secs = table.time_remaining % 60;
-  timerText.textContent = `${mins}:${secs.toString().padStart(2, "0")}`;
+  if (!table) return;
+
+  if (roundIdSpan) roundIdSpan.textContent = table.round_code || "-";
+  if (playerCountSpan) playerCountSpan.textContent = table.players || 0;
+
+  displayRemainingSeconds = table.time_remaining || 0;
+  renderTimer();
+
   updateGoalsFromBets(table.bets || []);
   updateMyBets(table.bets || []);
-  placeBetBtn.disabled = !!table.is_betting_closed;
 
-  if (table.is_betting_closed) {
-    setStatus("Betting closed for this round", "error");
-    placeBetBtn.disabled = true;
+  if (placeBetBtn && !gameFinished) {
+    placeBetBtn.disabled = !!table.is_betting_closed;
   }
-  if (table.is_finished && table.result !== null && table.result !== undefined) {
-    shootBallToWinningNumber(table.result);
+
+  // Highlight urgent timer when low
+  if (displayRemainingSeconds <= 10) {
+    timerPill && timerPill.classList.add("urgent");
+  } else {
+    timerPill && timerPill.classList.remove("urgent");
+  }
+
+  // Show player animation in last 15s (optional)
+  if (playerArea) {
+    if (displayRemainingSeconds <= 15) {
+      playerArea.classList.add("visible");
+    } else {
+      playerArea.classList.remove("visible");
+    }
+  }
+
+  // ==== SLOTS FULL CHECK (only if userHasBet is still false) ====
+  const maxPlayers =
+    typeof table.max_players === "number" ? table.max_players : null;
+  const isFull =
+    table.is_full === true ||
+    (maxPlayers !== null && table.players >= maxPlayers);
+
+  if (!gameFinished && !userHasBet && isFull) {
+    gameFinished = true;
+    disableBettingUI();
+    if (tablePollInterval) {
+      clearInterval(tablePollInterval);
+      tablePollInterval = null;
+    }
+    if (localTimerInterval) {
+      clearInterval(localTimerInterval);
+      localTimerInterval = null;
+    }
+    showSlotsFullPopup();
+    return;
+  }
+
+  // ===== Result handling =====
+  const hasResult =
+    table.result !== null && table.result !== undefined && table.result !== "";
+
+  if (hasResult && table.result !== lastResultShown) {
+    lastResultShown = table.result;
     setStatus(`Winning number: ${table.result}`, "ok");
+
+    ensureGoalForWinningNumber(table.result);
+    shootBallToWinningNumber(table.result);
+
+    if (!gameFinished) {
+      gameFinished = true;
+      disableBettingUI();
+
+      if (tablePollInterval) {
+        clearInterval(tablePollInterval);
+        tablePollInterval = null;
+      }
+      if (localTimerInterval) {
+        clearInterval(localTimerInterval);
+        localTimerInterval = null;
+      }
+
+      const outcomeInfo = determineUserOutcome(table);
+      setTimeout(() => {
+        showEndPopup(outcomeInfo);
+      }, 1000);
+    }
+  } else if (!hasResult) {
+    lastResultShown = null;
   }
 }
 
-setInterval(fetchTableData, 2000);
+function startPolling() {
+  fetchTableData();
+  if (tablePollInterval) clearInterval(tablePollInterval);
+  tablePollInterval = setInterval(() => {
+    if (!gameFinished) {
+      fetchTableData();
+    }
+  }, 2000);
+}
 
-// ========== SOCKET.IO ==========
+// ================= BALANCE / SOCKET =================
+
 const socket = io();
 
 async function fetchBalance() {
   try {
     const res = await fetch(`/balance/${USER_ID}`);
     const data = await res.json();
-    if (typeof data.balance === "number") updateWallet(data.balance);
+    if (typeof data.balance === "number") {
+      updateWallet(data.balance);
+    }
   } catch (err) {
     console.error("balance fetch error", err);
   }
@@ -333,71 +572,12 @@ socket.on("connect", () => {
   fetchTableData();
 });
 
-socket.on("round_data", (payload) => {
-  if (payload.game_type !== GAME) return;
-  if (
-    TABLE_CODE &&
-    payload.round_data &&
-    payload.round_data.round_code !== TABLE_CODE
-  )
-    return;
-  const rd = payload.round_data || {};
-  roundIdSpan.textContent = rd.round_code;
-  timerText.textContent = rd.time_remaining ?? "--";
-  playerCountSpan.textContent = rd.players ?? 0;
-  updateGoalsFromBets(rd.bets || []);
-  updateMyBets(rd.bets || []);
-});
-
-socket.on("new_round", (payload) => {
-  if (payload.game_type !== GAME) return;
-  const rd = payload.round_data || {};
-  roundIdSpan.textContent = rd.round_code;
-  timerText.textContent = rd.time_remaining ?? "--";
-  playerCountSpan.textContent = rd.players ?? 0;
-  updateGoalsFromBets(rd.bets || []);
-  updateMyBets(rd.bets || []);
-  setStatus("New round started", "ok");
-
-  ballImg.style.position = "";
-  ballImg.style.left = "";
-  ballImg.style.top = "";
-  ballImg.style.transform = "";
-  ballImg.style.zIndex = "10";
-  playerArea.classList.remove("visible");
-  playerShown = false;
-  timerPill.classList.remove("urgent");
-});
-
-socket.on("timer_update", (payload) => {
-  if (payload.game_type !== GAME) return;
-  const timeRemaining = payload.time_remaining ?? 0;
-  timerText.textContent = timeRemaining.toString().padStart(2, "0");
-  playerCountSpan.textContent = payload.players ?? 0;
-  if (timeRemaining <= 15 && !playerShown) {
-    playerArea.classList.add("visible");
-    playerShown = true;
-  }
-  if (timeRemaining <= 10) {
-    timerPill.classList.add("urgent");
-  } else {
-    timerPill.classList.remove("urgent");
-  }
-});
-
-socket.on("betting_closed", (payload) => {
-  if (payload.game_type !== GAME) return;
-  setStatus("Betting closed", "error");
-  placeBetBtn.disabled = true;
-});
-
-socket.on("bet_placed", (payload) => {
-  if (payload.game_type !== GAME) return;
-  fetchTableData();
-});
-
 socket.on("bet_success", (payload) => {
-  setStatus(payload.message || "Bet placed!", "ok");
+  if (gameFinished) return;
+
+  userHasBet = true; // as soon as our bet is accepted
+
+  setStatus(payload.message || "Bet placed", "ok");
   if (typeof payload.new_balance === "number") {
     updateWallet(payload.new_balance);
   }
@@ -405,44 +585,77 @@ socket.on("bet_success", (payload) => {
 });
 
 socket.on("bet_error", (payload) => {
+  if (gameFinished) return;
   setStatus(payload.message || "Bet error", "error");
 });
 
-socket.on("round_result", (payload) => {
-  if (payload.game_type !== GAME) return;
-  const winning = payload.result;
-  if (winning === undefined || winning === null) return;
-  setStatus(`Winning number: ${winning}`, "ok");
-  shootBallToWinningNumber(winning);
-});
+// ================= UI EVENTS =================
 
-// ========== UI EVENTS ==========
 numChips.forEach((chip) => {
   chip.addEventListener("click", () => {
+    if (gameFinished) return;
     const n = parseInt(chip.dataset.number, 10);
     setSelectedNumber(n);
   });
 });
 
-placeBetBtn.addEventListener("click", () => {
-  if (walletBalance < FIXED_BET_AMOUNT) {
-    setStatus("Insufficient balance", "error");
-    return;
-  }
-  if (selectedNumber == null) {
-    setStatus("Select a number first", "error");
-    return;
-  }
-  socket.emit("place_bet", {
-    game_type: GAME,
-    user_id: USER_ID,
-    username: USERNAME,
-    number: selectedNumber,
-  });
-});
+if (placeBetBtn) {
+  placeBetBtn.addEventListener("click", () => {
+    if (gameFinished) {
+      setStatus("This game has already finished.", "error");
+      return;
+    }
 
-// ========== INIT ==========
+    if (walletBalance < FIXED_BET_AMOUNT) {
+      setStatus("Insufficient balance", "error");
+      return;
+    }
+    if (selectedNumber === null || selectedNumber === undefined) {
+      setStatus("Select a number first", "error");
+      return;
+    }
+
+    // ===== FRONTEND: prevent duplicate number in this table =====
+    if (
+      currentTable &&
+      Array.isArray(currentTable.bets) &&
+      currentTable.bets.some(
+        (b) => String(b.number) === String(selectedNumber)
+      )
+    ) {
+      setStatus(
+        "This number is already taken in this game. Please choose another.",
+        "error"
+      );
+      return;
+    }
+
+    socket.emit("place_bet", {
+      game_type: GAME,
+      user_id: USER_ID,
+      username: USERNAME,
+      number: selectedNumber,
+    });
+  });
+}
+
+// popup buttons
+if (popupHomeBtn) {
+  popupHomeBtn.addEventListener("click", () => {
+    window.location.href = HOME_URL;
+  });
+}
+
+if (popupLobbyBtn) {
+  popupLobbyBtn.addEventListener("click", () => {
+    window.history.back();
+  });
+}
+
+// ================= INIT =================
+
 fetchBalance();
-fetchTableData();
+startPolling();
+startLocalTimer();
 setSelectedNumber(0);
 setStatus("");
