@@ -256,21 +256,17 @@ function syncUrlWithTable(roundCode) {
 
 // ================= FROG ANIMATION =================
 
-// Pre-calc frog's base center inside pond so all hops use same origin
-let frogBaseCenter = null;
-if (frogImg && pondEl) {
-  const pondRect0 = pondEl.getBoundingClientRect();
-  const frogRect0 = frogImg.getBoundingClientRect();
-  frogBaseCenter = {
-    x: frogRect0.left + frogRect0.width / 2 - pondRect0.left,
-    y: frogRect0.top + frogRect0.height / 2 - pondRect0.top,
-  };
-  frogImg.style.transformOrigin = "center center";
+// make sure frog is movable
+if (frogImg) {
+  if (!frogImg.style.position || frogImg.style.position === "static") {
+    frogImg.style.position = "fixed";
+  }
 }
 
-// find a pad whose data-number OR visible text equals winningNumber
+// find pad for number using data-number or visible text
 function findPadForNumber(winningNumber) {
   const targetStr = String(winningNumber);
+
   const pad = pads.find((p) => {
     const dataMatch = p.dataset.number === targetStr;
     const label = p.querySelector(".pad-number");
@@ -280,38 +276,52 @@ function findPadForNumber(winningNumber) {
   });
 
   if (!pad) {
-    console.log("[frog] No pad for number", winningNumber, "pads:", pads);
+    console.log(
+      "[frog] No pad for number",
+      winningNumber,
+      pads.map((p) => ({
+        data: p.dataset.number,
+        text:
+          p.querySelector(".pad-number")?.textContent.trim() || "(empty-text)",
+      }))
+    );
   }
 
   return pad;
 }
 
 function hopFrogToWinningNumber(winningNumber) {
-  if (!frogImg || !pondEl || !frogBaseCenter) {
-    console.log("[frog] Missing frog or base center");
+  if (!frogImg) {
+    console.log("[frog] Missing frogImg");
     return;
   }
 
   const targetPad = findPadForNumber(winningNumber);
-  if (!targetPad) return;
+  if (!targetPad) {
+    console.log("[frog] No pad currently showing number", winningNumber);
+    return;
+  }
 
   console.log("[frog] Hopping to pad number:", winningNumber);
 
-  const pondRect = pondEl.getBoundingClientRect();
   const padRect = targetPad.getBoundingClientRect();
+  const frogRect = frogImg.getBoundingClientRect();
 
-  // target center inside pond coordinates
-  const targetCenterX =
-    padRect.left + padRect.width / 2 - pondRect.left;
-  const targetCenterY =
-    padRect.top + padRect.height * 0.25 - pondRect.top;
+  const startX = frogRect.left;
+  const startY = frogRect.top;
 
-  // movement from frog's ORIGINAL center to target center
-  const deltaX = targetCenterX - frogBaseCenter.x;
-  const deltaY = targetCenterY - frogBaseCenter.y;
+  const endX = padRect.left + padRect.width / 2 - frogRect.width / 2;
+  const endY =
+    padRect.top + padRect.height * 0.25 - frogRect.height / 2; // slightly upper part of pad
 
-  const duration = 750;
-  const peak = -40;
+  // anchor frog to its current screen position
+  frogImg.style.position = "fixed";
+  frogImg.style.left = `${startX}px`;
+  frogImg.style.top = `${startY}px`;
+  frogImg.style.zIndex = "999";
+
+  const duration = 800;
+  const peak = -40; // jump height
   const startTime = performance.now();
 
   function step(now) {
@@ -321,18 +331,18 @@ function hopFrogToWinningNumber(winningNumber) {
     // ease in-out
     const ease = t < 0.5 ? 2 * t * t : -1 + (4 - 2 * t) * t;
 
-    const x = deltaX * ease;
-    const yLinear = deltaY * ease;
+    const x = startX + (endX - startX) * ease;
+    const yLinear = startY + (endY - startY) * ease;
     const yArc = yLinear + peak * (4 * t * (1 - t));
-    const scale = 1 + 0.08 * Math.sin(Math.PI * t);
 
-    // start from base center (0,0) and move towards (deltaX, deltaY)
-    frogImg.style.transform = `translate(${x}px, ${yArc}px) scale(${scale})`;
+    frogImg.style.left = `${x}px`;
+    frogImg.style.top = `${yArc}px`;
 
     if (t < 1) {
       requestAnimationFrame(step);
     } else {
-      frogImg.style.transform = `translate(${deltaX}px, ${deltaY}px) scale(1)`;
+      frogImg.style.left = `${endX}px`;
+      frogImg.style.top = `${endY}px`;
       targetPad.classList.add("win");
       console.log("[frog] Hop complete");
     }
@@ -362,238 +372,3 @@ async function fetchTableData() {
   try {
     const res = await fetch("/api/tables/silver");
     const data = await res.json();
-
-    if (!data.tables || !data.tables.length) {
-      setStatus("No active tables", "error");
-      return;
-    }
-
-    let table = null;
-
-    if (TABLE_CODE) {
-      table = data.tables.find((t) => t.round_code === TABLE_CODE) || null;
-    }
-    if (!table) {
-      table = data.tables[0];
-    }
-
-    syncUrlWithTable(table.round_code);
-
-    currentTable = table;
-    updateGameUI(table);
-  } catch (err) {
-    console.error("fetchTableData error", err);
-  }
-}
-
-function updateGameUI(table) {
-  if (!table) return;
-
-  if (roundIdSpan) roundIdSpan.textContent = table.round_code || "-";
-  if (playerCountSpan) playerCountSpan.textContent = table.players || 0;
-
-  displayRemainingSeconds = table.time_remaining || 0;
-  renderTimer();
-
-  updatePadsFromBets(table.bets || []);
-  updateMyBets(table.bets || []);
-
-  if (placeBetBtn && !gameFinished) {
-    placeBetBtn.disabled =
-      !!table.is_betting_closed ||
-      (typeof table.max_players === "number" &&
-        table.players >= table.max_players);
-  }
-
-  // ==== SLOTS FULL CHECK (only if userHasBet is still false) ====
-  const maxPlayers =
-    typeof table.max_players === "number" ? table.max_players : null;
-  const isFull =
-    table.is_full === true ||
-    (maxPlayers !== null && table.players >= maxPlayers);
-
-  if (!gameFinished && !userHasBet && isFull) {
-    gameFinished = true;
-    disableBettingUI();
-    if (tablePollInterval) {
-      clearInterval(tablePollInterval);
-      tablePollInterval = null;
-    }
-    if (localTimerInterval) {
-      clearInterval(localTimerInterval);
-      localTimerInterval = null;
-    }
-    showSlotsFullPopup();
-    return;
-  }
-
-  // ===== Result handling =====
-  const hasResult =
-    table.result !== null && table.result !== undefined && table.result !== "";
-
-  if (hasResult && table.result !== lastResultShown) {
-    lastResultShown = table.result;
-    setStatus(`Winning number: ${table.result}`, "ok");
-
-    ensurePadForWinningNumber(table.result);
-    hopFrogToWinningNumber(table.result);
-
-    if (!gameFinished) {
-      gameFinished = true;
-      disableBettingUI();
-
-      if (tablePollInterval) {
-        clearInterval(tablePollInterval);
-        tablePollInterval = null;
-      }
-      if (localTimerInterval) {
-        clearInterval(localTimerInterval);
-        localTimerInterval = null;
-      }
-
-      const outcomeInfo = determineUserOutcome(table);
-      // small delay so hop is visible
-      setTimeout(() => {
-        showEndPopup(outcomeInfo);
-      }, 1000);
-    }
-  } else if (!hasResult) {
-    lastResultShown = null;
-    pads.forEach((p) => p.classList.remove("win"));
-    if (frogImg) {
-      frogImg.style.transform = "translate(0px, 0px) scale(1)";
-    }
-  }
-}
-
-function startPolling() {
-  fetchTableData();
-  if (tablePollInterval) clearInterval(tablePollInterval);
-  tablePollInterval = setInterval(() => {
-    if (!gameFinished) {
-      fetchTableData();
-    }
-  }, 2000);
-}
-
-// ================= BALANCE / SOCKET =================
-
-const socket = io();
-
-async function fetchBalance() {
-  try {
-    const res = await fetch(`/balance/${USER_ID}`);
-    const data = await res.json();
-    if (typeof data.balance === "number") {
-      updateWallet(data.balance);
-    }
-  } catch (err) {
-    console.error("balance fetch error", err);
-  }
-}
-
-function joinGameRoom() {
-  socket.emit("join_game", {
-    game_type: GAME,
-    user_id: USER_ID,
-  });
-}
-
-socket.on("connect", () => {
-  joinGameRoom();
-  fetchBalance();
-  fetchTableData();
-});
-
-socket.on("bet_success", (payload) => {
-  if (gameFinished) return;
-
-  // As soon as backend confirms bet, lock this as a betting user
-  userHasBet = true;
-
-  setStatus(payload.message || "Bet placed", "ok");
-  if (typeof payload.new_balance === "number") {
-    updateWallet(payload.new_balance);
-  }
-  fetchTableData();
-});
-
-socket.on("bet_error", (payload) => {
-  if (gameFinished) return;
-  setStatus(payload.message || "Bet error", "error");
-});
-
-// ================= UI EVENTS =================
-
-numChips.forEach((chip) => {
-  chip.addEventListener("click", () => {
-    if (gameFinished) return;
-    const n = parseInt(chip.dataset.number, 10);
-    setSelectedNumber(n);
-  });
-});
-
-if (placeBetBtn) {
-  placeBetBtn.addEventListener("click", () => {
-    if (gameFinished) {
-      setStatus("This game has already finished.", "error");
-      return;
-    }
-
-    if (!currentTable) {
-      setStatus("Game is not ready yet. Please wait...", "error");
-      return;
-    }
-
-    // hard stop: no bet if all 6 slots are full
-    const maxPlayers =
-      typeof currentTable.max_players === "number"
-        ? currentTable.max_players
-        : null;
-    if (maxPlayers !== null && currentTable.players >= maxPlayers) {
-      setStatus("All slots are full for this game.", "error");
-      disableBettingUI();
-      return;
-    }
-
-    if (walletBalance < FIXED_BET_AMOUNT) {
-      setStatus("Insufficient balance", "error");
-      return;
-    }
-    if (selectedNumber === null || selectedNumber === undefined) {
-      setStatus("Select a number first", "error");
-      return;
-    }
-
-    // ⚠️ Duplicate-number rule is enforced on backend.
-    // We do NOT block here to avoid false “already taken” errors.
-
-    socket.emit("place_bet", {
-      game_type: GAME,
-      user_id: USER_ID,
-      username: USERNAME,
-      number: selectedNumber,
-    });
-  });
-}
-
-// popup buttons
-if (popupHomeBtn) {
-  popupHomeBtn.addEventListener("click", () => {
-    window.location.href = HOME_URL;
-  });
-}
-
-if (popupLobbyBtn) {
-  popupLobbyBtn.addEventListener("click", () => {
-    window.history.back();
-  });
-}
-
-// ================= INIT =================
-
-fetchBalance();
-startPolling();
-startLocalTimer();
-setSelectedNumber(0);
-setStatus("");
