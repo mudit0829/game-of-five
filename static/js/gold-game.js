@@ -484,7 +484,10 @@ function updateGameUI(table) {
   updateMyBets(table.bets || []);
 
   if (placeBetBtn && !gameFinished) {
-    placeBetBtn.disabled = !!table.is_betting_closed;
+    placeBetBtn.disabled =
+      !!table.is_betting_closed ||
+      (typeof table.max_players === "number" &&
+        table.players >= table.max_players);
   }
 
   // Highlight urgent timer when low
@@ -632,6 +635,22 @@ if (placeBetBtn) {
       return;
     }
 
+    if (!currentTable) {
+      setStatus("Game is not ready yet. Please wait...", "error");
+      return;
+    }
+
+    // hard stop: no bet if all 6 slots are full
+    const maxPlayers =
+      typeof currentTable.max_players === "number"
+        ? currentTable.max_players
+        : null;
+    if (maxPlayers !== null && currentTable.players >= maxPlayers) {
+      setStatus("All slots are full for this game.", "error");
+      disableBettingUI();
+      return;
+    }
+
     if (walletBalance < FIXED_BET_AMOUNT) {
       setStatus("Insufficient balance", "error");
       return;
@@ -641,20 +660,8 @@ if (placeBetBtn) {
       return;
     }
 
-    // ===== FRONTEND: prevent duplicate number in this table =====
-    if (
-      currentTable &&
-      Array.isArray(currentTable.bets) &&
-      currentTable.bets.some(
-        (b) => String(b.number) === String(selectedNumber)
-      )
-    ) {
-      setStatus(
-        "This number is already taken in this game. Please choose another.",
-        "error"
-      );
-      return;
-    }
+    // Duplicate-number rule is enforced on backend only.
+    // We don't block here to avoid false “already taken” errors.
 
     socket.emit("place_bet", {
       game_type: GAME,
