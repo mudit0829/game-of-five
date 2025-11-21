@@ -15,8 +15,9 @@ const HOME_URL = "/home2"; // TODO: change if your home route is different
 
 // ================= DOM REFERENCES =================
 
+// IMPORTANT: use the pond container, not frog's own wrapper, for coordinates
+const pondEl = document.querySelector(".pond");
 const frogImg = document.getElementById("frogSprite");
-const pondEl = frogImg ? frogImg.parentElement : document.body;
 const pads = Array.from(document.querySelectorAll(".pad"));
 
 const numChips = Array.from(document.querySelectorAll(".num-chip"));
@@ -32,7 +33,7 @@ const userNameLabel = document.getElementById("userName");
 const userBetCountLabel = document.getElementById("userBetCount");
 const myBetsRow = document.getElementById("myBetsRow");
 
-// popup elements
+// popup elements (used both for result + "slots full")
 const popupEl = document.getElementById("resultPopup");
 const popupTitleEl = document.getElementById("popupTitle");
 const popupMsgEl = document.getElementById("popupMessage");
@@ -54,6 +55,7 @@ let gameFinished = false;
 let tablePollInterval = null;
 let localTimerInterval = null;
 let displayRemainingSeconds = 0; // what we show on screen
+let userHasBet = false;          // has this user placed any bet in this table?
 
 // ================= UI HELPERS =================
 
@@ -98,6 +100,8 @@ function setSelectedNumber(n) {
 function updateMyBets(bets) {
   const myBets = (bets || []).filter((b) => b.user_id === USER_ID);
 
+  userHasBet = myBets.length > 0;
+
   if (userBetCountLabel) {
     userBetCountLabel.textContent = myBets.length;
   }
@@ -126,14 +130,11 @@ function updateMyBets(bets) {
 }
 
 /**
- * OLD behaviour grouped pads by number. That meant:
- * - last pads could be empty even with many players
- * - frog often had no pad with winning number
- *
- * NEW behaviour: one pad = one bet (first 6 bets in list)
+ * One pad = one bet (first 6 bets).
+ * This keeps all pads filled if there are up to 6 players.
  */
 function updatePadsFromBets(bets) {
-  const list = (bets || []).slice(0, 6); // first 6 bets
+  const list = (bets || []).slice(0, 6);
 
   pads.forEach((pad, i) => {
     const numSpan = pad.querySelector(".pad-number");
@@ -142,7 +143,7 @@ function updatePadsFromBets(bets) {
 
     if (i < list.length) {
       const b = list[i];
-      pad.dataset.number = b.number;
+      pad.dataset.number = String(b.number);
       if (numSpan) numSpan.textContent = b.number;
       if (userSpan) userSpan.textContent = b.username;
     } else {
@@ -155,10 +156,10 @@ function updatePadsFromBets(bets) {
 
 /**
  * Ensure there is at least one pad that shows the winning number.
- * If nobody bet that number, we overwrite the first pad to show it
- * so the frog has somewhere to jump.
+ * If nobody bet that number, overwrite the first pad so frog has
+ * a target to jump to.
  */
-function ensurePadForWinningNumber(winningNumber, bets) {
+function ensurePadForWinningNumber(winningNumber) {
   if (winningNumber === null || winningNumber === undefined) return;
 
   const existing = pads.find(
@@ -220,6 +221,26 @@ function showEndPopup(outcomeInfo) {
   popupEl.style.display = "flex";
 }
 
+/**
+ * Show popup when user has NOT bet and table is full.
+ * Then redirect them back to lobby (history back).
+ */
+function showSlotsFullPopup() {
+  if (!popupEl) return;
+
+  if (popupTitleEl) popupTitleEl.textContent = "All slots are full";
+  if (popupMsgEl)
+    popupMsgEl.textContent =
+      "This game is already full. You will be redirected to lobby to join another table.";
+
+  popupEl.style.display = "flex";
+
+  // After a short delay, send back to lobby
+  setTimeout(() => {
+    window.history.back();
+  }, 2000);
+}
+
 // Keep URL's ?table= in sync with the actual table we're using
 function syncUrlWithTable(roundCode) {
   if (!roundCode) return;
@@ -252,16 +273,16 @@ function hopFrogToWinningNumber(winningNumber) {
   const frogRect = frogImg.getBoundingClientRect();
   const padRect = targetPad.getBoundingClientRect();
 
-  const baseCenterX = frogRect.left + frogRect.width / 2 - pondRect.left;
-  const baseCenterY = frogRect.top + frogRect.height / 2 - pondRect.top;
+  // Frog center relative to pond
+  const frogCenterX = frogRect.left + frogRect.width / 2 - pondRect.left;
+  const frogCenterY = frogRect.top + frogRect.height / 2 - pondRect.top;
 
-  const endX = padRect.left + padRect.width / 2 - pondRect.left;
-  const endY = padRect.top + padRect.height * 0.25 - pondRect.top;
+  // Target position (slightly above pad)
+  const padTargetX = padRect.left + padRect.width / 2 - pondRect.left;
+  const padTargetY = padRect.top + padRect.height * 0.25 - pondRect.top;
 
-  const startX = baseCenterX;
-  const startY = baseCenterY;
-  const deltaX = endX - startX;
-  const deltaY = endY - startY;
+  const deltaX = padTargetX - frogCenterX;
+  const deltaY = padTargetY - frogCenterY;
 
   const duration = 750;
   const peak = -80;
@@ -276,22 +297,20 @@ function hopFrogToWinningNumber(winningNumber) {
 
     const ease = t < 0.5 ? 2 * t * t : -1 + (4 - 2 * t) * t;
 
-    const x = startX + deltaX * ease;
-    const yLinear = startY + deltaY * ease;
+    const x = frogCenterX + deltaX * ease;
+    const yLinear = frogCenterY + deltaY * ease;
     const yArc = yLinear + peak * (4 * t * (1 - t));
     const scale = 1 + 0.08 * Math.sin(Math.PI * t);
 
-    const relX = x - baseCenterX;
-    const relY = yArc - baseCenterY;
+    const relX = x - frogCenterX;
+    const relY = yArc - frogCenterY;
 
     frogImg.style.transform = `translate(${relX}px, ${relY}px) scale(${scale})`;
 
     if (t < 1) {
       requestAnimationFrame(step);
     } else {
-      frogImg.style.transform = `translate(${endX - baseCenterX}px, ${
-        endY - baseCenterY
-      }px) scale(1)`;
+      frogImg.style.transform = `translate(${deltaX}px, ${deltaY}px) scale(1)`;
       targetPad.classList.add("win");
     }
   }
@@ -364,7 +383,28 @@ function updateGameUI(table) {
     placeBetBtn.disabled = !!table.is_betting_closed;
   }
 
-  // detect finished result to trigger frog jump + delayed popup
+  // ===== NEW: KICK OUT SPECTATORS IF TABLE FULL & THEY DIDN'T BET =====
+  const maxPlayers = typeof table.max_players === "number" ? table.max_players : null;
+  const isFull =
+    table.is_full === true ||
+    (maxPlayers !== null && table.players >= maxPlayers);
+
+  if (!gameFinished && !userHasBet && isFull) {
+    gameFinished = true;
+    disableBettingUI();
+    if (tablePollInterval) {
+      clearInterval(tablePollInterval);
+      tablePollInterval = null;
+    }
+    if (localTimerInterval) {
+      clearInterval(localTimerInterval);
+      localTimerInterval = null;
+    }
+    showSlotsFullPopup();
+    return;
+  }
+
+  // ===== Normal finish flow: frog jump + result popup =====
   if (
     table.is_finished &&
     table.result !== null &&
@@ -374,8 +414,8 @@ function updateGameUI(table) {
     lastResultShown = table.result;
     setStatus(`Winning number: ${table.result}`, "ok");
 
-    // make sure there is a pad with that number, then jump
-    ensurePadForWinningNumber(table.result, table.bets || []);
+    // ensure there is a pad with the winning number, then jump
+    ensurePadForWinningNumber(table.result);
     hopFrogToWinningNumber(table.result);
 
     if (!gameFinished) {
@@ -397,7 +437,7 @@ function updateGameUI(table) {
       const outcomeInfo = determineUserOutcome(table);
       setTimeout(() => {
         showEndPopup(outcomeInfo);
-      }, 1000); // 1 second after jump starts
+      }, 1000); // wait so jump is visible
     }
   } else if (!table.is_finished) {
     lastResultShown = null;
@@ -506,7 +546,6 @@ if (popupHomeBtn) {
 
 if (popupLobbyBtn) {
   popupLobbyBtn.addEventListener("click", () => {
-    // Usually the user came from Silver game lobby, so go back.
     window.history.back();
   });
 }
