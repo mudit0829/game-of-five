@@ -192,7 +192,7 @@ body {
   width: 100%;
   max-width: 360px;
   z-index: 2;
-  margin-top: 40px;
+  margin-top: 60px;
 }
 
 .pads-row {
@@ -325,7 +325,7 @@ body {
   padding: 0 8px 6px;
   position: relative;
   z-index: 5;
-  margin-top: 40px;
+  margin-top: 80px;
 }
 
 .numbers-title {
