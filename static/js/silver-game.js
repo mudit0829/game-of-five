@@ -15,7 +15,7 @@ const HOME_URL = "/home2"; // TODO: change if your home route is different
 
 // ================= DOM REFERENCES =================
 
-// IMPORTANT: use the pond container for coordinates
+// use the pond container for coordinates
 const pondEl = document.querySelector(".pond");
 const frogImg = document.getElementById("frogSprite");
 const pads = Array.from(document.querySelectorAll(".pad"));
@@ -33,7 +33,7 @@ const userNameLabel = document.getElementById("userName");
 const userBetCountLabel = document.getElementById("userBetCount");
 const myBetsRow = document.getElementById("myBetsRow");
 
-// popup elements (used both for result + "slots full")
+// popup elements
 const popupEl = document.getElementById("resultPopup");
 const popupTitleEl = document.getElementById("popupTitle");
 const popupMsgEl = document.getElementById("popupMessage");
@@ -54,9 +54,9 @@ let lastResultShown = null;
 let gameFinished = false;
 let tablePollInterval = null;
 let localTimerInterval = null;
-let displayRemainingSeconds = 0; // what we show on screen
+let displayRemainingSeconds = 0;
 
-// IMPORTANT: persistent flag – once true, never set back to false
+// IMPORTANT: once true, never back to false
 let userHasBet = false;
 
 // ================= UI HELPERS =================
@@ -104,9 +104,8 @@ function updateMyBets(bets) {
     (b) => String(b.user_id) === String(USER_ID)
   );
 
-  // do NOT set userHasBet = false here – only ever turn it true
   if (myBets.length > 0) {
-    userHasBet = true;
+    userHasBet = true; // once true, stays true
   }
 
   if (userBetCountLabel) {
@@ -138,6 +137,8 @@ function updateMyBets(bets) {
 
 /**
  * One pad = one bet (first 6 bets).
+ * Your backend already ensures a number is unique per game,
+ * so you'll never see the same number twice here.
  */
 function updatePadsFromBets(bets) {
   const list = (bets || []).slice(0, 6);
@@ -376,7 +377,7 @@ function updateGameUI(table) {
     placeBetBtn.disabled = !!table.is_betting_closed;
   }
 
-  // ==== SLOTS FULL CHECK (only if userHasBet is still false) ====
+  // === SLOTS FULL CHECK (spectators only) ===
   const maxPlayers =
     typeof table.max_players === "number" ? table.max_players : null;
   const isFull =
@@ -398,13 +399,11 @@ function updateGameUI(table) {
     return;
   }
 
-  // ===== Normal finish flow: frog jump + result popup =====
-  if (
-    table.is_finished &&
-    table.result !== null &&
-    table.result !== undefined &&
-    table.result !== lastResultShown
-  ) {
+  // === RESULT HANDLING (NO is_finished CHECK – ONLY RESULT VALUE) ===
+  const hasResult =
+    table.result !== null && table.result !== undefined && table.result !== "";
+
+  if (hasResult && table.result !== lastResultShown) {
     lastResultShown = table.result;
     setStatus(`Winning number: ${table.result}`, "ok");
 
@@ -429,7 +428,7 @@ function updateGameUI(table) {
         showEndPopup(outcomeInfo);
       }, 1000);
     }
-  } else if (!table.is_finished) {
+  } else if (!hasResult) {
     lastResultShown = null;
   }
 }
@@ -476,8 +475,7 @@ socket.on("connect", () => {
 socket.on("bet_success", (payload) => {
   if (gameFinished) return;
 
-  // As soon as backend confirms bet, lock this as a betting user
-  userHasBet = true;
+  userHasBet = true; // as soon as our bet is accepted
 
   setStatus(payload.message || "Bet placed", "ok");
   if (typeof payload.new_balance === "number") {
@@ -524,7 +522,7 @@ if (placeBetBtn) {
       number: selectedNumber,
     });
   });
-}
+});
 
 // popup buttons
 if (popupHomeBtn) {
