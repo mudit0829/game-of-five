@@ -440,7 +440,9 @@ function updateGameUI(table) {
   const mins = Math.floor(tr / 60);
   const secs = tr % 60;
   if (timerText) {
-    timerText.textContent = `${mins}:${secs.toString().padStart(2, "0")}`;
+    timerText.textContent = `${mins}:${secs
+      .toString()
+      .padStart(2, "0")}`;
   }
 
   if (timerPill) {
@@ -614,7 +616,7 @@ if (placeBetBtn) {
     }
 
     if (selectedNumber === null || selectedNumber === undefined) {
-      setStatus("Select a number first", "error";
+      setStatus("Select a number first", "error");
       return;
     }
 
@@ -651,4 +653,3 @@ if (!tablePollInterval) {
   // poll every 1 second so timer moves by 1 second steps
   tablePollInterval = setInterval(fetchTableData, 1000);
 }
-
