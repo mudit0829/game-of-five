@@ -651,3 +651,4 @@ if (!tablePollInterval) {
   // poll every 1 second so timer moves by 1 second steps
   tablePollInterval = setInterval(fetchTableData, 1000);
 }
+
