@@ -25,7 +25,9 @@ const boats = Array.from(document.querySelectorAll(".boat"));
 const myBetsContainer = document.getElementById("myBetsContainer");
 const placeBetBtn = document.getElementById("placeBetBtn");
 const statusEl = document.getElementById("statusMessage");
-const paratrooper = document.getElementById("cssParatrooper");
+
+// NEW: paratrooper image
+const paratrooper = document.getElementById("paratrooperSprite");
 
 if (userNameLabel) {
   userNameLabel.textContent = USERNAME;
@@ -295,7 +297,7 @@ function showFullSlotAndGoBack(messageText) {
   document.body.appendChild(overlay);
 }
 
-// ============== PARATROOPER ANIMATION ==============
+// ============== PARATROOPER ANIMATION (IMAGE) ==============
 
 function dropParatrooperToWinningNumber(winningNumber) {
   if (!paratrooper) return;
@@ -310,45 +312,48 @@ function dropParatrooperToWinningNumber(winningNumber) {
 
   const boatRect = targetBoat.getBoundingClientRect();
 
+  // Where the paratrooper should land
   const targetX = boatRect.left + boatRect.width / 2;
-  const targetY = boatRect.top + boatRect.height * 0.3;
+  const targetY = boatRect.top + boatRect.height * 0.25;
 
-  paratrooper.style.transition = "none";
-  paratrooper.style.top = "-280px";
-  paratrooper.style.left = "50%";
-  paratrooper.style.transform = "translateX(-50%)";
-  paratrooper.classList.add("falling");
-
-  const startTime = performance.now();
-  const duration = 1300;
-  const startY = -280;
-  const endY = targetY - 90;
-
+  // Starting pos (off-screen top, centered)
+  const startY = -220;
   const startX = window.innerWidth / 2;
+
+  const endY = targetY - 80; // slightly above boat
   const endX = targetX;
-  const deltaX = endX - startX;
+
+  const duration = 1300;
+  const startTime = performance.now();
+
+  paratrooper.style.opacity = "1";
+  paratrooper.style.top = `${startY}px`;
+  paratrooper.style.left = `${startX}px`;
 
   function step(now) {
     const tRaw = (now - startTime) / duration;
     const t = Math.min(Math.max(tRaw, 0), 1);
+
+    // smooth easing
     const ease = 1 - Math.pow(1 - t, 3);
 
-    const y = startY + (endY - startY) * ease;
-    const sideways = deltaX * ease;
+    const currentX = startX + (endX - startX) * ease;
+    const currentY = startY + (endY - startY) * ease;
 
-    paratrooper.style.top = `${y}px`;
-    paratrooper.style.left = `${startX + sideways}px`;
-    paratrooper.style.transform = "translateX(-50%)";
+    paratrooper.style.top = `${currentY}px`;
+    paratrooper.style.left = `${currentX}px`;
+    paratrooper.style.transform = "translate(-50%, -50%)";
 
     if (t < 1) {
       requestAnimationFrame(step);
     } else {
       targetBoat.classList.add("win");
-      paratrooper.classList.remove("falling");
+      // send him back up after a while
       setTimeout(() => {
-        paratrooper.style.transition = "top 0.6s ease-out";
-        paratrooper.style.top = "-300px";
-      }, 900);
+        paratrooper.style.transition = "top 0.6s ease-out, opacity 0.4s";
+        paratrooper.style.top = "-260px";
+        paratrooper.style.opacity = "0";
+      }, 800);
     }
   }
 
