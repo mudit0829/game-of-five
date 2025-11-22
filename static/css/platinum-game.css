@@ -1,5 +1,6 @@
 /* ===== GLOBAL SETUP ===== */
-html, body {
+html,
+body {
   margin: 0;
   padding: 0;
   height: 100%;
@@ -90,14 +91,19 @@ html, body {
   font-weight: 800;
   font-size: 16px;
   box-shadow: 0 4px 16px rgba(236, 72, 153, 0.5),
-              0 0 20px rgba(139, 92, 246, 0.3);
+    0 0 20px rgba(139, 92, 246, 0.3);
   animation: timerPulse 2s ease-in-out infinite;
   white-space: nowrap;
 }
 
 @keyframes timerPulse {
-  0%, 100% { transform: scale(1); }
-  50% { transform: scale(1.05); }
+  0%,
+  100% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.05);
+  }
 }
 
 .timer-pill.urgent {
@@ -106,8 +112,15 @@ html, body {
 }
 
 @keyframes urgentPulse {
-  0%, 100% { transform: scale(1); box-shadow: 0 4px 16px rgba(239, 68, 68, 0.7); }
-  50% { transform: scale(1.08); box-shadow: 0 6px 20px rgba(239, 68, 68, 1); }
+  0%,
+  100% {
+    transform: scale(1);
+    box-shadow: 0 4px 16px rgba(239, 68, 68, 0.7);
+  }
+  50% {
+    transform: scale(1.08);
+    box-shadow: 0 6px 20px rgba(239, 68, 68, 1);
+  }
 }
 
 .timer-pill span {
@@ -147,10 +160,18 @@ html, body {
 }
 
 @keyframes coinBounce {
-  0% { transform: translateY(0) scale(1); }
-  40% { transform: translateY(-6px) scale(1.1); }
-  60% { transform: translateY(-3px) scale(1.05); }
-  100% { transform: translateY(0) scale(1); }
+  0% {
+    transform: translateY(0) scale(1);
+  }
+  40% {
+    transform: translateY(-6px) scale(1.1);
+  }
+  60% {
+    transform: translateY(-3px) scale(1.05);
+  }
+  100% {
+    transform: translateY(0) scale(1);
+  }
 }
 
 /* ===== PLAY AREA ===== */
@@ -213,8 +234,13 @@ html, body {
 
 /* Floating animation */
 @keyframes floatBoat {
-  0%, 100% { transform: translateY(0); }
-  50% { transform: translateY(-10px); }
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-10px);
+  }
 }
 
 /* ===== WATER RIPPLES ===== */
@@ -275,9 +301,7 @@ html, body {
   font-size: 22px;
   font-weight: 900;
   color: #f9fafb;
-  text-shadow: 
-    0 0 10px rgba(0, 0, 0, 1),
-    0 3px 8px rgba(0, 0, 0, 0.9),
+  text-shadow: 0 0 10px rgba(0, 0, 0, 1), 0 3px 8px rgba(0, 0, 0, 0.9),
     0 0 20px rgba(255, 255, 255, 0.3);
   z-index: 3;
 }
@@ -307,171 +331,43 @@ html, body {
 }
 
 @keyframes boatWinPulse {
-  0% { 
-    transform: scale(1) translateY(0); 
+  0% {
+    transform: scale(1) translateY(0);
     filter: drop-shadow(0 0 0 rgba(34, 197, 94, 0));
   }
-  25% { 
-    transform: scale(1.2) translateY(-15px); 
+  25% {
+    transform: scale(1.2) translateY(-15px);
     filter: drop-shadow(0 0 35px rgba(34, 197, 94, 1));
   }
-  50% { 
-    transform: scale(1.15) translateY(-10px); 
+  50% {
+    transform: scale(1.15) translateY(-10px);
     filter: drop-shadow(0 0 30px rgba(34, 197, 94, 0.9));
   }
-  100% { 
-    transform: scale(1.1) translateY(-5px); 
+  100% {
+    transform: scale(1.1) translateY(-5px);
     filter: drop-shadow(0 0 25px rgba(34, 197, 94, 0.7));
   }
 }
 
-/* ===== CSS ANIMATED PARATROOPER ===== */
-.css-paratrooper {
-  position: fixed;
-  top: -300px;
-  left: 50%;
-  transform: translateX(-50%);
-  width: 100px;
-  height: 180px;
-  z-index: 25;
-  filter: drop-shadow(0 15px 30px rgba(0, 0, 0, 0.8));
-  transition: none;
+/* ===== PARATROOPER IMAGE (replaces CSS paratrooper) ===== */
+
+.paratrooper-layer {
+  position: absolute;
+  inset: 0;
   pointer-events: none;
+  z-index: 25;
 }
 
-/* Parachute */
-.parachute {
+.paratrooper-img {
   position: absolute;
-  top: 0;
+  top: -260px;
   left: 50%;
-  transform: translateX(-50%);
+  transform: translate(-50%, -50%);
   width: 100px;
-  height: 60px;
-}
-
-.chute-canopy {
-  position: absolute;
-  top: 0;
-  left: 50%;
-  transform: translateX(-50%);
-  width: 100px;
-  height: 60px;
-  background: linear-gradient(135deg, #ef4444 0%, #dc2626 50%, #ef4444 100%);
-  border-radius: 50% 50% 30% 30%;
-  border: 3px solid #7f1d1d;
-  box-shadow: 
-    inset 0 -10px 20px rgba(0, 0, 0, 0.3),
-    0 8px 20px rgba(0, 0, 0, 0.5);
-}
-
-/* Parachute lines */
-.chute-line {
-  position: absolute;
-  top: 55px;
-  width: 2px;
-  height: 50px;
-  background: rgba(255, 255, 255, 0.8);
-  transform-origin: top center;
-}
-
-.chute-line-1 {
-  left: 15%;
-  transform: rotate(-15deg);
-}
-
-.chute-line-2 {
-  left: 35%;
-  transform: rotate(-5deg);
-}
-
-.chute-line-3 {
-  right: 35%;
-  transform: rotate(5deg);
-}
-
-.chute-line-4 {
-  right: 15%;
-  transform: rotate(15deg);
-}
-
-/* Person */
-.para-person {
-  position: absolute;
-  top: 105px;
-  left: 50%;
-  transform: translateX(-50%);
-  width: 30px;
-  height: 70px;
-}
-
-.para-head {
-  position: absolute;
-  top: 0;
-  left: 50%;
-  transform: translateX(-50%);
-  width: 18px;
-  height: 18px;
-  background: #f4a582;
-  border-radius: 50%;
-  border: 2px solid #1a1a1a;
-}
-
-.para-body {
-  position: absolute;
-  top: 16px;
-  left: 50%;
-  transform: translateX(-50%);
-  width: 20px;
-  height: 25px;
-  background: linear-gradient(135deg, #2c3e50, #34495e);
-  border-radius: 6px 6px 4px 4px;
-  border: 2px solid #1a1a1a;
-}
-
-.para-arm {
-  position: absolute;
-  top: 18px;
-  width: 8px;
-  height: 20px;
-  background: #2c3e50;
-  border-radius: 4px;
-  border: 2px solid #1a1a1a;
-}
-
-.para-arm-left {
-  left: 4px;
-}
-
-.para-arm-right {
-  right: 4px;
-}
-
-.para-leg {
-  position: absolute;
-  top: 38px;
-  width: 10px;
-  height: 30px;
-  background: linear-gradient(180deg, #2980b9 0%, #2980b9 60%, #1a1a1a 60%, #1a1a1a 100%);
-  border-radius: 5px;
-  border: 2px solid #1a1a1a;
-}
-
-.para-leg-left {
-  left: 6px;
-}
-
-.para-leg-right {
-  right: 6px;
-}
-
-/* Swinging animation during fall */
-.css-paratrooper.falling {
-  animation: swingParachute 1s ease-in-out infinite;
-}
-
-@keyframes swingParachute {
-  0%, 100% { transform: translateX(-50%) rotate(-4deg); }
-  50% { transform: translateX(-50%) rotate(4deg); }
+  max-width: 26%;
+  filter: drop-shadow(0 15px 30px rgba(0, 0, 0, 0.9));
+  opacity: 0;
+  transition: top 0.4s ease-out, opacity 0.3s ease-out;
 }
 
 /* ===== CONTROLS ===== */
@@ -488,6 +384,18 @@ html, body {
   border: 1px solid rgba(148, 163, 184, 0.3);
   z-index: 30;
   color: #f9fafb;
+}
+
+/* Extra glassy / more transparent like Silver & Gold */
+.transparent-controls {
+  background: linear-gradient(
+    to top,
+    rgba(2, 6, 23, 0.9),
+    rgba(2, 6, 23, 0.78),
+    rgba(15, 23, 42, 0.35)
+  );
+  border-color: rgba(148, 163, 184, 0.5);
+  backdrop-filter: blur(18px);
 }
 
 .controls h3 {
@@ -519,7 +427,7 @@ html, body {
   font-weight: 700;
   cursor: pointer;
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.8),
-              inset 0 1px 2px rgba(255, 255, 255, 0.1);
+    inset 0 1px 2px rgba(255, 255, 255, 0.1);
   transition: all 0.2s ease;
 }
 
@@ -537,14 +445,21 @@ html, body {
   color: #020617;
   border-color: #22c55e;
   box-shadow: 0 4px 16px rgba(34, 197, 94, 0.7),
-              0 0 20px rgba(34, 197, 94, 0.4),
-              inset 0 1px 2px rgba(255, 255, 255, 0.3);
+    0 0 20px rgba(34, 197, 94, 0.4),
+    inset 0 1px 2px rgba(255, 255, 255, 0.3);
   animation: selectedPulse 1.5s ease-in-out infinite;
 }
 
 @keyframes selectedPulse {
-  0%, 100% { box-shadow: 0 4px 16px rgba(34, 197, 94, 0.7), 0 0 20px rgba(34, 197, 94, 0.4); }
-  50% { box-shadow: 0 4px 20px rgba(34, 197, 94, 1), 0 0 30px rgba(34, 197, 94, 0.6); }
+  0%,
+  100% {
+    box-shadow: 0 4px 16px rgba(34, 197, 94, 0.7),
+      0 0 20px rgba(34, 197, 94, 0.4);
+  }
+  50% {
+    box-shadow: 0 4px 20px rgba(34, 197, 94, 1),
+      0 0 30px rgba(34, 197, 94, 0.6);
+  }
 }
 
 /* Your Bets Section */
@@ -556,6 +471,12 @@ html, body {
   padding: 8px 12px;
   margin: 12px 0;
   text-align: center;
+}
+
+/* more transparent variant for this screen */
+.transparent-bets {
+  background: rgba(15, 23, 42, 0.65);
+  border-color: rgba(148, 163, 184, 0.55);
 }
 
 .my-bets-title {
@@ -601,8 +522,8 @@ html, body {
   text-transform: uppercase;
   letter-spacing: 0.5px;
   box-shadow: 0 8px 20px rgba(34, 197, 94, 0.5),
-              0 4px 12px rgba(20, 184, 166, 0.4),
-              inset 0 1px 2px rgba(255, 255, 255, 0.3);
+    0 4px 12px rgba(20, 184, 166, 0.4),
+    inset 0 1px 2px rgba(255, 255, 255, 0.3);
   transition: all 0.2s ease;
   margin-bottom: 8px;
 }
@@ -610,12 +531,18 @@ html, body {
 .bet-button:hover {
   transform: translateY(-2px);
   box-shadow: 0 10px 24px rgba(34, 197, 94, 0.6),
-              0 6px 16px rgba(20, 184, 166, 0.5);
+    0 6px 16px rgba(20, 184, 166, 0.5);
 }
 
 .bet-button:active {
   transform: translateY(0) scale(0.98);
   box-shadow: 0 4px 12px rgba(34, 197, 94, 0.4);
+}
+
+.bet-button:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+  box-shadow: none;
 }
 
 /* Status Message */
@@ -735,15 +662,9 @@ html, body {
     height: 36px;
     font-size: 14px;
   }
-  
-  .css-paratrooper {
+
+  .paratrooper-img {
     width: 90px;
-    height: 160px;
-  }
-  
-  .chute-canopy {
-    width: 90px;
-    height: 54px;
   }
 }
 
@@ -763,24 +684,18 @@ html, body {
     font-size: 13px;
   }
 
-  .css-paratrooper {
+  .paratrooper-img {
     width: 80px;
-    height: 140px;
   }
-  
-  .chute-canopy {
-    width: 80px;
-    height: 48px;
-  }
-  
+
   .hud-game {
     font-size: 11px;
   }
-  
+
   .hud-line {
     font-size: 9px;
   }
-  
+
   .timer-pill {
     padding: 5px 14px;
     font-size: 15px;
