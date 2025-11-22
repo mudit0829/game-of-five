@@ -26,8 +26,17 @@ const myBetsContainer = document.getElementById("myBetsContainer");
 const placeBetBtn = document.getElementById("placeBetBtn");
 const statusEl = document.getElementById("statusMessage");
 
-// NEW: paratrooper image
+// Paratrooper image element
 const paratrooper = document.getElementById("paratrooperSprite");
+
+// Make sure paratrooper starts hidden & off-screen
+if (paratrooper) {
+  paratrooper.style.opacity = "0";
+  paratrooper.style.top = "-260px";
+  paratrooper.style.left = "50%";
+  paratrooper.style.transform = "translate(-50%, -50%)";
+  paratrooper.style.transition = "none";
+}
 
 if (userNameLabel) {
   userNameLabel.textContent = USERNAME;
@@ -326,6 +335,8 @@ function dropParatrooperToWinningNumber(winningNumber) {
   const duration = 1300;
   const startTime = performance.now();
 
+  // Reset transition for fresh animation
+  paratrooper.style.transition = "none";
   paratrooper.style.opacity = "1";
   paratrooper.style.top = `${startY}px`;
   paratrooper.style.left = `${startX}px`;
@@ -353,6 +364,11 @@ function dropParatrooperToWinningNumber(winningNumber) {
         paratrooper.style.transition = "top 0.6s ease-out, opacity 0.4s";
         paratrooper.style.top = "-260px";
         paratrooper.style.opacity = "0";
+
+        // after hide, remove transition so next drop starts clean
+        setTimeout(() => {
+          paratrooper.style.transition = "none";
+        }, 600);
       }, 800);
     }
   }
@@ -598,7 +614,7 @@ if (placeBetBtn) {
     }
 
     if (selectedNumber === null || selectedNumber === undefined) {
-      setStatus("Select a number first", "error");
+      setStatus("Select a number first", "error";
       return;
     }
 
