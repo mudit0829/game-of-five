@@ -9,7 +9,7 @@
 <body>
   <div class="platinum-page">
     
-    <!-- SIMPLE WATER BACKGROUND -->
+    <!-- BACKGROUND -->
     <div class="bg-wrapper">
       <img
         src="{{ url_for('static', filename='img/platinum_bg.png') }}"
@@ -21,10 +21,18 @@
     <!-- TOP HUD -->
     <header class="top-hud">
       <div class="hud-left">
-        <div class="hud-game">GAME <span id="roundCode">--</span></div>
-        <div class="hud-line"><span id="playerCount">0</span> PLAYERS</div>
-        <div class="hud-line">You: <span id="userName"></span></div>
-        <div class="hud-line">Bets: <span id="userBets">0</span></div>
+        <div class="hud-game">
+          GAME <span id="roundCode">--</span>
+        </div>
+        <div class="hud-line">
+          <span id="playerCount">0</span> PLAYERS
+        </div>
+        <div class="hud-line">
+          You: <span id="userName"></span>
+        </div>
+        <div class="hud-line">
+          Bets: <span id="userBets">0</span>
+        </div>
       </div>
 
       <div class="hud-center">
@@ -41,7 +49,7 @@
       </div>
     </header>
 
-    <!-- PLAY AREA: BOATS + CSS PARATROOPER -->
+    <!-- PLAY AREA: BOATS + PARATROOPER IMAGE -->
     <main class="play-layer">
       <!-- BOATS WITH WATER RIPPLES -->
       <div class="boats-container">
@@ -106,30 +114,18 @@
         </div>
       </div>
 
-      <!-- CSS ANIMATED PARATROOPER -->
-      <div id="cssParatrooper" class="css-paratrooper">
-        <!-- Parachute -->
-        <div class="parachute">
-          <div class="chute-canopy"></div>
-          <div class="chute-line chute-line-1"></div>
-          <div class="chute-line chute-line-2"></div>
-          <div class="chute-line chute-line-3"></div>
-          <div class="chute-line chute-line-4"></div>
-        </div>
-        
-        <!-- Person -->
-        <div class="para-person">
-          <div class="para-head"></div>
-          <div class="para-body"></div>
-          <div class="para-arm para-arm-left"></div>
-          <div class="para-arm para-arm-right"></div>
-          <div class="para-leg para-leg-left"></div>
-          <div class="para-leg para-leg-right"></div>
-        </div>
+      <!-- IMAGE PARATROOPER (no CSS-drawn shapes) -->
+      <div class="paratrooper-layer">
+        <img
+          id="paratrooperSprite"
+          class="paratrooper-img"
+          src="{{ url_for('static', filename='img/paratrooper.png') }}"
+          alt="Paratrooper"
+        />
       </div>
     </main>
 
-    <!-- BOTTOM CONTROLS -->
+    <!-- BOTTOM CONTROLS (TRANSPARENT LIKE SILVER/GOLD) -->
     <section class="controls transparent-controls">
       <h3>Select your number (0–9)</h3>
 
@@ -162,7 +158,7 @@
       <div id="statusMessage" class="status"></div>
     </section>
 
-    <!-- RESULT / SLOTS POPUP -->
+    <!-- LEGACY RESULT POPUP (not used by JS but kept just in case) -->
     <div id="resultPopup" class="result-popup">
       <div class="result-popup-card">
         <h2 id="popupTitle">Game Finished</h2>
