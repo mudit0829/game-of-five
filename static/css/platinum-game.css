@@ -349,7 +349,7 @@ body {
   }
 }
 
-/* ===== PARATROOPER IMAGE (replaces CSS paratrooper) ===== */
+/* ===== EMOJI PARATROOPER (legs + chute animation) ===== */
 
 .paratrooper-layer {
   position: absolute;
@@ -358,19 +358,167 @@ body {
   z-index: 25;
 }
 
-.paratrooper-img {
+.emoji-paratrooper {
   position: absolute;
   top: -260px;
   left: 50%;
   transform: translate(-50%, -50%);
-  width: 100px;
-  max-width: 26%;
-  filter: drop-shadow(0 15px 30px rgba(0, 0, 0, 0.9));
+  width: 90px;
+  height: 160px;
+  filter: drop-shadow(0 15px 30px rgba(0, 0, 0, 0.8));
   opacity: 0;
-  transition: top 0.4s ease-out, opacity 0.3s ease-out;
 }
 
-/* ===== CONTROLS ===== */
+/* Parachute group */
+.emoji-chute {
+  position: absolute;
+  top: 0;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 90px;
+  height: 60px;
+}
+
+.emoji-chute-canopy {
+  position: absolute;
+  top: 0;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 90px;
+  height: 60px;
+  background: linear-gradient(135deg, #f97316, #ef4444);
+  border-radius: 50% 50% 30% 30%;
+  border: 3px solid #7f1d1d;
+  box-shadow:
+    inset 0 -10px 18px rgba(0, 0, 0, 0.35),
+    0 8px 20px rgba(0, 0, 0, 0.6);
+}
+
+/* Lines holding the chute */
+.emoji-chute-line {
+  position: absolute;
+  top: 54px;
+  width: 2px;
+  height: 52px;
+  background: rgba(255, 255, 255, 0.9);
+  transform-origin: top center;
+}
+
+.emoji-chute-line-1 {
+  left: 16%;
+  transform: rotate(-12deg);
+}
+.emoji-chute-line-2 {
+  left: 36%;
+  transform: rotate(-4deg);
+}
+.emoji-chute-line-3 {
+  right: 36%;
+  transform: rotate(4deg);
+}
+.emoji-chute-line-4 {
+  right: 16%;
+  transform: rotate(12deg);
+}
+
+/* Body */
+.emoji-body {
+  position: absolute;
+  top: 98px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 36px;
+  height: 60px;
+}
+
+/* Head as emoji */
+.emoji-head {
+  position: absolute;
+  top: -8px;
+  left: 50%;
+  transform: translateX(-50%);
+  font-size: 24px;
+}
+
+/* Torso */
+.emoji-torso {
+  position: absolute;
+  top: 18px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 26px;
+  height: 26px;
+  border-radius: 8px;
+  background: linear-gradient(135deg, #0f766e, #22c55e);
+  border: 2px solid #022c22;
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.7);
+}
+
+/* Legs */
+.emoji-leg {
+  position: absolute;
+  top: 40px;
+  width: 9px;
+  height: 26px;
+  border-radius: 6px;
+  background: linear-gradient(180deg, #1d4ed8 0%, #1d4ed8 60%, #020617 60%, #020617 100%);
+  border: 2px solid #020617;
+  transform-origin: top center;
+}
+
+.emoji-leg-left {
+  left: 4px;
+}
+
+.emoji-leg-right {
+  right: 4px;
+}
+
+/* Flying state: sway chute + kick legs */
+.emoji-paratrooper--flying .emoji-chute {
+  animation: emojiChuteSway 1.2s ease-in-out infinite;
+}
+
+.emoji-paratrooper--flying .emoji-leg-left {
+  animation: emojiLegKickLeft 0.9s ease-in-out infinite;
+}
+
+.emoji-paratrooper--flying .emoji-leg-right {
+  animation: emojiLegKickRight 0.9s ease-in-out infinite;
+}
+
+@keyframes emojiChuteSway {
+  0%,
+  100% {
+    transform: translateX(-50%) rotate(-4deg);
+  }
+  50% {
+    transform: translateX(-50%) rotate(4deg);
+  }
+}
+
+@keyframes emojiLegKickLeft {
+  0%,
+  100% {
+    transform: rotate(8deg);
+  }
+  50% {
+    transform: rotate(-8deg);
+  }
+}
+
+@keyframes emojiLegKickRight {
+  0%,
+  100% {
+    transform: rotate(-8deg);
+  }
+  50% {
+    transform: rotate(8deg);
+  }
+}
+
+/* ===== CONTROLS (TRANSPARENT LIKE SILVER/GOLD) ===== */
+
 .controls {
   position: absolute;
   left: 10px;
@@ -378,24 +526,17 @@ body {
   bottom: 10px;
   padding: 10px 12px 8px;
   border-radius: 18px;
-  background: rgba(15, 23, 42, 0.85);
-  backdrop-filter: blur(12px);
-  box-shadow: 0 -4px 20px rgba(0, 0, 0, 0.5);
-  border: 1px solid rgba(148, 163, 184, 0.3);
+  background: transparent;          /* key: no card */
+  backdrop-filter: none;
+  box-shadow: none;
+  border: none;
   z-index: 30;
   color: #f9fafb;
 }
 
-/* Extra glassy / more transparent like Silver & Gold */
+/* keep class for HTML but don't add background */
 .transparent-controls {
-  background: linear-gradient(
-    to top,
-    rgba(2, 6, 23, 0.9),
-    rgba(2, 6, 23, 0.78),
-    rgba(15, 23, 42, 0.35)
-  );
-  border-color: rgba(148, 163, 184, 0.5);
-  backdrop-filter: blur(18px);
+  background: transparent;
 }
 
 .controls h3 {
@@ -473,7 +614,6 @@ body {
   text-align: center;
 }
 
-/* more transparent variant for this screen */
 .transparent-bets {
   background: rgba(15, 23, 42, 0.65);
   border-color: rgba(148, 163, 184, 0.55);
@@ -663,8 +803,8 @@ body {
     font-size: 14px;
   }
 
-  .paratrooper-img {
-    width: 90px;
+  .emoji-paratrooper {
+    width: 80px;
   }
 }
 
@@ -684,8 +824,8 @@ body {
     font-size: 13px;
   }
 
-  .paratrooper-img {
-    width: 80px;
+  .emoji-paratrooper {
+    width: 70px;
   }
 
   .hud-game {
