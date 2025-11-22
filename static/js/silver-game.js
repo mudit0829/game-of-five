@@ -256,14 +256,13 @@ function syncUrlWithTable(roundCode) {
 
 // ================= FROG ANIMATION =================
 
-// make sure frog is movable
+// basic transition for smooth jump
 if (frogImg) {
-  if (!frogImg.style.position || frogImg.style.position === "static") {
-    frogImg.style.position = "fixed";
-  }
+  frogImg.style.transition = "transform 0.7s cubic-bezier(0.22, 0.61, 0.36, 1)";
+  frogImg.style.transformOrigin = "center center";
 }
 
-// find pad for number using data-number or visible text
+// find pad for number using data-number OR visible text
 function findPadForNumber(winningNumber) {
   const targetStr = String(winningNumber);
 
@@ -304,51 +303,30 @@ function hopFrogToWinningNumber(winningNumber) {
 
   console.log("[frog] Hopping to pad number:", winningNumber);
 
-  const padRect = targetPad.getBoundingClientRect();
   const frogRect = frogImg.getBoundingClientRect();
+  const padRect = targetPad.getBoundingClientRect();
 
-  const startX = frogRect.left;
-  const startY = frogRect.top;
+  // Centers in viewport coordinates
+  const frogCenterX = frogRect.left + frogRect.width / 2;
+  const frogCenterY = frogRect.top + frogRect.height / 2;
 
-  const endX = padRect.left + padRect.width / 2 - frogRect.width / 2;
-  const endY =
-    padRect.top + padRect.height * 0.25 - frogRect.height / 2; // slightly upper part of pad
+  // Slightly upper area of lily pad
+  const padCenterX = padRect.left + padRect.width / 2;
+  const padCenterY = padRect.top + padRect.height * 0.3;
 
-  // anchor frog to its current screen position
-  frogImg.style.position = "fixed";
-  frogImg.style.left = `${startX}px`;
-  frogImg.style.top = `${startY}px`;
-  frogImg.style.zIndex = "999";
+  const deltaX = padCenterX - frogCenterX;
+  const deltaY = padCenterY - frogCenterY;
 
-  const duration = 800;
-  const peak = -40; // jump height
-  const startTime = performance.now();
+  // add a little "arc" via scale during transition
+  frogImg.style.transition = "transform 0.7s cubic-bezier(0.22, 0.61, 0.36, 1)";
+  frogImg.style.transform = `translate(${deltaX}px, ${deltaY}px) scale(1.05)`;
 
-  function step(now) {
-    const tRaw = (now - startTime) / duration;
-    const t = Math.min(Math.max(tRaw, 0), 1);
-
-    // ease in-out
-    const ease = t < 0.5 ? 2 * t * t : -1 + (4 - 2 * t) * t;
-
-    const x = startX + (endX - startX) * ease;
-    const yLinear = startY + (endY - startY) * ease;
-    const yArc = yLinear + peak * (4 * t * (1 - t));
-
-    frogImg.style.left = `${x}px`;
-    frogImg.style.top = `${yArc}px`;
-
-    if (t < 1) {
-      requestAnimationFrame(step);
-    } else {
-      frogImg.style.left = `${endX}px`;
-      frogImg.style.top = `${endY}px`;
-      targetPad.classList.add("win");
-      console.log("[frog] Hop complete");
-    }
-  }
-
-  requestAnimationFrame(step);
+  // after jump finishes, set scale back to 1 (no extra animation)
+  setTimeout(() => {
+    frogImg.style.transform = `translate(${deltaX}px, ${deltaY}px) scale(1)`;
+    targetPad.classList.add("win");
+    console.log("[frog] Hop complete");
+  }, 720);
 }
 
 // ================= TIMER (LOCAL 1-SECOND COUNTDOWN) =================
@@ -462,14 +440,19 @@ function updateGameUI(table) {
       }
 
       const outcomeInfo = determineUserOutcome(table);
-      // give frog time to hop before popup shows
+      // small delay so hop is visible
       setTimeout(() => {
         showEndPopup(outcomeInfo);
-      }, 1800);
+      }, 1100);
     }
   } else if (!hasResult) {
     lastResultShown = null;
     pads.forEach((p) => p.classList.remove("win"));
+    // reset frog back to center (original position)
+    if (frogImg) {
+      frogImg.style.transition = "transform 0.3s ease-out";
+      frogImg.style.transform = "translate(0px, 0px) scale(1)";
+    }
   }
 }
 
