@@ -147,19 +147,20 @@ body {
 
 /* Frog – moved LOWER so it visually sits on centre pad */
 .frog-wrapper {
-position: absolute;
-left: 50%;
-top: 30%; /* was 8% – lowered to sit on lilypad */
-transform: translateX(-50%);
-width: 130px;
-height: 130px;
-display: flex;
-align-items: center;
-justify-content: center;
-pointer-events: none;
-z-index: 4;
-filter: drop-shadow(0 10px 20px rgba(0, 0, 0, 0.6));
+  position: absolute;
+  left: 50%;
+  top: 45%;  /* 45% gets it centered on the pads */
+  transform: translateX(-50%);
+  width: 130px;
+  height: 130px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
+  z-index: 4;
+  filter: drop-shadow(0 10px 20px rgba(0, 0, 0, 0.6));
 }
+
 
 .frog {
   width: 100%;
