@@ -149,7 +149,7 @@ body {
 .frog-wrapper {
   position: absolute;
   left: 50%;
-  top: 52%;                 /* 🔴 key fix */
+  top: 56%;                 /* 🔴 key fix */
   transform: translate(-50%, -50%);
   width: 130px;
   height: 130px;
