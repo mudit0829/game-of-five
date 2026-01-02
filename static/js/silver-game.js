@@ -443,9 +443,27 @@ function startLocalTimer() {
   renderTimer();
 
   // Keep static frog until last 10 seconds
-  if (displayRemainingSeconds > 10) {
-    showFrogStatic();
+ if (displayRemainingSeconds === 10) {
+  console.log("[frog] 10 seconds reached – start jump preview");
+
+  // play front jump as preview (no movement yet)
+  if (frogVideo && frogVideoSource) {
+    frogVideoSource.src = FROG_VIDEOS.front;
+    frogVideo.load();
+
+    frogVideo.onloadeddata = () => {
+      frogImg.style.visibility = "hidden";
+      frogVideo.style.display = "block";
+      frogVideo.currentTime = 0;
+      frogVideo.play().catch(() => {});
+    };
   }
+}
+
+if (displayRemainingSeconds > 10) {
+  showFrogStatic();
+}
+
 }
 
   }, 1000);
@@ -536,6 +554,12 @@ function updateGameUI(table) {
     hopFrogToWinningNumber(table.result);
 
     if (!gameFinished) {
+      // allow frog video to finish before ending game
+setTimeout(() => {
+  gameFinished = true;
+}, 800);
+return;
+
       gameFinished = true;
       disableBettingUI();
 
