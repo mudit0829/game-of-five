@@ -382,6 +382,7 @@ if (frogVideoSource && FROG_VIDEOS[direction]) {
   frogVideo.style.left = `${frogX}px`;
   frogVideo.style.top = `${frogY}px`;
   frogVideo.style.display = "block";
+  frogVideo.style.visibility = "visible";
   frogVideo.currentTime = 0;
 
   frogImg.style.visibility = "hidden";
