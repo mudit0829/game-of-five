@@ -147,10 +147,10 @@ body {
 
 /* Frog – moved LOWER so it visually sits on centre pad */
 .frog-wrapper {
-  position: fixed;
+  position: absolute;
   left: 50%;
-  top: 50%;
-  transform: translate(-50%, -50%);
+  top: 42%;
+  transform: translateX(-50%);
   width: 130px;
   height: 130px;
   display: flex;
@@ -160,6 +160,7 @@ body {
   z-index: 4;
   filter: drop-shadow(0 10px 20px rgba(0, 0, 0, 0.6));
 }
+
 
 
 
