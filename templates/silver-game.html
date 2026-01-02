@@ -4,8 +4,20 @@
   <meta charset="UTF-8" />
   <title>{{ game.title }} – {{ game.name }}</title>
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-
   <link rel="stylesheet" href="{{ url_for('static', filename='css/silver-game.css') }}" />
+  <style>
+    /* Extra styles for video overlay */
+    .frog-video {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 140px; /* adjust if needed */
+      height: auto;
+      display: none;
+      pointer-events: none;
+      z-index: 7;
+    }
+  </style>
 </head>
 <body>
   <div class="game-root">
@@ -35,7 +47,7 @@
 
     <!-- FROG + LILYPADS AREA -->
     <section class="pond">
-      <!-- Frog (will hop to winning pad) -->
+      <!-- Frog idle sprite -->
       <div class="frog-wrapper">
         <img
           id="frogSprite"
@@ -44,6 +56,11 @@
           alt="Frog"
         >
       </div>
+
+      <!-- Frog jump video overlay -->
+      <video id="frogJumpVideo" class="frog-video" playsinline preload="auto">
+        <source src="{{ url_for('static', filename='video/front-jump-frog.mp4') }}" type="video/mp4">
+      </video>
 
       <!-- Lilypads -->
       <div class="pads">
@@ -72,24 +89,20 @@
     <section class="controls">
       <div class="numbers-title">SELECT YOUR NUMBER (0–9)</div>
 
-      <!-- row 0–4 -->
       <div class="numbers-row">
         {% for n in range(5) %}
         <button class="num-chip" data-number="{{ n }}">{{ n }}</button>
         {% endfor %}
       </div>
 
-      <!-- row 5–9 -->
       <div class="numbers-row">
         {% for n in range(5,10) %}
         <button class="num-chip" data-number="{{ n }}">{{ n }}</button>
         {% endfor %}
       </div>
 
-      <!-- Only chips list, no label text -->
       <div id="myBetsRow" class="my-bets-row"></div>
 
-      <!-- Fixed bet button (no input field) -->
       <button id="placeBetBtn" class="bet-button">
         PLACE BET (₹{{ game.bet_amount }})
       </button>
@@ -98,7 +111,7 @@
     </section>
   </div>
 
-  <!-- GAME END POPUP (shown once when result declared) -->
+  <!-- GAME END POPUP -->
   <div id="resultPopup" class="result-popup" style="display: none;">
     <div class="popup-card">
       <h2 id="popupTitle">Game Finished</h2>
