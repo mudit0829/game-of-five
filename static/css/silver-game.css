@@ -171,13 +171,16 @@ body {
 /* Jump video */
 /* ===== FROG VIDEO (CORRECT TARGET) ===== */
 
+/* ===== FROG VIDEO FIX ===== */
+
 .frog-video {
-  position: absolute;
-  inset: 0;                 /* fill frog-wrapper */
-  width: 100%;
+  position: absolute;        /* 🔴 REQUIRED */
+  left: 0;
+  top: 0;
+  width: 130px;
   height: auto;
-  display: none;            /* JS controls show/hide */
-  z-index: 6;
+  display: none;
+  z-index: 7;                /* above image */
   pointer-events: none;
 }
 
