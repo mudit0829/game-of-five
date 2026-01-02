@@ -17,8 +17,8 @@ const HOME_URL = "/home";
 
 // IMPORTANT: use the pond container for coordinates
 const pondEl = document.querySelector(".pond");
-const frogImg = document.getElementById("frogSprite");
-const frogVideo = document.getElementById("frogJumpVideo"); // NEW
+const frogImg = document.getElementById("frogStatic");
+const frogVideo = document.getElementById("frogVideo");
 const pads = Array.from(document.querySelectorAll(".pad"));
 
 const numChips = Array.from(document.querySelectorAll(".num-chip"));
@@ -363,6 +363,14 @@ function hopFrogToWinningNumberVideo(winningNumber) {
   }
 
   console.log("[frog] Hopping to pad number (video):", winningNumber);
+  const padIndex = pads.indexOf(targetPad);
+const direction = getJumpDirectionByPadIndex(padIndex);
+
+if (frogVideoSource && FROG_VIDEOS[direction]) {
+  frogVideoSource.src = FROG_VIDEOS[direction];
+  frogVideo.load();
+}
+
 
   const pondRect = pondEl.getBoundingClientRect();
   const frogRect = frogImg.getBoundingClientRect();
@@ -405,8 +413,22 @@ function hopFrogToWinningNumberVideo(winningNumber) {
 
 // Single entry point used by rest of code
 function hopFrogToWinningNumber(winningNumber) {
-  // try video, fallback to old transform if video missing/fails
-  hopFrogToWinningNumberVideo(winningNumber);
+  // Only use video in last 10 seconds
+  if (displayRemainingSeconds <= 10) {
+    hopFrogToWinningNumberVideo(winningNumber);
+  } else {
+    hopFrogToWinningNumberTransform(winningNumber);
+  }
+}
+
+function showFrogStatic() {
+  if (frogVideo) {
+    frogVideo.pause();
+    frogVideo.style.display = "none";
+  }
+  if (frogImg) {
+    frogImg.style.visibility = "visible";
+  }
 }
 
 // ================= TIMER (LOCAL 1-SECOND COUNTDOWN) =================
