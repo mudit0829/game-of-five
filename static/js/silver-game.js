@@ -40,6 +40,16 @@ const popupTitleEl = document.getElementById("popupTitle");
 const popupMsgEl = document.getElementById("popupMessage");
 const popupHomeBtn = document.getElementById("popupHomeBtn");
 const popupLobbyBtn = document.getElementById("popupLobbyBtn");
+// ================= FROG JUMP VIDEO CONFIG (ADDED) =================
+
+const FROG_VIDEOS = {
+  front: "/static/video/front-jump-frog.mp4",
+  left: "/static/video/left-jump-frog.mp4",
+  right: "/static/video/right-jump-frog.mp4",
+};
+
+const frogVideoSource = document.getElementById("frogVideoSource");
+
 
 if (userNameLabel) {
   userNameLabel.textContent = USERNAME;
@@ -263,6 +273,15 @@ if (frogImg) {
     "transform 0.7s cubic-bezier(0.22, 0.61, 0.36, 1)";
   frogImg.style.transformOrigin = "center center";
 }
+// Decide jump direction based on pad position
+function getJumpDirectionByPadIndex(index) {
+  // pads: [0][1][2]
+  //       [3][4][5]
+
+  if (index === 0 || index === 1) return "left";
+  if (index === 2 || index === 3) return "front";
+  return "right";
+}
 
 // find pad for number using data-number OR visible text
 function findPadForNumber(winningNumber) {
@@ -397,9 +416,15 @@ function startLocalTimer() {
   localTimerInterval = setInterval(() => {
     if (gameFinished) return;
     if (displayRemainingSeconds > 0) {
-      displayRemainingSeconds -= 1;
-      renderTimer();
-    }
+  displayRemainingSeconds -= 1;
+  renderTimer();
+
+  // Keep static frog until last 10 seconds
+  if (displayRemainingSeconds > 10) {
+    showFrogStatic();
+  }
+}
+
   }, 1000);
 }
 
