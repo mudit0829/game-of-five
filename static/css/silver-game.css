@@ -169,33 +169,25 @@ body {
 }
 
 /* Jump video */
+/* ===== FROG VIDEO (CORRECT TARGET) ===== */
+
 .frog-video {
+  position: absolute;
+  inset: 0;                 /* fill frog-wrapper */
   width: 100%;
   height: auto;
-  display: none;
+  display: none;            /* JS controls show/hide */
+  z-index: 6;
+  pointer-events: none;
 }
+
 @keyframes frogBreathe {
   0%, 100% { transform: scale(1); }
   50% { transform: scale(1.03); }
 }
 
-#frogSprite {
-  position: relative;
-  z-index: 5;
-  pointer-events: none;
-}
-
 /* Frog jump video – overlay on top */
-#frogJumpVideo {
-  position: absolute;
-  top: 50%;
-  left: 50%;
-  transform: translate(-50%, -50%);
-  width: 130px;
-  height: auto;
-  z-index: 6;
-  pointer-events: none;
-}
+
 
 /* Lilypads */
 .pads {
