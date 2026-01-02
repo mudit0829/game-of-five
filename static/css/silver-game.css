@@ -149,7 +149,7 @@ body {
 .frog-wrapper {
   position: absolute;
   left: 50%;
-  bottom: 45%;
+  top: 38%;
   transform: translateX(-50%);
   width: 130px;
   height: 130px;
