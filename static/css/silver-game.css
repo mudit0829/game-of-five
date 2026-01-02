@@ -1,6 +1,4 @@
-*,
-*::before,
-*::after {
+*, *::before, *::after {
   box-sizing: border-box;
 }
 
@@ -151,7 +149,7 @@ body {
 .frog-wrapper {
   position: absolute;
   left: 50%;
-  top: 30%; /* was 8% – lowered to sit on lilypad */
+  top: 30%;
   transform: translateX(-50%);
   width: 130px;
   height: 130px;
@@ -180,6 +178,18 @@ body {
 #frogSprite {
   position: relative;
   z-index: 5;
+  pointer-events: none;
+}
+
+/* Frog jump video – overlay on top */
+#frogJumpVideo {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 130px;
+  height: auto;
+  z-index: 6;
   pointer-events: none;
 }
 
