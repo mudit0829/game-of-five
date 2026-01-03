@@ -390,12 +390,9 @@ function hopFrogToWinningNumberVideo(winningNumber) {
 // ================= SINGLE ENTRY POINT =================
 
 function hopFrogToWinningNumber(winningNumber) {
-  if (displayRemainingSeconds <= 10) {
-    hopFrogToWinningNumberVideo(winningNumber);
-  } else {
-    hopFrogToWinningNumberTransform(winningNumber);
-  }
+  hopFrogToWinningNumberTransform(winningNumber);  // Force test
 }
+
 
 // ================= STATIC RESET =================
 
