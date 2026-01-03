@@ -193,6 +193,15 @@ pointer-events: none;
 }
 
 /* Frog jump video – overlay on top */
+#frogJumpVideo {
+  position: absolute !important;
+  display: block !important;
+  visibility: visible !important;
+  z-index: 9999 !important;
+  width: 300px !important;
+  height: 300px !important;
+  opacity: 1 !important;
+}
 
 
 /* Lilypads */
