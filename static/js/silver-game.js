@@ -527,8 +527,7 @@ function updateGameUI(table) {
     (maxPlayers !== null && table.players >= maxPlayers);
 
   if (!gameFinished && !userHasBet && isFull) {
-    gameFinished = true;
-    disableBettingUI();
+        disableBettingUI();
     if (tablePollInterval) {
       clearInterval(tablePollInterval);
       tablePollInterval = null;
@@ -550,6 +549,7 @@ function updateGameUI(table) {
     setStatus(`Winning number: ${table.result}`, "ok");
 
     ensurePadForWinningNumber(table.result);
+    showFrogStatic();
     hopFrogToWinningNumber(table.result);
 
     if (!gameFinished) {
