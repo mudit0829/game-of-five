@@ -336,6 +336,7 @@ function hopFrogToWinningNumberTransform(winningNumber) {
   setTimeout(() => {
     frogImg.style.transform = `translate(${dx}px, ${dy}px) scale(1)`;
     targetPad.classList.add("win");
+    console.log('[frog] Transform animation complete');
   }, 720);
 }
 
@@ -345,20 +346,21 @@ function hopFrogToWinningNumberVideo(winningNumber) {
   console.log('[frog] Video jump for:', winningNumber);
   
   if (!frogVideo || !frogImg || !pondEl || !frogVideoSource) {
-    console.warn('[frog] Missing element');
+    console.warn('[frog] Missing element - using transform');
     hopFrogToWinningNumberTransform(winningNumber);
     return;
   }
 
   const targetPad = findPadForNumber(winningNumber);
   if (!targetPad) {
-    console.warn('[frog] Pad not found');
+    console.warn('[frog] Pad not found - using transform');
     hopFrogToWinningNumberTransform(winningNumber);
     return;
   }
 
   const padIndex = pads.indexOf(targetPad);
   if (padIndex === -1) {
+    console.warn('[frog] Pad index invalid - using transform');
     hopFrogToWinningNumberTransform(winningNumber);
     return;
   }
@@ -368,11 +370,15 @@ function hopFrogToWinningNumberVideo(winningNumber) {
 
   console.log('[frog] Direction:', direction, 'Source:', videoSrc);
 
-  frogVideo.pause();
-  frogVideo.currentTime = 0;
-
-  frogVideoSource.src = videoSrc;
-  frogVideo.load();
+  // Hide image, show video
+  frogImg.style.visibility = "hidden";
+  frogImg.style.display = "none";
+  
+  frogVideo.style.position = "absolute";
+  frogVideo.style.display = "block";
+  frogVideo.style.visibility = "visible";
+  frogVideo.style.zIndex = "9999";
+  frogVideo.muted = true;
 
   const pondRect = pondEl.getBoundingClientRect();
   const frogRect = frogImg.getBoundingClientRect();
@@ -381,26 +387,13 @@ function hopFrogToWinningNumberVideo(winningNumber) {
   const startX = frogRect.left - pondRect.left;
   const startY = frogRect.top - pondRect.top;
 
-  // ===== HIDE IMAGE =====
-  console.log('[frog] Hiding image, showing video');
-  frogImg.style.visibility = "hidden";
-  frogImg.style.display = "none";
-  
-  // ===== SHOW VIDEO =====
-  frogVideo.style.position = "absolute";
   frogVideo.style.left = `${startX}px`;
   frogVideo.style.top = `${startY}px`;
-  frogVideo.style.display = "block";
-  frogVideo.style.visibility = "visible";
-  frogVideo.style.zIndex = "9999";
-  frogVideo.currentTime = 0;
-  frogVideo.muted = true;
 
-  // Handle video end - MUST be set before play()
+  // Set up handlers BEFORE loading
   frogVideo.onended = () => {
     console.log('[frog] Video ended, repositioning frog');
     
-    // ===== HIDE VIDEO, SHOW IMAGE =====
     frogVideo.style.display = "none";
     frogVideo.style.visibility = "hidden";
     
@@ -413,27 +406,52 @@ function hopFrogToWinningNumberVideo(winningNumber) {
     frogImg.style.transform = `translate(${endX - startX}px, ${endY - startY}px)`;
     
     targetPad.classList.add("win");
+    clearTimeout(fallbackTimeout);
     console.log('[frog] Animation complete');
   };
 
   frogVideo.onerror = (err) => {
     console.error('[frog] Video error:', err);
+    clearTimeout(fallbackTimeout);
+    frogVideo.style.display = "none";
+    frogVideo.style.visibility = "hidden";
+    frogImg.style.visibility = "visible";
+    frogImg.style.display = "block";
     hopFrogToWinningNumberTransform(winningNumber);
   };
 
-  // Play video with proper promise handling
+  // Load and play video
+  console.log('[frog] Loading video:', videoSrc);
+  frogVideoSource.src = videoSrc;
+  frogVideo.load();
+
+  // Safety fallback: if video doesn't play in 2 seconds, use transform
+  let fallbackTimeout = setTimeout(() => {
+    console.warn('[frog] Video timeout - using transform fallback');
+    if (!frogVideo.paused) return; // Video is playing, don't fallback
+    
+    frogVideo.style.display = "none";
+    frogVideo.style.visibility = "hidden";
+    frogImg.style.visibility = "visible";
+    frogImg.style.display = "block";
+    hopFrogToWinningNumberTransform(winningNumber);
+  }, 2000);
+
+  // Try to play
   const playPromise = frogVideo.play();
   if (playPromise !== undefined) {
     playPromise
       .then(() => {
-        console.log('[frog] Video playing successfully');
+        console.log('[frog] Video play initiated');
       })
       .catch((err) => {
         console.error('[frog] Play error:', err);
-        // Fallback if video fails
-        setTimeout(() => {
-          hopFrogToWinningNumberTransform(winningNumber);
-        }, 500);
+        clearTimeout(fallbackTimeout);
+        frogVideo.style.display = "none";
+        frogVideo.style.visibility = "hidden";
+        frogImg.style.visibility = "visible";
+        frogImg.style.display = "block";
+        hopFrogToWinningNumberTransform(winningNumber);
       });
   }
 }
@@ -443,13 +461,9 @@ function hopFrogToWinningNumberVideo(winningNumber) {
 function hopFrogToWinningNumber(winningNumber) {
   console.log('[frog] hopFrogToWinningNumber called for:', winningNumber);
   
-  if (displayRemainingSeconds <= 10) {
-    console.log('[frog] Using VIDEO animation');
-    hopFrogToWinningNumberVideo(winningNumber);
-  } else {
-    console.log('[frog] Using TRANSFORM fallback');
-    hopFrogToWinningNumberTransform(winningNumber);
-  }
+  // Always use transform - video seems to have issues
+  console.log('[frog] Using TRANSFORM animation');
+  hopFrogToWinningNumberTransform(winningNumber);
 }
 
 // ================= TIMER (LOCAL 1-SECOND COUNTDOWN) =================
