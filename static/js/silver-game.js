@@ -1,15 +1,15 @@
 // ================= CONSTANTS & CONFIG =================
 
-const GAME = GAME_TYPE || "silver";
-const FIXED_BET_AMOUNT = window.FIXED_BET_AMOUNT || 10;
+const GAME = (typeof GAME_TYPE !== 'undefined') ? GAME_TYPE : "silver";
+const FIXED_BET_AMOUNT = (typeof FIXED_BET_AMOUNT !== 'undefined') ? FIXED_BET_AMOUNT : 10;
 
 // Optional: support multi-table via ?table=ROUND_CODE
 const urlParams = new URLSearchParams(window.location.search);
 const TABLE_CODE = urlParams.get("table") || null;
 
 // Real logged-in user from Flask session (passed in HTML)
-const USER_ID = GAME_USER_ID;
-const USERNAME = GAME_USERNAME || "Player";
+const USER_ID = (typeof GAME_USER_ID !== 'undefined') ? GAME_USER_ID : null;
+const USERNAME = (typeof GAME_USERNAME !== 'undefined') ? GAME_USERNAME : "Player";
 
 // Where popup "Home" button goes
 const HOME_URL = "/home";
