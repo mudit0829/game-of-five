@@ -128,14 +128,18 @@
   </div>
 </div>
 
+<!-- Load Socket.IO first -->
 <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
 
+<!-- Pass variables to JS SAFELY -->
 <script>
-const GAME_TYPE = "{{ game_type }}";
-const GAME_USER_ID = {{ session['user_id'] or 0 }};
-const GAME_USERNAME = "{{ session['username'] or 'Player' }}";
+  window.GAME_TYPE = "{{ game_type or 'silver' }}";
+  window.FIXED_BET_AMOUNT = {{ game.bet_amount or 10 }};
+  window.GAME_USER_ID = {{ session['user_id'] or 0 }};
+  window.GAME_USERNAME = "{{ session['username'] or 'Player' }}";
 </script>
 
+<!-- Load game JS LAST -->
 <script src="{{ url_for('static', filename='js/silver-game.js') }}"></script>
 
 </body>
