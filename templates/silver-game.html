@@ -135,9 +135,9 @@ const GAME_TYPE = "{{ game_type }}";
 const FIXED_BET_AMOUNT = {{ game.bet_amount }};
 const GAME_USER_ID = {{ session['user_id'] or 0 }};
 const GAME_USERNAME = "{{ session['username'] or 'Player' }}";
-console.log('Template vars:', {GAME_TYPE, FIXED_BET_AMOUNT, GAME_USER_ID, GAME_USERNAME});
 </script>
 
 <script src="{{ url_for('static', filename='js/silver-game.js') }}"></script>
+
 </body>
 </html>
