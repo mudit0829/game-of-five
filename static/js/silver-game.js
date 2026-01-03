@@ -62,6 +62,7 @@ let currentTable = null;
 let lastResultShown = null;
 
 // flags / intervals
+let frogPreviewPlayed = false;
 let gameFinished = false;
 let tablePollInterval = null;
 let localTimerInterval = null;
@@ -433,38 +434,43 @@ function showFrogStatic() {
 
 // ================= TIMER (LOCAL 1-SECOND COUNTDOWN) =================
 
+// ================= TIMER (LOCAL 1-SECOND COUNTDOWN) =================
+
 function startLocalTimer() {
   if (localTimerInterval) clearInterval(localTimerInterval);
+
   localTimerInterval = setInterval(() => {
     if (gameFinished) return;
+
     if (displayRemainingSeconds > 0) {
-  displayRemainingSeconds -= 1;
-  renderTimer();
+      displayRemainingSeconds -= 1;
+      renderTimer();
 
-  // Keep static frog until last 10 seconds
- if (displayRemainingSeconds === 10) {
-  console.log("[frog] 10 seconds reached – start jump preview");
+      // ▶️ PLAY PREVIEW EXACTLY ONCE AT 10 SECONDS
+      if (displayRemainingSeconds === 10 && !frogPreviewPlayed) {
+        frogPreviewPlayed = true;
+        console.log("[frog] 10 seconds reached – start jump preview");
 
-  // play front jump as preview (no movement yet)
-  if (frogVideo && frogVideoSource) {
-    frogVideoSource.src = FROG_VIDEOS.front;
-    frogVideo.load();
+        if (frogVideo && frogVideoSource) {
+          frogVideo.pause();
+          frogVideoSource.src = FROG_VIDEOS.front;
+          frogVideo.load();
 
-    frogVideo.onloadeddata = () => {
-      frogImg.style.visibility = "hidden";
-      frogVideo.style.display = "block";
-      frogVideo.currentTime = 0;
-      frogVideo.play().catch(() => {});
-    };
-  }
-}
+          frogVideo.onloadeddata = () => {
+            frogImg.style.visibility = "hidden";
+            frogVideo.style.display = "block";
+            frogVideo.style.visibility = "visible";
+            frogVideo.currentTime = 0;
+            frogVideo.play().catch(() => {});
+          };
+        }
+      }
 
-if (displayRemainingSeconds > 10) {
-  showFrogStatic();
-}
-
-}
-
+      // 🐸 STATIC FROG BEFORE PREVIEW
+      if (displayRemainingSeconds > 10) {
+        showFrogStatic();
+      }
+    }
   }, 1000);
 }
 
@@ -503,6 +509,7 @@ async function fetchTableData() {
 function updateGameUI(table) {
   if (!table) return;
 
+  // ================= BASIC UI =================
   if (roundIdSpan) roundIdSpan.textContent = table.round_code || "-";
   if (playerCountSpan) playerCountSpan.textContent = table.players || 0;
 
@@ -519,15 +526,18 @@ function updateGameUI(table) {
         table.players >= table.max_players);
   }
 
-  // ==== SLOTS FULL CHECK (only if userHasBet is still false) ====
+  // ================= SLOTS FULL CHECK =================
   const maxPlayers =
     typeof table.max_players === "number" ? table.max_players : null;
+
   const isFull =
     table.is_full === true ||
     (maxPlayers !== null && table.players >= maxPlayers);
 
   if (!gameFinished && !userHasBet && isFull) {
-        disableBettingUI();
+    gameFinished = true;
+    disableBettingUI();
+
     if (tablePollInterval) {
       clearInterval(tablePollInterval);
       tablePollInterval = null;
@@ -536,27 +546,29 @@ function updateGameUI(table) {
       clearInterval(localTimerInterval);
       localTimerInterval = null;
     }
+
     showSlotsFullPopup();
     return;
   }
 
-  // ===== Result handling =====
+  // ================= RESULT HANDLING =================
   const hasResult =
-    table.result !== null && table.result !== undefined && table.result !== "";
+    table.result !== null &&
+    table.result !== undefined &&
+    table.result !== "";
 
   if (hasResult && table.result !== lastResultShown) {
     lastResultShown = table.result;
+
     setStatus(`Winning number: ${table.result}`, "ok");
 
     ensurePadForWinningNumber(table.result);
-    showFrogStatic();
+
+    // IMPORTANT: do NOT hide frog here
     hopFrogToWinningNumber(table.result);
 
+    // end game AFTER animation
     if (!gameFinished) {
-      // allow frog video to finish before ending game
-setTimeout(() => {
-  gameFinished = true;
-}, 800);
       gameFinished = true;
       disableBettingUI();
 
@@ -570,25 +582,37 @@ setTimeout(() => {
       }
 
       const outcomeInfo = determineUserOutcome(table);
-      // small delay so hop is visible
+
       setTimeout(() => {
         showEndPopup(outcomeInfo);
-      }, 1100);
+      }, 1200); // synced with jump animation
     }
+
   } else if (!hasResult) {
+    // ================= NEW ROUND RESET =================
     lastResultShown = null;
+    frogPreviewPlayed = false;
+
     pads.forEach((p) => p.classList.remove("win"));
-    // reset frog back to center (original position)
+
     if (frogImg) {
       frogImg.style.transition = "transform 0.3s ease-out";
       frogImg.style.transform = "translate(0px, 0px) scale(1)";
+      frogImg.style.visibility = "visible";
+    }
+
+    if (frogVideo) {
+      frogVideo.pause();
+      frogVideo.style.display = "none";
     }
   }
 }
 
 function startPolling() {
   fetchTableData();
+
   if (tablePollInterval) clearInterval(tablePollInterval);
+
   tablePollInterval = setInterval(() => {
     if (!gameFinished) {
       fetchTableData();
