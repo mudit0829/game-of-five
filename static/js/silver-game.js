@@ -392,12 +392,11 @@ function hopFrogToWinningNumberVideo(winningNumber) {
   const startY = frogRect.top - pondRect.top;
 
   frogVideo.style.left = `${startX}px`;
-  frogVideo.style.top = `${startY}px`;
-  frogVideo.style.display = "block";
-  frogVideo.style.visibility = "visible";
-  frogVideo.currentTime = 0;
+frogVideo.style.top = `${startY}px`;
+frogVideo.classList.add("playing");
+frogVideo.currentTime = 0;
 
-  frogImg.style.visibility = "hidden";
+frogImg.classList.add("hidden");
 
   frogVideo.onloadeddata = () => {
     frogVideo
@@ -406,7 +405,7 @@ function hopFrogToWinningNumberVideo(winningNumber) {
   };
 
   frogVideo.onended = () => {
-    frogVideo.style.display = "none";
+    frogVideo.classList.remove("playing");
 
     const endX = padRect.left - pondRect.left;
     const endY = padRect.top - pondRect.top;
@@ -434,10 +433,10 @@ function hopFrogToWinningNumber(winningNumber) {
 function showFrogStatic() {
   if (frogVideo) {
     frogVideo.pause();
-    frogVideo.style.display = "none";
+    frogVideo.classList.remove("playing");
   }
   if (frogImg) {
-    frogImg.style.visibility = "visible";
+    frogImg.classList.remove("hidden");
   }
 }
 
@@ -467,15 +466,14 @@ function startLocalTimer() {
           frogVideo.load();
 
           frogVideo.onloadeddata = () => {
-            frogImg.style.visibility = "hidden";
-            frogVideo.style.display = "block";
-            frogVideo.style.visibility = "visible";
-            frogVideo.currentTime = 0;
-            frogVideo.muted = true;
-
-            frogVideo.play().catch(err => {
-  console.warn("[frog] play blocked", err);
-});
+  frogImg.classList.add("hidden");
+  frogVideo.classList.add("playing");
+  frogVideo.muted = true;
+  unlockFrogVideoPlayback();
+  frogVideo.play().catch(err => {
+    console.warn("[frog] play blocked", err);
+  });
+};
 
           };
         }
@@ -621,13 +619,13 @@ startLocalTimer();
     if (frogImg) {
       frogImg.style.transition = "transform 0.3s ease-out";
       frogImg.style.transform = "translate(0px, 0px) scale(1)";
-      frogImg.style.visibility = "visible";
+      frogImg.classList.remove("hidden");
     }
 
     if (frogVideo) {
       frogVideo.pause();
-      frogVideo.currentTime = 0;
-      frogVideo.style.display = "none";
+frogVideo.currentTime = 0;
+frogVideo.classList.remove("playing");
     }
   }
 }
@@ -761,11 +759,11 @@ if (popupLobbyBtn) {
 // ================= INIT =================
 // Hide video on startup
 if (frogVideo) {
-  frogVideo.style.display = "none";
+  frogVideo.classList.remove("playing");
   frogVideo.muted = true;
 }
 if (frogImg) {
-  frogImg.style.visibility = "visible";
+  frogImg.classList.remove("hidden");
 }
 fetchBalance();
 startPolling();
