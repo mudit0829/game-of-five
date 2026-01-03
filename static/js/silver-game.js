@@ -17,8 +17,8 @@ const HOME_URL = "/home";
 
 // IMPORTANT: use the pond container for coordinates
 const pondEl = document.querySelector(".pond");
-const frogImg = document.getElementById("frogStatic");
-const frogVideo = document.getElementById("frogVideo");
+const frogImg = document.getElementById("frogSprite");
+const frogVideo = document.getElementById("frogJumpVideo");
 const pads = Array.from(document.querySelectorAll(".pad"));
 
 const numChips = Array.from(document.querySelectorAll(".num-chip"));
@@ -48,7 +48,7 @@ const FROG_VIDEOS = {
   right: "/static/video/right-jump-frog.mp4",
 };
 
-const frogVideoSource = document.getElementById("frogVideoSource");
+const frogVideoSource = frogVideo?.querySelector("source");
 
 
 if (userNameLabel) {
@@ -759,7 +759,14 @@ if (popupLobbyBtn) {
 }
 
 // ================= INIT =================
-
+// Hide video on startup
+if (frogVideo) {
+  frogVideo.style.display = "none";
+  frogVideo.muted = true;
+}
+if (frogImg) {
+  frogImg.style.visibility = "visible";
+}
 fetchBalance();
 startPolling();
 startLocalTimer();
