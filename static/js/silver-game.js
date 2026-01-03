@@ -215,7 +215,10 @@ function determineUserOutcome(table) {
 }
 
 function showEndPopup(outcomeInfo) {
-  if (!popupEl) return;
+  if (!popupEl) {
+    console.error('[popup] popupEl not found');
+    return;
+  }
 
   const { outcome } = outcomeInfo;
 
@@ -237,7 +240,25 @@ function showEndPopup(outcomeInfo) {
   if (popupMsgEl) popupMsgEl.textContent = message;
 
   console.log('[popup] Showing popup with outcome:', outcome);
-  popupEl.style.display = "flex";
+  console.log('[popup] popupEl element:', popupEl);
+  console.log('[popup] popupEl parent:', popupEl.parentElement);
+  
+  // Force visibility - remove any CSS that might hide it
+  popupEl.style.display = "flex !important";
+  popupEl.style.visibility = "visible !important";
+  popupEl.style.opacity = "1 !important";
+  popupEl.style.zIndex = "99999 !important";
+  popupEl.style.position = "fixed !important";
+  popupEl.style.top = "0 !important";
+  popupEl.style.left = "0 !important";
+  popupEl.style.right = "0 !important";
+  popupEl.style.bottom = "0 !important";
+  
+  // Also remove any hidden class
+  popupEl.classList.remove("hidden");
+  popupEl.classList.remove("hide");
+  
+  console.log('[popup] Popup forced visible');
 }
 
 function showSlotsFullPopup() {
