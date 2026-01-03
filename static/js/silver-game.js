@@ -1,17 +1,14 @@
 // ================= BASIC SETUP (DB USER) =================
-// FIX #1: Handle undefined GAME_TYPE
-const GAME = (typeof GAME_TYPE !== 'undefined') ? GAME_TYPE : "silver";
-const FIXED_BET_AMOUNT = 10;  // or any value you like
+const GAME = window.GAME_TYPE || "silver";
+const FIXED_BET_AMOUNT = window.FIXED_BET_AMOUNT || 10;
 
 // optional: support multi-table via ?table=ROUND_CODE
 const urlParams = new URLSearchParams(window.location.search);
 const TABLE_CODE = urlParams.get("table") || null;
 
 // Real logged-in user from Flask session (passed in HTML)
-// FIX #2: Handle undefined GAME_USER_ID
-const USER_ID = (typeof GAME_USER_ID !== 'undefined') ? GAME_USER_ID : null;
-// FIX #3: Handle undefined GAME_USERNAME
-const USERNAME = (typeof GAME_USERNAME !== 'undefined') ? GAME_USERNAME : "Player";
+const USER_ID = window.GAME_USER_ID || null;
+const USERNAME = window.GAME_USERNAME || "Player";
 
 // Where popup "Home" button goes
 const HOME_URL = "/home";
