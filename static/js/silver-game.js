@@ -69,6 +69,9 @@ let displayRemainingSeconds = 0;
 // IMPORTANT: persistent flag – once true, never set back to false
 let userHasBet = false;
 
+// Store outcome for popup
+let pendingOutcomeInfo = null;
+
 // ================= UI HELPERS =================
 
 function setStatus(msg, type = "") {
@@ -233,6 +236,7 @@ function showEndPopup(outcomeInfo) {
   if (popupTitleEl) popupTitleEl.textContent = title;
   if (popupMsgEl) popupMsgEl.textContent = message;
 
+  console.log('[popup] Showing popup with outcome:', outcome);
   popupEl.style.display = "flex";
 }
 
@@ -312,10 +316,16 @@ function findPadForNumber(winningNumber) {
 // ================= TRANSFORM FALLBACK =================
 
 function hopFrogToWinningNumberTransform(winningNumber) {
-  if (!frogImg) return;
+  if (!frogImg) {
+    console.error('[frog] No frog image found');
+    return;
+  }
 
   const targetPad = findPadForNumber(winningNumber);
-  if (!targetPad) return;
+  if (!targetPad) {
+    console.error('[frog] No target pad found');
+    return;
+  }
 
   const frogRect = frogImg.getBoundingClientRect();
   const padRect = targetPad.getBoundingClientRect();
@@ -329,6 +339,8 @@ function hopFrogToWinningNumberTransform(winningNumber) {
   const dx = padX - frogX;
   const dy = padY - frogY;
 
+  console.log('[frog] Animating jump - dx:', dx, 'dy:', dy);
+
   frogImg.style.transition =
     "transform 0.7s cubic-bezier(0.22, 0.61, 0.36, 1)";
   frogImg.style.transform = `translate(${dx}px, ${dy}px) scale(1.05)`;
@@ -337,7 +349,14 @@ function hopFrogToWinningNumberTransform(winningNumber) {
     frogImg.style.transform = `translate(${dx}px, ${dy}px) scale(1)`;
     targetPad.classList.add("win");
     console.log('[frog] Transform animation complete');
-  }, 720);
+    
+    // Show popup if pending
+    if (pendingOutcomeInfo) {
+      console.log('[frog] Showing pending popup');
+      showEndPopup(pendingOutcomeInfo);
+      pendingOutcomeInfo = null;
+    }
+  }, 700);
 }
 
 // ================= VIDEO JUMP (MAIN) =================
@@ -596,7 +615,12 @@ function updateGameUI(table) {
     setStatus(`Winning number: ${table.result}`, "ok");
     ensurePadForWinningNumber(table.result);
 
-    // IMPORTANT: do NOT hide frog here
+    // Determine outcome and store for popup
+    const outcomeInfo = determineUserOutcome(table);
+    pendingOutcomeInfo = outcomeInfo;
+    console.log('[game] Stored outcome for popup:', outcomeInfo);
+
+    // Call animation (which will show popup when done)
     hopFrogToWinningNumber(table.result);
 
     // end game AFTER animation
@@ -613,12 +637,6 @@ function updateGameUI(table) {
         clearInterval(localTimerInterval);
         localTimerInterval = null;
       }
-
-      const outcomeInfo = determineUserOutcome(table);
-
-      setTimeout(() => {
-        showEndPopup(outcomeInfo);
-      }, 1200); // synced with jump animation
     }
   } else if (!hasResult) {
     // ================= NEW ROUND RESET =================
@@ -626,6 +644,7 @@ function updateGameUI(table) {
     frogPreviewPlayed = false;
     gameFinished = false;
     userHasBet = false;
+    pendingOutcomeInfo = null;
 
     if (localTimerInterval) {
       clearInterval(localTimerInterval);
