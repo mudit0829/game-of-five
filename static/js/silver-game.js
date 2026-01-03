@@ -394,15 +394,9 @@ function hopFrogToWinningNumberVideo(winningNumber) {
   frogVideo.style.visibility = "visible";
   frogVideo.style.zIndex = "9999";
   frogVideo.currentTime = 0;
+  frogVideo.muted = true;
 
-  frogVideo.onloadeddata = () => {
-    console.log('[frog] Video loaded, playing');
-    frogVideo.play().catch((err) => {
-      console.error('[frog] Play error:', err);
-      hopFrogToWinningNumberTransform(winningNumber);
-    });
-  };
-
+  // Handle video end - MUST be set before play()
   frogVideo.onended = () => {
     console.log('[frog] Video ended, repositioning frog');
     
@@ -426,6 +420,22 @@ function hopFrogToWinningNumberVideo(winningNumber) {
     console.error('[frog] Video error:', err);
     hopFrogToWinningNumberTransform(winningNumber);
   };
+
+  // Play video with proper promise handling
+  const playPromise = frogVideo.play();
+  if (playPromise !== undefined) {
+    playPromise
+      .then(() => {
+        console.log('[frog] Video playing successfully');
+      })
+      .catch((err) => {
+        console.error('[frog] Play error:', err);
+        // Fallback if video fails
+        setTimeout(() => {
+          hopFrogToWinningNumberTransform(winningNumber);
+        }, 500);
+      });
+  }
 }
 
 // ================= MAIN ENTRY POINT =================
