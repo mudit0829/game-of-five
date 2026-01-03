@@ -1,6 +1,7 @@
 // ================= BASIC SETUP (DB USER) =================
 // FIX #1: Handle undefined GAME_TYPE
 const GAME = (typeof GAME_TYPE !== 'undefined') ? GAME_TYPE : "silver";
+const FIXED_BET_AMOUNT = 10;  // or any value you like
 
 // optional: support multi-table via ?table=ROUND_CODE
 const urlParams = new URLSearchParams(window.location.search);
