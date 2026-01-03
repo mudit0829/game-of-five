@@ -272,6 +272,19 @@ if (frogImg) {
   frogImg.style.transformOrigin = "center center";
 }
 
+// Show static frog (hide video)
+function showFrogStatic() {
+  if (frogVideo) {
+    frogVideo.pause();
+    frogVideo.style.display = "none";
+    frogVideo.style.visibility = "hidden";
+  }
+  if (frogImg) {
+    frogImg.style.visibility = "visible";
+    frogImg.style.display = "block";
+  }
+}
+
 // decide jump direction based on pad index
 function getJumpDirectionByPadIndex(index) {
   // pads layout:
@@ -353,6 +366,8 @@ function hopFrogToWinningNumberVideo(winningNumber) {
   const direction = getJumpDirectionByPadIndex(padIndex);
   const videoSrc = FROG_VIDEOS[direction] || FROG_VIDEOS.front;
 
+  console.log('[frog] Direction:', direction, 'Source:', videoSrc);
+
   frogVideo.pause();
   frogVideo.currentTime = 0;
 
@@ -367,6 +382,7 @@ function hopFrogToWinningNumberVideo(winningNumber) {
   const startY = frogRect.top - pondRect.top;
 
   // ===== HIDE IMAGE =====
+  console.log('[frog] Hiding image, showing video');
   frogImg.style.visibility = "hidden";
   frogImg.style.display = "none";
   
@@ -380,7 +396,7 @@ function hopFrogToWinningNumberVideo(winningNumber) {
   frogVideo.currentTime = 0;
 
   frogVideo.onloadeddata = () => {
-    console.log('[frog] Playing video');
+    console.log('[frog] Video loaded, playing');
     frogVideo.play().catch((err) => {
       console.error('[frog] Play error:', err);
       hopFrogToWinningNumberTransform(winningNumber);
@@ -388,7 +404,7 @@ function hopFrogToWinningNumberVideo(winningNumber) {
   };
 
   frogVideo.onended = () => {
-    console.log('[frog] Video complete');
+    console.log('[frog] Video ended, repositioning frog');
     
     // ===== HIDE VIDEO, SHOW IMAGE =====
     frogVideo.style.display = "none";
@@ -403,12 +419,27 @@ function hopFrogToWinningNumberVideo(winningNumber) {
     frogImg.style.transform = `translate(${endX - startX}px, ${endY - startY}px)`;
     
     targetPad.classList.add("win");
+    console.log('[frog] Animation complete');
   };
 
   frogVideo.onerror = (err) => {
     console.error('[frog] Video error:', err);
     hopFrogToWinningNumberTransform(winningNumber);
   };
+}
+
+// ================= MAIN ENTRY POINT =================
+
+function hopFrogToWinningNumber(winningNumber) {
+  console.log('[frog] hopFrogToWinningNumber called for:', winningNumber);
+  
+  if (displayRemainingSeconds <= 10) {
+    console.log('[frog] Using VIDEO animation');
+    hopFrogToWinningNumberVideo(winningNumber);
+  } else {
+    console.log('[frog] Using TRANSFORM fallback');
+    hopFrogToWinningNumberTransform(winningNumber);
+  }
 }
 
 // ================= TIMER (LOCAL 1-SECOND COUNTDOWN) =================
@@ -585,12 +616,14 @@ function updateGameUI(table) {
       frogImg.style.transition = "transform 0.3s ease-out";
       frogImg.style.transform = "translate(0px, 0px) scale(1)";
       frogImg.style.visibility = "visible";
+      frogImg.style.display = "block";
     }
 
     if (frogVideo) {
       frogVideo.pause();
       frogVideo.currentTime = 0;
       frogVideo.style.display = "none";
+      frogVideo.style.visibility = "hidden";
     }
   }
 }
