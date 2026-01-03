@@ -353,6 +353,10 @@ function hopFrogToWinningNumberVideo(winningNumber) {
   frogVideo.style.display = "none";
 
   const padIndex = pads.indexOf(targetPad);
+  if (padIndex === -1) {
+  hopFrogToWinningNumberTransform(winningNumber);
+  return;
+}
   const direction = getJumpDirectionByPadIndex(padIndex);
   const videoSrc = FROG_VIDEOS[direction] || FROG_VIDEOS.front;
 
