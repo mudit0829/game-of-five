@@ -71,6 +71,27 @@ let displayRemainingSeconds = 0; // what we show on screen
 // IMPORTANT: persistent flag – once true, never set back to false
 let userHasBet = false;
 
+let frogVideoUnlocked = false;
+
+function unlockFrogVideoPlayback() {
+  if (frogVideoUnlocked) return;
+
+  const unlocker = document.getElementById("frogUnlocker");
+  if (!unlocker) return;
+
+  unlocker.muted = true;
+  unlocker.play()
+    .then(() => {
+      unlocker.pause();
+      frogVideoUnlocked = true;
+      console.log("[frog] video playback unlocked");
+    })
+    .catch(() => {
+      // still locked, will retry on next click
+    });
+}
+
+
 // ================= UI HELPERS =================
 
 function setStatus(msg, type = "") {
@@ -452,7 +473,10 @@ function startLocalTimer() {
             frogVideo.currentTime = 0;
             frogVideo.muted = true;
 
-            frogVideo.play().catch(() => {});
+            frogVideo.play().catch(err => {
+  console.warn("[frog] play blocked", err);
+});
+
           };
         }
       }
