@@ -182,6 +182,9 @@ display: none;
 z-index: 7;
 pointer-events: none;
 }
+.frog-video.playing {
+  display: block;
+}
 
 
 @keyframes frogBreathe {
