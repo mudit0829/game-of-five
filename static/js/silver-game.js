@@ -349,6 +349,7 @@ function hopFrogToWinningNumberVideo(winningNumber) {
 
   // stop preview if still playing
   frogVideo.pause();
+  frogVideo.currentTime = 0;
   frogVideo.style.display = "none";
 
   const padIndex = pads.indexOf(targetPad);
@@ -578,6 +579,12 @@ function updateGameUI(table) {
     frogPreviewPlayed = false;
     gameFinished = false;
     userHasBet = false;
+    if (localTimerInterval) {
+  clearInterval(localTimerInterval);
+  localTimerInterval = null;
+}
+startLocalTimer();
+
 
     pads.forEach((p) => p.classList.remove("win"));
 
@@ -589,6 +596,7 @@ function updateGameUI(table) {
 
     if (frogVideo) {
       frogVideo.pause();
+      frogVideo.currentTime = 0;
       frogVideo.style.display = "none";
     }
   }
