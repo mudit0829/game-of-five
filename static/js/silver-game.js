@@ -249,6 +249,10 @@ function showEndPopup(outcomeInfo) {
   // Force inline styles with !important to override any remaining CSS
   popupEl.style.cssText = `
     display: flex !important;
+    flex-direction: column !important;
+    align-items: center !important;
+    justify-content: center !important;
+    gap: 20px !important;
     visibility: visible !important;
     opacity: 1 !important;
     z-index: 99999 !important;
@@ -257,11 +261,16 @@ function showEndPopup(outcomeInfo) {
     left: 0 !important;
     right: 0 !important;
     bottom: 0 !important;
-    width: 100% !important;
-    height: 100% !important;
+    width: 100vw !important;
+    height: 100vh !important;
+    min-height: 100vh !important;
+    background: rgba(0, 0, 0, 0.8) !important;
+    padding: 20px !important;
+    box-sizing: border-box !important;
+    overflow: auto !important;
   `;
   
-  console.log('[popup] Popup forced visible - all styles applied');
+  console.log('[popup] Popup forced visible - full screen with proper centering');
 }
 
 function showSlotsFullPopup() {
@@ -276,6 +285,10 @@ function showSlotsFullPopup() {
   popupEl.classList.remove("result-popup");
   popupEl.style.cssText = `
     display: flex !important;
+    flex-direction: column !important;
+    align-items: center !important;
+    justify-content: center !important;
+    gap: 20px !important;
     visibility: visible !important;
     opacity: 1 !important;
     z-index: 99999 !important;
@@ -284,6 +297,9 @@ function showSlotsFullPopup() {
     left: 0 !important;
     right: 0 !important;
     bottom: 0 !important;
+    width: 100vw !important;
+    height: 100vh !important;
+    background: rgba(0, 0, 0, 0.8) !important;
   `;
 
   setTimeout(() => {
@@ -349,7 +365,7 @@ function findPadForNumber(winningNumber) {
   return pad;
 }
 
-// ================= TRANSFORM FALLBACK =================
+// ================= TRANSFORM ANIMATION =================
 
 function hopFrogToWinningNumberTransform(winningNumber) {
   if (!frogImg) {
@@ -395,129 +411,11 @@ function hopFrogToWinningNumberTransform(winningNumber) {
   }, 700);
 }
 
-// ================= VIDEO JUMP (MAIN) =================
-
-function hopFrogToWinningNumberVideo(winningNumber) {
-  console.log('[frog] Video jump for:', winningNumber);
-  
-  if (!frogVideo || !frogImg || !pondEl || !frogVideoSource) {
-    console.warn('[frog] Missing element - using transform');
-    hopFrogToWinningNumberTransform(winningNumber);
-    return;
-  }
-
-  const targetPad = findPadForNumber(winningNumber);
-  if (!targetPad) {
-    console.warn('[frog] Pad not found - using transform');
-    hopFrogToWinningNumberTransform(winningNumber);
-    return;
-  }
-
-  const padIndex = pads.indexOf(targetPad);
-  if (padIndex === -1) {
-    console.warn('[frog] Pad index invalid - using transform');
-    hopFrogToWinningNumberTransform(winningNumber);
-    return;
-  }
-
-  const direction = getJumpDirectionByPadIndex(padIndex);
-  const videoSrc = FROG_VIDEOS[direction] || FROG_VIDEOS.front;
-
-  console.log('[frog] Direction:', direction, 'Source:', videoSrc);
-
-  // Hide image, show video
-  frogImg.style.visibility = "hidden";
-  frogImg.style.display = "none";
-  
-  frogVideo.style.position = "absolute";
-  frogVideo.style.display = "block";
-  frogVideo.style.visibility = "visible";
-  frogVideo.style.zIndex = "9999";
-  frogVideo.muted = true;
-
-  const pondRect = pondEl.getBoundingClientRect();
-  const frogRect = frogImg.getBoundingClientRect();
-  const padRect = targetPad.getBoundingClientRect();
-
-  const startX = frogRect.left - pondRect.left;
-  const startY = frogRect.top - pondRect.top;
-
-  frogVideo.style.left = `${startX}px`;
-  frogVideo.style.top = `${startY}px`;
-
-  // Set up handlers BEFORE loading
-  frogVideo.onended = () => {
-    console.log('[frog] Video ended, repositioning frog');
-    
-    frogVideo.style.display = "none";
-    frogVideo.style.visibility = "hidden";
-    
-    const endX = padRect.left - pondRect.left;
-    const endY = padRect.top - pondRect.top;
-
-    frogImg.style.visibility = "visible";
-    frogImg.style.display = "block";
-    frogImg.style.transition = "transform 0.2s ease-out";
-    frogImg.style.transform = `translate(${endX - startX}px, ${endY - startY}px)`;
-    
-    targetPad.classList.add("win");
-    clearTimeout(fallbackTimeout);
-    console.log('[frog] Animation complete');
-  };
-
-  frogVideo.onerror = (err) => {
-    console.error('[frog] Video error:', err);
-    clearTimeout(fallbackTimeout);
-    frogVideo.style.display = "none";
-    frogVideo.style.visibility = "hidden";
-    frogImg.style.visibility = "visible";
-    frogImg.style.display = "block";
-    hopFrogToWinningNumberTransform(winningNumber);
-  };
-
-  // Load and play video
-  console.log('[frog] Loading video:', videoSrc);
-  frogVideoSource.src = videoSrc;
-  frogVideo.load();
-
-  // Safety fallback: if video doesn't play in 2 seconds, use transform
-  let fallbackTimeout = setTimeout(() => {
-    console.warn('[frog] Video timeout - using transform fallback');
-    if (!frogVideo.paused) return; // Video is playing, don't fallback
-    
-    frogVideo.style.display = "none";
-    frogVideo.style.visibility = "hidden";
-    frogImg.style.visibility = "visible";
-    frogImg.style.display = "block";
-    hopFrogToWinningNumberTransform(winningNumber);
-  }, 2000);
-
-  // Try to play
-  const playPromise = frogVideo.play();
-  if (playPromise !== undefined) {
-    playPromise
-      .then(() => {
-        console.log('[frog] Video play initiated');
-      })
-      .catch((err) => {
-        console.error('[frog] Play error:', err);
-        clearTimeout(fallbackTimeout);
-        frogVideo.style.display = "none";
-        frogVideo.style.visibility = "hidden";
-        frogImg.style.visibility = "visible";
-        frogImg.style.display = "block";
-        hopFrogToWinningNumberTransform(winningNumber);
-      });
-  }
-}
-
 // ================= MAIN ENTRY POINT =================
 
 function hopFrogToWinningNumber(winningNumber) {
   console.log('[frog] hopFrogToWinningNumber called for:', winningNumber);
-  
-  // Always use transform - video seems to have issues
-  console.log('[frog] Using TRANSFORM animation');
+  console.log('[frog] Using TRANSFORM animation (video disabled due to sandbox issues)');
   hopFrogToWinningNumberTransform(winningNumber);
 }
 
