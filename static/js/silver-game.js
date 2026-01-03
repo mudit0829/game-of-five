@@ -450,6 +450,8 @@ function startLocalTimer() {
             frogVideo.style.display = "block";
             frogVideo.style.visibility = "visible";
             frogVideo.currentTime = 0;
+            frogVideo.muted = true;
+
             frogVideo.play().catch(() => {});
           };
         }
