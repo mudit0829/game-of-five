@@ -240,25 +240,28 @@ function showEndPopup(outcomeInfo) {
   if (popupMsgEl) popupMsgEl.textContent = message;
 
   console.log('[popup] Showing popup with outcome:', outcome);
-  console.log('[popup] popupEl element:', popupEl);
-  console.log('[popup] popupEl parent:', popupEl.parentElement);
   
-  // Force visibility - remove any CSS that might hide it
-  popupEl.style.display = "flex !important";
-  popupEl.style.visibility = "visible !important";
-  popupEl.style.opacity = "1 !important";
-  popupEl.style.zIndex = "99999 !important";
-  popupEl.style.position = "fixed !important";
-  popupEl.style.top = "0 !important";
-  popupEl.style.left = "0 !important";
-  popupEl.style.right = "0 !important";
-  popupEl.style.bottom = "0 !important";
-  
-  // Also remove any hidden class
+  // CRITICAL: Remove the CSS class that hides the popup
+  popupEl.classList.remove("result-popup");
   popupEl.classList.remove("hidden");
   popupEl.classList.remove("hide");
   
-  console.log('[popup] Popup forced visible');
+  // Force inline styles with !important to override any remaining CSS
+  popupEl.style.cssText = `
+    display: flex !important;
+    visibility: visible !important;
+    opacity: 1 !important;
+    z-index: 99999 !important;
+    position: fixed !important;
+    top: 0 !important;
+    left: 0 !important;
+    right: 0 !important;
+    bottom: 0 !important;
+    width: 100% !important;
+    height: 100% !important;
+  `;
+  
+  console.log('[popup] Popup forced visible - all styles applied');
 }
 
 function showSlotsFullPopup() {
@@ -269,7 +272,19 @@ function showSlotsFullPopup() {
     popupMsgEl.textContent =
       "This game is already full. You will be redirected to lobby to join another table.";
 
-  popupEl.style.display = "flex";
+  // Remove class and apply styles
+  popupEl.classList.remove("result-popup");
+  popupEl.style.cssText = `
+    display: flex !important;
+    visibility: visible !important;
+    opacity: 1 !important;
+    z-index: 99999 !important;
+    position: fixed !important;
+    top: 0 !important;
+    left: 0 !important;
+    right: 0 !important;
+    bottom: 0 !important;
+  `;
 
   setTimeout(() => {
     window.history.back();
@@ -688,6 +703,12 @@ function updateGameUI(table) {
       frogVideo.currentTime = 0;
       frogVideo.style.display = "none";
       frogVideo.style.visibility = "hidden";
+    }
+    
+    // Hide popup when resetting
+    if (popupEl) {
+      popupEl.classList.add("result-popup");
+      popupEl.style.cssText = "";
     }
   }
 }
