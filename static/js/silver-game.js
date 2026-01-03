@@ -40,7 +40,7 @@ const popupMsgEl = document.getElementById("popupMessage");
 const popupHomeBtn = document.getElementById("popupHomeBtn");
 const popupLobbyBtn = document.getElementById("popupLobbyBtn");
 
-// ================= FROG JUMP VIDEO CONFIG (ADDED) =================
+// ================= FROG JUMP VIDEO CONFIG =================
 const FROG_VIDEOS = {
   front: "/static/video/front-jump-frog.mp4",
   left: "/static/video/left-jump-frog.mp4",
@@ -49,9 +49,7 @@ const FROG_VIDEOS = {
 
 const frogVideoSource = document.getElementById("frogVideoSource");
 
-// Fixed bet amount (from Flask template)
-const FIXED_BET_AMOUNT = (typeof FIXED_BET_AMOUNT !== 'undefined') ? FIXED_BET_AMOUNT : 10;
-
+// Display username
 if (userNameLabel) {
   userNameLabel.textContent = USERNAME;
 }
@@ -66,7 +64,7 @@ let frogPreviewPlayed = false;
 let gameFinished = false;
 let tablePollInterval = null;
 let localTimerInterval = null;
-let displayRemainingSeconds = 0; // what we show on screen
+let displayRemainingSeconds = 0;
 
 // IMPORTANT: persistent flag – once true, never set back to false
 let userHasBet = false;
