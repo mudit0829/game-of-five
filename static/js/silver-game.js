@@ -350,8 +350,7 @@ function hopFrogToWinningNumberTransform(winningNumber) {
 
 // NEW: video-based hop using front-jump-frog.mp4
 function hopFrogToWinningNumberVideo(winningNumber) {
-  if (!frogVideo || !frogImg || !pondEl) {
-    // if video missing, fallback to old transform logic
+  if (!frogVideo || !frogImg || !pondEl || !frogVideoSource) {
     hopFrogToWinningNumberTransform(winningNumber);
     return;
   }
@@ -363,36 +362,38 @@ function hopFrogToWinningNumberVideo(winningNumber) {
   }
 
   console.log("[frog] Hopping to pad number (video):", winningNumber);
+
   const padIndex = pads.indexOf(targetPad);
-const direction = getJumpDirectionByPadIndex(padIndex);
+  const direction = getJumpDirectionByPadIndex(padIndex);
+  const videoSrc = FROG_VIDEOS[direction] || FROG_VIDEOS.front;
 
-if (frogVideoSource && FROG_VIDEOS[direction]) {
-  frogVideoSource.src = FROG_VIDEOS[direction];
+  // set video source
+  frogVideoSource.src = videoSrc;
   frogVideo.load();
-}
 
-
+  // position video at frog start
   const pondRect = pondEl.getBoundingClientRect();
   const frogRect = frogImg.getBoundingClientRect();
   const padRect = targetPad.getBoundingClientRect();
 
-  const frogX = frogRect.left - pondRect.left;
-  const frogY = frogRect.top - pondRect.top;
+  const startX = frogRect.left - pondRect.left;
+  const startY = frogRect.top - pondRect.top;
 
-  frogVideo.style.left = `${frogX}px`;
-  frogVideo.style.top = `${frogY}px`;
+  frogVideo.style.left = `${startX}px`;
+  frogVideo.style.top = `${startY}px`;
   frogVideo.style.display = "block";
   frogVideo.style.visibility = "visible";
   frogVideo.currentTime = 0;
 
   frogImg.style.visibility = "hidden";
 
-  frogVideo.play().catch((err) => {
-    console.error("frog video play error:", err);
-    frogVideo.style.display = "none";
-    frogImg.style.visibility = "visible";
-    hopFrogToWinningNumberTransform(winningNumber);
-  });
+  frogVideo.onloadeddata = () => {
+    frogVideo.play().catch(() => {
+      frogVideo.style.display = "none";
+      frogImg.style.visibility = "visible";
+      hopFrogToWinningNumberTransform(winningNumber);
+    });
+  };
 
   frogVideo.onended = () => {
     frogVideo.style.display = "none";
@@ -400,17 +401,15 @@ if (frogVideoSource && FROG_VIDEOS[direction]) {
     const endX = padRect.left - pondRect.left;
     const endY = padRect.top - pondRect.top;
 
-    const relX = endX - frogX;
-    const relY = endY - frogY;
-
     frogImg.style.transition = "transform 0.2s ease-out";
-    frogImg.style.transform = `translate(${relX}px, ${relY}px)`;
+    frogImg.style.transform = `translate(${endX - startX}px, ${endY - startY}px)`;
     frogImg.style.visibility = "visible";
 
     targetPad.classList.add("win");
     console.log("[frog] Hop complete (video)");
   };
 }
+
 
 // Single entry point used by rest of code
 function hopFrogToWinningNumber(winningNumber) {
@@ -558,8 +557,6 @@ function updateGameUI(table) {
 setTimeout(() => {
   gameFinished = true;
 }, 800);
-return;
-
       gameFinished = true;
       disableBettingUI();
 
