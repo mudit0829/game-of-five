@@ -268,88 +268,73 @@ function syncUrlWithTable(roundCode) {
 
 // ================= FROG ANIMATION =================
 
-// basic transition for smooth jump
+// base transition for static frog
 if (frogImg) {
   frogImg.style.transition =
     "transform 0.7s cubic-bezier(0.22, 0.61, 0.36, 1)";
   frogImg.style.transformOrigin = "center center";
 }
-// Decide jump direction based on pad position
+
+// decide jump direction based on pad index
 function getJumpDirectionByPadIndex(index) {
-  // pads: [0][1][2]
-  //       [3][4][5]
+  // pads layout:
+  // [0][1][2]
+  // [3][4][5]
 
   if (index === 0 || index === 1) return "left";
   if (index === 2 || index === 3) return "front";
   return "right";
 }
 
-// find pad for number using data-number OR visible text
+// find pad showing winning number
 function findPadForNumber(winningNumber) {
   const targetStr = String(winningNumber);
 
   const pad = pads.find((p) => {
-    const dataMatch = p.dataset.number === targetStr;
+    if (p.dataset.number === targetStr) return true;
     const label = p.querySelector(".pad-number");
-    const textMatch =
-      label && label.textContent && label.textContent.trim() === targetStr;
-    return dataMatch || textMatch;
+    return label && label.textContent.trim() === targetStr;
   });
 
   if (!pad) {
-    console.log(
-      "[frog] No pad for number",
-      winningNumber,
-      pads.map((p) => ({
-        data: p.dataset.number,
-        text:
-          p.querySelector(".pad-number")?.textContent.trim() || "(empty-text)",
-      }))
-    );
+    console.warn("[frog] No pad found for number:", winningNumber);
   }
 
   return pad;
 }
 
-// ORIGINAL transform-based hop (kept as fallback)
+// ================= TRANSFORM FALLBACK =================
+
 function hopFrogToWinningNumberTransform(winningNumber) {
-  if (!frogImg) {
-    console.log("[frog] Missing frogImg");
-    return;
-  }
+  if (!frogImg) return;
 
   const targetPad = findPadForNumber(winningNumber);
-  if (!targetPad) {
-    console.log("[frog] No pad currently showing number", winningNumber);
-    return;
-  }
-
-  console.log("[frog] Hopping to pad number (transform):", winningNumber);
+  if (!targetPad) return;
 
   const frogRect = frogImg.getBoundingClientRect();
   const padRect = targetPad.getBoundingClientRect();
 
-  const frogCenterX = frogRect.left + frogRect.width / 2;
-  const frogCenterY = frogRect.top + frogRect.height / 2;
+  const frogX = frogRect.left + frogRect.width / 2;
+  const frogY = frogRect.top + frogRect.height / 2;
 
-  const padCenterX = padRect.left + padRect.width / 2;
-  const padCenterY = padRect.top + padRect.height * 0.3;
+  const padX = padRect.left + padRect.width / 2;
+  const padY = padRect.top + padRect.height * 0.3;
 
-  const deltaX = padCenterX - frogCenterX;
-  const deltaY = padCenterY - frogCenterY;
+  const dx = padX - frogX;
+  const dy = padY - frogY;
 
   frogImg.style.transition =
     "transform 0.7s cubic-bezier(0.22, 0.61, 0.36, 1)";
-  frogImg.style.transform = `translate(${deltaX}px, ${deltaY}px) scale(1.05)`;
+  frogImg.style.transform = `translate(${dx}px, ${dy}px) scale(1.05)`;
 
   setTimeout(() => {
-    frogImg.style.transform = `translate(${deltaX}px, ${deltaY}px) scale(1)`;
+    frogImg.style.transform = `translate(${dx}px, ${dy}px) scale(1)`;
     targetPad.classList.add("win");
-    console.log("[frog] Hop complete (transform)");
   }, 720);
 }
 
-// NEW: video-based hop using front-jump-frog.mp4
+// ================= VIDEO JUMP (MAIN) =================
+
 function hopFrogToWinningNumberVideo(winningNumber) {
   if (!frogVideo || !frogImg || !pondEl || !frogVideoSource) {
     hopFrogToWinningNumberTransform(winningNumber);
@@ -362,17 +347,17 @@ function hopFrogToWinningNumberVideo(winningNumber) {
     return;
   }
 
-  console.log("[frog] Hopping to pad number (video):", winningNumber);
+  // stop preview if still playing
+  frogVideo.pause();
+  frogVideo.style.display = "none";
 
   const padIndex = pads.indexOf(targetPad);
   const direction = getJumpDirectionByPadIndex(padIndex);
   const videoSrc = FROG_VIDEOS[direction] || FROG_VIDEOS.front;
 
-  // set video source
   frogVideoSource.src = videoSrc;
   frogVideo.load();
 
-  // position video at frog start
   const pondRect = pondEl.getBoundingClientRect();
   const frogRect = frogImg.getBoundingClientRect();
   const padRect = targetPad.getBoundingClientRect();
@@ -389,11 +374,9 @@ function hopFrogToWinningNumberVideo(winningNumber) {
   frogImg.style.visibility = "hidden";
 
   frogVideo.onloadeddata = () => {
-    frogVideo.play().catch(() => {
-      frogVideo.style.display = "none";
-      frogImg.style.visibility = "visible";
-      hopFrogToWinningNumberTransform(winningNumber);
-    });
+    frogVideo
+      .play()
+      .catch(() => hopFrogToWinningNumberTransform(winningNumber));
   };
 
   frogVideo.onended = () => {
@@ -407,20 +390,20 @@ function hopFrogToWinningNumberVideo(winningNumber) {
     frogImg.style.visibility = "visible";
 
     targetPad.classList.add("win");
-    console.log("[frog] Hop complete (video)");
   };
 }
 
+// ================= SINGLE ENTRY POINT =================
 
-// Single entry point used by rest of code
 function hopFrogToWinningNumber(winningNumber) {
-  // Only use video in last 10 seconds
   if (displayRemainingSeconds <= 10) {
     hopFrogToWinningNumberVideo(winningNumber);
   } else {
     hopFrogToWinningNumberTransform(winningNumber);
   }
 }
+
+// ================= STATIC RESET =================
 
 function showFrogStatic() {
   if (frogVideo) {
@@ -431,6 +414,7 @@ function showFrogStatic() {
     frogImg.style.visibility = "visible";
   }
 }
+
 
 // ================= TIMER (LOCAL 1-SECOND COUNTDOWN) =================
 
@@ -592,6 +576,8 @@ function updateGameUI(table) {
     // ================= NEW ROUND RESET =================
     lastResultShown = null;
     frogPreviewPlayed = false;
+    gameFinished = false;
+    userHasBet = false;
 
     pads.forEach((p) => p.classList.remove("win"));
 
