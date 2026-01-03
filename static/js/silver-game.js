@@ -329,21 +329,20 @@ function hopFrogToWinningNumberTransform(winningNumber) {
 // ================= VIDEO JUMP (MAIN) =================
 
 function hopFrogToWinningNumberVideo(winningNumber) {
+  console.log('[frog] Video jump for:', winningNumber);
+  
   if (!frogVideo || !frogImg || !pondEl || !frogVideoSource) {
+    console.warn('[frog] Missing element');
     hopFrogToWinningNumberTransform(winningNumber);
     return;
   }
 
   const targetPad = findPadForNumber(winningNumber);
   if (!targetPad) {
+    console.warn('[frog] Pad not found');
     hopFrogToWinningNumberTransform(winningNumber);
     return;
   }
-
-  // stop preview if still playing
-  frogVideo.pause();
-  frogVideo.currentTime = 0;
-  frogVideo.style.display = "none";
 
   const padIndex = pads.indexOf(targetPad);
   if (padIndex === -1) {
@@ -353,6 +352,9 @@ function hopFrogToWinningNumberVideo(winningNumber) {
 
   const direction = getJumpDirectionByPadIndex(padIndex);
   const videoSrc = FROG_VIDEOS[direction] || FROG_VIDEOS.front;
+
+  frogVideo.pause();
+  frogVideo.currentTime = 0;
 
   frogVideoSource.src = videoSrc;
   frogVideo.load();
@@ -364,46 +366,49 @@ function hopFrogToWinningNumberVideo(winningNumber) {
   const startX = frogRect.left - pondRect.left;
   const startY = frogRect.top - pondRect.top;
 
+  // ===== HIDE IMAGE =====
+  frogImg.style.visibility = "hidden";
+  frogImg.style.display = "none";
+  
+  // ===== SHOW VIDEO =====
+  frogVideo.style.position = "absolute";
   frogVideo.style.left = `${startX}px`;
   frogVideo.style.top = `${startY}px`;
   frogVideo.style.display = "block";
   frogVideo.style.visibility = "visible";
+  frogVideo.style.zIndex = "9999";
   frogVideo.currentTime = 0;
-  frogImg.style.visibility = "hidden";
 
   frogVideo.onloadeddata = () => {
-    frogVideo.play().catch(() => hopFrogToWinningNumberTransform(winningNumber));
+    console.log('[frog] Playing video');
+    frogVideo.play().catch((err) => {
+      console.error('[frog] Play error:', err);
+      hopFrogToWinningNumberTransform(winningNumber);
+    });
   };
 
   frogVideo.onended = () => {
+    console.log('[frog] Video complete');
+    
+    // ===== HIDE VIDEO, SHOW IMAGE =====
     frogVideo.style.display = "none";
+    frogVideo.style.visibility = "hidden";
+    
     const endX = padRect.left - pondRect.left;
     const endY = padRect.top - pondRect.top;
 
+    frogImg.style.visibility = "visible";
+    frogImg.style.display = "block";
     frogImg.style.transition = "transform 0.2s ease-out";
     frogImg.style.transform = `translate(${endX - startX}px, ${endY - startY}px)`;
-    frogImg.style.visibility = "visible";
+    
     targetPad.classList.add("win");
   };
-}
 
-// ================= SINGLE ENTRY POINT =================
-
-function hopFrogToWinningNumber(winningNumber) {
-  hopFrogToWinningNumberTransform(winningNumber);  // Force test
-}
-
-
-// ================= STATIC RESET =================
-
-function showFrogStatic() {
-  if (frogVideo) {
-    frogVideo.pause();
-    frogVideo.style.display = "none";
-  }
-  if (frogImg) {
-    frogImg.style.visibility = "visible";
-  }
+  frogVideo.onerror = (err) => {
+    console.error('[frog] Video error:', err);
+    hopFrogToWinningNumberTransform(winningNumber);
+  };
 }
 
 // ================= TIMER (LOCAL 1-SECOND COUNTDOWN) =================
