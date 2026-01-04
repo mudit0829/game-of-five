@@ -415,8 +415,65 @@ function hopFrogToWinningNumberTransform(winningNumber) {
 
 function hopFrogToWinningNumber(winningNumber) {
   console.log('[frog] hopFrogToWinningNumber called for:', winningNumber);
-  console.log('[frog] Using TRANSFORM animation (video disabled due to sandbox issues)');
-  hopFrogToWinningNumberTransform(winningNumber);
+
+  if (displayRemainingSeconds <= 10 && frogVideo && frogVideoSource) {
+    console.log('[frog] Using VIDEO jump');
+    hopFrogToWinningNumberVideo(winningNumber);
+  } else {
+    console.log('[frog] Using TRANSFORM jump');
+    hopFrogToWinningNumberTransform(winningNumber);
+  }
+}
+
+function hopFrogToWinningNumberVideo(winningNumber) {
+  if (!frogVideo || !frogVideoSource || !frogImg || !pondEl) {
+    console.warn('[frog] Video elements missing, fallback to transform');
+    hopFrogToWinningNumberTransform(winningNumber);
+    return;
+  }
+
+  const targetPad = findPadForNumber(winningNumber);
+  if (!targetPad) {
+    console.warn('[frog] Target pad not found, fallback');
+    hopFrogToWinningNumberTransform(winningNumber);
+    return;
+  }
+
+  const padIndex = pads.indexOf(targetPad);
+  const direction = getJumpDirectionByPadIndex(padIndex);
+  const videoSrc = FROG_VIDEOS[direction] || FROG_VIDEOS.front;
+
+  console.log('[frog] Playing jump video:', videoSrc);
+
+  frogImg.style.display = "none";
+
+  frogVideoSource.src = videoSrc;
+  frogVideo.load();
+
+  frogVideo.style.display = "block";
+  frogVideo.style.visibility = "visible";
+  frogVideo.currentTime = 0;
+
+  frogVideo.onloadeddata = () => {
+    frogVideo.play().catch(err => {
+      console.error('[frog] Video play failed, fallback', err);
+      frogVideo.style.display = "none";
+      frogImg.style.display = "block";
+      hopFrogToWinningNumberTransform(winningNumber);
+    });
+  };
+
+  frogVideo.onended = () => {
+    frogVideo.style.display = "none";
+    frogImg.style.display = "block";
+
+    targetPad.classList.add("win");
+
+    if (pendingOutcomeInfo) {
+      showEndPopup(pendingOutcomeInfo);
+      pendingOutcomeInfo = null;
+    }
+  };
 }
 
 // ================= TIMER (LOCAL 1-SECOND COUNTDOWN) =================
@@ -453,9 +510,16 @@ function startLocalTimer() {
       }
 
       // 🐸 STATIC FROG BEFORE PREVIEW
-      if (displayRemainingSeconds > 10) {
-        showFrogStatic();
-      }
+    function showFrogStatic() {
+  if (frogVideo) {
+    frogVideo.pause();
+    frogVideo.style.display = "none";
+  }
+  if (frogImg) {
+    frogImg.style.display = "block";
+  }
+}
+
     }
   }, 1000);
 }
