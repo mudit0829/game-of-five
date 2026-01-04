@@ -37,33 +37,28 @@
 
   <!-- Frog container -->
   <div id="frogContainer" class="frog-wrapper">
-    
-    <!-- Static image -->
-    <img
-      id="frogSprite"
-      src="{{ url_for('static', filename='img/frog.png') }}"
-      class="frog"
-    />
 
-    <!-- Jump video (hidden initially) -->
+    <!-- Idle frog (always looping) -->
+    <video
+      id="frogIdleVideo"
+      class="frog-video"
+      muted
+      playsinline
+      autoplay
+      loop
+    >
+      <source src="/static/video/frog-idle.mp4" type="video/mp4">
+    </video>
+
+    <!-- Jump frog (played on result) -->
     <video
       id="frogJumpVideo"
       class="frog-video"
       muted
       playsinline
-      preload="auto"
     >
       <source id="frogVideoSource" src="" type="video/mp4">
     </video>
-
-    <!-- Unlock video playback (hidden) -->
-    <video
-      id="frogUnlocker"
-      src="/static/video/front-jump-frog.mp4"
-      muted
-      playsinline
-      style="display:none"
-    ></video>
 
   </div>
 
