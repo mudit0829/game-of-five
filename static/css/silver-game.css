@@ -162,15 +162,7 @@ filter: drop-shadow(0 12px 24px rgba(0, 0, 0, 0.65));
 }
 
 /* Static frog */
-.frog {
-width: 100%;
-height: auto;
-animation: frogBreathe 3s ease-in-out infinite;
-}
-.frog.hidden {
-visibility: hidden;
-animation: none;
-}
+
 .frog-video {
   position: absolute;
   left: 50%;
