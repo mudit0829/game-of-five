@@ -16,8 +16,9 @@ const HOME_URL = "/home";
 // ================= DOM REFERENCES =================
 // IMPORTANT: use the pond container for coordinates
 const pondEl = document.querySelector(".pond");
-const frogImg = document.getElementById("frogSprite");
-const frogVideo = document.getElementById("frogJumpVideo");
+const frogIdleVideo = document.getElementById("frogIdleVideo");
+const frogJumpVideo = document.getElementById("frogJumpVideo");
+const frogVideoSource = document.getElementById("frogVideoSource");
 const pads = Array.from(document.querySelectorAll(".pad"));
 
 const numChips = Array.from(document.querySelectorAll(".num-chip"));
@@ -47,29 +48,15 @@ const FROG_VIDEOS = {
   right: "/static/video/right-jump-frog.mp4",
 };
 
-const frogVideoSource = document.getElementById("frogVideoSource");
-
-// 🔥 FORCE frog video to exactly overlay frog image (ONCE ONLY)
-if (frogVideo && frogImg) {
-  frogVideo.style.position = "absolute";
-  frogVideo.style.top = "0";
-  frogVideo.style.left = "0";
-  frogVideo.style.width = "100%";
-  frogVideo.style.height = "100%";
-  frogVideo.style.objectFit = "contain";
-  frogVideo.style.zIndex = "10";
-  frogVideo.style.pointerEvents = "none";
-}
-
 // 🔓 Unlock video playback on first user interaction
 let videoUnlocked = false;
 document.addEventListener("click", () => {
-  if (videoUnlocked || !frogVideo) return;
+  if (videoUnlocked || !frogJumpVideo) return;
 
-  frogVideo.muted = true;
-  frogVideo.play().then(() => {
-    frogVideo.pause();
-    frogVideo.currentTime = 0;
+  frogJumpVideo.muted = true;
+  frogJumpVideo.play().then(() => {
+    frogJumpVideo.pause();
+    frogJumpVideo.currentTime = 0;
     videoUnlocked = true;
     console.log("[frog] video unlocked by user interaction");
   }).catch(() => {});
@@ -348,25 +335,6 @@ function syncUrlWithTable(roundCode) {
 
 // ================= FROG ANIMATION =================
 
-// base transition for static frog
-if (frogImg) {
-  frogImg.style.transition = "transform 0.7s cubic-bezier(0.22, 0.61, 0.36, 1)";
-  frogImg.style.transformOrigin = "center center";
-}
-
-// Show static frog (hide video)
-function showFrogStatic() {
-  if (frogVideo) {
-    frogVideo.style.display = "none";
-    frogVideo.style.visibility = "hidden";
-  }
-
-  if (frogImg) {
-    frogImg.style.visibility = "visible";
-    frogImg.style.display = "block";
-  }
-}
-
 // decide jump direction based on pad index
 function getJumpDirectionByPadIndex(index) {
   // pads layout:
@@ -391,80 +359,48 @@ function findPadForNumber(winningNumber) {
   return pad;
 }
 
-// ================= VIDEO JUMP =================
+// ================= ONE CLEAN JUMP FUNCTION =================
 
-function hopFrogToWinningNumberVideo(winningNumber) {
+function hopFrogToWinningNumber(winningNumber) {
   const targetPad = findPadForNumber(winningNumber);
-  if (!targetPad) {
-    console.error('[frog] No target pad found');
-    return;
-  }
+  if (!targetPad) return;
 
   const padIndex = pads.indexOf(targetPad);
   const direction = getJumpDirectionByPadIndex(padIndex);
-  const videoSrc = FROG_VIDEOS[direction] || FROG_VIDEOS.front;
 
-  console.log('[frog] Playing video:', videoSrc);
+  const videoSrc =
+    FROG_VIDEOS[direction] || FROG_VIDEOS.front;
 
-  // Hide image
-  frogImg.style.display = "none";
+  console.log("[frog] jump video:", videoSrc);
 
-  // Prepare video
+  // hide idle
+  frogIdleVideo.pause();
+  frogIdleVideo.style.display = "none";
+
+  // prepare jump
   frogVideoSource.src = videoSrc;
-  frogVideo.load();
+  frogJumpVideo.load();
+  frogJumpVideo.style.display = "block";
+  frogJumpVideo.currentTime = 0;
 
-  frogVideo.style.display = "block";
-  frogVideo.style.visibility = "visible";
-  frogVideo.muted = true;
-  frogVideo.currentTime = 0;
-
-  frogVideo.onloadeddata = () => {
-    frogVideo.play().catch(err => {
-      console.error('[frog] play failed', err);
-      frogVideo.style.display = "none";
-      frogImg.style.display = "block";
-    });
+  frogJumpVideo.onloadeddata = () => {
+    frogJumpVideo.play();
   };
 
-  frogVideo.onended = () => {
-    console.log('[frog] Video ended');
-    frogVideo.style.display = "none";
-    frogImg.style.display = "block";
+  frogJumpVideo.onended = () => {
+    frogJumpVideo.style.display = "none";
+    frogIdleVideo.style.display = "block";
+    frogIdleVideo.play();
 
     targetPad.classList.add("win");
 
-    // ✅ NOW safely finish game (AFTER video ends)
     gameFinished = true;
-
-    if (tablePollInterval) {
-      clearInterval(tablePollInterval);
-      tablePollInterval = null;
-    }
-
-    if (localTimerInterval) {
-      clearInterval(localTimerInterval);
-      localTimerInterval = null;
-    }
 
     if (pendingOutcomeInfo) {
       showEndPopup(pendingOutcomeInfo);
       pendingOutcomeInfo = null;
     }
   };
-}
-
-// ================= MAIN ENTRY POINT =================
-
-function hopFrogToWinningNumber(winningNumber) {
-  console.log('[frog] hopFrogToWinningNumber called for:', winningNumber);
-
-  // ALWAYS USE VIDEO IF AVAILABLE
-  if (frogVideo && frogVideoSource) {
-    console.log('[frog] Using VIDEO animation');
-    hopFrogToWinningNumberVideo(winningNumber);
-  } else {
-    console.log('[frog] Video not available');
-  }
 }
 
 // ================= TIMER (LOCAL 1-SECOND COUNTDOWN) =================
@@ -568,18 +504,11 @@ function updateGameUI(table) {
   if (hasResult && table.result !== lastResultShown) {
     lastResultShown = table.result;
 
-    setStatus(`Winning number: ${table.result}`, "ok");
+    disableBettingUI();
     ensurePadForWinningNumber(table.result);
 
-    // Determine outcome and store for popup
-    const outcomeInfo = determineUserOutcome(table);
-    pendingOutcomeInfo = outcomeInfo;
-    console.log('[game] Stored outcome for popup:', outcomeInfo);
+    pendingOutcomeInfo = determineUserOutcome(table);
 
-    // ✅ DISABLE BETTING ONLY (DO NOT stop game yet)
-    disableBettingUI();
-
-    // ✅ NOW play frog animation (gameFinished stays false during video)
     hopFrogToWinningNumber(table.result);
   } else if (!hasResult && lastResultShown !== null) {
     // ================= NEW ROUND RESET =================
@@ -597,18 +526,15 @@ function updateGameUI(table) {
 
     pads.forEach((p) => p.classList.remove("win"));
 
-    if (frogImg) {
-      frogImg.style.transition = "transform 0.3s ease-out";
-      frogImg.style.transform = "translate(0px, 0px) scale(1)";
-      frogImg.style.visibility = "visible";
-      frogImg.style.display = "block";
+    if (frogIdleVideo) {
+      frogIdleVideo.style.display = "block";
+      frogIdleVideo.play();
     }
 
-    if (frogVideo) {
-      frogVideo.pause();
-      frogVideo.currentTime = 0;
-      frogVideo.style.display = "none";
-      frogVideo.style.visibility = "hidden";
+    if (frogJumpVideo) {
+      frogJumpVideo.pause();
+      frogJumpVideo.currentTime = 0;
+      frogJumpVideo.style.display = "none";
     }
     
     // Hide popup when resetting
