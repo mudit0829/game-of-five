@@ -415,65 +415,8 @@ function hopFrogToWinningNumberTransform(winningNumber) {
 
 function hopFrogToWinningNumber(winningNumber) {
   console.log('[frog] hopFrogToWinningNumber called for:', winningNumber);
-
-  if (displayRemainingSeconds <= 10 && frogVideo && frogVideoSource) {
-    console.log('[frog] Using VIDEO jump');
-    hopFrogToWinningNumberVideo(winningNumber);
-  } else {
-    console.log('[frog] Using TRANSFORM jump');
-    hopFrogToWinningNumberTransform(winningNumber);
-  }
-}
-
-function hopFrogToWinningNumberVideo(winningNumber) {
-  if (!frogVideo || !frogVideoSource || !frogImg || !pondEl) {
-    console.warn('[frog] Video elements missing, fallback to transform');
-    hopFrogToWinningNumberTransform(winningNumber);
-    return;
-  }
-
-  const targetPad = findPadForNumber(winningNumber);
-  if (!targetPad) {
-    console.warn('[frog] Target pad not found, fallback');
-    hopFrogToWinningNumberTransform(winningNumber);
-    return;
-  }
-
-  const padIndex = pads.indexOf(targetPad);
-  const direction = getJumpDirectionByPadIndex(padIndex);
-  const videoSrc = FROG_VIDEOS[direction] || FROG_VIDEOS.front;
-
-  console.log('[frog] Playing jump video:', videoSrc);
-
-  frogImg.style.display = "none";
-
-  frogVideoSource.src = videoSrc;
-  frogVideo.load();
-
-  frogVideo.style.display = "block";
-  frogVideo.style.visibility = "visible";
-  frogVideo.currentTime = 0;
-
-  frogVideo.onloadeddata = () => {
-    frogVideo.play().catch(err => {
-      console.error('[frog] Video play failed, fallback', err);
-      frogVideo.style.display = "none";
-      frogImg.style.display = "block";
-      hopFrogToWinningNumberTransform(winningNumber);
-    });
-  };
-
-  frogVideo.onended = () => {
-    frogVideo.style.display = "none";
-    frogImg.style.display = "block";
-
-    targetPad.classList.add("win");
-
-    if (pendingOutcomeInfo) {
-      showEndPopup(pendingOutcomeInfo);
-      pendingOutcomeInfo = null;
-    }
-  };
+  console.log('[frog] Using TRANSFORM animation');
+  hopFrogToWinningNumberTransform(winningNumber);
 }
 
 // ================= TIMER (LOCAL 1-SECOND COUNTDOWN) =================
@@ -488,38 +431,10 @@ function startLocalTimer() {
       displayRemainingSeconds -= 1;
       renderTimer();
 
-      // ▶️ PLAY PREVIEW EXACTLY ONCE AT 10 SECONDS
-      if (displayRemainingSeconds === 10 && !frogPreviewPlayed) {
-        frogPreviewPlayed = true;
-        console.log("[frog] 10 seconds reached – start jump preview");
-
-        if (frogVideo && frogVideoSource) {
-          frogVideo.pause();
-          frogVideoSource.src = FROG_VIDEOS.front;
-          frogVideo.load();
-
-          frogVideo.onloadeddata = () => {
-            frogImg.style.visibility = "hidden";
-            frogVideo.style.display = "block";
-            frogVideo.style.visibility = "visible";
-            frogVideo.currentTime = 0;
-            frogVideo.muted = true;
-            frogVideo.play().catch(() => {});
-          };
-        }
+      // 🐸 STATIC FROG BEFORE PREVIEW (MOVED HERE - OUTSIDE === 10 CHECK)
+      if (displayRemainingSeconds > 10) {
+        showFrogStatic();
       }
-
-      // 🐸 STATIC FROG BEFORE PREVIEW
-    function showFrogStatic() {
-  if (frogVideo) {
-    frogVideo.pause();
-    frogVideo.style.display = "none";
-  }
-  if (frogImg) {
-    frogImg.style.display = "block";
-  }
-}
-
     }
   }, 1000);
 }
@@ -618,10 +533,7 @@ function updateGameUI(table) {
     pendingOutcomeInfo = outcomeInfo;
     console.log('[game] Stored outcome for popup:', outcomeInfo);
 
-    // Call animation (which will show popup when done)
-    hopFrogToWinningNumber(table.result);
-
-    // end game AFTER animation
+    // STOP TIMER FIRST (ONLY ONCE - NO DOUBLE CLEAR)
     if (!gameFinished) {
       gameFinished = true;
       disableBettingUI();
@@ -636,6 +548,9 @@ function updateGameUI(table) {
         localTimerInterval = null;
       }
     }
+
+    // NOW play frog animation
+    hopFrogToWinningNumber(table.result);
   } else if (!hasResult) {
     // ================= NEW ROUND RESET =================
     lastResultShown = null;
