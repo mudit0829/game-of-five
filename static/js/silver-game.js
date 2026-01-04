@@ -49,6 +49,32 @@ const FROG_VIDEOS = {
 
 const frogVideoSource = document.getElementById("frogVideoSource");
 
+// 🔥 FORCE frog video to exactly overlay frog image (ONCE ONLY)
+if (frogVideo && frogImg) {
+  frogVideo.style.position = "absolute";
+  frogVideo.style.top = "0";
+  frogVideo.style.left = "0";
+  frogVideo.style.width = "100%";
+  frogVideo.style.height = "100%";
+  frogVideo.style.objectFit = "contain";
+  frogVideo.style.zIndex = "10";
+  frogVideo.style.pointerEvents = "none";
+}
+
+// 🔓 Unlock video playback on first user interaction
+let videoUnlocked = false;
+document.addEventListener("click", () => {
+  if (videoUnlocked || !frogVideo) return;
+
+  frogVideo.muted = true;
+  frogVideo.play().then(() => {
+    frogVideo.pause();
+    frogVideo.currentTime = 0;
+    videoUnlocked = true;
+    console.log("[frog] video unlocked by user interaction");
+  }).catch(() => {});
+}, { once: true });
+
 // Display username
 if (userNameLabel) {
   userNameLabel.textContent = USERNAME;
@@ -331,10 +357,10 @@ if (frogImg) {
 // Show static frog (hide video)
 function showFrogStatic() {
   if (frogVideo) {
-    frogVideo.pause();
     frogVideo.style.display = "none";
     frogVideo.style.visibility = "hidden";
   }
+
   if (frogImg) {
     frogImg.style.visibility = "visible";
     frogImg.style.display = "block";
@@ -365,58 +391,80 @@ function findPadForNumber(winningNumber) {
   return pad;
 }
 
-// ================= TRANSFORM ANIMATION =================
+// ================= VIDEO JUMP =================
 
-function hopFrogToWinningNumberTransform(winningNumber) {
-  if (!frogImg) {
-    console.error('[frog] No frog image found');
-    return;
-  }
-
+function hopFrogToWinningNumberVideo(winningNumber) {
   const targetPad = findPadForNumber(winningNumber);
   if (!targetPad) {
     console.error('[frog] No target pad found');
     return;
   }
 
-  const frogRect = frogImg.getBoundingClientRect();
-  const padRect = targetPad.getBoundingClientRect();
+  const padIndex = pads.indexOf(targetPad);
+  const direction = getJumpDirectionByPadIndex(padIndex);
+  const videoSrc = FROG_VIDEOS[direction] || FROG_VIDEOS.front;
 
-  const frogX = frogRect.left + frogRect.width / 2;
-  const frogY = frogRect.top + frogRect.height / 2;
+  console.log('[frog] Playing video:', videoSrc);
 
-  const padX = padRect.left + padRect.width / 2;
-  const padY = padRect.top + padRect.height * 0.3;
+  // Hide image
+  frogImg.style.display = "none";
 
-  const dx = padX - frogX;
-  const dy = padY - frogY;
+  // Prepare video
+  frogVideoSource.src = videoSrc;
+  frogVideo.load();
 
-  console.log('[frog] Animating jump - dx:', dx, 'dy:', dy);
+  frogVideo.style.display = "block";
+  frogVideo.style.visibility = "visible";
+  frogVideo.muted = true;
+  frogVideo.currentTime = 0;
 
-  frogImg.style.transition =
-    "transform 0.7s cubic-bezier(0.22, 0.61, 0.36, 1)";
-  frogImg.style.transform = `translate(${dx}px, ${dy}px) scale(1.05)`;
+  frogVideo.onloadeddata = () => {
+    frogVideo.play().catch(err => {
+      console.error('[frog] play failed', err);
+      frogVideo.style.display = "none";
+      frogImg.style.display = "block";
+    });
+  };
 
-  setTimeout(() => {
-    frogImg.style.transform = `translate(${dx}px, ${dy}px) scale(1)`;
+  frogVideo.onended = () => {
+    console.log('[frog] Video ended');
+    frogVideo.style.display = "none";
+    frogImg.style.display = "block";
+
     targetPad.classList.add("win");
-    console.log('[frog] Transform animation complete');
-    
-    // Show popup if pending
+
+    // ✅ NOW safely finish game (AFTER video ends)
+    gameFinished = true;
+
+    if (tablePollInterval) {
+      clearInterval(tablePollInterval);
+      tablePollInterval = null;
+    }
+
+    if (localTimerInterval) {
+      clearInterval(localTimerInterval);
+      localTimerInterval = null;
+    }
+
     if (pendingOutcomeInfo) {
-      console.log('[frog] Showing pending popup');
       showEndPopup(pendingOutcomeInfo);
       pendingOutcomeInfo = null;
     }
-  }, 700);
+  };
 }
 
 // ================= MAIN ENTRY POINT =================
 
 function hopFrogToWinningNumber(winningNumber) {
   console.log('[frog] hopFrogToWinningNumber called for:', winningNumber);
-  console.log('[frog] Using TRANSFORM animation');
-  hopFrogToWinningNumberTransform(winningNumber);
+
+  // ALWAYS USE VIDEO IF AVAILABLE
+  if (frogVideo && frogVideoSource) {
+    console.log('[frog] Using VIDEO animation');
+    hopFrogToWinningNumberVideo(winningNumber);
+  } else {
+    console.log('[frog] Video not available');
+  }
 }
 
 // ================= TIMER (LOCAL 1-SECOND COUNTDOWN) =================
@@ -430,11 +478,6 @@ function startLocalTimer() {
     if (displayRemainingSeconds > 0) {
       displayRemainingSeconds -= 1;
       renderTimer();
-
-      // 🐸 STATIC FROG BEFORE PREVIEW (MOVED HERE - OUTSIDE === 10 CHECK)
-      if (displayRemainingSeconds > 10) {
-        showFrogStatic();
-      }
     }
   }, 1000);
 }
@@ -533,27 +576,13 @@ function updateGameUI(table) {
     pendingOutcomeInfo = outcomeInfo;
     console.log('[game] Stored outcome for popup:', outcomeInfo);
 
-    // STOP TIMER FIRST (ONLY ONCE - NO DOUBLE CLEAR)
-    if (!gameFinished) {
-      gameFinished = true;
-      disableBettingUI();
+    // ✅ DISABLE BETTING ONLY (DO NOT stop game yet)
+    disableBettingUI();
 
-      if (tablePollInterval) {
-        clearInterval(tablePollInterval);
-        tablePollInterval = null;
-      }
-
-      if (localTimerInterval) {
-        clearInterval(localTimerInterval);
-        localTimerInterval = null;
-      }
-    }
-
-    // NOW play frog animation
+    // ✅ NOW play frog animation (gameFinished stays false during video)
     hopFrogToWinningNumber(table.result);
-  } else if (!hasResult) {
+  } else if (!hasResult && lastResultShown !== null) {
     // ================= NEW ROUND RESET =================
-    lastResultShown = null;
     frogPreviewPlayed = false;
     gameFinished = false;
     userHasBet = false;
@@ -587,6 +616,8 @@ function updateGameUI(table) {
       popupEl.classList.add("result-popup");
       popupEl.style.cssText = "";
     }
+    
+    lastResultShown = null;
   }
 }
 
