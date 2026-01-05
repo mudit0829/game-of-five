@@ -471,7 +471,10 @@ function updateGameUI(table) {
   if (roundIdSpan) roundIdSpan.textContent = table.round_code || "-";
   if (playerCountSpan) playerCountSpan.textContent = table.players || 0;
 
+  if (!jumpStarted && !gameFinished) {
   displayRemainingSeconds = table.time_remaining || 0;
+}
+
   renderTimer();
 
   updatePadsFromBets(table.bets || []);
