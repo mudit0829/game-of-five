@@ -420,6 +420,7 @@ function startLocalTimer() {
   if (
     displayRemainingSeconds === 3 &&
     !jumpStarted &&
+    !gameFinished &&
     currentTable &&
     currentTable.result !== null &&
     currentTable.result !== undefined
@@ -523,7 +524,7 @@ function updateGameUI(table) {
 
     pendingOutcomeInfo = determineUserOutcome(table);
 
-    hopFrogToWinningNumber(table.result);
+   
   } else if (!hasResult && lastResultShown !== null) {
     // ================= NEW ROUND RESET =================
     jumpStarted = false;
