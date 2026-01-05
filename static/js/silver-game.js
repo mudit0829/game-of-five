@@ -287,6 +287,11 @@ function showEndPopup(outcomeInfo) {
   `;
   
   console.log('[popup] Popup forced visible - full screen with proper centering');
+
+  // AUTO-RETURN TO LOBBY AFTER 5 SECONDS
+  setTimeout(() => {
+    window.history.back();
+  }, 5000);
 }
 
 function showSlotsFullPopup() {
@@ -400,6 +405,9 @@ function hopFrogToWinningNumber(winningNumber) {
 
     targetPad.classList.add("win");
 
+    // GAME ENDS WHEN JUMP VIDEO ENDS
+    gameFinished = true;
+
     if (pendingOutcomeInfo) {
       showEndPopup(pendingOutcomeInfo);
       pendingOutcomeInfo = null;
@@ -413,7 +421,7 @@ function startLocalTimer() {
   if (localTimerInterval) clearInterval(localTimerInterval);
 
   localTimerInterval = setInterval(() => {
-    if (gameFinished && displayRemainingSeconds <= 0) return;
+    if (gameFinished) return;
 
     if (displayRemainingSeconds > 0) {
       displayRemainingSeconds -= 1;
@@ -438,16 +446,6 @@ function startLocalTimer() {
       if (displayRemainingSeconds === 3 && lockedWinningPad) {
         lockedWinningPad.classList.add("win");
       }
-
-      // 🏁 GAME FINISH AT 0:00 ONLY
-      if (displayRemainingSeconds === 0) {
-        gameFinished = true;
-
-        if (pendingOutcomeInfo) {
-          showEndPopup(pendingOutcomeInfo);
-          pendingOutcomeInfo = null;
-        }
-      }
     }
   }, 1000);
 }
@@ -455,7 +453,7 @@ function startLocalTimer() {
 // ================= BACKEND POLLING (TABLE DATA) =================
 
 async function fetchTableData() {
-  if (gameFinished && displayRemainingSeconds <= 0) return;
+  if (gameFinished && lastResultShown !== null) return;
 
   try {
     const res = await fetch("/api/tables/silver");
@@ -546,12 +544,8 @@ function updateGameUI(table) {
       return;
     }
 
-    // SAFETY: if result arrives late, trigger jump immediately
-    if (
-      storedResult !== null &&
-      displayRemainingSeconds <= 5 &&
-      !jumpStarted
-    ) {
+    // 🔥 FORCE JUMP IF TIMER ALREADY PASSED 0:05
+    if (!jumpStarted) {
       jumpStarted = true;
       hopFrogToWinningNumber(storedResult);
     }
