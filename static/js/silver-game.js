@@ -71,6 +71,8 @@ let walletBalance = 0;
 let selectedNumber = 0;
 let currentTable = null;
 let lastResultShown = null;
+let lockedWinningPad = null;
+
 
 // flags / intervals
 let frogPreviewPlayed = false;
@@ -364,8 +366,11 @@ function findPadForNumber(winningNumber) {
 // ================= ONE CLEAN JUMP FUNCTION =================
 
 function hopFrogToWinningNumber(winningNumber) {
-  const targetPad = findPadForNumber(winningNumber);
-  if (!targetPad) return;
+  const targetPad = lockedWinningPad || findPadForNumber(winningNumber);
+  if (!targetPad) {
+    console.warn("[frog] No target pad, abort jump");
+    return;
+  }
 
   const padIndex = pads.indexOf(targetPad);
   const direction = getJumpDirectionByPadIndex(padIndex);
@@ -419,14 +424,6 @@ function startLocalTimer() {
 
       // START JUMP AT 3 SECONDS (NO RESULT CHECK)
       // START JUMP ONLY WHEN RESULT IS KNOWN
-if (
-  displayRemainingSeconds === 3 &&
-  !jumpStarted &&
-  storedResult !== null
-) {
-  jumpStarted = true;
-  hopFrogToWinningNumber(storedResult);
-}
 
     }
   }, 1000);
@@ -519,23 +516,27 @@ function updateGameUI(table) {
     table.result !== "";
 
    if (hasResult && table.result !== lastResultShown) {
-    lastResultShown = table.result;
-    storedResult = table.result;
+  lastResultShown = table.result;
+  storedResult = table.result;
 
-    ensurePadForWinningNumber(table.result);
-    pendingOutcomeInfo = determineUserOutcome(table);
+  ensurePadForWinningNumber(table.result);
+  lockedWinningPad = findPadForNumber(table.result);
+  pendingOutcomeInfo = determineUserOutcome(table);
 
-    // If user NEVER bet → show exit popup
-    if (!userHasBet) {
-      showSlotsFullPopup();
-      return;
-    }
-
-    // If jump already finished → show popup now
-    if (jumpStarted) {
-       showEndPopup(pendingOutcomeInfo);
-    }
+  // ❌ user did not bet
+  if (!userHasBet) {
+    gameFinished = true;
+    showSlotsFullPopup();
+    return;
   }
+
+  // ✅ START JUMP IMMEDIATELY WHEN RESULT ARRIVES
+  if (!jumpStarted) {
+    jumpStarted = true;
+    hopFrogToWinningNumber(storedResult);
+  }
+}
+
 // ================= NEW ROUND RESET =================
 if (
   table.result === null &&
@@ -550,6 +551,7 @@ if (
   gameFinished = false;
   userHasBet = false;
   pendingOutcomeInfo = null;
+  lockedWinningPad = null;
 
   pads.forEach(p => p.classList.remove("win"));
 
