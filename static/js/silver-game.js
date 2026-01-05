@@ -78,6 +78,7 @@ let gameFinished = false;
 let tablePollInterval = null;
 let localTimerInterval = null;
 let displayRemainingSeconds = 0;
+let jumpStarted = false;
 
 // IMPORTANT: persistent flag – once true, never set back to false
 let userHasBet = false;
@@ -412,9 +413,22 @@ function startLocalTimer() {
     if (gameFinished) return;
 
     if (displayRemainingSeconds > 0) {
-      displayRemainingSeconds -= 1;
-      renderTimer();
-    }
+  displayRemainingSeconds -= 1;
+  renderTimer();
+
+  // 🐸 START JUMP BEFORE RESULT (UX FIX)
+  if (
+    displayRemainingSeconds === 3 &&
+    !jumpStarted &&
+    currentTable &&
+    currentTable.result !== null &&
+    currentTable.result !== undefined
+  ) {
+    jumpStarted = true;
+    hopFrogToWinningNumber(currentTable.result);
+  }
+}
+
   }, 1000);
 }
 
@@ -512,6 +526,7 @@ function updateGameUI(table) {
     hopFrogToWinningNumber(table.result);
   } else if (!hasResult && lastResultShown !== null) {
     // ================= NEW ROUND RESET =================
+    jumpStarted = false;
     frogPreviewPlayed = false;
     gameFinished = false;
     userHasBet = false;
