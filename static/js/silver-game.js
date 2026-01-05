@@ -79,6 +79,7 @@ let tablePollInterval = null;
 let localTimerInterval = null;
 let displayRemainingSeconds = 0;
 let jumpStarted = false;
+let storedResult = null;
 
 // IMPORTANT: persistent flag – once true, never set back to false
 let userHasBet = false;
@@ -413,25 +414,24 @@ function startLocalTimer() {
     if (gameFinished) return;
 
     if (displayRemainingSeconds > 0) {
-  displayRemainingSeconds -= 1;
-  renderTimer();
+      displayRemainingSeconds -= 1;
+      renderTimer();
 
-  // 🐸 START JUMP BEFORE RESULT (UX FIX)
-  if (
-    displayRemainingSeconds === 3 &&
-    !jumpStarted &&
-    !gameFinished &&
-    currentTable &&
-    currentTable.result !== null &&
-    currentTable.result !== undefined
-  ) {
-    jumpStarted = true;
-    hopFrogToWinningNumber(currentTable.result);
-  }
+      // START JUMP AT 3 SECONDS (NO RESULT CHECK)
+      // START JUMP ONLY WHEN RESULT IS KNOWN
+if (
+  displayRemainingSeconds === 3 &&
+  !jumpStarted &&
+  storedResult !== null
+) {
+  jumpStarted = true;
+  hopFrogToWinningNumber(storedResult);
 }
 
+    }
   }, 1000);
 }
+
 
 // ================= BACKEND POLLING (TABLE DATA) =================
 
@@ -496,8 +496,7 @@ function updateGameUI(table) {
     (maxPlayers !== null && table.players >= maxPlayers);
 
   if (!gameFinished && !userHasBet && isFull) {
-    gameFinished = true;
-    disableBettingUI();
+       disableBettingUI();
 
     if (tablePollInterval) {
       clearInterval(tablePollInterval);
@@ -519,52 +518,60 @@ function updateGameUI(table) {
     table.result !== undefined &&
     table.result !== "";
 
-  if (hasResult && table.result !== lastResultShown) {
+   if (hasResult && table.result !== lastResultShown) {
     lastResultShown = table.result;
+    storedResult = table.result;
 
-    disableBettingUI();
     ensurePadForWinningNumber(table.result);
-
     pendingOutcomeInfo = determineUserOutcome(table);
 
-   
-  } else if (!hasResult && lastResultShown !== null) {
-    // ================= NEW ROUND RESET =================
-    jumpStarted = false;
-    frogPreviewPlayed = false;
-    gameFinished = false;
-    userHasBet = false;
-    pendingOutcomeInfo = null;
-
-    if (localTimerInterval) {
-      clearInterval(localTimerInterval);
-      localTimerInterval = null;
+    // If user NEVER bet → show exit popup
+    if (!userHasBet) {
+      showSlotsFullPopup();
+      return;
     }
 
-    startLocalTimer();
-
-    pads.forEach((p) => p.classList.remove("win"));
-
-    if (frogIdleVideo) {
-      frogIdleVideo.style.display = "block";
-      frogIdleVideo.play();
+    // If jump already finished → show popup now
+    if (jumpStarted) {
+       showEndPopup(pendingOutcomeInfo);
     }
+  }
+// ================= NEW ROUND RESET =================
+if (
+  table.result === null &&
+  lastResultShown !== null &&
+  gameFinished
+) {
+  console.log("[game] new round detected, resetting state");
 
-    if (frogJumpVideo) {
-      frogJumpVideo.pause();
-      frogJumpVideo.currentTime = 0;
-      frogJumpVideo.style.display = "none";
-    }
-    
-    // Hide popup when resetting
-    if (popupEl) {
-      popupEl.classList.add("result-popup");
-      popupEl.style.cssText = "";
-    }
-    
-    lastResultShown = null;
+  jumpStarted = false;
+  storedResult = null;
+  lastResultShown = null;
+  gameFinished = false;
+  userHasBet = false;
+  pendingOutcomeInfo = null;
+
+  pads.forEach(p => p.classList.remove("win"));
+
+  if (frogJumpVideo) {
+    frogJumpVideo.pause();
+    frogJumpVideo.currentTime = 0;
+    frogJumpVideo.style.display = "none";
+  }
+
+  if (frogIdleVideo) {
+    frogIdleVideo.style.display = "block";
+    frogIdleVideo.play();
+  }
+
+  if (popupEl) {
+    popupEl.classList.add("result-popup");
+    popupEl.style.cssText = "";
   }
 }
+
+}
+
 
 function startPolling() {
   fetchTableData();
@@ -577,6 +584,7 @@ function startPolling() {
     }
   }, 2000);
 }
+
 
 // ================= BALANCE / SOCKET =================
 
