@@ -589,3 +589,20 @@ background: #111827;
 color: #e5e7eb;
 border: 1px solid rgba(148, 163, 184, 0.6);
 }
+/* ── Frog movement during jump ──────────────────────────────────────── */
+
+.frog-wrapper {
+  transition: transform 4.5s cubic-bezier(0.25, 0.46, 0.45, 0.94); /* smooth, natural arc feel */
+  will-change: transform;
+}
+
+/* Direction offsets — adjust these numbers if landing is too far/close */
+.frog-wrapper.jump-left   { transform: translate(calc(-50% - 160px), -50%); }
+.frog-wrapper.jump-front  { transform: translate(-50%, calc(-50% - 110px)); }
+.frog-wrapper.jump-right  { transform: translate(calc(-50% + 160px), -50%); }
+
+/* Optional: slight "jump up" feel during animation */
+.frog-wrapper.jumping {
+  transform: scale(1.06);
+  transition: transform 4.5s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+}
