@@ -177,39 +177,67 @@ function hopFrogToWinningNumber(winningNumber) {
   if (jumpStarted) return;
   jumpStarted = true;
 
-  const targetPad = findPadForNumber(winningNumber);
+  const targetPad = lockedWinningPad || findPadForNumber(winningNumber);
   if (!targetPad) {
-    console.warn("[frog] No pad found for", winningNumber);
+    console.warn("[frog] No target pad found for number:", winningNumber);
     jumpStarted = false;
     return;
   }
 
-  const index = pads.indexOf(targetPad);
-  const direction = getJumpDirectionByPadIndex(index);
-  const src = FROG_VIDEOS[direction] || FROG_VIDEOS.front;
+  const padIndex = pads.indexOf(targetPad);
+  const direction = getJumpDirectionByPadIndex(padIndex);
 
-  console.log(`[frog] JUMP → ${direction} to ${winningNumber} (pad ${index}) at ${displayRemainingSeconds}s left`);
+  const directionClass = {
+    left:  "jump-left",
+    front: "jump-front",
+    right: "jump-right"
+  }[direction] || "jump-front";
 
+  console.log(`[frog] Starting jump → ${direction} to number ${winningNumber} (pad ${padIndex})`);
+
+  // 1. Hide idle video
   frogIdleVideo.pause();
   frogIdleVideo.style.display = "none";
-  frogVideoSource.src = src;
+
+  // 2. Prepare and load jump video
+  frogVideoSource.src = FROG_VIDEOS[direction] || FROG_VIDEOS.front;
   frogJumpVideo.load();
   frogJumpVideo.style.display = "block";
   frogJumpVideo.currentTime = 0;
 
-  frogJumpVideo.onloadeddata = () => {
-    console.log("[frog] Video ready → playing");
-    frogJumpVideo.play().catch(e => console.error("[frog] Play error:", e));
-  };
+  // 3. Start movement + video playback together
+  requestAnimationFrame(() => {
+    // Add both jumping (scale) + direction movement
+    frogContainer.classList.add("jumping", directionClass);
 
+    frogJumpVideo.onloadeddata = () => {
+      console.log("[frog] Jump video loaded → playing");
+      frogJumpVideo.play().catch(e => console.error("[frog] Play failed:", e));
+    };
+  });
+
+  // 4. When jump video finishes → show win effect + reset frog position slowly
   frogJumpVideo.onended = () => {
-    console.log("[frog] Jump finished");
+    console.log("[frog] Jump animation finished");
+
     frogJumpVideo.style.display = "none";
     frogIdleVideo.style.display = "block";
     frogIdleVideo.play();
+
+    // Mark winning pad
     targetPad.classList.add("win");
+
     gameFinished = true;
-    if (pendingOutcomeInfo) showEndPopup(pendingOutcomeInfo);
+
+    // Slowly return frog to center after ~1.5–2 seconds (optional — comment out if you want frog to stay at pad)
+    setTimeout(() => {
+      frogContainer.classList.remove("jumping", "jump-left", "jump-front", "jump-right");
+    }, 1800);
+
+    if (pendingOutcomeInfo) {
+      showEndPopup(pendingOutcomeInfo);
+      pendingOutcomeInfo = null;
+    }
   };
 }
 
