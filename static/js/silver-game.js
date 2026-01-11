@@ -1,4 +1,4 @@
-// ================= BASIC SETUP (DB USER) =================
+// ================= BASIC SETUP =================
 const GAME = window.GAME_TYPE || "silver";
 const FIXED_BET_AMOUNT = window.FIXED_BET_AMOUNT || 10;
 const urlParams = new URLSearchParams(window.location.search);
@@ -8,6 +8,8 @@ const USERNAME = window.GAME_USERNAME || "Player";
 const HOME_URL = "/home";
 
 // ================= DOM REFERENCES =================
+const pondEl = document.querySelector(".pond");
+const frogContainer = document.getElementById("frogContainer");
 const frogIdleVideo = document.getElementById("frogIdleVideo");
 const frogJumpVideo = document.getElementById("frogJumpVideo");
 const frogVideoSource = document.getElementById("frogVideoSource");
@@ -36,7 +38,7 @@ const FROG_VIDEOS = {
   right: "/static/video/right-jump-frog.mp4",
 };
 
-// Unlock video on interaction
+// Unlock video on first interaction
 let videoUnlocked = false;
 document.addEventListener("click", () => {
   if (videoUnlocked || !frogJumpVideo) return;
@@ -64,6 +66,9 @@ let jumpStarted = false;
 let storedResult = null;
 let userHasBet = false;
 let pendingOutcomeInfo = null;
+
+// ================= GSAP REGISTER (VERY IMPORTANT) =================
+gsap.registerPlugin(MotionPathPlugin);
 
 // ================= HELPERS =================
 function setStatus(msg, type = "") {
@@ -98,7 +103,7 @@ function updateMyBets(bets) {
   if (myBets.length > 0) userHasBet = true;
   if (userBetCountLabel) userBetCountLabel.textContent = myBets.length;
   if (!myBetsRow) return;
-  myBetsRow.innerHTML = myBets.length === 0 
+  myBetsRow.innerHTML = myBets.length === 0
     ? '<span style="color:#6b7280;font-size:11px;">none</span>'
     : myBets.map(b => `<span class="my-bet-chip">${b.number}</span>`).join(", ");
 }
@@ -173,6 +178,7 @@ function findPadForNumber(num) {
   return pads.find(p => p.dataset.number === str || p.querySelector(".pad-number")?.textContent.trim() === str);
 }
 
+// ================= BEST JUMP ANIMATION WITH GSAP MOTIONPATH =================
 function hopFrogToWinningNumber(winningNumber) {
   if (jumpStarted) return;
   jumpStarted = true;
@@ -187,51 +193,71 @@ function hopFrogToWinningNumber(winningNumber) {
   const padIndex = pads.indexOf(targetPad);
   const direction = getJumpDirectionByPadIndex(padIndex);
 
-  const directionClass = {
-    left:  "jump-left",
-    front: "jump-front",
-    right: "jump-right"
-  }[direction] || "jump-front";
+  console.log(`[frog] Starting GSAP jump → ${direction} to number ${winningNumber} (pad ${padIndex})`);
 
-  console.log(`[frog] Starting jump → ${direction} to number ${winningNumber} (pad ${padIndex})`);
-
-  // 1. Hide idle video
+  // 1. Hide idle
   frogIdleVideo.pause();
   frogIdleVideo.style.display = "none";
 
-  // 2. Prepare and load jump video
+  // 2. Prepare jump video
   frogVideoSource.src = FROG_VIDEOS[direction] || FROG_VIDEOS.front;
   frogJumpVideo.load();
   frogJumpVideo.style.display = "block";
   frogJumpVideo.currentTime = 0;
 
-  // 3. Start movement + video playback together
-  requestAnimationFrame(() => {
-    // Add both jumping (scale) + direction movement
-    frogContainer.classList.add("jumping", directionClass);
+  // 3. Get real positions
+  const frogRect = frogContainer.getBoundingClientRect();
+  const padRect = targetPad.getBoundingClientRect();
+  const pondRect = pondEl.getBoundingClientRect();
 
-    frogJumpVideo.onloadeddata = () => {
-      console.log("[frog] Jump video loaded → playing");
-      frogJumpVideo.play().catch(e => console.error("[frog] Play failed:", e));
-    };
-  });
+  // Relative coordinates inside pond
+  const startX = frogRect.left - pondRect.left + frogRect.width / 2;
+  const startY = frogRect.top - pondRect.top + frogRect.height / 2;
+  const endX = padRect.left - pondRect.left + padRect.width / 2;
+  const endY = padRect.top - pondRect.top + padRect.height / 2;
 
-  // 4. When jump video finishes → show win effect + reset frog position slowly
+  // 4. Start jump video and smooth GSAP path at the same time
+  frogJumpVideo.onloadeddata = () => {
+    console.log("[frog] Jump video ready → playing + GSAP motion");
+    frogJumpVideo.play().catch(e => console.error("[frog] Play failed:", e));
+
+    gsap.to(frogContainer, {
+      duration: 5,                    // match your jump video length (adjust if needed)
+      ease: "power2.out",             // natural gravity feel
+      motionPath: {
+        path: [
+          { x: startX, y: startY },
+          { x: (startX + endX) / 2, y: Math.min(startY, endY) - 120 }, // peak of arc
+          { x: endX, y: endY }
+        ],
+        curviness: 1.6,               // higher = taller jump arc (1.2–2.2 range)
+        autoRotate: false
+      },
+      onComplete: () => {
+        console.log("[frog] GSAP motion completed - landed");
+      }
+    });
+  };
+
+  // 5. When video ends → win effect + prepare reset
   frogJumpVideo.onended = () => {
-    console.log("[frog] Jump animation finished");
-
+    console.log("[frog] Jump video finished");
     frogJumpVideo.style.display = "none";
     frogIdleVideo.style.display = "block";
     frogIdleVideo.play();
 
-    // Mark winning pad
     targetPad.classList.add("win");
-
     gameFinished = true;
 
-    // Slowly return frog to center after ~1.5–2 seconds (optional — comment out if you want frog to stay at pad)
+    // Optional: slowly return to center after celebration (comment out to stay on pad)
     setTimeout(() => {
-      frogContainer.classList.remove("jumping", "jump-left", "jump-front", "jump-right");
+      gsap.to(frogContainer, {
+        duration: 2,
+        x: 0,
+        y: 0,
+        scale: 1,
+        ease: "power1.inOut"
+      });
     }, 1800);
 
     if (pendingOutcomeInfo) {
@@ -249,10 +275,7 @@ function startLocalTimer() {
     if (displayRemainingSeconds > 0) {
       displayRemainingSeconds--;
       renderTimer();
-
       if (displayRemainingSeconds === 15) disableBettingUI();
-
-      // Try normal trigger at 10s
       if (displayRemainingSeconds === 10 && storedResult !== null && !jumpStarted) {
         console.log("[timer] Normal jump trigger at 10s");
         hopFrogToWinningNumber(storedResult);
@@ -268,13 +291,10 @@ async function fetchTableData() {
     const res = await fetch("/api/tables/silver");
     const data = await res.json();
     if (!data.tables?.length) return setStatus("No active tables", "error");
-
-    let table = TABLE_CODE 
-      ? data.tables.find(t => t.round_code === TABLE_CODE) 
+    let table = TABLE_CODE
+      ? data.tables.find(t => t.round_code === TABLE_CODE)
       : data.tables[0];
-
     if (!table) return;
-
     currentTable = table;
     updateGameUI(table);
   } catch (err) {
@@ -286,7 +306,6 @@ function updateGameUI(table) {
   roundIdSpan.textContent = table.round_code || "-";
   playerCountSpan.textContent = table.players || 0;
 
-  // Always trust server timer (prevents local drift)
   if (!gameFinished) {
     const oldSec = displayRemainingSeconds;
     displayRemainingSeconds = table.time_remaining || 0;
@@ -297,11 +316,10 @@ function updateGameUI(table) {
   updateMyBets(table.bets || []);
 
   if (placeBetBtn && !gameFinished) {
-    placeBetBtn.disabled = displayRemainingSeconds <= 15 || 
+    placeBetBtn.disabled = displayRemainingSeconds <= 15 ||
       (table.max_players && table.players >= table.max_players);
   }
 
-  // Slots full → popup for non-betters
   const isFull = table.is_full || (table.max_players && table.players >= table.max_players);
   if (!gameFinished && !userHasBet && isFull) {
     disableBettingUI();
@@ -311,7 +329,6 @@ function updateGameUI(table) {
     return;
   }
 
-  // Result arrived
   if (table.result != null && table.result !== lastResultShown) {
     console.log(`[result] Received ${table.result} at ${displayRemainingSeconds}s left`);
     lastResultShown = table.result;
@@ -322,14 +339,12 @@ function updateGameUI(table) {
 
     if (!userHasBet) return showSlotsFullPopup();
 
-    // Jump if not started yet (even at low seconds)
-    if (!jumpStarted && displayRemainingSeconds <= 12) {  // ← increased window to 12s
+    if (!jumpStarted && displayRemainingSeconds <= 12) {
       console.log("[force] Late result → starting jump now");
       hopFrogToWinningNumber(storedResult);
     }
   }
 
-  // New round reset
   if (table.result === null && lastResultShown !== null) {
     console.log("[reset] New round detected");
     jumpStarted = false;
@@ -340,18 +355,20 @@ function updateGameUI(table) {
     pendingOutcomeInfo = null;
     lockedWinningPad = null;
     pads.forEach(p => p.classList.remove("win"));
+    gsap.killTweensOf(frogContainer);
     frogJumpVideo.pause();
     frogJumpVideo.style.display = "none";
     frogJumpVideo.currentTime = 0;
     frogIdleVideo.style.display = "block";
     frogIdleVideo.play();
+    gsap.set(frogContainer, { x: 0, y: 0, scale: 1 });
     if (popupEl) popupEl.style.display = "none";
   }
 }
 
 function startPolling() {
   fetchTableData();
-  tablePollInterval = setInterval(fetchTableData, 1500); // faster polling = catch result earlier
+  tablePollInterval = setInterval(fetchTableData, 1500);
 }
 
 // ================= SOCKET & EVENTS =================
@@ -410,4 +427,5 @@ startPolling();
 startLocalTimer();
 setSelectedNumber(0);
 setStatus("");
+
 console.log(`[init] user=${USER_ID} | game=${GAME} | bet=${FIXED_BET_AMOUNT}`);
