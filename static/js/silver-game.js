@@ -288,7 +288,7 @@ function hopFrogToWinningNumber(winningNumber) {
   const direction = getJumpDirectionByPadIndex(padIndex);
   const videoSrc = FROG_VIDEOS[direction] || FROG_VIDEOS.front;
 
-  console.log("[frog] Starting jump →", direction, "to number:", winningNumber);
+  console.log("[frog] Starting jump →", direction, "to number:", winningNumber, "at seconds left:", displayRemainingSeconds);
 
   // hide idle
   frogIdleVideo.pause();
@@ -301,10 +301,12 @@ function hopFrogToWinningNumber(winningNumber) {
   frogJumpVideo.currentTime = 0;
 
   frogJumpVideo.onloadeddata = () => {
+    console.log("[frog] Video loaded, attempting to play");
     frogJumpVideo.play().catch(e => console.error("[frog] Play failed:", e));
   };
 
   frogJumpVideo.onended = () => {
+    console.log("[frog] Jump video ended");
     frogJumpVideo.style.display = "none";
     frogIdleVideo.style.display = "block";
     frogIdleVideo.play();
@@ -334,13 +336,14 @@ function startLocalTimer() {
       }
 
       // 🐸 START JUMP AT 0:10 (when 10 seconds remain)
-      if (
-        displayRemainingSeconds === 10 &&
-        !jumpStarted &&
-        storedResult !== null
-      ) {
-        jumpStarted = true;
-        hopFrogToWinningNumber(storedResult);
+      if (displayRemainingSeconds === 10 && !jumpStarted) {
+        if (storedResult !== null) {
+          console.log("[frog] Triggering timed jump at 10s");
+          jumpStarted = true;
+          hopFrogToWinningNumber(storedResult);
+        } else {
+          console.warn("[frog] No result available at 10s - waiting for force trigger");
+        }
       }
 
       // Highlight winning pad at 0:05 as fallback (if video is ~5s long)
@@ -385,7 +388,8 @@ function updateGameUI(table) {
   if (roundIdSpan) roundIdSpan.textContent = table.round_code || "-";
   if (playerCountSpan) playerCountSpan.textContent = table.players || 0;
 
-  if (!jumpStarted && !gameFinished && displayRemainingSeconds === 0) {
+  // Sync timer to server every poll to prevent drift
+  if (!gameFinished) {
     displayRemainingSeconds = table.time_remaining || 0;
   }
   renderTimer();
@@ -418,6 +422,7 @@ function updateGameUI(table) {
   const hasResult = table.result !== null && table.result !== undefined && table.result !== "";
 
   if (hasResult && table.result !== lastResultShown) {
+    console.log("[game] Result received:", table.result, "at local seconds left:", displayRemainingSeconds);
     lastResultShown = table.result;
     storedResult = table.result;
     ensurePadForWinningNumber(table.result);
@@ -431,6 +436,7 @@ function updateGameUI(table) {
 
     // Force jump if we already passed the jump time
     if (!jumpStarted && displayRemainingSeconds <= 10) {
+      console.log("[frog] Force triggering jump at", displayRemainingSeconds, "s");
       jumpStarted = true;
       hopFrogToWinningNumber(storedResult);
     }
