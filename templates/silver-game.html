@@ -4,13 +4,14 @@
 <meta charset="UTF-8" />
 <title>{{ game.title }} – {{ game.name }}</title>
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-
 <link rel="stylesheet" href="{{ url_for('static', filename='css/silver-game.css') }}" />
+
+<!-- GSAP + MotionPath - required for smooth, precise frog jump animation -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/gsap.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/MotionPathPlugin.min.js"></script>
 </head>
 <body>
-
 <div class="game-root">
-
 <header class="top-bar">
   <div class="top-left">
     <div class="game-label">GAME <span id="roundId">–</span></div>
@@ -19,11 +20,9 @@
       You: <span id="userName"></span> · Bets: <span id="userBetCount">0</span>
     </div>
   </div>
-
   <div class="top-center">
     <div class="timer-pill"><span id="timerText">--</span></div>
   </div>
-
   <div class="top-right">
     <div class="coins">
       <img src="{{ url_for('static', filename='img/coin.png') }}">
@@ -34,10 +33,8 @@
 
 <!-- POND -->
 <section class="pond">
-
   <!-- Frog container -->
   <div id="frogContainer" class="frog-wrapper">
-
     <!-- Idle frog (always looping) -->
     <video
       id="frogIdleVideo"
@@ -49,7 +46,6 @@
     >
       <source src="/static/video/frog-idle.mp4" type="video/mp4">
     </video>
-
     <!-- Jump frog (played on result) -->
     <video
       id="frogJumpVideo"
@@ -59,7 +55,6 @@
     >
       <source id="frogVideoSource" src="" type="video/mp4">
     </video>
-
   </div>
 
   <!-- Pads -->
@@ -83,33 +78,26 @@
       {% endfor %}
     </div>
   </div>
-
 </section>
 
 <section class="controls">
   <div class="numbers-title">SELECT YOUR NUMBER (0–9)</div>
-
   <div class="numbers-row">
     {% for n in range(5) %}
     <button class="num-chip" data-number="{{ n }}">{{ n }}</button>
     {% endfor %}
   </div>
-
   <div class="numbers-row">
     {% for n in range(5,10) %}
     <button class="num-chip" data-number="{{ n }}">{{ n }}</button>
     {% endfor %}
   </div>
-
   <div id="myBetsRow" class="my-bets-row"></div>
-
   <button id="placeBetBtn" class="bet-button">
     PLACE BET (₹{{ game.bet_amount }})
   </button>
-
   <div id="statusMessage" class="status"></div>
 </section>
-
 </div>
 
 <div id="resultPopup" class="result-popup" style="display:none">
@@ -136,6 +124,5 @@
 
 <!-- Load game JS LAST -->
 <script src="{{ url_for('static', filename='js/silver-game.js') }}"></script>
-
 </body>
 </html>
