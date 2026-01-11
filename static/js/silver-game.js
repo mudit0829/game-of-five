@@ -38,7 +38,7 @@ const FROG_VIDEOS = {
   right: "/static/video/right-jump-frog.mp4",
 };
 
-// Unlock video on first interaction
+// Unlock video on interaction
 let videoUnlocked = false;
 document.addEventListener("click", () => {
   if (videoUnlocked || !frogJumpVideo) return;
@@ -66,9 +66,6 @@ let jumpStarted = false;
 let storedResult = null;
 let userHasBet = false;
 let pendingOutcomeInfo = null;
-
-// ================= GSAP REGISTER (VERY IMPORTANT) =================
-gsap.registerPlugin(MotionPathPlugin);
 
 // ================= HELPERS =================
 function setStatus(msg, type = "") {
@@ -103,7 +100,7 @@ function updateMyBets(bets) {
   if (myBets.length > 0) userHasBet = true;
   if (userBetCountLabel) userBetCountLabel.textContent = myBets.length;
   if (!myBetsRow) return;
-  myBetsRow.innerHTML = myBets.length === 0
+  myBetsRow.innerHTML = myBets.length === 0 
     ? '<span style="color:#6b7280;font-size:11px;">none</span>'
     : myBets.map(b => `<span class="my-bet-chip">${b.number}</span>`).join(", ");
 }
@@ -178,7 +175,6 @@ function findPadForNumber(num) {
   return pads.find(p => p.dataset.number === str || p.querySelector(".pad-number")?.textContent.trim() === str);
 }
 
-// ================= BEST JUMP ANIMATION WITH GSAP MOTIONPATH =================
 function hopFrogToWinningNumber(winningNumber) {
   if (jumpStarted) return;
   jumpStarted = true;
@@ -192,8 +188,9 @@ function hopFrogToWinningNumber(winningNumber) {
 
   const padIndex = pads.indexOf(targetPad);
   const direction = getJumpDirectionByPadIndex(padIndex);
+  const animationClass = `jump-${direction}`;
 
-  console.log(`[frog] Starting GSAP jump → ${direction} to number ${winningNumber} (pad ${padIndex})`);
+  console.log(`[frog] Starting new keyframe animation → ${direction} to number ${winningNumber} (pad ${padIndex})`);
 
   // 1. Hide idle
   frogIdleVideo.pause();
@@ -205,43 +202,16 @@ function hopFrogToWinningNumber(winningNumber) {
   frogJumpVideo.style.display = "block";
   frogJumpVideo.currentTime = 0;
 
-  // 3. Get real positions
-  const frogRect = frogContainer.getBoundingClientRect();
-  const padRect = targetPad.getBoundingClientRect();
-  const pondRect = pondEl.getBoundingClientRect();
-
-  // Relative coordinates inside pond
-  const startX = frogRect.left - pondRect.left + frogRect.width / 2;
-  const startY = frogRect.top - pondRect.top + frogRect.height / 2;
-  const endX = padRect.left - pondRect.left + padRect.width / 2;
-  const endY = padRect.top - pondRect.top + padRect.height / 2;
-
-  // 4. Start jump video and smooth GSAP path at the same time
+  // 3. Start video and keyframe animation
   frogJumpVideo.onloadeddata = () => {
-    console.log("[frog] Jump video ready → playing + GSAP motion");
+    console.log("[frog] Jump video ready → playing + keyframe animation");
     frogJumpVideo.play().catch(e => console.error("[frog] Play failed:", e));
-
-    gsap.to(frogContainer, {
-      duration: 5,                    // match your jump video length (adjust if needed)
-      ease: "power2.out",             // natural gravity feel
-      motionPath: {
-        path: [
-          { x: startX, y: startY },
-          { x: (startX + endX) / 2, y: Math.min(startY, endY) - 120 }, // peak of arc
-          { x: endX, y: endY }
-        ],
-        curviness: 1.6,               // higher = taller jump arc (1.2–2.2 range)
-        autoRotate: false
-      },
-      onComplete: () => {
-        console.log("[frog] GSAP motion completed - landed");
-      }
-    });
+    frogContainer.classList.add(animationClass, "jumping");
   };
 
-  // 5. When video ends → win effect + prepare reset
+  // 4. When video ends → win effect + reset animation
   frogJumpVideo.onended = () => {
-    console.log("[frog] Jump video finished");
+    console.log("[frog] Jump animation finished");
     frogJumpVideo.style.display = "none";
     frogIdleVideo.style.display = "block";
     frogIdleVideo.play();
@@ -249,15 +219,9 @@ function hopFrogToWinningNumber(winningNumber) {
     targetPad.classList.add("win");
     gameFinished = true;
 
-    // Optional: slowly return to center after celebration (comment out to stay on pad)
+    // Return to center after celebration
     setTimeout(() => {
-      gsap.to(frogContainer, {
-        duration: 2,
-        x: 0,
-        y: 0,
-        scale: 1,
-        ease: "power1.inOut"
-      });
+      frogContainer.classList.remove("jumping", "jump-left", "jump-front", "jump-right");
     }, 1800);
 
     if (pendingOutcomeInfo) {
@@ -291,8 +255,8 @@ async function fetchTableData() {
     const res = await fetch("/api/tables/silver");
     const data = await res.json();
     if (!data.tables?.length) return setStatus("No active tables", "error");
-    let table = TABLE_CODE
-      ? data.tables.find(t => t.round_code === TABLE_CODE)
+    let table = TABLE_CODE 
+      ? data.tables.find(t => t.round_code === TABLE_CODE) 
       : data.tables[0];
     if (!table) return;
     currentTable = table;
@@ -316,7 +280,7 @@ function updateGameUI(table) {
   updateMyBets(table.bets || []);
 
   if (placeBetBtn && !gameFinished) {
-    placeBetBtn.disabled = displayRemainingSeconds <= 15 ||
+    placeBetBtn.disabled = displayRemainingSeconds <= 15 || 
       (table.max_players && table.players >= table.max_players);
   }
 
@@ -355,13 +319,12 @@ function updateGameUI(table) {
     pendingOutcomeInfo = null;
     lockedWinningPad = null;
     pads.forEach(p => p.classList.remove("win"));
-    gsap.killTweensOf(frogContainer);
+    frogContainer.classList.remove("jumping", "jump-left", "jump-front", "jump-right");
     frogJumpVideo.pause();
     frogJumpVideo.style.display = "none";
     frogJumpVideo.currentTime = 0;
     frogIdleVideo.style.display = "block";
     frogIdleVideo.play();
-    gsap.set(frogContainer, { x: 0, y: 0, scale: 1 });
     if (popupEl) popupEl.style.display = "none";
   }
 }
