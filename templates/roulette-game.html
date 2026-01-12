@@ -1,82 +1,28 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
-  <title>Roulette Game UI</title>
-  <link rel="stylesheet" href="{{ url_for('static', filename='css/wheel.css') }}" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<meta charset="UTF-8">
+<title>Roulette Wheel</title>
+<link rel="stylesheet" href="roulette-wheel.css">
 </head>
 <body>
 
-<div class="game-container">
+<div class="wheel-wrapper">
 
-  <!-- ===== TOP BAR ===== -->
-  <div class="top-bar">
-    <div class="game-id">GAME #10234</div>
+  <!-- Arrow -->
+  <div class="roulette-arrow"></div>
 
-    <div class="timer-box">
-      <span id="timer">04:32</span>
-    </div>
+  <!-- Wheel -->
+  <div class="roulette-wheel" id="rouletteWheel">
+    <div class="wheel-outer"></div>
 
-    <div class="coins">
-      <span class="coin-icon">🪙</span>
-      <span id="coinAmount">2,450</span>
-    </div>
-  </div>
+    <div class="wheel-pockets" id="wheelPockets"></div>
 
-  <!-- ===== WHEEL SECTION ===== -->
-  <div class="wheel-section">
-
-    <!-- POINTER -->
-    <div class="pointer"></div>
-
-    <!-- WHEEL -->
-    <div class="wheel-wrapper">
-      <svg
-        id="rouletteWheel"
-        viewBox="0 0 500 500"
-        width="100%"
-        height="100%"
-      >
-
-        <!-- OUTER GOLD RING -->
-        <circle cx="250" cy="250" r="245" fill="url(#goldRing)" />
-
-        <!-- NUMBER SLICES -->
-        <g id="slices"></g>
-
-        <!-- CENTER HUB -->
-        <circle cx="250" cy="250" r="60" fill="url(#centerGold)" />
-
-        <!-- DEFINITIONS -->
-        <defs>
-          <radialGradient id="goldRing">
-            <stop offset="0%" stop-color="#ffd65a"/>
-            <stop offset="100%" stop-color="#b8860b"/>
-          </radialGradient>
-
-          <radialGradient id="centerGold">
-            <stop offset="0%" stop-color="#fff2a8"/>
-            <stop offset="100%" stop-color="#c89b1d"/>
-          </radialGradient>
-        </defs>
-
-      </svg>
-    </div>
-  </div>
-
-  <!-- ===== SELECT NUMBER ===== -->
-  <div class="select-title">Select Number</div>
-
-  <div class="number-grid" id="numberGrid"></div>
-
-  <!-- ===== PLAYERS ===== -->
-  <div class="players">
-    👥 Total Players: <strong>128</strong>
+    <div class="wheel-center"></div>
   </div>
 
 </div>
 
-<script src="{{ url_for('static', filename='js/wheel.js') }}"></script>
+<script src="roulette-wheel.js"></script>
 </body>
 </html>
