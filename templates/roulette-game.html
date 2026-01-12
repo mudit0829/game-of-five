@@ -1,33 +1,3 @@
-
-Add this in the script.
-
-For the spinWheel(num) {
-
-  const order = [0, 32, ...];
-
-  const n = 37;
-  const degStep = 360 / n;
-  const index = order.indexOf(num);
-  const baseDeg = index * degStep;
-  const extraSpins = Math.floor(Math.random() * 5) + 5; // 5-9 spins
-  const finalDeg = - (baseDeg + extraSpins * 360);
-
-  const container = document.querySelector('.wheel-container');
-  container.classList.add('spinning');
-  document.getElementById('wheelGroup').style.setProperty('--final-deg', finalDeg + 'deg');
-
-  setTimeout(() => container.classList.remove('spinning'), 5000);
-}
-
-Add in style .spinning #wheelGroup { animation: spin 5s ease-out forwards; }
-
-Yes.
-
-This should make the wheel look professional with numbers.
-
-For the popup and all, already there.
-
-The full code is ready.<|control12|>```html
 <!DOCTYPE html>
 <html lang="en">
 <head>
