@@ -5,80 +5,131 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Roulette Spin - BetGames</title>
     <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
-    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@600;700&family=Roboto:wght@400;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@700&family=Roboto:wght@700&display=swap" rel="stylesheet">
     <style>
         * { margin:0; padding:0; box-sizing:border-box; }
         body {
             font-family: 'Roboto', sans-serif;
-            background: #0a0015;
-            color: #f0f0ff;
+            background: #0b001a;
+            color: white;
             height: 100vh;
             overflow: hidden;
-            background-image: radial-gradient(circle at 20% 30%, rgba(255,215,0,0.05), transparent 40%),
-                             radial-gradient(circle at 80% 70%, rgba(195,20,50,0.08), transparent 50%);
+            background-image: linear-gradient(to bottom, #0b001a, #140033);
         }
-        .container { height:100vh; display:flex; flex-direction:column; }
+
+        .container {
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
 
         /* Header */
         header {
-            background: rgba(10,0,20,0.9);
-            backdrop-filter: blur(12px);
-            padding: 12px 20px;
+            background: linear-gradient(to bottom, #1a0033, #0d001a);
+            padding: 10px 15px;
             display: flex;
             justify-content: space-between;
             align-items: center;
-            border-bottom: 1px solid rgba(255,215,0,0.25);
-            z-index: 100;
+            border-bottom: 3px solid #ffd700;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.6);
         }
-        .logo {
+
+        .game-title {
             font-family: 'Orbitron', sans-serif;
-            font-size: 24px;
-            font-weight: 700;
+            font-size: 22px;
             color: #ffd700;
-            text-shadow: 0 0 15px #ffd70080;
-            letter-spacing: 2px;
+            text-shadow: 0 0 10px #ffd700aa;
         }
-        .info-box {
+
+        .header-right {
             display: flex;
-            gap: 20px;
+            gap: 15px;
             align-items: center;
         }
-        .players, .timer, .balance {
-            background: rgba(255,215,0,0.08);
-            border: 1px solid #ffd70040;
-            border-radius: 30px;
-            padding: 8px 16px;
+
+        .timer-box, .balance-box {
+            background: #1a0033;
+            border: 2px solid #ffd700;
+            border-radius: 12px;
+            padding: 6px 14px;
+            font-weight: bold;
             font-size: 16px;
-            font-weight: 600;
         }
-        .timer.warning { background: #c3143266; border-color: #ff4d4d80; animation: pulse 1.2s infinite; }
-        @keyframes pulse { 0%,100% { transform:scale(1); } 50% { transform:scale(1.05); } }
 
-        /* Main Area */
-        main { flex:1; display:flex; flex-direction:column; align-items:center; justify-content: center; padding:20px; }
+        .timer-box.warning {
+            background: #c31432;
+            animation: pulse 1.2s infinite;
+        }
 
-        .wheel-container {
+        @keyframes pulse {
+            0%,100% { transform: scale(1); }
+            50% { transform: scale(1.05); }
+        }
+
+        /* Wheel Area */
+        .wheel-section {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+
+        .roulette-wheel {
             position: relative;
-            width: 400px;
-            height: 400px;
-            margin: 20px 0;
+            width: 320px;
+            height: 320px;
+            border-radius: 50%;
+            background: conic-gradient(
+                from 0deg,
+                #c31432 0deg 9.73deg, #111111 9.73deg 19.46deg,
+                #c31432 19.46deg 29.19deg, #111111 29.19deg 38.92deg,
+                #c31432 38.92deg 48.65deg, #111111 48.65deg 58.38deg,
+                #c31432 58.38deg 68.11deg, #111111 68.11deg 77.84deg,
+                #c31432 77.84deg 87.57deg, #111111 87.57deg 97.3deg,
+                #c31432 97.3deg 107.03deg, #111111 107.03deg 116.76deg,
+                #c31432 116.76deg 126.49deg, #111111 126.49deg 136.22deg,
+                #c31432 136.22deg 145.95deg, #111111 145.95deg 155.68deg,
+                #c31432 155.68deg 165.41deg, #111111 165.41deg 175.14deg,
+                #c31432 175.14deg 184.86deg, #111111 184.86deg 194.59deg,
+                #c31432 194.59deg 204.32deg, #111111 204.32deg 214.05deg,
+                #c31432 214.05deg 223.78deg, #111111 223.78deg 233.51deg,
+                #c31432 233.51deg 243.24deg, #111111 243.24deg 252.97deg,
+                #c31432 252.97deg 262.7deg, #111111 262.7deg 272.43deg,
+                #c31432 272.43deg 282.16deg, #111111 282.16deg 291.89deg,
+                #c31432 291.89deg 301.62deg, #111111 301.62deg 311.35deg,
+                #c31432 311.35deg 321.08deg, #111111 321.08deg 330.81deg,
+                #c31432 330.81deg 340.54deg, #111111 340.54deg 350.27deg,
+                #c31432 350.27deg 360deg
+            );
+            border: 12px solid #ffd700;
+            box-shadow: 
+                inset 0 0 50px #000000aa,
+                0 0 60px #c3143255,
+                0 0 120px #ffd70044;
+            position: relative;
         }
 
-        #wheel {
-            width: 100%;
-            height: 100%;
+        .wheel.spinning {
+            animation: spinWheel 5s cubic-bezier(0.25, 0.1, 0.25, 1) forwards;
         }
 
-        #wheelGroup {
-            transform-origin: 200px 200px;
+        @keyframes spinWheel {
+            to { transform: rotate(var(--spin-deg, 3600deg)); }
         }
 
-        .spinning #wheelGroup {
-            animation: spin 5s ease-out forwards;
-        }
-
-        @keyframes spin {
-            to { transform: rotate(var(--final-deg)); }
+        .wheel-center {
+            position: absolute;
+            inset: 0;
+            margin: auto;
+            width: 60px;
+            height: 60px;
+            background: radial-gradient(#ffd700, #b8860b);
+            border-radius: 50%;
+            border: 5px solid #000;
+            box-shadow: 0 0 40px #ffd700aa;
+            z-index: 10;
         }
 
         .ball {
@@ -87,20 +138,22 @@
             height: 20px;
             background: white;
             border-radius: 50%;
-            top: 10px;
-            left: 190px;
+            top: -30px;
+            left: 50%;
+            transform: translateX(-50%);
             box-shadow: 0 0 20px white, inset 0 0 6px black;
             z-index: 20;
         }
 
-        /* Numbers Grid */
+        /* Number Grid */
         .numbers-grid {
             display: grid;
             grid-template-columns: repeat(6, 1fr);
             gap: 10px;
             width: 100%;
-            max-width: 400px;
+            max-width: 420px;
             padding: 0 20px;
+            margin-top: 20px;
         }
 
         .number-btn {
@@ -119,24 +172,24 @@
             justify-content: center;
         }
 
-        .number-btn.zero { background: radial-gradient(#00ff00, #008000); }
-        .number-btn.red { background: radial-gradient(#ff0000, #8b0000); }
-        .number-btn.black { background: radial-gradient(#333333, #000000); }
+        .number-btn.zero   { background: radial-gradient(#00ff00, #008000); }
+        .number-btn.red    { background: radial-gradient(#ff0000, #8b0000); }
+        .number-btn.black  { background: radial-gradient(#333333, #000000); }
 
-        .number-btn:hover { transform: scale(1.1); box-shadow: 0 0 20px rgba(255,0,0,0.6); }
-        .number-btn.selected { box-shadow: 0 0 25px #ffd700; border: 2px solid #ffd700; }
+        .number-btn:hover  { transform: scale(1.12); box-shadow: 0 0 25px rgba(255,107,107,0.6); }
+        .number-btn.selected { border: 4px solid #ffd700; box-shadow: 0 0 30px #ffd700aa; }
 
         .bet-count {
             position: absolute;
-            bottom: -5px;
-            right: -5px;
+            bottom: -6px;
+            right: -6px;
             background: #ffd700;
             color: black;
-            width: 24px;
-            height: 24px;
+            width: 26px;
+            height: 26px;
             border-radius: 50%;
             font-size: 12px;
-            line-height: 24px;
+            line-height: 26px;
             text-align: center;
             font-weight: bold;
             display: none;
@@ -149,12 +202,12 @@
             background: rgba(10,0,20,0.9);
             backdrop-filter: blur(12px);
             padding: 15px 20px;
-            border-top: 2px solid rgba(255,215,0,0.3);
+            border-top: 3px solid #ffd700;
         }
 
         .status {
             text-align: center;
-            font-size: 15px;
+            font-size: 16px;
             margin-bottom: 12px;
             color: #ccc;
         }
@@ -190,24 +243,31 @@
 
         .confirm-box {
             background: linear-gradient(135deg, #1a0033, #0d001a);
-            border: 3px solid #ffd700;
+            border: 4px solid #ffd700;
             border-radius: 20px;
-            padding: 30px;
+            padding: 30px 25px;
             text-align: center;
             width: 90%;
             max-width: 360px;
             box-shadow: 0 0 60px #ffd70066;
         }
 
-        .confirm-box h2 { color: #ffd700; margin-bottom: 15px; font-size: 22px; }
-        .confirm-btns { display: flex; gap: 20px; margin-top: 25px; justify-content: center; }
-        .btn { padding: 12px 30px; border-radius: 12px; font-size: 16px; font-weight: 700; cursor: pointer; transition: 0.3s; }
+        .confirm-box h2 { color: #ffd700; margin-bottom: 20px; font-size: 22px; }
+        .confirm-btns { display: flex; gap: 20px; justify-content: center; }
+        .btn {
+            padding: 12px 35px;
+            border-radius: 12px;
+            font-size: 16px;
+            font-weight: 700;
+            cursor: pointer;
+            transition: 0.3s;
+        }
         .btn.approve { background: #00c853; color: white; border: none; }
         .btn.cancel  { background: #c31432; color: white; border: none; }
-        .btn:hover { transform: scale(1.08); }
+        .btn:hover { transform: scale(1.1); }
 
-        /* Result Message */
-        .result-message {
+        /* Result Popup */
+        .result-popup {
             position: fixed;
             inset: 0;
             background: rgba(0,0,0,0.9);
@@ -216,13 +276,17 @@
             justify-content: center;
             z-index: 150;
             font-family: 'Orbitron', sans-serif;
-            font-size: 36px;
+            font-size: 40px;
             color: #ffd700;
             text-shadow: 0 0 30px #ffd700aa;
         }
+
+        .result-popup.win { color: #00ff9d; text-shadow: 0 0 30px #00ff9daa; }
+        .result-popup.lose { color: #ff4d4d; text-shadow: 0 0 30px #ff4d4daa; }
     </style>
 </head>
 <body>
+
 <div class="container">
     <header>
         <div class="logo">ROULETTE SPIN</div>
@@ -234,11 +298,13 @@
     </header>
 
     <main>
-        <div class="wheel-container">
-            <svg id="wheel" viewBox="0 0 400 400">
-                <!-- Generated by JS -->
-            </svg>
-            <div class="ball"></div>
+        <div class="wheel-section">
+            <div class="wheel-container">
+                <div class="roulette-wheel" id="wheel">
+                    <div class="wheel-center"></div>
+                </div>
+                <div class="ball"></div>
+            </div>
         </div>
 
         <div class="numbers-grid" id="numbersGrid"></div>
@@ -248,7 +314,7 @@
         <div class="status" id="status">Place up to 20 bets • 200 coins each • Win 2000!</div>
         <div class="my-bets" id="myBets"></div>
     </div>
-</body>
+</div>
 
 <!-- Confirmation Popup -->
 <div class="confirm-popup" id="confirmPopup">
@@ -261,8 +327,8 @@
     </div>
 </div>
 
-<!-- Result Message -->
-<div class="result-message" id="resultMessage"></div>
+<!-- Result Popup -->
+<div class="result-popup" id="resultPopup"></div>
 
 <script>
     const socket = io();
@@ -276,91 +342,13 @@
 
     socket.emit('join_game', { game_type: 'roulette', user_id: userId, username });
 
-    // Init Wheel
-    function initWheel() {
-        const svg = document.getElementById('wheel');
-        const g = document.createElementNS("http://www.w3.org/2000/svg", 'g');
-        g.id = 'wheelGroup';
-        svg.appendChild(g);
-
-        const segments = document.createElementNS("http://www.w3.org/2000/svg", 'g');
-        g.appendChild(segments);
-
-        const texts = document.createElementNS("http://www.w3.org/2000/svg", 'g');
-        g.appendChild(texts);
-
-        const n = 37;
-        const r = 200;
-        const radStep = 2 * Math.PI / n;
-
-        const order = [0, 32, 15, 19, 4, 21, 2, 25, 17, 34, 6, 27, 13, 36, 11, 30, 8, 23, 10, 5, 24, 16, 33, 1, 20, 14, 31, 9, 22, 18, 29, 7, 28, 12, 35, 3, 26];
-
-        const colorList = ['#008000'];
-        for (let i = 1; i < n; i++) colorList.push(i % 2 === 1 ? '#ff0000' : '#000000');
-
-        for (let i = 0; i < n; i++) {
-            let startRad = i * radStep - Math.PI / 2; // start from top
-            let endRad = (i + 1) * radStep - Math.PI / 2;
-
-            let x1 = r + r * Math.cos(startRad);
-            let y1 = r + r * Math.sin(startRad);
-            let x2 = r + r * Math.cos(endRad);
-            let y2 = r + r * Math.sin(endRad);
-
-            let large = (endRad - startRad) > Math.PI ? 1 : 0;
-
-            const path = document.createElementNS("http://www.w3.org/2000/svg", 'path');
-            path.setAttribute('d', `M${r},${r} L${x1},${y1} A${r},${r} 0 ${large} 1 ${x2},${y2} Z`);
-            path.setAttribute('fill', colorList[i]);
-            path.setAttribute('stroke', '#ffd700');
-            path.setAttribute('stroke-width', '1');
-            segments.appendChild(path);
-
-            // Text
-            let midRad = startRad + radStep / 2;
-            let tx = r + (r - 20) * Math.cos(midRad);
-            let ty = r + (r - 20) * Math.sin(midRad);
-
-            const text = document.createElementNS("http://www.w3.org/2000/svg", 'text');
-            text.setAttribute('x', tx);
-            text.setAttribute('y', ty);
-            text.setAttribute('fill', 'white');
-            text.setAttribute('font-size', '14');
-            text.setAttribute('text-anchor', 'middle');
-            text.setAttribute('dy', '5');
-            text.setAttribute('transform', `rotate(${(midRad * 180 / Math.PI) + 90}, ${tx}, ${ty})`);
-            text.textContent = order[i];
-            texts.appendChild(text);
-        }
-
-        // Outer Rim
-        const rim = document.createElementNS("http://www.w3.org/2000/svg", 'circle');
-        rim.setAttribute('cx', r);
-        rim.setAttribute('cy', r);
-        rim.setAttribute('r', r - 5);
-        rim.setAttribute('fill', 'none');
-        rim.setAttribute('stroke', '#ffd700');
-        rim.setAttribute('stroke-width', '10');
-        svg.appendChild(rim);
-
-        // Center
-        const center = document.createElementNS("http://www.w3.org/2000/svg", 'circle');
-        center.setAttribute('cx', r);
-        center.setAttribute('cy', r);
-        center.setAttribute('r', 30);
-        center.setAttribute('fill', '#ffd700');
-        svg.appendChild(center);
-    }
-
-    initWheel();
-
-    // Create number buttons
+    // Create number buttons (0-36)
     const grid = document.getElementById('numbersGrid');
-    for(let i = 0; i <= 36; i++) {
+    for (let i = 0; i <= 36; i++) {
         const btn = document.createElement('button');
         btn.className = 'number-btn';
-        if(i === 0) btn.classList.add('zero');
-        else if(i % 2 === 1) btn.classList.add('red');
+        if (i === 0) btn.classList.add('zero');
+        else if (i % 2 === 1) btn.classList.add('red');
         else btn.classList.add('black');
 
         btn.innerHTML = `${i}<span class="bet-count">0</span>`;
@@ -368,13 +356,13 @@
         grid.appendChild(btn);
     }
 
-    // Confirmation
+    // Confirmation Popup
     function requestBetConfirmation(num) {
-        if(selectedBets.length >= MAX_BETS) {
+        if (selectedBets.length >= MAX_BETS) {
             showResult(`Maximum ${MAX_BETS} bets allowed!`, false);
             return;
         }
-        if(selectedBets.includes(num)) {
+        if (selectedBets.includes(num)) {
             showResult("Already bet on this number", false);
             return;
         }
@@ -385,7 +373,7 @@
     }
 
     document.getElementById('approveBet').onclick = () => {
-        if(pendingNumber === null) return;
+        if (pendingNumber === null) return;
         socket.emit('place_bet', {
             game_type: 'roulette',
             user_id: userId,
@@ -393,10 +381,11 @@
             number: pendingNumber,
             amount: BET_AMOUNT
         });
+
         selectedBets.push(pendingNumber);
 
-        const btn = Array.from(grid.children).find(b => parseInt(b.textContent, 10) === pendingNumber);
-        if(btn) {
+        const btn = Array.from(grid.children).find(b => parseInt(b.textContent) === pendingNumber);
+        if (btn) {
             btn.classList.add('selected');
             const count = btn.querySelector('.bet-count');
             count.textContent = parseInt(count.textContent) + 1;
@@ -433,15 +422,17 @@
 
         if (data.time_remaining <= 60) {
             timerEl.classList.add('warning');
-            document.getElementById('status').textContent = "Betting closed - Spinning soon!";
-            document.querySelectorAll('.number-btn').forEach(b => b.disabled = true);
+            document.getElementById('status').textContent = "Betting closed - Wheel spinning soon!";
         } else {
             timerEl.classList.remove('warning');
             document.getElementById('status').textContent = "Place up to 20 bets • 200 coins each • Win 2000!";
-            document.querySelectorAll('.number-btn').forEach(b => b.disabled = false);
         }
 
-        // Trigger spin at 10s, but assume server sends round_result
+        // Auto-spin at ~10 seconds left
+        if (data.time_remaining === 10) {
+            // Request spin (or server will trigger result)
+            socket.emit('request_spin');
+        }
     });
 
     socket.on('round_result', data => {
@@ -449,41 +440,31 @@
         spinWheel(data.result);
         setTimeout(() => {
             const isWin = data.winners?.some(w => w.user_id === userId);
-            showResult(
-                isWin ? `🎉 WINNER! #${data.result} - +2000 coins!` : `❌ #${data.result} - Better luck next time!`,
-                isWin
-            );
-            selectedBets = [];
-            updateMyBetsDisplay();
-            document.querySelectorAll('.number-btn').forEach(b => {
-                b.classList.remove('selected');
-                b.querySelector('.bet-count').textContent = '0';
-            });
-            document.querySelectorAll('.number-btn').forEach(b => b.disabled = false);
-            document.getElementById('status').textContent = "Place up to 20 bets • 200 coins each • Win 2000!";
+            const msg = document.getElementById('resultPopup');
+            msg.textContent = isWin ? `WINNER! #${data.result} +2000 coins!` : `Landed on #${data.result}`;
+            msg.className = 'result-popup ' + (isWin ? 'win' : 'lose');
+            msg.style.display = 'flex';
+
+            setTimeout(() => {
+                msg.style.display = 'none';
+                selectedBets = [];
+                updateMyBetsDisplay();
+                document.querySelectorAll('.number-btn').forEach(b => {
+                    b.classList.remove('selected');
+                    b.querySelector('.bet-count').textContent = '0';
+                });
+            }, 5000);
         }, 5000);
     });
 
     function spinWheel(num) {
-        const order = [0, 32, 15, 19, 4, 21, 2, 25, 17, 34, 6, 27, 13, 36, 11, 30, 8, 23, 10, 5, 24, 16, 33, 1, 20, 14, 31, 9, 22, 18, 29, 7, 28, 12, 35, 3, 26];
-        const n = 37;
-        const degStep = 360 / n;
-        const index = order.indexOf(num);
-        const baseDeg = index * degStep;
-        const extraSpins = Math.floor(Math.random() * 5) + 5;
-        const finalDeg = - (baseDeg + extraSpins * 360);
+        const wheel = document.getElementById('wheel');
+        const degPerNum = 360 / 37;
+        const extraSpins = 8 + Math.floor(Math.random() * 5); // 8-12 spins
+        const finalDeg = (37 - num) * degPerNum + extraSpins * 360;
 
-        const container = document.querySelector('.wheel-container');
-        container.classList.add('spinning');
-        document.getElementById('wheelGroup').style.setProperty('--final-deg', finalDeg + 'deg');
-    }
-
-    function showResult(text, isWin) {
-        const msg = document.getElementById('resultMessage');
-        msg.textContent = text;
-        msg.style.color = isWin ? '#00ff9d' : '#ff4d4d';
-        msg.style.display = 'flex';
-        setTimeout(() => msg.style.display = 'none', 5000);
+        wheel.style.setProperty('--spin-deg', `${finalDeg}deg`);
+        wheel.classList.add('spinning');
     }
 
     // Balance refresh
@@ -494,7 +475,7 @@
         fetch(`/balance/${userId}`).then(r => r.json()).then(d => {
             document.getElementById('balance').textContent = d.balance || 100000;
         });
-    }, 5000);
+    }, 3000);
 </script>
 </body>
 </html>
