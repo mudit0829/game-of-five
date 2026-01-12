@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <title>Roulette Wheel</title>
-<link rel="stylesheet" href="roulette-wheel.css">
+<link rel="stylesheet" href="{{ url_for('static', filename='css/roulette-wheel.css') }}" />
 </head>
 <body>
 
@@ -23,6 +23,6 @@
 
 </div>
 
-<script src="roulette-wheel.js"></script>
+<script src="{{ url_for('static', filename='js/roulette-wheel.js') }}"></script>
 </body>
 </html>
