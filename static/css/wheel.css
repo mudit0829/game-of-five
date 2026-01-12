@@ -1,0 +1,117 @@
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+  font-family: "Segoe UI", system-ui, sans-serif;
+}
+
+body {
+  min-height: 100vh;
+  background: radial-gradient(circle at top, #0b2a52, #020914);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  color: #fff;
+}
+
+.game-container {
+  width: 420px;
+  max-width: 100%;
+  padding: 20px;
+}
+
+/* ===== TOP BAR ===== */
+.top-bar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 20px;
+}
+
+.game-id {
+  font-weight: 700;
+  color: #f5d77a;
+  letter-spacing: 0.5px;
+}
+
+.timer-box {
+  background: linear-gradient(180deg, #2c6bff, #1a3fb3);
+  padding: 10px 22px;
+  border-radius: 12px;
+  font-size: 20px;
+  font-weight: 800;
+  box-shadow: 0 0 15px rgba(44,107,255,.6);
+}
+
+.coins {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-weight: 700;
+  color: #ffd76a;
+}
+
+/* ===== WHEEL ===== */
+.wheel-section {
+  position: relative;
+  display: flex;
+  justify-content: center;
+  margin: 20px 0 10px;
+}
+
+.wheel-wrapper {
+  width: 360px;
+  height: 360px;
+  filter: drop-shadow(0 0 25px rgba(255,215,100,.4));
+}
+
+.pointer {
+  position: absolute;
+  top: -6px;
+  width: 0;
+  height: 0;
+  border-left: 18px solid transparent;
+  border-right: 18px solid transparent;
+  border-bottom: 30px solid #ffd700;
+  z-index: 10;
+  filter: drop-shadow(0 4px 4px rgba(0,0,0,.6));
+}
+
+/* ===== SELECT NUMBER ===== */
+.select-title {
+  text-align: center;
+  margin: 18px 0 10px;
+  font-weight: 600;
+  opacity: .9;
+}
+
+.number-grid {
+  display: grid;
+  grid-template-columns: repeat(9, 1fr);
+  gap: 8px;
+}
+
+.number-grid button {
+  padding: 10px 0;
+  background: linear-gradient(180deg, #1f2f4a, #0d182b);
+  border: 1px solid #2e456b;
+  border-radius: 6px;
+  color: #fff;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.number-grid button.green {
+  background: linear-gradient(180deg, #2fa64a, #1b6f30);
+}
+
+.number-grid button:hover {
+  outline: 2px solid #ffd700;
+}
+
+/* ===== PLAYERS ===== */
+.players {
+  margin-top: 18px;
+  text-align: center;
+  opacity: .85;
+}
