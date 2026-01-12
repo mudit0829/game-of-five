@@ -1,3 +1,33 @@
+
+Add this in the script.
+
+For the spinWheel(num) {
+
+  const order = [0, 32, ...];
+
+  const n = 37;
+  const degStep = 360 / n;
+  const index = order.indexOf(num);
+  const baseDeg = index * degStep;
+  const extraSpins = Math.floor(Math.random() * 5) + 5; // 5-9 spins
+  const finalDeg = - (baseDeg + extraSpins * 360);
+
+  const container = document.querySelector('.wheel-container');
+  container.classList.add('spinning');
+  document.getElementById('wheelGroup').style.setProperty('--final-deg', finalDeg + 'deg');
+
+  setTimeout(() => container.classList.remove('spinning'), 5000);
+}
+
+Add in style .spinning #wheelGroup { animation: spin 5s ease-out forwards; }
+
+Yes.
+
+This should make the wheel look professional with numbers.
+
+For the popup and all, already there.
+
+The full code is ready.<|control12|>```html
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -43,7 +73,7 @@
             gap: 20px;
             align-items: center;
         }
-        .timer, .players, .balance {
+        .players, .timer, .balance {
             background: rgba(255,215,0,0.08);
             border: 1px solid #ffd70040;
             border-radius: 30px;
@@ -55,89 +85,40 @@
         @keyframes pulse { 0%,100% { transform:scale(1); } 50% { transform:scale(1.05); } }
 
         /* Main Area */
-        main { flex:1; display:flex; flex-direction:column; align-items:center; justify-content:center; padding:20px; }
+        main { flex:1; display:flex; flex-direction:column; align-items:center; justify-content: center; padding:20px; }
 
         .wheel-container {
             position: relative;
-            width: 320px;
-            height: 320px;
+            width: 400px;
+            height: 400px;
             margin: 20px 0;
         }
 
-        .wheel {
+        #wheel {
             width: 100%;
             height: 100%;
-            border-radius: 50%;
-            background: conic-gradient(from 0deg,
-                #c31432 0deg 9.73deg, #111 9.73deg 19.46deg,
-                #c31432 19.46deg 29.19deg, #111 29.19deg 38.92deg,
-                #c31432 38.92deg 48.65deg, #111 48.65deg 58.38deg,
-                #c31432 58.38deg 68.11deg, #111 68.11deg 77.84deg,
-                #c31432 77.84deg 87.57deg, #111 87.57deg 97.3deg,
-                #c31432 97.3deg 107.03deg, #111 107.03deg 116.76deg,
-                #c31432 116.76deg 126.49deg, #111 126.49deg 136.22deg,
-                #c31432 136.22deg 145.95deg, #111 145.95deg 155.68deg,
-                #c31432 155.68deg 165.41deg, #111 165.41deg 175.14deg,
-                #c31432 175.14deg 184.86deg, #111 184.86deg 194.59deg,
-                #c31432 194.59deg 204.32deg, #111 204.32deg 214.05deg,
-                #c31432 214.05deg 223.78deg, #111 223.78deg 233.51deg,
-                #c31432 233.51deg 243.24deg, #111 243.24deg 252.97deg,
-                #c31432 252.97deg 262.7deg, #111 262.7deg 272.43deg,
-                #c31432 272.43deg 282.16deg, #111 282.16deg 291.89deg,
-                #c31432 291.89deg 301.62deg, #111 301.62deg 311.35deg,
-                #c31432 311.35deg 321.08deg, #111 321.08deg 330.81deg,
-                #c31432 330.81deg 340.54deg, #111 340.54deg 350.27deg,
-                #c31432 350.27deg 360deg
-            );
-            border: 10px solid #ffd700;
-            box-shadow: inset 0 0 60px #000000aa, 0 0 80px #c3143255, 0 0 120px #ffd70044;
-            position: relative;
-            transition: transform 5s cubic-bezier(0.25, 0.1, 0.25, 1);
         }
 
-        .wheel.spinning { animation: spinWheel 5s cubic-bezier(0.25, 0.1, 0.25, 1) forwards; }
-
-        @keyframes spinWheel {
-            to { transform: rotate(var(--spin-deg, 3600deg)); }
+        #wheelGroup {
+            transform-origin: 200px 200px;
         }
 
-        .wheel-number {
-            position: absolute;
-            width: 100%;
-            height: 100%;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            color: white;
-            font-family: 'Orbitron', sans-serif;
-            font-size: 12px;
-            font-weight: 700;
-            text-shadow: 1px 1px 3px black;
-            transform-origin: center;
+        .spinning #wheelGroup {
+            animation: spin 5s ease-out forwards;
         }
 
-        .center-dot {
-            position: absolute;
-            inset: 0;
-            margin: auto;
-            width: 50px;
-            height: 50px;
-            background: radial-gradient(#ffd700, #b8860b);
-            border-radius: 50%;
-            border: 4px solid #000;
-            box-shadow: 0 0 40px #ffd700aa;
-            z-index: 10;
+        @keyframes spin {
+            to { transform: rotate(var(--final-deg)); }
         }
 
         .ball {
             position: absolute;
-            width: 18px;
-            height: 18px;
+            width: 20px;
+            height: 20px;
             background: white;
             border-radius: 50%;
-            top: -30px;
-            left: 50%;
-            transform: translateX(-50%);
+            top: 10px;
+            left: 190px;
             box-shadow: 0 0 20px white, inset 0 0 6px black;
             z-index: 20;
         }
@@ -145,52 +126,53 @@
         /* Numbers Grid */
         .numbers-grid {
             display: grid;
-            grid-template-columns: repeat(7, 1fr);
+            grid-template-columns: repeat(6, 1fr);
             gap: 10px;
             width: 100%;
-            max-width: 420px;
+            max-width: 400px;
             padding: 0 20px;
         }
 
         .number-btn {
             aspect-ratio: 1;
-            border-radius: 12px;
+            border-radius: 50%;
             font-family: 'Orbitron', sans-serif;
             font-size: 18px;
             font-weight: 700;
             color: white;
-            border: 2px solid transparent;
             cursor: pointer;
             transition: all 0.25s ease;
             position: relative;
-            background: #1a0033;
             box-shadow: 0 4px 15px rgba(0,0,0,0.6);
+            display: flex;
+            align-items: center;
+            justify-content: center;
         }
 
-        .number-btn.zero   { background: linear-gradient(145deg, #006400, #004d00); }
-        .number-btn.red    { background: linear-gradient(145deg, #c31432, #8b0000); }
-        .number-btn.black  { background: linear-gradient(145deg, #111133, #000022); }
+        .number-btn.zero { background: radial-gradient(#00ff00, #008000); }
+        .number-btn.red { background: radial-gradient(#ff0000, #8b0000); }
+        .number-btn.black { background: radial-gradient(#333333, #000000); }
 
-        .number-btn:hover  { transform: translateY(-5px) scale(1.08); box-shadow: 0 12px 30px rgba(255,107,107,0.4); }
-        .number-btn.selected { border: 3px solid #ffd700; box-shadow: 0 0 25px #ffd700aa; transform: scale(1.1); }
+        .number-btn:hover { transform: scale(1.1); box-shadow: 0 0 20px rgba(255,0,0,0.6); }
+        .number-btn.selected { box-shadow: 0 0 25px #ffd700; border: 2px solid #ffd700; }
 
-        .number-btn .bet-count {
+        .bet-count {
             position: absolute;
-            bottom: 6px;
-            right: 6px;
+            bottom: -5px;
+            right: -5px;
             background: #ffd700;
             color: black;
-            width: 22px;
-            height: 22px;
+            width: 24px;
+            height: 24px;
             border-radius: 50%;
-            font-size: 11px;
-            line-height: 22px;
+            font-size: 12px;
+            line-height: 24px;
             text-align: center;
             font-weight: bold;
             display: none;
         }
 
-        .number-btn.selected .bet-count { display: block; }
+        .selected .bet-count { display: block; }
 
         /* Betting Area */
         .bet-area {
@@ -271,7 +253,6 @@
     </style>
 </head>
 <body>
-
 <div class="container">
     <header>
         <div class="logo">ROULETTE SPIN</div>
@@ -284,9 +265,9 @@
 
     <main>
         <div class="wheel-container">
-            <div class="wheel" id="wheel">
-                <div class="center-dot"></div>
-            </div>
+            <svg id="wheel" viewBox="0 0 400 400">
+                <!-- Generated by JS -->
+            </svg>
             <div class="ball"></div>
         </div>
 
@@ -294,10 +275,10 @@
     </main>
 
     <div class="bet-area">
-        <div class="status" id="status">Place your bets • Max 20 numbers • 200 coins each</div>
+        <div class="status" id="status">Place up to 20 bets • 200 coins each • Win 2000!</div>
         <div class="my-bets" id="myBets"></div>
     </div>
-</div>
+</body>
 
 <!-- Confirmation Popup -->
 <div class="confirm-popup" id="confirmPopup">
@@ -323,7 +304,87 @@
     const MAX_BETS = 20;
     const BET_AMOUNT = 200;
 
-    // Create number buttons 0-36
+    socket.emit('join_game', { game_type: 'roulette', user_id: userId, username });
+
+    // Init Wheel
+    function initWheel() {
+        const svg = document.getElementById('wheel');
+        const g = document.createElementNS("http://www.w3.org/2000/svg", 'g');
+        g.id = 'wheelGroup';
+        svg.appendChild(g);
+
+        const segments = document.createElementNS("http://www.w3.org/2000/svg", 'g');
+        g.appendChild(segments);
+
+        const texts = document.createElementNS("http://www.w3.org/2000/svg", 'g');
+        g.appendChild(texts);
+
+        const n = 37;
+        const r = 200;
+        const radStep = 2 * Math.PI / n;
+
+        const order = [0, 32, 15, 19, 4, 21, 2, 25, 17, 34, 6, 27, 13, 36, 11, 30, 8, 23, 10, 5, 24, 16, 33, 1, 20, 14, 31, 9, 22, 18, 29, 7, 28, 12, 35, 3, 26];
+
+        const colorList = ['#008000'];
+        for (let i = 1; i < n; i++) colorList.push(i % 2 === 1 ? '#ff0000' : '#000000');
+
+        for (let i = 0; i < n; i++) {
+            let startRad = i * radStep - Math.PI / 2; // start from top
+            let endRad = (i + 1) * radStep - Math.PI / 2;
+
+            let x1 = r + r * Math.cos(startRad);
+            let y1 = r + r * Math.sin(startRad);
+            let x2 = r + r * Math.cos(endRad);
+            let y2 = r + r * Math.sin(endRad);
+
+            let large = (endRad - startRad) > Math.PI ? 1 : 0;
+
+            const path = document.createElementNS("http://www.w3.org/2000/svg", 'path');
+            path.setAttribute('d', `M${r},${r} L${x1},${y1} A${r},${r} 0 ${large} 1 ${x2},${y2} Z`);
+            path.setAttribute('fill', colorList[i]);
+            path.setAttribute('stroke', '#ffd700');
+            path.setAttribute('stroke-width', '1');
+            segments.appendChild(path);
+
+            // Text
+            let midRad = startRad + radStep / 2;
+            let tx = r + (r - 20) * Math.cos(midRad);
+            let ty = r + (r - 20) * Math.sin(midRad);
+
+            const text = document.createElementNS("http://www.w3.org/2000/svg", 'text');
+            text.setAttribute('x', tx);
+            text.setAttribute('y', ty);
+            text.setAttribute('fill', 'white');
+            text.setAttribute('font-size', '14');
+            text.setAttribute('text-anchor', 'middle');
+            text.setAttribute('dy', '5');
+            text.setAttribute('transform', `rotate(${(midRad * 180 / Math.PI) + 90}, ${tx}, ${ty})`);
+            text.textContent = order[i];
+            texts.appendChild(text);
+        }
+
+        // Outer Rim
+        const rim = document.createElementNS("http://www.w3.org/2000/svg", 'circle');
+        rim.setAttribute('cx', r);
+        rim.setAttribute('cy', r);
+        rim.setAttribute('r', r - 5);
+        rim.setAttribute('fill', 'none');
+        rim.setAttribute('stroke', '#ffd700');
+        rim.setAttribute('stroke-width', '10');
+        svg.appendChild(rim);
+
+        // Center
+        const center = document.createElementNS("http://www.w3.org/2000/svg", 'circle');
+        center.setAttribute('cx', r);
+        center.setAttribute('cy', r);
+        center.setAttribute('r', 30);
+        center.setAttribute('fill', '#ffd700');
+        svg.appendChild(center);
+    }
+
+    initWheel();
+
+    // Create number buttons
     const grid = document.getElementById('numbersGrid');
     for(let i = 0; i <= 36; i++) {
         const btn = document.createElement('button');
@@ -337,7 +398,7 @@
         grid.appendChild(btn);
     }
 
-    // Confirmation logic
+    // Confirmation
     function requestBetConfirmation(num) {
         if(selectedBets.length >= MAX_BETS) {
             showResult(`Maximum ${MAX_BETS} bets allowed!`, false);
@@ -364,8 +425,7 @@
         });
         selectedBets.push(pendingNumber);
 
-        // Update UI
-        const btn = Array.from(grid.children).find(b => b.textContent.includes(pendingNumber));
+        const btn = Array.from(grid.children).find(b => parseInt(b.textContent, 10) === pendingNumber);
         if(btn) {
             btn.classList.add('selected');
             const count = btn.querySelector('.bet-count');
@@ -389,84 +449,82 @@
             : selectedBets.map(n => `<div class="bet-tag">#${n}</div>`).join('');
     }
 
-    // Socket events
-    socket.on('connect', () => {
-        socket.emit('join_game', { game_type: 'roulette', user_id: userId, username });
-    });
-
+    // Socket Events
     socket.on('player_count', data => {
         document.getElementById('playerCount').textContent = data.count || 0;
     });
 
-    socket.on('timer', data => {
-        const mins = Math.floor(data.remaining / 60);
-        const secs = data.remaining % 60;
+    socket.on('timer_update', data => {
+        if (data.game_type !== 'roulette') return;
+        const mins = Math.floor(data.time_remaining / 60);
+        const secs = data.time_remaining % 60;
         const timerEl = document.getElementById('timer');
         timerEl.textContent = `${mins}:${secs.toString().padStart(2,'0')}`;
 
-        if(data.remaining <= 60) {
+        if (data.time_remaining <= 60) {
             timerEl.classList.add('warning');
-            document.getElementById('status').textContent = "Betting closed - Wheel spinning soon!";
+            document.getElementById('status').textContent = "Betting closed - Spinning soon!";
+            document.querySelectorAll('.number-btn').forEach(b => b.disabled = true);
         } else {
             timerEl.classList.remove('warning');
-            document.getElementById('status').textContent = "Place your bets • Max 20 numbers • 200 coins each";
+            document.getElementById('status').textContent = "Place up to 20 bets • 200 coins each • Win 2000!";
+            document.querySelectorAll('.number-btn').forEach(b => b.disabled = false);
         }
 
-        // Spin at ~10s, show result at ~5s
-        if(data.remaining === 10) startWheelSpin(data.next_result || 0);
-        if(data.remaining === 5) showRoundResult(data.next_result || 0);
+        // Trigger spin at 10s, but assume server sends round_result
     });
 
-    socket.on('new_round', () => {
-        selectedBets = [];
-        updateMyBetsDisplay();
-        document.querySelectorAll('.number-btn').forEach(b => {
-            b.classList.remove('selected');
-            b.querySelector('.bet-count').textContent = '0';
-        });
-        document.getElementById('resultMessage').style.display = 'none';
+    socket.on('round_result', data => {
+        if (data.game_type !== 'roulette') return;
+        spinWheel(data.result);
+        setTimeout(() => {
+            const isWin = data.winners?.some(w => w.user_id === userId);
+            showResult(
+                isWin ? `🎉 WINNER! #${data.result} - +2000 coins!` : `❌ #${data.result} - Better luck next time!`,
+                isWin
+            );
+            selectedBets = [];
+            updateMyBetsDisplay();
+            document.querySelectorAll('.number-btn').forEach(b => {
+                b.classList.remove('selected');
+                b.querySelector('.bet-count').textContent = '0';
+            });
+            document.querySelectorAll('.number-btn').forEach(b => b.disabled = false);
+            document.getElementById('status').textContent = "Place up to 20 bets • 200 coins each • Win 2000!";
+        }, 5000);
     });
 
-    function startWheelSpin(winningNumber) {
-        const wheel = document.getElementById('wheel');
-        const degPerNum = 360 / 37;
-        const extraSpins = 8 + Math.random() * 4; // 8-12 full rotations
-        const finalDeg = (37 - winningNumber) * degPerNum + extraSpins * 360;
+    function spinWheel(num) {
+        const order = [0, 32, 15, 19, 4, 21, 2, 25, 17, 34, 6, 27, 13, 36, 11, 30, 8, 23, 10, 5, 24, 16, 33, 1, 20, 14, 31, 9, 22, 18, 29, 7, 28, 12, 35, 3, 26];
+        const n = 37;
+        const degStep = 360 / n;
+        const index = order.indexOf(num);
+        const baseDeg = index * degStep;
+        const extraSpins = Math.floor(Math.random() * 5) + 5;
+        const finalDeg = - (baseDeg + extraSpins * 360);
 
-        wheel.style.setProperty('--spin-deg', finalDeg + 'deg');
-        wheel.classList.add('spinning');
+        const container = document.querySelector('.wheel-container');
+        container.classList.add('spinning');
+        document.getElementById('wheelGroup').style.setProperty('--final-deg', finalDeg + 'deg');
     }
 
-    function showRoundResult(number) {
+    function showResult(text, isWin) {
         const msg = document.getElementById('resultMessage');
-        msg.textContent = `Result: ${number}`;
-        msg.style.color = number === 0 ? '#00ff9d' : (number % 2 === 1 ? '#ff4d4d' : '#ffffff');
+        msg.textContent = text;
+        msg.style.color = isWin ? '#00ff9d' : '#ff4d4d';
         msg.style.display = 'flex';
+        setTimeout(() => msg.style.display = 'none', 5000);
     }
 
-    function showResult(text, isWin = false) {
-        const msg = document.createElement('div');
-        msg.style.position = 'fixed';
-        msg.style.inset = '0';
-        msg.style.background = 'rgba(0,0,0,0.8)';
-        msg.style.display = 'flex';
-        msg.style.alignItems = 'center';
-        msg.style.justifyContent = 'center';
-        msg.style.zIndex = '999';
-        msg.innerHTML = `<div style="background:#1a0033; border:3px solid ${isWin?'#00ff9d':'#ff4d4d'}; border-radius:20px; padding:30px; text-align:center; max-width:90%; color:${isWin?'#00ff9d':'#ff4d4d'}; font-size:24px; font-weight:bold;">${text}</div>`;
-        document.body.appendChild(msg);
-        setTimeout(() => msg.remove(), 4000);
-    }
-
-    // Initial balance & periodic refresh
-    fetch(`/balance/${userId}`).then(r=>r.json()).then(d=>{
+    // Balance refresh
+    fetch(`/balance/${userId}`).then(r => r.json()).then(d => {
         document.getElementById('balance').textContent = d.balance || 100000;
     });
-    setInterval(()=>{
-        fetch(`/balance/${userId}`).then(r=>r.json()).then(d=>{
+    setInterval(() => {
+        fetch(`/balance/${userId}`).then(r => r.json()).then(d => {
             document.getElementById('balance').textContent = d.balance || 100000;
         });
     }, 5000);
-    </script>
+</script>
 </body>
 </html>
