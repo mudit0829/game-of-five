@@ -2,149 +2,141 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<title>Real Roulette Wheel – Fixed</title>
+<title>Roulette – Correct Geometry</title>
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
 <style>
-* {
-  margin: 0;
-  padding: 0;
-  box-sizing: border-box;
+* { margin:0; padding:0; box-sizing:border-box; }
+
+body{
+  height:100vh;
+  background:radial-gradient(circle at top,#0b1c33,#050b14);
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  font-family:Arial,sans-serif;
 }
 
-body {
-  height: 100vh;
-  background: radial-gradient(circle at top, #0b1c33, #050b14);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-family: Arial, sans-serif;
+.wrapper{
+  position:relative;
+  width:420px;
+  height:420px;
 }
 
-/* ================= WRAPPER ================= */
-.roulette-wrapper {
-  position: relative;
-  width: 380px;
-  height: 380px;
-}
-
-/* ================= ARROW ================= */
-.arrow {
-  position: absolute;
-  top: -16px;
-  left: 50%;
-  transform: translateX(-50%);
-  width: 0;
-  height: 0;
-  border-left: 6px solid transparent;
-  border-right: 6px solid transparent;
-  border-bottom: 34px solid #f5c04a;
-  z-index: 50;
-  filter: drop-shadow(0 4px 6px rgba(0,0,0,0.8));
+.arrow{
+  position:absolute;
+  top:-18px;
+  left:50%;
+  transform:translateX(-50%);
+  width:0;height:0;
+  border-left:6px solid transparent;
+  border-right:6px solid transparent;
+  border-bottom:36px solid #f5c04a;
+  z-index:10;
 }
 
 /* ================= WHEEL ================= */
-.wheel {
-  width: 100%;
-  height: 100%;
-  border-radius: 50%;
-  position: relative;
-  background: #6b3e1e;
-  box-shadow: 0 30px 60px rgba(0,0,0,0.8);
-  overflow: hidden;
-  transition: transform 5s cubic-bezier(0.12, 0.85, 0.25, 1);
+.wheel{
+  width:100%;
+  height:100%;
+  border-radius:50%;
+  position:relative;
+  background:#6b3e1e;
+  box-shadow:0 30px 60px rgba(0,0,0,.8);
+  overflow:hidden;
+  transition:transform 5.2s cubic-bezier(.12,.85,.25,1);
 }
 
-.wheel::before {
-  content: "";
-  position: absolute;
-  inset: 0;
-  border-radius: 50%;
+.wheel::before{
+  content:"";
+  position:absolute;
+  inset:0;
+  border-radius:50%;
   box-shadow:
-    inset 0 0 0 10px #b8862b,
-    inset 0 0 0 16px #f3d27a;
+    inset 0 0 0 12px #b8862b,
+    inset 0 0 0 18px #f3d27a;
 }
 
 /* ================= POCKET RING ================= */
-.pocket-ring {
-  position: absolute;
-  inset: 30px;
-  border-radius: 50%;
+.pockets{
+  position:absolute;
+  inset:38px;
+  border-radius:50%;
 }
 
-/* ================= POCKET ================= */
-.pocket {
-  position: absolute;
-  width: 26px;
-  height: 44px;
-  top: 0;
-  left: 50%;
-  transform-origin: 50% 155px; /* 🔑 increased radius */
-  border-left: 1px solid #d4af37;
-  border-right: 1px solid #8a6b1f;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-weight: 800;
-  font-size: 11px; /* 🔑 reduced size */
-  color: #fff;
-  text-shadow: 0 1px 2px rgba(0,0,0,0.8);
+.pocket{
+  position:absolute;
+  width:30px;
+  height:48px;
+  top:0;
+  left:50%;
+  transform-origin:50% 180px;
+  border-left:1px solid #e0c36a;
+  border-right:1px solid #7a5a1a;
 }
 
-/* COLORS */
-.pocket.red { background: #c62828; }
-.pocket.black { background: #111; }
-.pocket.green { background: #2e7d32; }
+.red{ background:#c62828; }
+.black{ background:#111; }
+.green{ background:#2e7d32; }
 
-/* ================= INNER BOWL ================= */
-.inner-bowl {
-  position: absolute;
-  inset: 100px;
-  border-radius: 50%;
-  background: radial-gradient(circle, #7a4a28, #4a2a16);
-  box-shadow: inset 0 10px 20px rgba(0,0,0,0.6);
+/* ================= NUMBERS (REAL FIX) ================= */
+.number{
+  position:absolute;
+  width:24px;
+  height:24px;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  font-size:12px;
+  font-weight:800;
+  color:#fff;
+  text-shadow:0 1px 2px rgba(0,0,0,.8);
+  pointer-events:none;
 }
 
-/* ================= CENTER ================= */
-.spindle {
-  position: absolute;
-  width: 82px;
-  height: 82px;
-  border-radius: 50%;
-  background: radial-gradient(circle, #ffe6a1, #cfa13a);
-  top: 50%;
-  left: 50%;
-  transform: translate(-50%, -50%);
-  box-shadow:
-    inset 0 0 12px rgba(255,255,255,0.6),
-    0 8px 18px rgba(0,0,0,0.7);
-  z-index: 10;
+/* ================= INNER ================= */
+.inner{
+  position:absolute;
+  inset:135px;
+  border-radius:50%;
+  background:radial-gradient(circle,#7a4a28,#4a2a16);
+}
+
+.center{
+  position:absolute;
+  width:86px;
+  height:86px;
+  border-radius:50%;
+  background:radial-gradient(circle,#ffe6a1,#cfa13a);
+  top:50%;
+  left:50%;
+  transform:translate(-50%,-50%);
+  z-index:5;
 }
 
 /* ================= WIN ================= */
-.pocket.win {
-  box-shadow:
-    inset 0 0 12px rgba(255,215,0,0.9),
-    0 0 8px rgba(255,215,0,0.8);
-  transform: scale(1.15) !important;
+.number.win{
+  color:#ffd700;
+  transform:scale(1.4);
 }
 </style>
 </head>
 
 <body>
 
-<div class="roulette-wrapper">
+<div class="wrapper">
   <div class="arrow"></div>
 
   <div class="wheel" id="wheel">
-    <div class="pocket-ring" id="pockets"></div>
-    <div class="inner-bowl"></div>
-    <div class="spindle"></div>
+    <div class="pockets" id="pockets"></div>
+    <div class="inner"></div>
+    <div class="center"></div>
   </div>
 </div>
 
 <script>
-const numbers = [
+/* ================= DATA ================= */
+const nums=[
   0,32,15,19,4,21,2,25,17,34,
   6,27,13,36,11,30,8,23,10,
   5,24,16,33,1,20,14,31,
@@ -152,49 +144,57 @@ const numbers = [
   35,3,26
 ];
 
-const redNums = [
+const reds=[
   1,3,5,7,9,12,14,16,18,19,
   21,23,25,27,30,32,34,36
 ];
 
-const wheel = document.getElementById("wheel");
-const pocketsEl = document.getElementById("pockets");
-const angle = 360 / numbers.length;
+const wheel=document.getElementById("wheel");
+const pockets=document.getElementById("pockets");
+const radius=168;           // 🔑 fixed circle
+const center=210;           // wrapper/2
+const step=360/nums.length;
 
-/* BUILD POCKETS */
-numbers.forEach((num, i) => {
-  const p = document.createElement("div");
-  p.classList.add("pocket");
+/* ================= BUILD POCKETS ================= */
+nums.forEach((n,i)=>{
+  const p=document.createElement("div");
+  p.className="pocket "+(n===0?"green":reds.includes(n)?"red":"black");
+  p.style.transform=`rotate(${i*step}deg) translateX(-50%)`;
+  pockets.appendChild(p);
 
-  let color = "black";
-  if (num === 0) color = "green";
-  else if (redNums.includes(num)) color = "red";
-  p.classList.add(color);
+  /* NUMBER – TRUE POLAR PLACEMENT */
+  const angle=(i*step-90)*Math.PI/180;
+  const x=center+radius*Math.cos(angle)-12;
+  const y=center+radius*Math.sin(angle)-12;
 
-  p.style.transform = `rotate(${i * angle}deg) translateX(-50%)`;
-  p.textContent = num;
-  pocketsEl.appendChild(p);
+  const num=document.createElement("div");
+  num.className="number";
+  num.textContent=n;
+  num.style.left=x+"px";
+  num.style.top=y+"px";
+  num.dataset.index=i;
+  wheel.appendChild(num);
 });
 
-/* SPIN */
-function spinTo(number) {
-  const index = numbers.indexOf(number);
-  const stopAngle = 360 - index * angle;
-  const spins = 7 * 360;
+/* ================= SPIN ================= */
+function spinTo(n){
+  const i=nums.indexOf(n);
+  const stop=360-i*step;
+  const spins=7*360;
 
-  document.querySelectorAll(".pocket").forEach(p =>
-    p.classList.remove("win")
-  );
+  document.querySelectorAll(".number")
+    .forEach(x=>x.classList.remove("win"));
 
-  wheel.style.transform = `rotate(${spins + stopAngle}deg)`;
+  wheel.style.transform=`rotate(${spins+stop}deg)`;
 
-  setTimeout(() => {
-    document.querySelectorAll(".pocket")[index].classList.add("win");
-  }, 5200);
+  setTimeout(()=>{
+    document.querySelectorAll(".number")[i]
+      .classList.add("win");
+  },5200);
 }
 
 /* DEMO */
-setTimeout(() => spinTo(26), 1000);
+setTimeout(()=>spinTo(26),1000);
 </script>
 
 </body>
