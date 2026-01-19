@@ -17,6 +17,7 @@ import time
 import os
 import hashlib
 import secrets
+from functools import wraps
 
 # ---------------------------------------------------
 # Flask / DB / Socket setup
@@ -107,6 +108,11 @@ class User(db.Model):
     email = db.Column(db.String(200))
     country = db.Column(db.String(100))
     phone = db.Column(db.String(50))
+    
+    # Admin fields
+    is_admin = db.Column(db.Boolean, default=False)
+    is_blocked = db.Column(db.Boolean, default=False)
+    block_reason = db.Column(db.Text)
 
     wallet = db.relationship("Wallet", backref="user", uselist=False)
     tickets = db.relationship("Ticket", backref="user", lazy=True)
@@ -152,14 +158,28 @@ user_game_history = {}  # {user_id: [bet_record, ...]}  (pending + completed)
 
 
 def login_required(f):
-    from functools import wraps
-
     @wraps(f)
     def decorated(*args, **kwargs):
         if "user_id" not in session:
             return redirect(url_for("login_page"))
         return f(*args, **kwargs)
 
+    return decorated
+
+
+def admin_required(f):
+    """Check if user is logged in AND is admin"""
+    @wraps(f)
+    def decorated(*args, **kwargs):
+        if "user_id" not in session:
+            return redirect(url_for("login_page"))
+        
+        user = User.query.get(session.get("user_id"))
+        if not user or not user.is_admin:
+            return jsonify({"error": "Admin access required"}), 403
+        
+        return f(*args, **kwargs)
+    
     return decorated
 
 
@@ -563,6 +583,9 @@ def user_games_history_api():
 @app.route("/")
 def index():
     if "user_id" in session:
+        user = User.query.get(session.get("user_id"))
+        if user and user.is_admin:
+            return redirect(url_for("admin_panel"))
         return redirect(url_for("home"))
     return redirect(url_for("login_page"))
 
@@ -595,6 +618,11 @@ def login_post():
             {"success": False, "message": "Invalid username or password"}
         ), 401
 
+    if user.is_blocked:
+        return jsonify(
+            {"success": False, "message": f"Your account is blocked. Reason: {user.block_reason or 'No reason provided'}"}
+        ), 403
+
     # ensure wallet
     ensure_wallet_for_user(user)
 
@@ -605,13 +633,15 @@ def login_post():
 
     token = secrets.token_urlsafe(32)
 
+    redirect_url = url_for("admin_panel") if user.is_admin else url_for("home")
+
     return jsonify(
         {
             "success": True,
             "user_id": user.id,
             "username": user.username,
             "token": token,
-            "redirect": url_for("home"),
+            "redirect": redirect_url,
         }
     )
 
@@ -872,6 +902,171 @@ def get_balance(user_id):
 
 
 # ---------------------------------------------------
+# ADMIN PANEL ROUTES
+# ---------------------------------------------------
+
+
+@app.route("/admin")
+@admin_required
+def admin_panel():
+    """Main admin panel page"""
+    return render_template("admin_panel.html")
+
+
+@app.route("/api/admin/users", methods=["GET"])
+@admin_required
+def admin_get_users():
+    """Get all users with wallet info"""
+    users = User.query.all()
+    user_list = []
+    
+    for user in users:
+        wallet = ensure_wallet_for_user(user)
+        user_list.append({
+            "id": user.id,
+            "username": user.username,
+            "email": user.email or "",
+            "password_hash": user.password_hash,
+            "status": "blocked" if user.is_blocked else "active",
+            "balance": wallet.balance,
+            "created_at": user.created_at.strftime("%Y-%m-%d %H:%M"),
+            "block_reason": user.block_reason or "",
+        })
+    
+    return jsonify(user_list)
+
+
+@app.route("/api/admin/users/<int:user_id>", methods=["PUT"])
+@admin_required
+def admin_update_user(user_id):
+    """Update user information"""
+    user = User.query.get(user_id)
+    if not user:
+        return jsonify({"success": False, "message": "User not found"}), 404
+    
+    data = request.get_json() or {}
+    
+    if "username" in data:
+        user.username = data["username"]
+    if "email" in data:
+        user.email = data["email"]
+    if "password" in data and data["password"]:
+        user.set_password(data["password"])
+    if "status" in data:
+        user.is_blocked = (data["status"] == "blocked")
+    if "balance" in data:
+        wallet = ensure_wallet_for_user(user)
+        wallet.balance = data["balance"]
+    if "block_reason" in data:
+        user.block_reason = data["block_reason"]
+    
+    db.session.commit()
+    return jsonify({"success": True, "message": "User updated successfully"})
+
+
+@app.route("/api/admin/users/<int:user_id>/block", methods=["POST"])
+@admin_required
+def admin_block_user(user_id):
+    """Block a user"""
+    user = User.query.get(user_id)
+    if not user:
+        return jsonify({"success": False, "message": "User not found"}), 404
+    
+    data = request.get_json() or {}
+    user.is_blocked = True
+    user.block_reason = data.get("reason", "Blocked by admin")
+    
+    db.session.commit()
+    return jsonify({"success": True, "message": "User blocked successfully"})
+
+
+@app.route("/api/admin/users/<int:user_id>/unblock", methods=["POST"])
+@admin_required
+def admin_unblock_user(user_id):
+    """Unblock a user"""
+    user = User.query.get(user_id)
+    if not user:
+        return jsonify({"success": False, "message": "User not found"}), 404
+    
+    user.is_blocked = False
+    user.block_reason = None
+    
+    db.session.commit()
+    return jsonify({"success": True, "message": "User unblocked successfully"})
+
+
+@app.route("/api/admin/users/<int:user_id>/balance", methods=["POST"])
+@admin_required
+def admin_credit_debit(user_id):
+    """Credit or debit user balance"""
+    user = User.query.get(user_id)
+    if not user:
+        return jsonify({"success": False, "message": "User not found"}), 404
+    
+    data = request.get_json() or {}
+    transaction_type = data.get("type", "add")  # add or deduct
+    amount = float(data.get("amount", 0))
+    reason = data.get("reason", "Admin transaction")
+    
+    wallet = ensure_wallet_for_user(user)
+    
+    if transaction_type == "add":
+        wallet.balance += amount
+    else:
+        wallet.balance -= amount
+    
+    db.session.commit()
+    
+    return jsonify({
+        "success": True,
+        "message": f"Transaction processed. New balance: ₹{wallet.balance}",
+        "new_balance": wallet.balance
+    })
+
+
+@app.route("/api/admin/games", methods=["GET"])
+@admin_required
+def admin_get_games():
+    """Get all active games"""
+    all_games = []
+    
+    for game_type, tables in game_tables.items():
+        for table in tables:
+            all_games.append({
+                "round_code": table.round_code,
+                "game_type": game_type,
+                "players": len(table.bets),
+                "max_players": table.max_players,
+                "status": "finished" if table.is_finished else "completed" if table.is_betting_closed else "active",
+                "result": table.result,
+                "total_bets": sum(b.get("bet_amount", 0) for b in table.bets),
+                "started_at": table.start_time.strftime("%Y-%m-%d %H:%M"),
+            })
+    
+    return jsonify(all_games)
+
+
+@app.route("/api/admin/stats", methods=["GET"])
+@admin_required
+def admin_get_stats():
+    """Get admin dashboard statistics"""
+    total_users = User.query.count()
+    blocked_users = User.query.filter_by(is_blocked=True).count()
+    active_games = sum(1 for tables in game_tables.values() for t in tables if not t.is_finished)
+    
+    # Calculate total revenue from all wallets
+    all_wallets = Wallet.query.all()
+    total_revenue = sum(w.balance for w in all_wallets)
+    
+    return jsonify({
+        "total_users": total_users,
+        "active_games": active_games,
+        "total_revenue": total_revenue,
+        "blocked_users": blocked_users,
+    })
+
+
+# ---------------------------------------------------
 # Socket.IO handlers
 # ---------------------------------------------------
 
@@ -937,6 +1132,11 @@ def handle_place_bet(data):
     user = User.query.get(user_id)
     if not user:
         emit("bet_error", {"message": "User not found"})
+        return
+
+    # Check if user is blocked
+    if user.is_blocked:
+        emit("bet_error", {"message": f"Your account is blocked. Reason: {user.block_reason or 'No reason provided'}"})
         return
 
     wallet = ensure_wallet_for_user(user)
@@ -1025,7 +1225,18 @@ def seed_demo_users():
             db.session.add(user)
             db.session.commit()
         ensure_wallet_for_user(user)
+    
+    # Create admin user
+    admin = User.query.filter_by(username="admin").first()
+    if not admin:
+        admin = User(username="admin", display_name="Admin User", is_admin=True)
+        admin.set_password("admin123")
+        db.session.add(admin)
+        db.session.commit()
+        ensure_wallet_for_user(admin)
+    
     print("Demo users ready: demo, demo1..demo5, password='demo123'")
+    print("Admin user ready: admin, password='admin123'")
 
 
 # ---------------------------------------------------
