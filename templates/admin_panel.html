@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Admin Panel - Frog Jump Gaming</title>
+    <title>Admin Panel - Game of Five</title>
     <style>
         * {
             margin: 0;
@@ -12,82 +12,60 @@
         }
 
         body {
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
-            color: #e0e0e0;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, #1f2937 0%, #111827 100%);
+            color: #f3f4f6;
             min-height: 100vh;
         }
 
         .admin-container {
-            display: flex;
+            display: grid;
+            grid-template-columns: 250px 1fr;
             min-height: 100vh;
         }
 
-        /* ================= SIDEBAR ================= */
         .sidebar {
-            width: 280px;
-            background: #0f3460;
-            padding: 30px 0;
-            border-right: 2px solid #00d4ff;
+            background: #111827;
+            border-right: 1px solid #374151;
+            padding: 20px;
             position: fixed;
+            width: 250px;
             height: 100vh;
             overflow-y: auto;
-            box-shadow: 2px 0 10px rgba(0, 212, 255, 0.1);
         }
 
-        .sidebar-logo {
-            padding: 0 20px 30px;
-            border-bottom: 1px solid #1a5a7a;
+        .sidebar h2 {
+            color: #10b981;
             margin-bottom: 20px;
+            font-size: 18px;
         }
 
-        .sidebar-logo h1 {
-            font-size: 20px;
-            color: #00d4ff;
-            display: flex;
-            align-items: center;
-            gap: 10px;
-        }
-
-        .sidebar-logo h1::before {
-            content: "⚙️";
-            font-size: 24px;
-        }
-
-        .sidebar-nav {
+        .sidebar ul {
             list-style: none;
         }
 
-        .sidebar-nav li {
-            margin: 5px 0;
+        .sidebar li {
+            margin-bottom: 10px;
         }
 
-        .sidebar-nav a {
+        .sidebar a {
             display: block;
-            padding: 12px 20px;
-            color: #b0b0b0;
+            padding: 10px 15px;
+            color: #d1d5db;
             text-decoration: none;
-            transition: all 0.3s ease;
-            border-left: 3px solid transparent;
+            border-radius: 6px;
+            transition: all 0.3s;
             cursor: pointer;
         }
 
-        .sidebar-nav a:hover {
-            background: rgba(0, 212, 255, 0.1);
-            color: #00d4ff;
-            border-left-color: #00d4ff;
+        .sidebar a:hover,
+        .sidebar a.active {
+            background: #1f2937;
+            color: #10b981;
         }
 
-        .sidebar-nav a.active {
-            background: rgba(0, 212, 255, 0.15);
-            color: #00d4ff;
-            border-left-color: #00d4ff;
-        }
-
-        /* ================= MAIN CONTENT ================= */
         .main-content {
-            margin-left: 280px;
-            flex: 1;
+            margin-left: 250px;
             padding: 30px;
         }
 
@@ -96,1174 +74,607 @@
             justify-content: space-between;
             align-items: center;
             margin-bottom: 30px;
-            padding-bottom: 20px;
-            border-bottom: 2px solid #1a5a7a;
         }
 
-        .header h2 {
+        .header h1 {
             font-size: 28px;
-            color: #00d4ff;
+            color: #f3f4f6;
         }
 
-        .admin-info {
-            display: flex;
-            align-items: center;
-            gap: 20px;
-        }
-
-        .admin-info button {
-            background: #d32f2f;
+        .logout-btn {
+            background: #ef4444;
             color: white;
             border: none;
             padding: 10px 20px;
-            border-radius: 5px;
-            cursor: pointer;
-            transition: 0.3s;
-        }
-
-        .admin-info button:hover {
-            background: #b71c1c;
-        }
-
-        /* ================= TAB SYSTEM ================= */
-        .tab-container {
-            margin-bottom: 30px;
-        }
-
-        .tab-buttons {
-            display: flex;
-            gap: 10px;
-            margin-bottom: 20px;
-            border-bottom: 2px solid #1a5a7a;
-        }
-
-        .tab-btn {
-            background: transparent;
-            border: none;
-            color: #b0b0b0;
-            padding: 12px 20px;
+            border-radius: 6px;
             cursor: pointer;
             font-size: 14px;
-            border-bottom: 3px solid transparent;
-            transition: all 0.3s;
+            transition: background 0.3s;
         }
 
-        .tab-btn:hover {
-            color: #00d4ff;
+        .logout-btn:hover {
+            background: #dc2626;
         }
 
-        .tab-btn.active {
-            color: #00d4ff;
-            border-bottom-color: #00d4ff;
-        }
-
-        .tab-content {
+        .section {
             display: none;
         }
 
-        .tab-content.active {
+        .section.active {
             display: block;
         }
 
-        /* ================= DASHBOARD ================= */
-        .dashboard-grid {
+        .stats-grid {
             display: grid;
-            grid-template-columns: repeat(4, 1fr);
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
             gap: 20px;
             margin-bottom: 30px;
         }
 
         .stat-card {
-            background: linear-gradient(135deg, #0f3460 0%, #1a5a7a 100%);
+            background: #1f2937;
+            border: 1px solid #374151;
             padding: 20px;
             border-radius: 8px;
-            border: 1px solid #00d4ff;
-            box-shadow: 0 4px 15px rgba(0, 212, 255, 0.1);
         }
 
         .stat-card h3 {
-            color: #b0b0b0;
+            color: #9ca3af;
             font-size: 12px;
             text-transform: uppercase;
             margin-bottom: 10px;
         }
 
         .stat-card .value {
-            color: #00d4ff;
-            font-size: 28px;
+            color: #10b981;
+            font-size: 32px;
             font-weight: bold;
         }
 
-        /* ================= USER MANAGEMENT ================= */
-        .user-table-wrapper {
-            background: linear-gradient(135deg, #0f3460 0%, #1a5a7a 100%);
-            border: 1px solid #00d4ff;
-            border-radius: 8px;
-            overflow: hidden;
-            box-shadow: 0 4px 15px rgba(0, 212, 255, 0.1);
-        }
-
-        .search-bar {
-            padding: 20px;
-            border-bottom: 1px solid #1a5a7a;
-            display: flex;
-            gap: 10px;
-        }
-
-        .search-bar input {
-            flex: 1;
-            padding: 10px 15px;
-            background: rgba(255, 255, 255, 0.05);
-            border: 1px solid #00d4ff;
-            color: #e0e0e0;
-            border-radius: 5px;
-            font-size: 14px;
-        }
-
-        .search-bar input::placeholder {
-            color: #707070;
-        }
-
-        .search-bar button {
-            padding: 10px 20px;
-            background: #00d4ff;
-            color: #0f3460;
-            border: none;
-            border-radius: 5px;
-            cursor: pointer;
-            font-weight: bold;
-            transition: 0.3s;
-        }
-
-        .search-bar button:hover {
-            background: #00a8cc;
-        }
-
-        table {
+        .data-table {
             width: 100%;
             border-collapse: collapse;
+            background: #1f2937;
+            border-radius: 8px;
+            overflow: hidden;
         }
 
-        th {
-            background: rgba(0, 212, 255, 0.1);
+        .data-table thead {
+            background: #111827;
+        }
+
+        .data-table th {
             padding: 15px;
             text-align: left;
-            color: #00d4ff;
+            color: #9ca3af;
             font-weight: 600;
-            border-bottom: 1px solid #1a5a7a;
-            font-size: 12px;
+            border-bottom: 1px solid #374151;
         }
 
-        td {
+        .data-table td {
             padding: 15px;
-            border-bottom: 1px solid #1a5a7a;
-            font-size: 13px;
+            border-bottom: 1px solid #374151;
         }
 
-        tr:hover {
-            background: rgba(0, 212, 255, 0.05);
+        .data-table tr:hover {
+            background: #374151;
         }
 
-        /* ================= ACTION BUTTONS ================= */
-        .action-btn {
-            padding: 6px 12px;
-            margin: 0 3px;
-            border: none;
-            border-radius: 4px;
-            cursor: pointer;
-            font-size: 12px;
-            transition: 0.3s;
-            font-weight: 600;
-        }
-
-        .btn-view {
-            background: #1976d2;
-            color: white;
-        }
-
-        .btn-view:hover {
-            background: #1565c0;
-        }
-
-        .btn-block {
-            background: #d32f2f;
-            color: white;
-        }
-
-        .btn-block:hover {
-            background: #b71c1c;
-        }
-
-        .btn-unblock {
-            background: #388e3c;
-            color: white;
-        }
-
-        .btn-unblock:hover {
-            background: #2e7d32;
-        }
-
-        .btn-edit {
-            background: #f57c00;
-            color: white;
-        }
-
-        .btn-edit:hover {
-            background: #e65100;
-        }
-
-        /* ================= MODAL ================= */
-        .modal {
-            display: none;
-            position: fixed;
-            z-index: 1000;
-            left: 0;
-            top: 0;
-            width: 100%;
-            height: 100%;
-            background-color: rgba(0, 0, 0, 0.7);
-            backdrop-filter: blur(5px);
-        }
-
-        .modal.active {
-            display: flex;
-            align-items: center;
-            justify-content: center;
-        }
-
-        .modal-content {
-            background: linear-gradient(135deg, #0f3460 0%, #1a5a7a 100%);
-            padding: 40px;
-            border-radius: 8px;
-            border: 1px solid #00d4ff;
-            width: 90%;
-            max-width: 600px;
-            max-height: 80vh;
-            overflow-y: auto;
-            box-shadow: 0 8px 32px rgba(0, 212, 255, 0.2);
-        }
-
-        .modal-header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-bottom: 25px;
-            padding-bottom: 15px;
-            border-bottom: 1px solid #1a5a7a;
-        }
-
-        .modal-header h3 {
-            color: #00d4ff;
-            font-size: 20px;
-        }
-
-        .close-btn {
-            background: none;
-            border: none;
-            color: #00d4ff;
-            font-size: 28px;
-            cursor: pointer;
-            transition: 0.3s;
-        }
-
-        .close-btn:hover {
-            color: #ff6b6b;
-        }
-
-        .form-group {
-            margin-bottom: 20px;
-        }
-
-        .form-group label {
-            display: block;
-            margin-bottom: 8px;
-            color: #b0b0b0;
-            font-size: 13px;
-            font-weight: 600;
-        }
-
-        .form-group input,
-        .form-group textarea,
-        .form-group select {
-            width: 100%;
-            padding: 10px 15px;
-            background: rgba(255, 255, 255, 0.05);
-            border: 1px solid #00d4ff;
-            color: #e0e0e0;
-            border-radius: 5px;
-            font-family: inherit;
-            font-size: 13px;
-        }
-
-        .form-group textarea {
-            resize: vertical;
-            min-height: 100px;
-        }
-
-        .form-actions {
-            display: flex;
-            gap: 10px;
-            margin-top: 25px;
-        }
-
-        .form-actions button {
-            flex: 1;
-            padding: 12px;
-            border: none;
-            border-radius: 5px;
-            cursor: pointer;
-            font-weight: 600;
-            transition: 0.3s;
-        }
-
-        .btn-save {
-            background: #00d4ff;
-            color: #0f3460;
-        }
-
-        .btn-save:hover {
-            background: #00a8cc;
-        }
-
-        .btn-cancel {
-            background: #666;
-            color: white;
-        }
-
-        .btn-cancel:hover {
-            background: #555;
-        }
-
-        /* ================= STATUS BADGE ================= */
         .status-badge {
-            padding: 4px 10px;
-            border-radius: 20px;
-            font-size: 11px;
+            display: inline-block;
+            padding: 5px 10px;
+            border-radius: 4px;
+            font-size: 12px;
             font-weight: 600;
         }
 
         .status-active {
-            background: rgba(56, 142, 60, 0.2);
-            color: #4caf50;
+            background: rgba(16, 185, 129, 0.2);
+            color: #10b981;
         }
 
         .status-blocked {
-            background: rgba(211, 47, 47, 0.2);
-            color: #f44336;
+            background: rgba(239, 68, 68, 0.2);
+            color: #ef4444;
         }
 
-        /* ================= INFO BOX ================= */
-        .info-box {
-            background: rgba(0, 212, 255, 0.1);
-            border-left: 4px solid #00d4ff;
+        .action-btn {
+            padding: 6px 12px;
+            margin-right: 5px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 12px;
+            transition: all 0.3s;
+        }
+
+        .btn-block {
+            background: #ef4444;
+            color: white;
+        }
+
+        .btn-block:hover {
+            background: #dc2626;
+        }
+
+        .btn-unblock {
+            background: #10b981;
+            color: white;
+        }
+
+        .btn-unblock:hover {
+            background: #059669;
+        }
+
+        .btn-edit {
+            background: #3b82f6;
+            color: white;
+        }
+
+        .btn-edit:hover {
+            background: #2563eb;
+        }
+
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.7);
+            z-index: 1000;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .modal.active {
+            display: flex;
+        }
+
+        .modal-content {
+            background: #1f2937;
+            padding: 30px;
+            border-radius: 8px;
+            width: 90%;
+            max-width: 500px;
+            border: 1px solid #374151;
+        }
+
+        .modal-content h2 {
+            margin-bottom: 20px;
+            color: #f3f4f6;
+        }
+
+        .form-group {
+            margin-bottom: 15px;
+        }
+
+        .form-group label {
+            display: block;
+            margin-bottom: 5px;
+            color: #d1d5db;
+            font-size: 14px;
+        }
+
+        .form-group input,
+        .form-group select,
+        .form-group textarea {
+            width: 100%;
+            padding: 10px;
+            background: #111827;
+            border: 1px solid #374151;
+            color: #f3f4f6;
+            border-radius: 4px;
+            font-family: inherit;
+        }
+
+        .form-group textarea {
+            resize: vertical;
+            min-height: 80px;
+        }
+
+        .modal-buttons {
+            display: flex;
+            gap: 10px;
+            margin-top: 20px;
+        }
+
+        .modal-buttons button {
+            flex: 1;
+            padding: 10px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 600;
+            transition: all 0.3s;
+        }
+
+        .btn-save {
+            background: #10b981;
+            color: white;
+        }
+
+        .btn-save:hover {
+            background: #059669;
+        }
+
+        .btn-cancel {
+            background: #6b7280;
+            color: white;
+        }
+
+        .btn-cancel:hover {
+            background: #4b5563;
+        }
+
+        .loading {
+            text-align: center;
+            padding: 40px;
+            color: #9ca3af;
+        }
+
+        .error {
+            background: rgba(239, 68, 68, 0.2);
+            color: #fca5a5;
             padding: 15px;
             border-radius: 4px;
             margin-bottom: 20px;
-            color: #b0b0b0;
-            font-size: 13px;
         }
 
-        /* ================= PAGINATION ================= */
-        .pagination {
-            display: flex;
-            justify-content: center;
-            gap: 5px;
-            margin-top: 20px;
+        .success {
+            background: rgba(16, 185, 129, 0.2);
+            color: #86efac;
             padding: 15px;
-        }
-
-        .pagination button {
-            padding: 8px 12px;
-            background: rgba(0, 212, 255, 0.1);
-            color: #00d4ff;
-            border: 1px solid #00d4ff;
             border-radius: 4px;
-            cursor: pointer;
-            transition: 0.3s;
+            margin-bottom: 20px;
         }
 
-        .pagination button:hover {
-            background: #00d4ff;
-            color: #0f3460;
+        .search-box {
+            margin-bottom: 20px;
         }
 
-        .pagination button.active {
-            background: #00d4ff;
-            color: #0f3460;
-        }
-
-        /* ================= RESPONSIVE ================= */
-        @media (max-width: 1400px) {
-            .dashboard-grid {
-                grid-template-columns: repeat(2, 1fr);
-            }
-        }
-
-        @media (max-width: 1024px) {
-            .sidebar {
-                width: 240px;
-            }
-
-            .main-content {
-                margin-left: 240px;
-            }
-
-            .dashboard-grid {
-                grid-template-columns: 1fr;
-            }
+        .search-box input {
+            width: 300px;
+            padding: 10px;
+            background: #1f2937;
+            border: 1px solid #374151;
+            color: #f3f4f6;
+            border-radius: 4px;
         }
     </style>
 </head>
 <body>
     <div class="admin-container">
-        <!-- SIDEBAR -->
-        <aside class="sidebar">
-            <div class="sidebar-logo">
-                <h1>Admin Panel</h1>
-            </div>
-            <nav class="sidebar-nav">
-                <li><a class="nav-link active" data-tab="dashboard">📊 Dashboard</a></li>
-                <li><a class="nav-link" data-tab="users">👥 User Management</a></li>
-                <li><a class="nav-link" data-tab="games">🎮 Game Management</a></li>
-                <li><a class="nav-link" data-tab="wallet">💰 Wallet Management</a></li>
-                <li><a class="nav-link" data-tab="reports">📈 Reports</a></li>
-                <li><a class="nav-link" data-tab="settings">⚙️ Settings</a></li>
-            </nav>
-        </aside>
+        <div class="sidebar">
+            <h2>⚙️ Admin Panel</h2>
+            <ul>
+                <li><a class="menu-link active" data-section="dashboard">Dashboard</a></li>
+                <li><a class="menu-link" data-section="users">Users Management</a></li>
+                <li><a class="menu-link" data-section="games">Active Games</a></li>
+                <li><hr style="margin: 20px 0; border: none; border-top: 1px solid #374151;"></li>
+                <li><a class="logout-link">🚪 Logout</a></li>
+            </ul>
+        </div>
 
-        <!-- MAIN CONTENT -->
-        <main class="main-content">
-            <!-- HEADER -->
+        <div class="main-content">
             <div class="header">
-                <h2 id="page-title">Dashboard</h2>
-                <div class="admin-info">
-                    <span id="admin-name">Admin User</span>
-                    <button onclick="logout()">🚪 Logout</button>
-                </div>
+                <h1>Admin Dashboard</h1>
+                <button class="logout-btn" onclick="logout()">Logout</button>
             </div>
 
-            <!-- DASHBOARD TAB -->
-            <div id="dashboard" class="tab-content active">
-                <div class="dashboard-grid">
+            <!-- Dashboard Section -->
+            <div id="dashboard" class="section active">
+                <h2>Dashboard Overview</h2>
+                <div class="stats-grid" id="statsContainer">
                     <div class="stat-card">
                         <h3>Total Users</h3>
-                        <div class="value" id="total-users">0</div>
+                        <div class="value" id="totalUsers">0</div>
                     </div>
                     <div class="stat-card">
                         <h3>Active Games</h3>
-                        <div class="value" id="active-games">0</div>
+                        <div class="value" id="activeGames">0</div>
                     </div>
                     <div class="stat-card">
                         <h3>Total Revenue</h3>
-                        <div class="value" id="total-revenue">₹0</div>
+                        <div class="value" id="totalRevenue">₹0</div>
                     </div>
                     <div class="stat-card">
                         <h3>Blocked Users</h3>
-                        <div class="value" id="blocked-users">0</div>
-                    </div>
-                </div>
-
-                <div class="info-box">
-                    ℹ️ Dashboard updated in real-time. Use other tabs to manage users, games, wallets, and view detailed reports.
-                </div>
-            </div>
-
-            <!-- USER MANAGEMENT TAB -->
-            <div id="users" class="tab-content">
-                <div class="tab-buttons">
-                    <button class="tab-btn active" data-subtab="all-users">All Users</button>
-                    <button class="tab-btn" data-subtab="active-users">Active</button>
-                    <button class="tab-btn" data-subtab="blocked-users">Blocked</button>
-                </div>
-
-                <div class="user-table-wrapper">
-                    <div class="search-bar">
-                        <input type="text" id="user-search" placeholder="Search by username, email, or user ID...">
-                        <button onclick="searchUsers()">Search</button>
-                    </div>
-
-                    <table>
-                        <thead>
-                            <tr>
-                                <th>User ID</th>
-                                <th>Username</th>
-                                <th>Email</th>
-                                <th>Status</th>
-                                <th>Balance</th>
-                                <th>Games Played</th>
-                                <th>Joined Date</th>
-                                <th>Actions</th>
-                            </tr>
-                        </thead>
-                        <tbody id="user-table-body">
-                            <tr>
-                                <td colspan="8" style="text-align: center; color: #707070;">Loading users...</td>
-                            </tr>
-                        </tbody>
-                    </table>
-
-                    <div class="pagination" id="user-pagination"></div>
-                </div>
-            </div>
-
-            <!-- GAME MANAGEMENT TAB -->
-            <div id="games" class="tab-content">
-                <div class="user-table-wrapper">
-                    <div class="search-bar">
-                        <input type="text" id="game-search" placeholder="Search by round code or game type...">
-                        <button onclick="searchGames()">Search</button>
-                    </div>
-
-                    <table>
-                        <thead>
-                            <tr>
-                                <th>Round Code</th>
-                                <th>Game Type</th>
-                                <th>Players</th>
-                                <th>Status</th>
-                                <th>Result</th>
-                                <th>Started At</th>
-                                <th>Total Bets</th>
-                                <th>Actions</th>
-                            </tr>
-                        </thead>
-                        <tbody id="game-table-body">
-                            <tr>
-                                <td colspan="8" style="text-align: center; color: #707070;">Loading games...</td>
-                            </tr>
-                        </tbody>
-                    </table>
-
-                    <div class="pagination" id="game-pagination"></div>
-                </div>
-            </div>
-
-            <!-- WALLET MANAGEMENT TAB -->
-            <div id="wallet" class="tab-content">
-                <div class="user-table-wrapper">
-                    <div class="search-bar">
-                        <input type="text" id="wallet-search" placeholder="Search by username or user ID...">
-                        <button onclick="searchWallet()">Search</button>
-                    </div>
-
-                    <table>
-                        <thead>
-                            <tr>
-                                <th>User ID</th>
-                                <th>Username</th>
-                                <th>Current Balance</th>
-                                <th>Total Deposited</th>
-                                <th>Total Withdrawn</th>
-                                <th>Total Winnings</th>
-                                <th>Last Transaction</th>
-                                <th>Actions</th>
-                            </tr>
-                        </thead>
-                        <tbody id="wallet-table-body">
-                            <tr>
-                                <td colspan="8" style="text-align: center; color: #707070;">Loading wallet data...</td>
-                            </tr>
-                        </tbody>
-                    </table>
-
-                    <div class="pagination" id="wallet-pagination"></div>
-                </div>
-            </div>
-
-            <!-- REPORTS TAB -->
-            <div id="reports" class="tab-content">
-                <div class="dashboard-grid" style="grid-template-columns: repeat(3, 1fr); margin-bottom: 30px;">
-                    <div class="stat-card">
-                        <h3>Today's Revenue</h3>
-                        <div class="value" id="today-revenue">₹0</div>
-                    </div>
-                    <div class="stat-card">
-                        <h3>This Month Revenue</h3>
-                        <div class="value" id="month-revenue">₹0</div>
-                    </div>
-                    <div class="stat-card">
-                        <h3>Avg Win Rate</h3>
-                        <div class="value" id="avg-winrate">0%</div>
-                    </div>
-                </div>
-
-                <div class="user-table-wrapper">
-                    <table>
-                        <thead>
-                            <tr>
-                                <th>Date</th>
-                                <th>Total Games</th>
-                                <th>Total Bets</th>
-                                <th>Revenue</th>
-                                <th>Withdrawals</th>
-                                <th>Net Profit</th>
-                            </tr>
-                        </thead>
-                        <tbody id="report-table-body">
-                            <tr>
-                                <td colspan="6" style="text-align: center; color: #707070;">Loading report data...</td>
-                            </tr>
-                        </tbody>
-                    </table>
-                </div>
-            </div>
-
-            <!-- SETTINGS TAB -->
-            <div id="settings" class="tab-content">
-                <div class="user-table-wrapper" style="max-width: 600px;">
-                    <div style="padding: 30px;">
-                        <div class="form-group">
-                            <label>Min Bet Amount (₹)</label>
-                            <input type="number" id="min-bet" value="10">
-                        </div>
-
-                        <div class="form-group">
-                            <label>Max Bet Amount (₹)</label>
-                            <input type="number" id="max-bet" value="1000">
-                        </div>
-
-                        <div class="form-group">
-                            <label>Max Players Per Table</label>
-                            <input type="number" id="max-players" value="6">
-                        </div>
-
-                        <div class="form-group">
-                            <label>Game Round Time (seconds)</label>
-                            <input type="number" id="round-time" value="60">
-                        </div>
-
-                        <div class="form-group">
-                            <label>Platform Commission (%)</label>
-                            <input type="number" id="commission" step="0.1" value="5.0">
-                        </div>
-
-                        <div class="form-actions">
-                            <button class="btn-save" onclick="saveSettings()">Save Settings</button>
-                            <button class="btn-cancel" onclick="resetSettings()">Reset</button>
-                        </div>
+                        <div class="value" id="blockedUsers">0</div>
                     </div>
                 </div>
             </div>
-        </main>
-    </div>
 
-    <!-- USER DETAILS MODAL -->
-    <div id="userModal" class="modal">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h3>User Details</h3>
-                <button class="close-btn" onclick="closeModal('userModal')">&times;</button>
+            <!-- Users Management Section -->
+            <div id="users" class="section">
+                <h2>Users Management</h2>
+                <div class="search-box">
+                    <input type="text" id="searchUsers" placeholder="Search by username or email...">
+                </div>
+                <div id="usersLoading" class="loading">Loading users...</div>
+                <table class="data-table" id="usersTable" style="display:none;">
+                    <thead>
+                        <tr>
+                            <th>ID</th>
+                            <th>Username</th>
+                            <th>Email</th>
+                            <th>Balance</th>
+                            <th>Status</th>
+                            <th>Created</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody id="usersTableBody">
+                    </tbody>
+                </table>
             </div>
 
-            <div id="user-details-content">
-                <!-- Populated dynamically -->
+            <!-- Games Section -->
+            <div id="games" class="section">
+                <h2>Active Games</h2>
+                <div id="gamesLoading" class="loading">Loading games...</div>
+                <table class="data-table" id="gamesTable" style="display:none;">
+                    <thead>
+                        <tr>
+                            <th>Round Code</th>
+                            <th>Game Type</th>
+                            <th>Players</th>
+                            <th>Status</th>
+                            <th>Total Bets</th>
+                            <th>Result</th>
+                            <th>Started</th>
+                        </tr>
+                    </thead>
+                    <tbody id="gamesTableBody">
+                    </tbody>
+                </table>
             </div>
         </div>
     </div>
 
-    <!-- EDIT USER MODAL -->
-    <div id="editUserModal" class="modal">
+    <!-- Edit User Modal -->
+    <div id="editModal" class="modal">
         <div class="modal-content">
-            <div class="modal-header">
-                <h3>Edit User</h3>
-                <button class="close-btn" onclick="closeModal('editUserModal')">&times;</button>
-            </div>
-
-            <div class="form-group">
-                <label>User ID (Read-only)</label>
-                <input type="text" id="edit-user-id" readonly>
-            </div>
-
-            <div class="form-group">
-                <label>Username</label>
-                <input type="text" id="edit-username">
-            </div>
-
-            <div class="form-group">
-                <label>Email</label>
-                <input type="email" id="edit-email">
-            </div>
-
-            <div class="form-group">
-                <label>Password (Leave blank to keep current)</label>
-                <input type="password" id="edit-password" placeholder="Enter new password or leave blank">
-            </div>
-
-            <div class="form-group">
-                <label>Status</label>
-                <select id="edit-status">
-                    <option value="active">Active</option>
-                    <option value="blocked">Blocked</option>
-                </select>
-            </div>
-
-            <div class="form-group">
-                <label>Balance (₹)</label>
-                <input type="number" id="edit-balance" step="0.01">
-            </div>
-
-            <div class="form-group">
-                <label>Block Reason (if blocked)</label>
-                <textarea id="edit-block-reason" placeholder="Enter reason for blocking..."></textarea>
-            </div>
-
-            <div class="form-actions">
-                <button class="btn-save" onclick="saveUserChanges()">Save Changes</button>
-                <button class="btn-cancel" onclick="closeModal('editUserModal')">Cancel</button>
-            </div>
-        </div>
-    </div>
-
-    <!-- CREDIT/DEBIT MODAL -->
-    <div id="creditModal" class="modal">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h3>Manage User Balance</h3>
-                <button class="close-btn" onclick="closeModal('creditModal')">&times;</button>
-            </div>
-
-            <div class="form-group">
-                <label>Username</label>
-                <input type="text" id="credit-username" readonly>
-            </div>
-
-            <div class="form-group">
-                <label>Current Balance (₹)</label>
-                <input type="text" id="credit-current-balance" readonly>
-            </div>
-
-            <div class="form-group">
-                <label>Transaction Type</label>
-                <select id="credit-type">
-                    <option value="add">Add (Credit)</option>
-                    <option value="deduct">Deduct (Debit)</option>
-                </select>
-            </div>
-
-            <div class="form-group">
-                <label>Amount (₹)</label>
-                <input type="number" id="credit-amount" placeholder="0.00" step="0.01">
-            </div>
-
-            <div class="form-group">
-                <label>Reason/Description</label>
-                <textarea id="credit-reason" placeholder="Enter reason for transaction..."></textarea>
-            </div>
-
-            <div class="form-actions">
-                <button class="btn-save" onclick="processCredit()">Process Transaction</button>
-                <button class="btn-cancel" onclick="closeModal('creditModal')">Cancel</button>
+            <h2>Edit User</h2>
+            <div id="editForm">
+                <div class="form-group">
+                    <label>Username</label>
+                    <input type="text" id="editUsername" readonly>
+                </div>
+                <div class="form-group">
+                    <label>Email</label>
+                    <input type="email" id="editEmail">
+                </div>
+                <div class="form-group">
+                    <label>New Balance</label>
+                    <input type="number" id="editBalance">
+                </div>
+                <div class="form-group">
+                    <label>Status</label>
+                    <select id="editStatus">
+                        <option value="active">Active</option>
+                        <option value="blocked">Blocked</option>
+                    </select>
+                </div>
+                <div class="form-group" id="blockReasonGroup" style="display:none;">
+                    <label>Block Reason</label>
+                    <textarea id="editBlockReason"></textarea>
+                </div>
+                <div class="modal-buttons">
+                    <button class="btn-save" onclick="saveUserEdit()">Save Changes</button>
+                    <button class="btn-cancel" onclick="closeModal()">Cancel</button>
+                </div>
             </div>
         </div>
     </div>
 
     <script>
-        // ================= INITIALIZATION =================
-        let currentPage = 1;
-        let currentSubTab = 'all-users';
-        let mockUsers = [];
-        let mockGames = [];
+        let currentUserId = null;
 
-        document.addEventListener('DOMContentLoaded', () => {
-            initializeAdmin();
-            loadDashboard();
-            setupEventListeners();
+        // Load stats on page load
+        document.addEventListener('DOMContentLoaded', function() {
+            loadStats();
+            setupMenuLinks();
         });
 
-        function initializeAdmin() {
-            // Mock data
-            mockUsers = Array.from({length: 25}, (_, i) => ({
-                id: `USR${String(i + 1).padStart(5, '0')}`,
-                username: `player${i + 1}`,
-                email: `player${i + 1}@example.com`,
-                password: 'hashed_password_' + (i + 1),
-                status: Math.random() > 0.8 ? 'blocked' : 'active',
-                balance: Math.floor(Math.random() * 50000),
-                gamesPlayed: Math.floor(Math.random() * 100),
-                joinedDate: new Date(Date.now() - Math.random() * 90 * 24 * 60 * 60 * 1000).toLocaleDateString(),
-                blockReason: 'Suspicious activity'
-            }));
-
-            mockGames = Array.from({length: 15}, (_, i) => ({
-                roundCode: `GAME${String(i + 1).padStart(6, '0')}`,
-                gameType: 'silver',
-                players: Math.floor(Math.random() * 6) + 1,
-                status: Math.random() > 0.5 ? 'completed' : 'active',
-                result: Math.floor(Math.random() * 10),
-                startedAt: new Date(Date.now() - Math.random() * 24 * 60 * 60 * 1000).toLocaleString(),
-                totalBets: Math.floor(Math.random() * 100000)
-            }));
-        }
-
-        function setupEventListeners() {
-            // Sidebar navigation
-            document.querySelectorAll('.nav-link').forEach(link => {
-                link.addEventListener('click', (e) => {
-                    const tabName = e.target.getAttribute('data-tab');
-                    switchTab(tabName);
+        function setupMenuLinks() {
+            document.querySelectorAll('.menu-link').forEach(link => {
+                link.addEventListener('click', function(e) {
+                    e.preventDefault();
+                    const section = this.dataset.section;
+                    switchSection(section);
+                    document.querySelectorAll('.menu-link').forEach(l => l.classList.remove('active'));
+                    this.classList.add('active');
                 });
             });
 
-            // User sub-tabs
-            document.querySelectorAll('[data-subtab]').forEach(btn => {
-                btn.addEventListener('click', (e) => {
-                    const subtab = e.target.getAttribute('data-subtab');
-                    switchUserSubTab(subtab);
-                });
-            });
-
-            // Close modals on outside click
-            document.querySelectorAll('.modal').forEach(modal => {
-                modal.addEventListener('click', (e) => {
-                    if (e.target === modal) {
-                        modal.classList.remove('active');
-                    }
-                });
-            });
+            document.querySelector('.logout-link').addEventListener('click', logout);
         }
 
-        // ================= NAVIGATION =================
-        function switchTab(tabName) {
-            // Update sidebar active state
-            document.querySelectorAll('.nav-link').forEach(link => {
-                link.classList.remove('active');
-                if (link.getAttribute('data-tab') === tabName) {
-                    link.classList.add('active');
-                }
-            });
+        function switchSection(section) {
+            document.querySelectorAll('.section').forEach(s => s.classList.remove('active'));
+            document.getElementById(section).classList.add('active');
 
-            // Update page title
-            const titles = {
-                dashboard: 'Dashboard',
-                users: 'User Management',
-                games: 'Game Management',
-                wallet: 'Wallet Management',
-                reports: 'Reports & Analytics',
-                settings: 'Settings'
-            };
-            document.getElementById('page-title').textContent = titles[tabName];
-
-            // Hide all tabs
-            document.querySelectorAll('.tab-content').forEach(tab => {
-                tab.classList.remove('active');
-            });
-
-            // Show selected tab
-            document.getElementById(tabName).classList.add('active');
-
-            // Load data if needed
-            if (tabName === 'users') {
-                loadUsers();
-            } else if (tabName === 'games') {
-                loadGames();
-            } else if (tabName === 'wallet') {
-                loadWallet();
-            } else if (tabName === 'reports') {
-                loadReports();
-            }
+            if (section === 'users') loadUsers();
+            if (section === 'games') loadGames();
+            if (section === 'dashboard') loadStats();
         }
 
-        function switchUserSubTab(subtab) {
-            currentSubTab = subtab;
-            document.querySelectorAll('[data-subtab]').forEach(btn => {
-                btn.classList.remove('active');
-                if (btn.getAttribute('data-subtab') === subtab) {
-                    btn.classList.add('active');
-                }
-            });
-            currentPage = 1;
-            loadUsers();
+        function loadStats() {
+            fetch('/api/admin/stats')
+                .then(r => r.json())
+                .then(data => {
+                    document.getElementById('totalUsers').textContent = data.total_users;
+                    document.getElementById('activeGames').textContent = data.active_games;
+                    document.getElementById('totalRevenue').textContent = '₹' + data.total_revenue.toLocaleString();
+                    document.getElementById('blockedUsers').textContent = data.blocked_users;
+                })
+                .catch(err => console.error('Error loading stats:', err));
         }
 
-        // ================= DASHBOARD =================
-        function loadDashboard() {
-            document.getElementById('total-users').textContent = mockUsers.length;
-            document.getElementById('active-games').textContent = mockGames.filter(g => g.status === 'active').length;
-            document.getElementById('total-revenue').textContent = '₹' + (Math.random() * 1000000).toFixed(0);
-            document.getElementById('blocked-users').textContent = mockUsers.filter(u => u.status === 'blocked').length;
-        }
-
-        // ================= USERS =================
         function loadUsers() {
-            let filteredUsers = mockUsers;
+            document.getElementById('usersLoading').style.display = 'block';
+            document.getElementById('usersTable').style.display = 'none';
 
-            if (currentSubTab === 'active-users') {
-                filteredUsers = mockUsers.filter(u => u.status === 'active');
-            } else if (currentSubTab === 'blocked-users') {
-                filteredUsers = mockUsers.filter(u => u.status === 'blocked');
-            }
+            fetch('/api/admin/users')
+                .then(r => {
+                    if (r.status === 403) {
+                        window.location.href = '/login';
+                        return null;
+                    }
+                    return r.json();
+                })
+                .then(data => {
+                    if (!data) return;
+                    const tbody = document.getElementById('usersTableBody');
+                    tbody.innerHTML = '';
 
-            const itemsPerPage = 10;
-            const totalPages = Math.ceil(filteredUsers.length / itemsPerPage);
-            const startIndex = (currentPage - 1) * itemsPerPage;
-            const paginatedUsers = filteredUsers.slice(startIndex, startIndex + itemsPerPage);
+                    data.forEach(user => {
+                        const row = document.createElement('tr');
+                        row.innerHTML = `
+                            <td>${user.id}</td>
+                            <td>${user.username}</td>
+                            <td>${user.email || '-'}</td>
+                            <td>₹${user.balance.toLocaleString()}</td>
+                            <td><span class="status-badge status-${user.status}">${user.status}</span></td>
+                            <td>${user.created_at}</td>
+                            <td>
+                                <button class="action-btn btn-edit" onclick="editUser(${user.id}, '${user.username}', '${user.email}', ${user.balance}, '${user.status}')">Edit</button>
+                                ${user.status === 'active' 
+                                    ? `<button class="action-btn btn-block" onclick="blockUser(${user.id})">Block</button>`
+                                    : `<button class="action-btn btn-unblock" onclick="unblockUser(${user.id})">Unblock</button>`
+                                }
+                            </td>
+                        `;
+                        tbody.appendChild(row);
+                    });
 
-            const tbody = document.getElementById('user-table-body');
-            tbody.innerHTML = paginatedUsers.map(user => `
-                <tr>
-                    <td>${user.id}</td>
-                    <td><strong>${user.username}</strong></td>
-                    <td>${user.email}</td>
-                    <td><span class="status-badge status-${user.status}">${user.status.toUpperCase()}</span></td>
-                    <td>₹${user.balance.toFixed(0)}</td>
-                    <td>${user.gamesPlayed}</td>
-                    <td>${user.joinedDate}</td>
-                    <td>
-                        <button class="action-btn btn-view" onclick="viewUserDetails('${user.id}')">View</button>
-                        <button class="action-btn btn-edit" onclick="editUser('${user.id}')">Edit</button>
-                        <button class="action-btn btn-${user.status === 'active' ? 'block' : 'unblock'}" onclick="toggleUserBlock('${user.id}')">
-                            ${user.status === 'active' ? 'Block' : 'Unblock'}
-                        </button>
-                    </td>
-                </tr>
-            `).join('');
-
-            // Pagination
-            const pagination = document.getElementById('user-pagination');
-            pagination.innerHTML = '';
-            for (let i = 1; i <= totalPages; i++) {
-                const btn = document.createElement('button');
-                btn.textContent = i;
-                btn.className = currentPage === i ? 'active' : '';
-                btn.onclick = () => {
-                    currentPage = i;
-                    loadUsers();
-                };
-                pagination.appendChild(btn);
-            }
+                    document.getElementById('usersLoading').style.display = 'none';
+                    document.getElementById('usersTable').style.display = 'table';
+                })
+                .catch(err => console.error('Error loading users:', err));
         }
 
-        function searchUsers() {
-            const searchTerm = document.getElementById('user-search').value.toLowerCase();
-            mockUsers = mockUsers.filter(u =>
-                u.username.includes(searchTerm) ||
-                u.email.includes(searchTerm) ||
-                u.id.includes(searchTerm)
-            );
-            currentPage = 1;
-            loadUsers();
-        }
-
-        function viewUserDetails(userId) {
-            const user = mockUsers.find(u => u.id === userId);
-            if (!user) return;
-
-            const content = document.getElementById('user-details-content');
-            content.innerHTML = `
-                <div class="form-group">
-                    <label>User ID</label>
-                    <input type="text" value="${user.id}" readonly>
-                </div>
-                <div class="form-group">
-                    <label>Username</label>
-                    <input type="text" value="${user.username}" readonly>
-                </div>
-                <div class="form-group">
-                    <label>Email</label>
-                    <input type="text" value="${user.email}" readonly>
-                </div>
-                <div class="form-group">
-                    <label>Password (Hashed)</label>
-                    <input type="text" value="${user.password}" readonly>
-                </div>
-                <div class="form-group">
-                    <label>Status</label>
-                    <input type="text" value="${user.status.toUpperCase()}" readonly>
-                </div>
-                <div class="form-group">
-                    <label>Current Balance (₹)</label>
-                    <input type="text" value="₹${user.balance.toFixed(2)}" readonly>
-                </div>
-                <div class="form-group">
-                    <label>Games Played</label>
-                    <input type="text" value="${user.gamesPlayed}" readonly>
-                </div>
-                <div class="form-group">
-                    <label>Joined Date</label>
-                    <input type="text" value="${user.joinedDate}" readonly>
-                </div>
-                <div class="form-actions">
-                    <button class="btn-cancel" onclick="closeModal('userModal')">Close</button>
-                </div>
-            `;
-            document.getElementById('userModal').classList.add('active');
-        }
-
-        function editUser(userId) {
-            const user = mockUsers.find(u => u.id === userId);
-            if (!user) return;
-
-            document.getElementById('edit-user-id').value = user.id;
-            document.getElementById('edit-username').value = user.username;
-            document.getElementById('edit-email').value = user.email;
-            document.getElementById('edit-status').value = user.status;
-            document.getElementById('edit-balance').value = user.balance;
-            document.getElementById('edit-block-reason').value = user.blockReason || '';
-
-            document.getElementById('editUserModal').classList.add('active');
-            window.currentEditUserId = userId;
-        }
-
-        function saveUserChanges() {
-            const userId = window.currentEditUserId;
-            const user = mockUsers.find(u => u.id === userId);
-            if (!user) return;
-
-            const newPassword = document.getElementById('edit-password').value;
-            if (newPassword) {
-                user.password = 'hashed_' + newPassword;
-            }
-
-            user.username = document.getElementById('edit-username').value;
-            user.email = document.getElementById('edit-email').value;
-            user.status = document.getElementById('edit-status').value;
-            user.balance = parseFloat(document.getElementById('edit-balance').value);
-            user.blockReason = document.getElementById('edit-block-reason').value;
-
-            alert('✅ User updated successfully!');
-            closeModal('editUserModal');
-            loadUsers();
-        }
-
-        function toggleUserBlock(userId) {
-            const user = mockUsers.find(u => u.id === userId);
-            if (!user) return;
-
-            if (user.status === 'active') {
-                user.status = 'blocked';
-                alert('🚫 User blocked successfully!');
-            } else {
-                user.status = 'active';
-                alert('✅ User unblocked successfully!');
-            }
-            loadUsers();
-        }
-
-        // ================= GAMES =================
         function loadGames() {
-            const tbody = document.getElementById('game-table-body');
-            tbody.innerHTML = mockGames.map(game => `
-                <tr>
-                    <td><strong>${game.roundCode}</strong></td>
-                    <td>${game.gameType}</td>
-                    <td>${game.players}/6</td>
-                    <td><span class="status-badge status-${game.status === 'active' ? 'active' : 'blocked'}">${game.status.toUpperCase()}</span></td>
-                    <td>${game.result}</td>
-                    <td>${game.startedAt}</td>
-                    <td>₹${game.totalBets.toFixed(0)}</td>
-                    <td>
-                        <button class="action-btn btn-view" onclick="alert('Game details for ' + '${game.roundCode}')">Details</button>
-                    </td>
-                </tr>
-            `).join('');
+            document.getElementById('gamesLoading').style.display = 'block';
+            document.getElementById('gamesTable').style.display = 'none';
+
+            fetch('/api/admin/games')
+                .then(r => r.json())
+                .then(data => {
+                    const tbody = document.getElementById('gamesTableBody');
+                    tbody.innerHTML = '';
+
+                    data.forEach(game => {
+                        const row = document.createElement('tr');
+                        row.innerHTML = `
+                            <td>${game.round_code}</td>
+                            <td>${game.game_type}</td>
+                            <td>${game.players}/${game.max_players}</td>
+                            <td><span class="status-badge status-${game.status}">${game.status}</span></td>
+                            <td>₹${game.total_bets}</td>
+                            <td>${game.result !== null ? game.result : '-'}</td>
+                            <td>${game.started_at}</td>
+                        `;
+                        tbody.appendChild(row);
+                    });
+
+                    document.getElementById('gamesLoading').style.display = 'none';
+                    document.getElementById('gamesTable').style.display = 'table';
+                })
+                .catch(err => console.error('Error loading games:', err));
         }
 
-        function searchGames() {
-            const searchTerm = document.getElementById('game-search').value.toLowerCase();
-            mockGames = mockGames.filter(g =>
-                g.roundCode.includes(searchTerm) ||
-                g.gameType.includes(searchTerm)
-            );
-            loadGames();
+        function editUser(id, username, email, balance, status) {
+            currentUserId = id;
+            document.getElementById('editUsername').value = username;
+            document.getElementById('editEmail').value = email;
+            document.getElementById('editBalance').value = balance;
+            document.getElementById('editStatus').value = status;
+            document.getElementById('editBlockReason').value = '';
+            
+            // Show/hide block reason based on status
+            document.getElementById('blockReasonGroup').style.display = status === 'blocked' ? 'block' : 'none';
+            document.getElementById('editStatus').addEventListener('change', function() {
+                document.getElementById('blockReasonGroup').style.display = this.value === 'blocked' ? 'block' : 'none';
+            });
+
+            document.getElementById('editModal').classList.add('active');
         }
 
-        // ================= WALLET =================
-        function loadWallet() {
-            const tbody = document.getElementById('wallet-table-body');
-            tbody.innerHTML = mockUsers.map(user => `
-                <tr>
-                    <td>${user.id}</td>
-                    <td><strong>${user.username}</strong></td>
-                    <td>₹${user.balance.toFixed(2)}</td>
-                    <td>₹${(Math.random() * 100000).toFixed(2)}</td>
-                    <td>₹${(Math.random() * 50000).toFixed(2)}</td>
-                    <td>₹${(Math.random() * 75000).toFixed(2)}</td>
-                    <td>${new Date().toLocaleDateString()}</td>
-                    <td>
-                        <button class="action-btn btn-edit" onclick="creditDebit('${user.id}')">Credit/Debit</button>
-                    </td>
-                </tr>
-            `).join('');
+        function saveUserEdit() {
+            const data = {
+                email: document.getElementById('editEmail').value,
+                balance: parseInt(document.getElementById('editBalance').value),
+                status: document.getElementById('editStatus').value,
+                block_reason: document.getElementById('editBlockReason').value || 'Blocked by admin'
+            };
+
+            fetch(`/api/admin/users/${currentUserId}`, {
+                method: 'PUT',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify(data)
+            })
+            .then(r => r.json())
+            .then(res => {
+                alert(res.message);
+                closeModal();
+                loadUsers();
+            })
+            .catch(err => alert('Error updating user: ' + err));
         }
 
-        function searchWallet() {
-            const searchTerm = document.getElementById('wallet-search').value.toLowerCase();
-            // Filter implementation
-            loadWallet();
+        function blockUser(userId) {
+            const reason = prompt('Enter block reason:');
+            if (!reason) return;
+
+            fetch(`/api/admin/users/${userId}/block`, {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({reason})
+            })
+            .then(r => r.json())
+            .then(res => {
+                alert(res.message);
+                loadUsers();
+            });
         }
 
-        function creditDebit(userId) {
-            const user = mockUsers.find(u => u.id === userId);
-            if (!user) return;
-
-            document.getElementById('credit-username').value = user.username;
-            document.getElementById('credit-current-balance').value = '₹' + user.balance.toFixed(2);
-            document.getElementById('creditModal').classList.add('active');
-            window.currentCreditUserId = userId;
+        function unblockUser(userId) {
+            fetch(`/api/admin/users/${userId}/unblock`, {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'}
+            })
+            .then(r => r.json())
+            .then(res => {
+                alert(res.message);
+                loadUsers();
+            });
         }
 
-        function processCredit() {
-            const userId = window.currentCreditUserId;
-            const user = mockUsers.find(u => u.id === userId);
-            const type = document.getElementById('credit-type').value;
-            const amount = parseFloat(document.getElementById('credit-amount').value);
-
-            if (type === 'add') {
-                user.balance += amount;
-            } else {
-                user.balance -= amount;
-            }
-
-            alert('✅ Transaction processed successfully!');
-            closeModal('creditModal');
-            loadWallet();
-        }
-
-        // ================= REPORTS =================
-        function loadReports() {
-            document.getElementById('today-revenue').textContent = '₹' + (Math.random() * 100000).toFixed(0);
-            document.getElementById('month-revenue').textContent = '₹' + (Math.random() * 3000000).toFixed(0);
-            document.getElementById('avg-winrate').textContent = (Math.random() * 100).toFixed(1) + '%';
-
-            const tbody = document.getElementById('report-table-body');
-            tbody.innerHTML = Array.from({length: 7}, (_, i) => {
-                const date = new Date(Date.now() - i * 24 * 60 * 60 * 1000);
-                return `
-                    <tr>
-                        <td>${date.toLocaleDateString()}</td>
-                        <td>${Math.floor(Math.random() * 500)}</td>
-                        <td>₹${(Math.random() * 500000).toFixed(0)}</td>
-                        <td>₹${(Math.random() * 100000).toFixed(0)}</td>
-                        <td>₹${(Math.random() * 50000).toFixed(0)}</td>
-                        <td>₹${(Math.random() * 100000).toFixed(0)}</td>
-                    </tr>
-                `;
-            }).join('');
-        }
-
-        // ================= SETTINGS =================
-        function saveSettings() {
-            alert('✅ Settings saved successfully!');
-        }
-
-        function resetSettings() {
-            document.getElementById('min-bet').value = '10';
-            document.getElementById('max-bet').value = '1000';
-            document.getElementById('max-players').value = '6';
-            document.getElementById('round-time').value = '60';
-            document.getElementById('commission').value = '5.0';
-        }
-
-        // ================= MODALS =================
-        function closeModal(modalId) {
-            document.getElementById(modalId).classList.remove('active');
+        function closeModal() {
+            document.getElementById('editModal').classList.remove('active');
         }
 
         function logout() {
-            if (confirm('Are you sure you want to logout?')) {
-                window.location.href = '/logout';
-            }
+            window.location.href = '/logout';
         }
+
+        // Search functionality
+        document.addEventListener('DOMContentLoaded', function() {
+            const searchBox = document.getElementById('searchUsers');
+            if (searchBox) {
+                searchBox.addEventListener('input', function() {
+                    const filter = this.value.toLowerCase();
+                    document.querySelectorAll('#usersTableBody tr').forEach(row => {
+                        const text = row.textContent.toLowerCase();
+                        row.style.display = text.includes(filter) ? '' : 'none';
+                    });
+                });
+            }
+        });
     </script>
 </body>
 </html>
