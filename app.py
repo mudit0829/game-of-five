@@ -48,44 +48,44 @@ socketio = SocketIO(
 )
 
 # ---------------------------------------------------
-# Game configurations  (UPDATED BET / PAYOUT VALUES)
+# Game configurations
 # ---------------------------------------------------
 GAME_CONFIGS = {
     "silver": {
-        "bet_amount": 10,      # You bet 10
-        "payout": 50,          # You get 50
+        "bet_amount": 10,
+        "payout": 50,
         "name": "Silver Game",
         "type": "number",
         "title": "Frog Leap",
         "emoji": "🐸",
     },
     "gold": {
-        "bet_amount": 50,      # You bet 50
-        "payout": 250,         # You get 250
+        "bet_amount": 50,
+        "payout": 250,
         "name": "Gold Game",
         "type": "number",
         "title": "Football Goal",
         "emoji": "⚽",
     },
     "diamond": {
-        "bet_amount": 100,     # You bet 100
-        "payout": 500,         # You get 500
+        "bet_amount": 100,
+        "payout": 500,
         "name": "Diamond Game",
         "type": "number",
         "title": "Archer Hit",
         "emoji": "🏹",
     },
     "platinum": {
-        "bet_amount": 200,     # You bet 200
-        "payout": 1000,        # You get 1000
+        "bet_amount": 200,
+        "payout": 1000,
         "name": "Platinum Game",
         "type": "number",
         "title": "Parachute Drop",
         "emoji": "🪂",
     },
     "roulette": {
-        "bet_amount": 200,     # You bet 200
-        "payout": 2000,        # You get 2000
+        "bet_amount": 200,
+        "payout": 2000,
         "name": "Roulette Game",
         "type": "roulette",
         "title": "Roulette Spin",
@@ -136,7 +136,7 @@ class Ticket(db.Model):
     user_id = db.Column(db.Integer, db.ForeignKey("user.id"), nullable=False)
     subject = db.Column(db.String(200))
     message = db.Column(db.Text)
-    status = db.Column(db.String(20), default="open")  # open / in_progress / closed
+    status = db.Column(db.String(20), default="open")
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     updated_at = db.Column(
         db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow
@@ -145,11 +145,11 @@ class Ticket(db.Model):
 
 
 # ---------------------------------------------------
-# In-memory structures (tables + history)
+# In-memory structures
 # ---------------------------------------------------
 
-game_tables = {}  # {game_type: [GameTable, ...]}
-user_game_history = {}  # {user_id: [bet_record, ...]}  (pending + completed)
+game_tables = {}
+user_game_history = {}
 
 
 # ---------------------------------------------------
@@ -209,7 +209,7 @@ def generate_bot_name():
 
 
 # ---------------------------------------------------
-# GameTable (per-table round logic, in memory)
+# GameTable class
 # ---------------------------------------------------
 
 
@@ -222,7 +222,7 @@ class GameTable:
         self.start_time = datetime.now() + timedelta(seconds=initial_delay)
         self.end_time = self.start_time + timedelta(minutes=5)
         self.betting_close_time = self.end_time - timedelta(seconds=15)
-        self.bets = []  # list of dicts
+        self.bets = []
         self.result = None
         self.is_betting_closed = False
         self.is_finished = False
@@ -239,22 +239,12 @@ class GameTable:
         return list(range(10))
 
     def add_bet(self, user_id, username, number, is_bot=False):
-        """
-        Add a bet to this table.
-        RULES:
-        - Each NUMBER can be used only once in this table (real users + bots).
-        - Max 4 bets per user.
-        - Max players = self.max_players (6).
-        We normalise real users' IDs to int so history keys match /api/user-games.
-        """
-        # normalise number to int
         try:
             number_int = int(number)
         except (TypeError, ValueError):
             return False, "Invalid number"
         number = number_int
 
-        # one bet per number in this game
         for bet in self.bets:
             if bet["number"] == number:
                 return (
@@ -262,7 +252,6 @@ class GameTable:
                     "This number is already taken in this game. Please choose another.",
                 )
 
-        # Normalise user id for non-bots
         if not is_bot:
             try:
                 user_id_norm = int(user_id)
@@ -271,12 +260,10 @@ class GameTable:
         else:
             user_id_norm = user_id
 
-        # max 4 bets per user
         user_bets = [b for b in self.bets if b["user_id"] == user_id_norm]
         if len(user_bets) >= 4:
             return False, "Maximum 4 bets per user"
 
-        # table full
         if len(self.bets) >= self.max_players:
             return False, "All slots are full"
 
@@ -290,7 +277,6 @@ class GameTable:
         }
         self.bets.append(bet_obj)
 
-        # log into user history (non-bots)
         if not is_bot:
             if user_id_norm not in user_game_history:
                 user_game_history[user_id_norm] = []
@@ -309,11 +295,6 @@ class GameTable:
         return True, "Bet placed successfully"
 
     def add_bot_bet(self):
-        """
-        Add a bot bet, respecting the SAME rules:
-        - table not full
-        - number not already used by any bet in this table
-        """
         if len(self.bets) >= self.max_players:
             return False
 
@@ -392,7 +373,7 @@ class GameTable:
 
 
 # ---------------------------------------------------
-# Table initialization and threads
+# Table initialization
 # ---------------------------------------------------
 
 
@@ -407,18 +388,15 @@ def initialize_game_tables():
 
 
 def manage_game_table(table: GameTable):
-    # Each thread needs application context for DB operations
     with app.app_context():
         while True:
             try:
                 now = datetime.now()
 
-                # wait until start
                 if now < table.start_time:
                     time.sleep(1)
                     continue
 
-                # add bots during middle of round
                 if (
                     not table.is_betting_closed
                     and len(table.bets) < table.max_players
@@ -431,12 +409,10 @@ def manage_game_table(table: GameTable):
                         if table.add_bot_bet():
                             table.last_bot_added_at = now
 
-                # close betting
                 if now >= table.betting_close_time and not table.is_betting_closed:
                     table.is_betting_closed = True
                     print(f"{table.game_type} Table {table.table_number}: Betting closed")
 
-                # finish game
                 if now >= table.end_time and not table.is_finished:
                     table.is_finished = True
                     result = table.calculate_result()
@@ -445,7 +421,6 @@ def manage_game_table(table: GameTable):
                         f"{table.game_type} Table {table.table_number}: Game ended. Winner: {result}"
                     )
 
-                    # finalize history
                     for bet in table.bets:
                         if bet.get("is_bot"):
                             continue
@@ -468,7 +443,6 @@ def manage_game_table(table: GameTable):
                                 rec["is_resolved"] = True
                                 rec["date_time"] = now.strftime("%Y-%m-%d %H:%M")
 
-                    # award winners
                     for winner in winners:
                         wallet = Wallet.query.filter_by(
                             user_id=winner["user_id"]
@@ -477,7 +451,6 @@ def manage_game_table(table: GameTable):
                             wallet.balance += winner["payout"]
                     db.session.commit()
 
-                    # restart round
                     time.sleep(3)
                     table.bets = []
                     table.result = None
@@ -623,7 +596,6 @@ def login_post():
             {"success": False, "message": f"Your account is blocked. Reason: {user.block_reason or 'No reason provided'}"}
         ), 403
 
-    # ensure wallet
     ensure_wallet_for_user(user)
 
     session["user_id"] = user.id
@@ -706,7 +678,7 @@ def logout():
 
 
 # ---------------------------------------------------
-# Game pages / history / profile / help
+# Game pages
 # ---------------------------------------------------
 
 
@@ -754,10 +726,8 @@ def profile_page():
         return redirect(url_for("logout"))
 
     wallet = ensure_wallet_for_user(user)
-
     joined_at = user.created_at.strftime("%d %b %Y") if user.created_at else "Just now"
 
-    # build very simple coin transactions from history (bets + wins)
     txns = []
     for rec in user_game_history.get(user_id, []):
         cfg = GAME_CONFIGS.get(rec["game_type"], {})
@@ -855,14 +825,12 @@ def help_tickets_api():
             )
         return jsonify(out)
 
-    # POST (new ticket)
     subject = request.form.get("subject", "").strip() or "(no subject)"
     message = request.form.get("message", "").strip()
     file = request.files.get("attachment")
 
     attach_name = None
     if file and file.filename:
-        # NOTE: In production, use secure_filename and external storage
         upload_dir = os.path.join(os.path.dirname(__file__), "uploads")
         os.makedirs(upload_dir, exist_ok=True)
         attach_name = f"{int(time.time())}_{file.filename}"
@@ -884,11 +852,6 @@ def help_tickets_api():
 
 @app.route("/balance/<user_id>")
 def get_balance(user_id):
-    """
-    Balance API used by the game pages.
-    We IGNORE the id in the URL and always use the logged-in user
-    from the Flask session, so calls like /balance/undefined still work.
-    """
     real_user_id = session.get("user_id")
     if not real_user_id:
         return jsonify({"balance": 0})
@@ -1004,7 +967,7 @@ def admin_credit_debit(user_id):
         return jsonify({"success": False, "message": "User not found"}), 404
     
     data = request.get_json() or {}
-    transaction_type = data.get("type", "add")  # add or deduct
+    transaction_type = data.get("type", "add")
     amount = float(data.get("amount", 0))
     reason = data.get("reason", "Admin transaction")
     
@@ -1054,7 +1017,6 @@ def admin_get_stats():
     blocked_users = User.query.filter_by(is_blocked=True).count()
     active_games = sum(1 for tables in game_tables.values() for t in tables if not t.is_finished)
     
-    # Calculate total revenue from all wallets
     all_wallets = Wallet.query.all()
     total_revenue = sum(w.balance for w in all_wallets)
     
@@ -1090,40 +1052,18 @@ def handle_join_game(data):
     join_room(game_type)
 
 
-# ---------------------------------------------------
-# PLACE BET  (UPDATED: tie to round_code + block full games)
-# ---------------------------------------------------
-
-
 @socketio.on("place_bet")
 def handle_place_bet(data):
-    """
-    Place bet from game clients.
-
-    NEW behaviour:
-    - If 'round_code' is provided, we place the bet ONLY on that round/table.
-      (So user always bets on the game they see on screen.)
-    - If no 'round_code' is provided (older JS), we fall back to the first
-      open table for that game_type.
-    - We block bets if:
-        * game_type invalid
-        * user not found
-        * wallet < bet amount
-        * table is finished or betting_closed
-        * table is full (6 slots including bots)
-        * GameTable.add_bet rejects (duplicate number, >4 bets per user, etc.)
-    """
     game_type = data.get("game_type")
     raw_user_id = data.get("user_id")
     username = data.get("username")
     number = data.get("number")
-    round_code = data.get("round_code")  # optional – sent from new JS
+    round_code = data.get("round_code")
 
     if game_type not in GAME_CONFIGS:
         emit("bet_error", {"message": "Invalid game type"})
         return
 
-    # Normalise user id
     try:
         user_id = int(raw_user_id)
     except (TypeError, ValueError):
@@ -1134,7 +1074,6 @@ def handle_place_bet(data):
         emit("bet_error", {"message": "User not found"})
         return
 
-    # Check if user is blocked
     if user.is_blocked:
         emit("bet_error", {"message": f"Your account is blocked. Reason: {user.block_reason or 'No reason provided'}"})
         return
@@ -1146,7 +1085,6 @@ def handle_place_bet(data):
         emit("bet_error", {"message": "No tables for this game"})
         return
 
-    # --- Find the exact table by round_code if provided ---
     table = None
     if round_code:
         for t in tables:
@@ -1162,7 +1100,6 @@ def handle_place_bet(data):
             )
             return
     else:
-        # fallback: first open table
         for t in tables:
             if not t.is_betting_closed and not t.is_finished and len(t.bets) < t.max_players:
                 table = t
@@ -1171,12 +1108,10 @@ def handle_place_bet(data):
             emit("bet_error", {"message": "No open game table"})
             return
 
-    # Block if table already finished / closed
     if table.is_finished or table.is_betting_closed:
         emit("bet_error", {"message": "Betting is closed for this game"})
         return
 
-    # Block if all 6 slots are full, for everyone (even existing players)
     if len(table.bets) >= table.max_players:
         emit("bet_error", {"message": "All slots are full"})
         return
@@ -1187,10 +1122,6 @@ def handle_place_bet(data):
         emit("bet_error", {"message": "Insufficient balance"})
         return
 
-    # This enforces:
-    # - one number per game (for all users)
-    # - max 4 bets per user
-    # - table full check again
     success, message = table.add_bet(user_id, username, number)
     if not success:
         emit("bet_error", {"message": message})
@@ -1226,17 +1157,22 @@ def seed_demo_users():
             db.session.commit()
         ensure_wallet_for_user(user)
     
-    # Create admin user
+    # Create or update admin user
     admin = User.query.filter_by(username="admin").first()
     if not admin:
         admin = User(username="admin", display_name="Admin User", is_admin=True)
         admin.set_password("admin123")
         db.session.add(admin)
-        db.session.commit()
-        ensure_wallet_for_user(admin)
+    else:
+        # Update existing admin user to ensure is_admin is True
+        admin.is_admin = True
+        admin.set_password("admin123")
+    
+    db.session.commit()
+    ensure_wallet_for_user(admin)
     
     print("Demo users ready: demo, demo1..demo5, password='demo123'")
-    print("Admin user ready: admin, password='admin123'")
+    print("✅ Admin user ready: admin, password='admin123'")
 
 
 # ---------------------------------------------------
