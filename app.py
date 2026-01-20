@@ -175,7 +175,12 @@ def admin_required(f):
         
         user = User.query.get(session.get("user_id"))
         if not user or not user.is_admin:
-            return jsonify({"error": "Admin access required"}), 403
+            # For HTML page requests, redirect to login
+            # For API requests (JSON), return 403
+            if request.path.startswith('/api/'):
+                return jsonify({"error": "Admin access required"}), 403
+            else:
+                return redirect(url_for("login_page"))
         
         return f(*args, **kwargs)
     
