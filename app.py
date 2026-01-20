@@ -30,10 +30,9 @@ app.config["SESSION_COOKIE_HTTPONLY"] = True
 app.config["SESSION_COOKIE_SAMESITE"] = "Lax"
 app.config["PERMANENT_SESSION_LIFETIME"] = timedelta(days=7)
 
-# DB config – you can replace with your Render DB URL
-app.config["SQLALCHEMY_DATABASE_URI"] = os.environ.get(
-    "DATABASE_URL", "sqlite:///game.db"
-)
+# DB config - uses sqlite in current directory
+db_path = os.path.join(os.path.dirname(__file__), 'game.db')
+app.config["SQLALCHEMY_DATABASE_URI"] = f"sqlite:///{db_path}"
 app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
 
 db = SQLAlchemy(app)
@@ -1146,7 +1145,9 @@ def handle_place_bet(data):
 
 
 def seed_demo_users():
-    """Create demo, demo1..demo5 with 10k coins if they don't exist."""
+    """Create demo, demo1..demo5 with 10k coins and admin user"""
+    print("\n🔄 Checking/Creating users...")
+    
     demo_usernames = ["demo"] + [f"demo{i}" for i in range(1, 6)]
     for uname in demo_usernames:
         user = User.query.filter_by(username=uname).first()
@@ -1155,24 +1156,29 @@ def seed_demo_users():
             user.set_password("demo123")
             db.session.add(user)
             db.session.commit()
+            print(f"✅ Created user: {uname}")
         ensure_wallet_for_user(user)
     
-    # Create or update admin user
+    # Create or update admin user - ALWAYS ensure is_admin=True
     admin = User.query.filter_by(username="admin").first()
     if not admin:
+        print("✅ Creating admin user...")
         admin = User(username="admin", display_name="Admin User", is_admin=True)
         admin.set_password("admin123")
         db.session.add(admin)
+        db.session.commit()
+        ensure_wallet_for_user(admin)
+        print("✅ Admin user created: is_admin=True")
     else:
-        # Update existing admin user to ensure is_admin is True
-        admin.is_admin = True
-        admin.set_password("admin123")
+        # Ensure existing admin has is_admin=True
+        if not admin.is_admin:
+            print("⚠️  Fixing admin user: setting is_admin=True")
+            admin.is_admin = True
+            db.session.commit()
+        ensure_wallet_for_user(admin)
+        print("✅ Admin user verified: is_admin=True")
     
-    db.session.commit()
-    ensure_wallet_for_user(admin)
-    
-    print("Demo users ready: demo, demo1..demo5, password='demo123'")
-    print("✅ Admin user ready: admin, password='admin123'")
+    print("✅ All users ready!\n")
 
 
 # ---------------------------------------------------
@@ -1181,10 +1187,26 @@ def seed_demo_users():
 
 if __name__ == "__main__":
     with app.app_context():
+        print("🔧 Creating database tables...")
         db.create_all()
+        print("✅ Database tables created")
+        
+        print("👥 Seeding demo users...")
         seed_demo_users()
+        
+        print("🎮 Initializing game tables...")
         initialize_game_tables()
+        
+        print("▶️  Starting game threads...")
         start_all_game_tables()
+        
+        print("\n" + "="*60)
+        print("🎮 GAME OF FIVE - Admin Panel Ready")
+        print("="*60)
+        print("📍 Admin URL: http://localhost:10000/admin")
+        print("👤 Admin Username: admin")
+        print("🔐 Admin Password: admin123")
+        print("="*60 + "\n")
 
     socketio.run(
         app,
