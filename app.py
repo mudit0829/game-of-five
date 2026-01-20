@@ -193,7 +193,9 @@ def admin_required(f):
 
 
 def ensure_wallet_for_user(user: User) -> Wallet:
-    """Ensure the user has a wallet row with starting 10000 coins."""
+    """Ensure the user has a wallet row with starting 10000 coins - ONLY FOR NON-ADMIN USERS"""
+    if user.is_admin:
+        return None
     if not user.wallet:
         wallet = Wallet(user_id=user.id, balance=10000)
         db.session.add(wallet)
@@ -608,7 +610,8 @@ def login_post():
             {"success": False, "message": f"Your account is blocked. Reason: {user.block_reason or 'No reason provided'}"}
         ), 403
 
-    ensure_wallet_for_user(user)
+    if not user.is_admin:
+        ensure_wallet_for_user(user)
 
     session["user_id"] = user.id
     session["username"] = user.username
@@ -780,7 +783,7 @@ def profile_page():
         username=user.username,
         display_name=user.display_name or user.username,
         joined_at=joined_at,
-        wallet_balance=wallet.balance,
+        wallet_balance=wallet.balance if wallet else 0,
         email=user.email or "",
         country=user.country or "",
         phone=user.phone or "",
@@ -873,7 +876,7 @@ def get_balance(user_id):
         return jsonify({"balance": 0})
 
     wallet = ensure_wallet_for_user(user)
-    return jsonify({"balance": wallet.balance})
+    return jsonify({"balance": wallet.balance if wallet else 0})
 
 
 # ---------------------------------------------------
@@ -892,7 +895,7 @@ def admin_panel():
 @admin_required
 def admin_get_users():
     """Get all users with wallet info"""
-    users = User.query.all()
+    users = User.query.filter(User.is_admin == False).all()
     user_list = []
     
     for user in users:
@@ -903,7 +906,7 @@ def admin_get_users():
             "email": user.email or "",
             "password_hash": user.password_hash,
             "status": "blocked" if user.is_blocked else "active",
-            "balance": wallet.balance,
+            "balance": wallet.balance if wallet else 0,
             "created_at": user.created_at.strftime("%Y-%m-%d %H:%M"),
             "block_reason": user.block_reason or "",
         })
@@ -931,7 +934,8 @@ def admin_update_user(user_id):
         user.is_blocked = (data["status"] == "blocked")
     if "balance" in data:
         wallet = ensure_wallet_for_user(user)
-        wallet.balance = data["balance"]
+        if wallet:
+            wallet.balance = data["balance"]
     if "block_reason" in data:
         user.block_reason = data["block_reason"]
     
@@ -985,17 +989,18 @@ def admin_credit_debit(user_id):
     
     wallet = ensure_wallet_for_user(user)
     
-    if transaction_type == "add":
-        wallet.balance += amount
-    else:
-        wallet.balance -= amount
+    if wallet:
+        if transaction_type == "add":
+            wallet.balance += amount
+        else:
+            wallet.balance -= amount
     
     db.session.commit()
     
     return jsonify({
         "success": True,
-        "message": f"Transaction processed. New balance: ₹{wallet.balance}",
-        "new_balance": wallet.balance
+        "message": f"Transaction processed. New balance: ₹{wallet.balance if wallet else 0}",
+        "new_balance": wallet.balance if wallet else 0
     })
 
 
@@ -1025,18 +1030,49 @@ def admin_get_games():
 @admin_required
 def admin_get_stats():
     """Get admin dashboard statistics"""
-    total_users = User.query.count()
-    blocked_users = User.query.filter_by(is_blocked=True).count()
-    active_games = sum(1 for tables in game_tables.values() for t in tables if not t.is_finished)
+    # Get all non-admin users
+    total_users = User.query.filter(User.is_admin == False).count()
+    blocked_users = User.query.filter(User.is_admin == False, User.is_blocked == True).count()
     
+    # Active users = users with wallet coins AND played game in last 30 days
+    thirty_days_ago = datetime.utcnow() - timedelta(days=30)
+    active_users = 0
+    for user in User.query.filter(User.is_admin == False).all():
+        wallet = ensure_wallet_for_user(user)
+        if wallet and wallet.balance > 0:
+            recent_games = [g for g in user_game_history.get(user.id, []) 
+                           if g.get("bet_time") and isinstance(g["bet_time"], datetime) 
+                           and g["bet_time"] > thirty_days_ago]
+            if recent_games:
+                active_users += 1
+    
+    inactive_users = total_users - active_users
+    
+    # Revenue calculations
     all_wallets = Wallet.query.all()
     total_revenue = sum(w.balance for w in all_wallets)
     
+    # For now, total_deposit and total_withdrawl are assumed to be part of revenue
+    # You can modify this based on your actual transaction tracking
+    total_deposit = total_revenue  # Simplified
+    total_withdrawal = 0  # Simplified
+    
+    # Active games today
+    active_games = sum(1 for tables in game_tables.values() for t in tables if not t.is_finished)
+    
+    # Open tickets
+    open_tickets = Ticket.query.filter_by(status="open").count()
+    
     return jsonify({
         "total_users": total_users,
+        "active_users": active_users,
+        "inactive_users": inactive_users,
         "active_games": active_games,
         "total_revenue": total_revenue,
+        "total_deposit": total_deposit,
+        "total_withdrawal": total_withdrawal,
         "blocked_users": blocked_users,
+        "open_tickets": open_tickets,
     })
 
 
@@ -1091,6 +1127,9 @@ def handle_place_bet(data):
         return
 
     wallet = ensure_wallet_for_user(user)
+    if not wallet:
+        emit("bet_error", {"message": "Admin cannot place bets"})
+        return
 
     tables = game_tables.get(game_type)
     if not tables:
@@ -1172,7 +1211,7 @@ def seed_demo_users():
             print(f"✅ Created user: {uname}")
         ensure_wallet_for_user(user)
     
-    # Create or update admin user - ALWAYS ensure is_admin=True
+    # Create or update admin user - NO WALLET for admin
     admin = User.query.filter_by(username="admin").first()
     if not admin:
         print("✅ Creating admin user...")
@@ -1180,15 +1219,13 @@ def seed_demo_users():
         admin.set_password("admin123")
         db.session.add(admin)
         db.session.commit()
-        ensure_wallet_for_user(admin)
-        print("✅ Admin user created: is_admin=True")
+        print("✅ Admin user created: is_admin=True (NO WALLET)")
     else:
         # Ensure existing admin has is_admin=True
         if not admin.is_admin:
             print("⚠️  Fixing admin user: setting is_admin=True")
             admin.is_admin = True
             db.session.commit()
-        ensure_wallet_for_user(admin)
         print("✅ Admin user verified: is_admin=True")
     
     print("✅ All users ready!\n")
