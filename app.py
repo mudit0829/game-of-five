@@ -174,12 +174,17 @@ def admin_required(f):
             return redirect(url_for("login_page"))
         
         user = User.query.get(session.get("user_id"))
-        if not user or not user.is_admin:
-            # For admin API requests return JSON 403
+        if not user:
+            session.clear()
+            return redirect(url_for("login_page"))
+        
+        if not user.is_admin:
+            # For API routes, return JSON 403
             if request.path.startswith('/api/admin/'):
                 return jsonify({"error": "Admin access required"}), 403
-            # For /admin page, always go to login so you can login as admin
+            # For /admin page, logout and redirect to login so they can login as admin
             else:
+                session.clear()
                 return redirect(url_for("login_page"))
         
         return f(*args, **kwargs)
@@ -570,6 +575,9 @@ def index():
 @app.route("/login")
 def login_page():
     if "user_id" in session:
+        user = User.query.get(session.get("user_id"))
+        if user and user.is_admin:
+            return redirect(url_for("admin_panel"))
         return redirect(url_for("home"))
     return render_template("login.html")
 
