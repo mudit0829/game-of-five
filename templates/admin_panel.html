@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Admin Dashboard - Game of Five</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='admin_styles.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='users_styles.css') }}">
 </head>
 <body>
     <div class="admin-container">
@@ -16,14 +17,14 @@
             
             <nav class="sidebar-menu">
                 <ul>
-                    <li class="menu-item active" data-section="dashboard">
+                    <li class="menu-item" data-section="dashboard">
                         <a href="#dashboard" class="menu-link">
                             <span class="icon">📊</span>
                             <span class="label">Dashboard</span>
                         </a>
                     </li>
                     
-                    <li class="menu-item" data-section="users">
+                    <li class="menu-item active" data-section="users">
                         <a href="#users" class="menu-link">
                             <span class="icon">👥</span>
                             <span class="label">Users</span>
@@ -87,8 +88,8 @@
             <!-- Header -->
             <header class="header">
                 <div class="header-left">
-                    <h1>Dashboard</h1>
-                    <p id="header-subtitle">Welcome to Game of Five Admin Panel</p>
+                    <h1>User Management</h1>
+                    <p id="header-subtitle">Manage and monitor all users</p>
                 </div>
                 <div class="header-right">
                     <div class="admin-info">
@@ -98,14 +99,59 @@
                 </div>
             </header>
 
-            <!-- Dashboard Section -->
-            <section id="dashboard" class="section active">
+            <!-- Users Section -->
+            <section id="users" class="section active">
+                <div class="section-header">
+                    <h2>All Users</h2>
+                    <div class="section-controls">
+                        <input type="text" id="search-users" class="search-input" placeholder="Search by username or ID...">
+                        <button class="refresh-btn-table" id="refresh-users">🔄 Refresh</button>
+                    </div>
+                </div>
+
+                <!-- Users Table -->
+                <div class="table-container">
+                    <table class="users-table">
+                        <thead>
+                            <tr>
+                                <th class="col-sno">S.No</th>
+                                <th class="col-userid">User ID</th>
+                                <th class="col-referid">Refer ID</th>
+                                <th class="col-joined">Date of Joining</th>
+                                <th class="col-balance">Wallet Balance</th>
+                                <th class="col-games">Games</th>
+                                <th class="col-won">Won</th>
+                                <th class="col-coinswon">Coins Won</th>
+                                <th class="col-login">Login Details</th>
+                                <th class="col-action">Block/UnBlock</th>
+                            </tr>
+                        </thead>
+                        <tbody id="users-table-body">
+                            <!-- Populated by JavaScript -->
+                        </tbody>
+                    </table>
+                    <div id="loading-indicator" class="loading">
+                        <span>Loading users...</span>
+                    </div>
+                    <div id="no-users" class="no-data" style="display: none;">
+                        <span>No users found</span>
+                    </div>
+                </div>
+
+                <!-- Pagination -->
+                <div class="pagination">
+                    <button id="prev-page" class="pagination-btn">← Previous</button>
+                    <span id="page-info" class="page-info">Page 1</span>
+                    <button id="next-page" class="pagination-btn">Next →</button>
+                </div>
+            </section>
+
+            <!-- Dashboard Section (Hidden) -->
+            <section id="dashboard" class="section">
                 <div class="section-header">
                     <h2>Dashboard Overview</h2>
                     <p>Real-time statistics and analytics</p>
                 </div>
-
-                <!-- First Row: Users Stats -->
                 <div class="stats-row">
                     <div class="stat-card">
                         <div class="stat-icon users-icon">👥</div>
@@ -114,7 +160,6 @@
                             <p class="stat-value" id="total-users">-</p>
                         </div>
                     </div>
-
                     <div class="stat-card">
                         <div class="stat-icon active-icon">✅</div>
                         <div class="stat-content">
@@ -122,7 +167,6 @@
                             <p class="stat-value" id="active-users">-</p>
                         </div>
                     </div>
-
                     <div class="stat-card">
                         <div class="stat-icon inactive-icon">❌</div>
                         <div class="stat-content">
@@ -131,18 +175,14 @@
                         </div>
                     </div>
                 </div>
-
-                <!-- Second Row: Revenue Stats -->
                 <div class="stats-row">
                     <div class="stat-card">
                         <div class="stat-icon revenue-icon">💹</div>
                         <div class="stat-content">
                             <h3>Total Revenue</h3>
                             <p class="stat-value" id="total-revenue">₹-</p>
-                            <p class="stat-label">(Deposit - Withdrawal)</p>
                         </div>
                     </div>
-
                     <div class="stat-card">
                         <div class="stat-icon deposit-icon">📈</div>
                         <div class="stat-content">
@@ -150,7 +190,6 @@
                             <p class="stat-value" id="total-deposit">₹-</p>
                         </div>
                     </div>
-
                     <div class="stat-card">
                         <div class="stat-icon withdrawal-icon">📉</div>
                         <div class="stat-content">
@@ -159,8 +198,6 @@
                         </div>
                     </div>
                 </div>
-
-                <!-- Third Row: Activity Stats -->
                 <div class="stats-row">
                     <div class="stat-card">
                         <div class="stat-icon games-icon">🎮</div>
@@ -169,7 +206,6 @@
                             <p class="stat-value" id="active-games">-</p>
                         </div>
                     </div>
-
                     <div class="stat-card">
                         <div class="stat-icon tickets-icon">🎫</div>
                         <div class="stat-content">
@@ -177,7 +213,6 @@
                             <p class="stat-value" id="open-tickets">-</p>
                         </div>
                     </div>
-
                     <div class="stat-card">
                         <div class="stat-icon blocked-icon">🚫</div>
                         <div class="stat-content">
@@ -186,86 +221,216 @@
                         </div>
                     </div>
                 </div>
-
-                <!-- Last Updated -->
                 <div class="last-updated">
                     Last updated: <span id="last-update">Just now</span>
                     <button class="refresh-btn" id="refresh-stats">🔄 Refresh</button>
                 </div>
             </section>
 
-            <!-- Users Section -->
-            <section id="users" class="section">
-                <div class="section-header">
-                    <h2>User Management</h2>
-                    <p>Manage and monitor all users</p>
-                </div>
-                <div id="users-content" class="content-placeholder">
-                    Users management will be implemented next
-                </div>
-            </section>
-
-            <!-- Agents Section -->
+            <!-- Other Sections -->
             <section id="agents" class="section">
                 <div class="section-header">
                     <h2>Agents Management</h2>
                     <p>Manage affiliate agents</p>
                 </div>
-                <div id="agents-content" class="content-placeholder">
-                    Agents management will be implemented next
-                </div>
+                <div class="content-placeholder">Agents management will be implemented next</div>
             </section>
 
-            <!-- Games Section -->
             <section id="games" class="section">
                 <div class="section-header">
                     <h2>Game Management</h2>
                     <p>Monitor active games and statistics</p>
                 </div>
-                <div id="games-content" class="content-placeholder">
-                    Games management will be implemented next
-                </div>
+                <div class="content-placeholder">Games management will be implemented next</div>
             </section>
 
-            <!-- Revenue Section -->
             <section id="revenue" class="section">
                 <div class="section-header">
                     <h2>Revenue Analytics</h2>
                     <p>Detailed revenue and financial reports</p>
                 </div>
-                <div id="revenue-content" class="content-placeholder">
-                    Revenue analytics will be implemented next
-                </div>
+                <div class="content-placeholder">Revenue analytics will be implemented next</div>
             </section>
 
-            <!-- Tickets Section -->
             <section id="tickets" class="section">
                 <div class="section-header">
                     <h2>Support Tickets</h2>
                     <p>Manage customer support tickets</p>
                 </div>
-                <div id="tickets-content" class="content-placeholder">
-                    Tickets management will be implemented next
-                </div>
+                <div class="content-placeholder">Tickets management will be implemented next</div>
             </section>
 
-            <!-- Settings Section -->
             <section id="settings" class="section">
                 <div class="section-header">
                     <h2>Settings</h2>
                     <p>System and admin settings</p>
                 </div>
-                <div id="settings-content" class="content-placeholder">
-                    Settings will be implemented next
-                </div>
+                <div class="content-placeholder">Settings will be implemented next</div>
             </section>
         </main>
+    </div>
+
+    <!-- Modals -->
+    
+    <!-- Login Details Modal -->
+    <div id="login-modal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>Login Details</h2>
+                <button class="modal-close">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div class="login-detail-row">
+                    <label>User ID:</label>
+                    <div class="login-detail-value" id="modal-userid">-</div>
+                    <button class="copy-btn" onclick="copyToClipboard('#modal-userid')">📋 Copy</button>
+                </div>
+                <div class="login-detail-row">
+                    <label>Username:</label>
+                    <div class="login-detail-value" id="modal-username">-</div>
+                    <button class="copy-btn" onclick="copyToClipboard('#modal-username')">📋 Copy</button>
+                </div>
+                <div class="login-detail-row">
+                    <label>Password:</label>
+                    <div class="login-detail-value password-field">
+                        <input type="password" id="modal-password" readonly>
+                        <button class="toggle-password-btn" onclick="togglePassword()">👁️ Show</button>
+                        <button class="copy-btn" onclick="copyPassword()">📋 Copy</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Refer ID Modal -->
+    <div id="refer-modal" class="modal">
+        <div class="modal-content modal-medium">
+            <div class="modal-header">
+                <h2>Referral Information</h2>
+                <button class="modal-close">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div class="refer-info-row">
+                    <label>Refer ID:</label>
+                    <div class="refer-info-value" id="modal-referid">-</div>
+                </div>
+                <div class="refer-info-row">
+                    <label>Agent Name:</label>
+                    <div class="refer-info-value" id="modal-agentname">-</div>
+                </div>
+                <div class="refer-info-row">
+                    <label>Referral Date:</label>
+                    <div class="refer-info-value" id="modal-referdate">-</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Wallet Balance Modal -->
+    <div id="wallet-modal" class="modal">
+        <div class="modal-content modal-medium">
+            <div class="modal-header">
+                <h2>Wallet Details</h2>
+                <button class="modal-close">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div class="wallet-info-row">
+                    <label>Current Balance:</label>
+                    <div class="wallet-info-value" id="modal-balance">₹-</div>
+                </div>
+                <div class="wallet-info-row">
+                    <label>Total Earned:</label>
+                    <div class="wallet-info-value" id="modal-earned">₹-</div>
+                </div>
+                <div class="wallet-info-row">
+                    <label>Total Spent:</label>
+                    <div class="wallet-info-value" id="modal-spent">₹-</div>
+                </div>
+                <div class="wallet-action-row">
+                    <input type="number" id="amount-input" placeholder="Enter amount">
+                    <button class="action-btn add-btn" onclick="creditAmount()">➕ Credit</button>
+                    <button class="action-btn debit-btn" onclick="debitAmount()">➖ Debit</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Games Statistics Modal -->
+    <div id="games-modal" class="modal">
+        <div class="modal-content modal-large">
+            <div class="modal-header">
+                <h2>Game Statistics</h2>
+                <button class="modal-close">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div class="game-stats-row">
+                    <div class="game-stat-item">
+                        <label>Total Games Played:</label>
+                        <span class="game-stat-value" id="modal-totalgames">-</span>
+                    </div>
+                    <div class="game-stat-item">
+                        <label>Total Games Won:</label>
+                        <span class="game-stat-value" id="modal-gameswon">-</span>
+                    </div>
+                    <div class="game-stat-item">
+                        <label>Win Rate:</label>
+                        <span class="game-stat-value" id="modal-winrate">-</span>
+                    </div>
+                </div>
+                <div class="game-stats-row">
+                    <div class="game-stat-item">
+                        <label>Total Coins Spent:</label>
+                        <span class="game-stat-value" id="modal-coinsspent">₹-</span>
+                    </div>
+                    <div class="game-stat-item">
+                        <label>Total Coins Won:</label>
+                        <span class="game-stat-value" id="modal-coinswon-stat">₹-</span>
+                    </div>
+                    <div class="game-stat-item">
+                        <label>Net Profit/Loss:</label>
+                        <span class="game-stat-value" id="modal-netprofit">₹-</span>
+                    </div>
+                </div>
+                <div class="game-history-section">
+                    <h3>Recent Games</h3>
+                    <div id="game-history-list" class="game-history-list">
+                        <!-- Populated by JavaScript -->
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Block/Unblock Confirmation Modal -->
+    <div id="block-modal" class="modal">
+        <div class="modal-content modal-small">
+            <div class="modal-header">
+                <h2>Block User</h2>
+                <button class="modal-close">&times;</button>
+            </div>
+            <div class="modal-body">
+                <p id="block-message">Are you sure you want to block this user?</p>
+                <textarea id="block-reason" placeholder="Enter block reason (optional)" class="block-reason-textarea"></textarea>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-cancel" onclick="closeBlockModal()">Cancel</button>
+                <button class="btn btn-confirm" onclick="confirmBlockUser()">Confirm Block</button>
+            </div>
+        </div>
     </div>
 
     <script>
         // Session storage
         const adminUsername = sessionStorage.getItem('username') || 'Admin';
         document.getElementById('admin-username').textContent = adminUsername;
+
+        // Global variables
+        let allUsers = [];
+        let filteredUsers = [];
+        let currentPage = 1;
+        const usersPerPage = 10;
+        let currentUserId = null;
+        let currentBlockAction = null;
 
         // Sidebar navigation
         document.querySelectorAll('.menu-item').forEach(item => {
@@ -300,6 +465,280 @@
                 section.classList.add('active');
                 document.getElementById('header-subtitle').textContent = 
                     section.querySelector('h2').textContent;
+                
+                if (sectionId === 'users') {
+                    loadUsers();
+                } else if (sectionId === 'dashboard') {
+                    loadStats();
+                }
+            }
+        }
+
+        // Load Users
+        async function loadUsers() {
+            try {
+                document.getElementById('loading-indicator').style.display = 'block';
+                document.getElementById('no-users').style.display = 'none';
+                
+                const response = await fetch('/api/admin/users');
+                allUsers = await response.json();
+                filteredUsers = allUsers;
+                currentPage = 1;
+                
+                displayUsers();
+                document.getElementById('loading-indicator').style.display = 'none';
+            } catch (error) {
+                console.error('Error loading users:', error);
+                document.getElementById('loading-indicator').style.display = 'none';
+                document.getElementById('no-users').style.display = 'block';
+            }
+        }
+
+        // Display Users
+        function displayUsers() {
+            const tbody = document.getElementById('users-table-body');
+            tbody.innerHTML = '';
+
+            if (filteredUsers.length === 0) {
+                document.getElementById('no-users').style.display = 'block';
+                return;
+            }
+
+            document.getElementById('no-users').style.display = 'none';
+
+            const startIdx = (currentPage - 1) * usersPerPage;
+            const endIdx = startIdx + usersPerPage;
+            const pageUsers = filteredUsers.slice(startIdx, endIdx);
+
+            pageUsers.forEach((user, idx) => {
+                const rowNum = startIdx + idx + 1;
+                const createdDate = new Date(user.created_at);
+                const formattedDate = createdDate.toLocaleDateString('en-IN') + ' ' + 
+                                     createdDate.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+                
+                // Calculate game stats
+                const gameStats = calculateGameStats(user.id);
+                
+                const row = document.createElement('tr');
+                row.innerHTML = `
+                    <td class="col-sno">${rowNum}</td>
+                    <td class="col-userid">${user.id}</td>
+                    <td class="col-referid">
+                        ${user.refer_id ? `<button class="link-btn" onclick="showReferModal('${user.refer_id}')">REF-${user.refer_id}</button>` : '-'}
+                    </td>
+                    <td class="col-joined">${formattedDate}</td>
+                    <td class="col-balance">
+                        <button class="link-btn balance-btn" onclick="showWalletModal(${user.id})">₹${user.balance}</button>
+                    </td>
+                    <td class="col-games">
+                        <button class="link-btn games-btn" onclick="showGamesModal(${user.id})">
+                            ${gameStats.total}
+                        </button>
+                    </td>
+                    <td class="col-won">${gameStats.won}</td>
+                    <td class="col-coinswon">₹${gameStats.coinsWon}</td>
+                    <td class="col-login">
+                        <button class="link-btn login-btn" onclick="showLoginModal(${user.id}, '${user.username}')">View</button>
+                    </td>
+                    <td class="col-action">
+                        <button class="action-toggle-btn ${user.status === 'blocked' ? 'blocked' : 'active'}" 
+                                onclick="toggleBlockUser(${user.id}, '${user.status}')"
+                                data-status="${user.status}">
+                            ${user.status === 'blocked' ? 'Unblock' : 'Block'}
+                        </button>
+                    </td>
+                `;
+                tbody.appendChild(row);
+            });
+
+            updatePagination();
+        }
+
+        // Calculate game stats
+        function calculateGameStats(userId) {
+            // This will be populated from API in next step
+            // For now, returning placeholder
+            return {
+                total: 0,
+                won: 0,
+                coinsWon: 0
+            };
+        }
+
+        // Search functionality
+        document.getElementById('search-users').addEventListener('keyup', function(e) {
+            const searchTerm = e.target.value.toLowerCase();
+            filteredUsers = allUsers.filter(user => 
+                user.username.toLowerCase().includes(searchTerm) ||
+                user.id.toString().includes(searchTerm)
+            );
+            currentPage = 1;
+            displayUsers();
+        });
+
+        // Pagination
+        function updatePagination() {
+            const totalPages = Math.ceil(filteredUsers.length / usersPerPage);
+            document.getElementById('page-info').textContent = `Page ${currentPage} of ${totalPages}`;
+            
+            document.getElementById('prev-page').disabled = currentPage === 1;
+            document.getElementById('next-page').disabled = currentPage === totalPages;
+        }
+
+        document.getElementById('prev-page').addEventListener('click', function() {
+            if (currentPage > 1) {
+                currentPage--;
+                displayUsers();
+                window.scrollTo(0, 0);
+            }
+        });
+
+        document.getElementById('next-page').addEventListener('click', function() {
+            const totalPages = Math.ceil(filteredUsers.length / usersPerPage);
+            if (currentPage < totalPages) {
+                currentPage++;
+                displayUsers();
+                window.scrollTo(0, 0);
+            }
+        });
+
+        // Refresh users
+        document.getElementById('refresh-users').addEventListener('click', loadUsers);
+
+        // Modal functions
+        function closeModal(modalId) {
+            document.getElementById(modalId).style.display = 'none';
+        }
+
+        document.querySelectorAll('.modal-close').forEach(btn => {
+            btn.addEventListener('click', function() {
+                this.closest('.modal').style.display = 'none';
+            });
+        });
+
+        window.addEventListener('click', function(e) {
+            if (e.target.classList.contains('modal')) {
+                e.target.style.display = 'none';
+            }
+        });
+
+        // Show Login Modal
+        function showLoginModal(userId, username) {
+            currentUserId = userId;
+            document.getElementById('modal-userid').textContent = userId;
+            document.getElementById('modal-username').textContent = username;
+            document.getElementById('modal-password').value = '••••••••';
+            document.getElementById('login-modal').style.display = 'flex';
+        }
+
+        // Show Refer Modal
+        function showReferModal(referId) {
+            document.getElementById('modal-referid').textContent = referId;
+            document.getElementById('modal-agentname').textContent = 'Agent Name';
+            document.getElementById('modal-referdate').textContent = new Date().toLocaleDateString('en-IN');
+            document.getElementById('refer-modal').style.display = 'flex';
+        }
+
+        // Show Wallet Modal
+        function showWalletModal(userId) {
+            currentUserId = userId;
+            const user = allUsers.find(u => u.id === userId);
+            document.getElementById('modal-balance').textContent = `₹${user.balance}`;
+            document.getElementById('modal-earned').textContent = `₹${user.balance}`;
+            document.getElementById('modal-spent').textContent = `₹0`;
+            document.getElementById('wallet-modal').style.display = 'flex';
+        }
+
+        // Show Games Modal
+        function showGamesModal(userId) {
+            currentUserId = userId;
+            document.getElementById('modal-totalgames').textContent = '0';
+            document.getElementById('modal-gameswon').textContent = '0';
+            document.getElementById('modal-winrate').textContent = '0%';
+            document.getElementById('modal-coinsspent').textContent = '₹0';
+            document.getElementById('modal-coinswon-stat').textContent = '₹0';
+            document.getElementById('modal-netprofit').textContent = '₹0';
+            document.getElementById('game-history-list').innerHTML = '<p>No games found</p>';
+            document.getElementById('games-modal').style.display = 'flex';
+        }
+
+        // Copy to clipboard
+        function copyToClipboard(selector) {
+            const element = document.querySelector(selector);
+            const text = element.textContent;
+            navigator.clipboard.writeText(text).then(() => {
+                alert('Copied to clipboard!');
+            });
+        }
+
+        // Toggle password visibility
+        function togglePassword() {
+            const input = document.getElementById('modal-password');
+            const btn = event.target;
+            if (input.type === 'password') {
+                input.type = 'text';
+                btn.textContent = '🙈 Hide';
+            } else {
+                input.type = 'password';
+                btn.textContent = '👁️ Show';
+            }
+        }
+
+        // Copy password
+        function copyPassword() {
+            const input = document.getElementById('modal-password');
+            const tempInput = document.createElement('input');
+            tempInput.type = 'text';
+            tempInput.value = input.value;
+            document.body.appendChild(tempInput);
+            tempInput.select();
+            document.execCommand('copy');
+            document.body.removeChild(tempInput);
+            alert('Password copied to clipboard!');
+        }
+
+        // Block/Unblock user
+        function toggleBlockUser(userId, status) {
+            currentUserId = userId;
+            currentBlockAction = status === 'blocked' ? 'unblock' : 'block';
+            const action = currentBlockAction === 'block' ? 'Block' : 'Unblock';
+            document.querySelector('.modal-header h2').textContent = currentBlockAction === 'block' ? 'Block User' : 'Unblock User';
+            document.getElementById('block-message').textContent = `Are you sure you want to ${action.toLowerCase()} this user?`;
+            document.getElementById('block-reason').style.display = currentBlockAction === 'block' ? 'block' : 'none';
+            document.getElementById('block-modal').style.display = 'flex';
+        }
+
+        function closeBlockModal() {
+            document.getElementById('block-modal').style.display = 'none';
+            document.getElementById('block-reason').value = '';
+        }
+
+        async function confirmBlockUser() {
+            const endpoint = currentBlockAction === 'block' 
+                ? `/api/admin/users/${currentUserId}/block`
+                : `/api/admin/users/${currentUserId}/unblock`;
+            
+            const data = currentBlockAction === 'block' 
+                ? { reason: document.getElementById('block-reason').value }
+                : {};
+            
+            try {
+                const response = await fetch(endpoint, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(data)
+                });
+                
+                if (response.ok) {
+                    alert(`User ${currentBlockAction === 'block' ? 'blocked' : 'unblocked'} successfully!`);
+                    closeBlockModal();
+                    loadUsers();
+                } else {
+                    alert('Error updating user status');
+                }
+            } catch (error) {
+                console.error('Error:', error);
+                alert('Error updating user status');
             }
         }
 
@@ -326,14 +765,57 @@
             }
         }
 
-        // Refresh button
+        // Refresh stats
         document.getElementById('refresh-stats').addEventListener('click', loadStats);
 
         // Initial load
-        loadStats();
+        loadUsers();
 
-        // Auto-refresh every 30 seconds
-        setInterval(loadStats, 30000);
+        // Credit amount
+        function creditAmount() {
+            const amount = document.getElementById('amount-input').value;
+            if (!amount || isNaN(amount) || amount <= 0) {
+                alert('Please enter a valid amount');
+                return;
+            }
+            updateBalance(currentUserId, 'add', parseFloat(amount));
+        }
+
+        // Debit amount
+        function debitAmount() {
+            const amount = document.getElementById('amount-input').value;
+            if (!amount || isNaN(amount) || amount <= 0) {
+                alert('Please enter a valid amount');
+                return;
+            }
+            updateBalance(currentUserId, 'debit', parseFloat(amount));
+        }
+
+        // Update balance
+        async function updateBalance(userId, type, amount) {
+            try {
+                const response = await fetch(`/api/admin/users/${userId}/balance`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        type: type,
+                        amount: amount,
+                        reason: 'Admin transaction'
+                    })
+                });
+                
+                if (response.ok) {
+                    const data = await response.json();
+                    alert(data.message);
+                    document.getElementById('amount-input').value = '';
+                    loadUsers();
+                    closeModal('wallet-modal');
+                }
+            } catch (error) {
+                console.error('Error:', error);
+                alert('Error updating balance');
+            }
+        }
     </script>
 </body>
 </html>
