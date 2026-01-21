@@ -3,819 +3,840 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Admin Dashboard - Game of Five</title>
-    <link rel="stylesheet" href="{{ url_for('static', filename='admin_styles.css') }}">
-    <link rel="stylesheet" href="{{ url_for('static', filename='users_styles.css') }}">
+    <title>Admin Panel - Game of Five</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, #1f2937 0%, #111827 100%);
+            color: #f3f4f6;
+            min-height: 100vh;
+        }
+
+        .admin-container {
+            display: grid;
+            grid-template-columns: 280px 1fr;
+            min-height: 100vh;
+        }
+
+        .sidebar {
+            background: #111827;
+            border-right: 1px solid #374151;
+            padding: 25px 15px;
+            position: fixed;
+            width: 280px;
+            height: 100vh;
+            overflow-y: auto;
+        }
+
+        .sidebar h2 {
+            color: #10b981;
+            margin-bottom: 30px;
+            font-size: 16px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .sidebar ul {
+            list-style: none;
+        }
+
+        .sidebar li {
+            margin-bottom: 8px;
+        }
+
+        .sidebar a {
+            display: block;
+            padding: 12px 15px;
+            color: #d1d5db;
+            text-decoration: none;
+            border-radius: 6px;
+            transition: all 0.3s;
+            cursor: pointer;
+            border-left: 3px solid transparent;
+        }
+
+        .sidebar a:hover,
+        .sidebar a.active {
+            background: #1f2937;
+            color: #10b981;
+            border-left-color: #10b981;
+        }
+
+        .main-content {
+            margin-left: 280px;
+            padding: 30px;
+            background: linear-gradient(135deg, #1f2937 0%, #111827 100%);
+        }
+
+        .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 30px;
+        }
+
+        .header h1 {
+            font-size: 28px;
+            color: #f3f4f6;
+        }
+
+        .logout-btn {
+            background: #ef4444;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 14px;
+            transition: background 0.3s;
+        }
+
+        .logout-btn:hover {
+            background: #dc2626;
+        }
+
+        .section {
+            display: none;
+        }
+
+        .section.active {
+            display: block;
+            animation: fadeIn 0.3s ease-in;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+
+        .stat-card {
+            background: #1f2937;
+            border: 1px solid #374151;
+            padding: 20px;
+            border-radius: 8px;
+            transition: all 0.3s;
+        }
+
+        .stat-card:hover {
+            border-color: #10b981;
+            box-shadow: 0 0 20px rgba(16, 185, 129, 0.1);
+        }
+
+        .stat-card h3 {
+            color: #9ca3af;
+            font-size: 12px;
+            text-transform: uppercase;
+            margin-bottom: 10px;
+            font-weight: 600;
+            letter-spacing: 0.5px;
+        }
+
+        .stat-card .value {
+            color: #10b981;
+            font-size: 32px;
+            font-weight: bold;
+        }
+
+        .search-box {
+            margin-bottom: 20px;
+            display: flex;
+            gap: 10px;
+        }
+
+        .search-box input {
+            flex: 1;
+            max-width: 400px;
+            padding: 12px;
+            background: #1f2937;
+            border: 1px solid #374151;
+            color: #f3f4f6;
+            border-radius: 6px;
+            font-size: 14px;
+        }
+
+        .search-box button {
+            padding: 12px 20px;
+            background: #10b981;
+            color: white;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 14px;
+            transition: background 0.3s;
+        }
+
+        .search-box button:hover {
+            background: #059669;
+        }
+
+        .table-wrapper {
+            background: #1f2937;
+            border: 1px solid #374151;
+            border-radius: 8px;
+            overflow: hidden;
+        }
+
+        .data-table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+
+        .data-table thead {
+            background: #111827;
+        }
+
+        .data-table th {
+            padding: 15px;
+            text-align: left;
+            color: #9ca3af;
+            font-weight: 600;
+            border-bottom: 1px solid #374151;
+            font-size: 13px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .data-table td {
+            padding: 15px;
+            border-bottom: 1px solid #374151;
+            font-size: 14px;
+        }
+
+        .data-table tbody tr:hover {
+            background: #374151;
+        }
+
+        .status-badge {
+            display: inline-block;
+            padding: 6px 12px;
+            border-radius: 4px;
+            font-size: 12px;
+            font-weight: 600;
+        }
+
+        .status-active {
+            background: rgba(16, 185, 129, 0.2);
+            color: #10b981;
+        }
+
+        .status-blocked {
+            background: rgba(239, 68, 68, 0.2);
+            color: #ef4444;
+        }
+
+        .status-active-game {
+            background: rgba(59, 130, 246, 0.2);
+            color: #3b82f6;
+        }
+
+        .status-finished {
+            background: rgba(107, 114, 128, 0.2);
+            color: #9ca3af;
+        }
+
+        .status-completed {
+            background: rgba(245, 158, 11, 0.2);
+            color: #f59e0b;
+        }
+
+        .action-btn {
+            padding: 6px 12px;
+            margin-right: 5px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 12px;
+            transition: all 0.3s;
+        }
+
+        .btn-view {
+            background: #3b82f6;
+            color: white;
+        }
+
+        .btn-view:hover {
+            background: #2563eb;
+        }
+
+        .btn-block {
+            background: #ef4444;
+            color: white;
+        }
+
+        .btn-block:hover {
+            background: #dc2626;
+        }
+
+        .btn-unblock {
+            background: #10b981;
+            color: white;
+        }
+
+        .btn-unblock:hover {
+            background: #059669;
+        }
+
+        .btn-edit {
+            background: #3b82f6;
+            color: white;
+        }
+
+        .btn-edit:hover {
+            background: #2563eb;
+        }
+
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.7);
+            z-index: 1000;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .modal.active {
+            display: flex;
+        }
+
+        .modal-content {
+            background: #1f2937;
+            padding: 30px;
+            border-radius: 8px;
+            width: 90%;
+            max-width: 550px;
+            border: 1px solid #374151;
+            max-height: 90vh;
+            overflow-y: auto;
+        }
+
+        .modal-content h2 {
+            margin-bottom: 20px;
+            color: #f3f4f6;
+            font-size: 20px;
+        }
+
+        .form-group {
+            margin-bottom: 15px;
+        }
+
+        .form-group label {
+            display: block;
+            margin-bottom: 6px;
+            color: #d1d5db;
+            font-size: 13px;
+            font-weight: 600;
+        }
+
+        .form-group input,
+        .form-group select,
+        .form-group textarea {
+            width: 100%;
+            padding: 10px;
+            background: #111827;
+            border: 1px solid #374151;
+            color: #f3f4f6;
+            border-radius: 4px;
+            font-family: inherit;
+            font-size: 14px;
+        }
+
+        .form-group input:focus,
+        .form-group select:focus,
+        .form-group textarea:focus {
+            outline: none;
+            border-color: #10b981;
+            box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.1);
+        }
+
+        .form-group textarea {
+            resize: vertical;
+            min-height: 80px;
+        }
+
+        .modal-buttons {
+            display: flex;
+            gap: 10px;
+            margin-top: 20px;
+        }
+
+        .modal-buttons button {
+            flex: 1;
+            padding: 10px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 600;
+            transition: all 0.3s;
+        }
+
+        .btn-save {
+            background: #10b981;
+            color: white;
+        }
+
+        .btn-save:hover {
+            background: #059669;
+        }
+
+        .btn-cancel {
+            background: #6b7280;
+            color: white;
+        }
+
+        .btn-cancel:hover {
+            background: #4b5563;
+        }
+
+        .loading {
+            text-align: center;
+            padding: 40px;
+            color: #9ca3af;
+        }
+
+        .error {
+            background: rgba(239, 68, 68, 0.2);
+            color: #fca5a5;
+            padding: 15px;
+            border-radius: 4px;
+            margin-bottom: 20px;
+        }
+
+        .success {
+            background: rgba(16, 185, 129, 0.2);
+            color: #86efac;
+            padding: 15px;
+            border-radius: 4px;
+            margin-bottom: 20px;
+        }
+
+        .pagination {
+            display: flex;
+            justify-content: center;
+            gap: 10px;
+            margin-top: 20px;
+        }
+
+        .pagination button {
+            padding: 8px 12px;
+            background: #1f2937;
+            color: #d1d5db;
+            border: 1px solid #374151;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 12px;
+            transition: all 0.3s;
+        }
+
+        .pagination button:hover,
+        .pagination button.active {
+            background: #10b981;
+            color: white;
+            border-color: #10b981;
+        }
+
+        .no-data {
+            text-align: center;
+            padding: 40px;
+            color: #9ca3af;
+            font-size: 14px;
+        }
+    </style>
 </head>
 <body>
     <div class="admin-container">
-        <!-- Sidebar -->
-        <aside class="sidebar">
-            <div class="sidebar-header">
-                <h2>⚙️ Admin Panel</h2>
-            </div>
-            
-            <nav class="sidebar-menu">
-                <ul>
-                    <li class="menu-item" data-section="dashboard">
-                        <a href="#dashboard" class="menu-link">
-                            <span class="icon">📊</span>
-                            <span class="label">Dashboard</span>
-                        </a>
-                    </li>
-                    
-                    <li class="menu-item active" data-section="users">
-                        <a href="#users" class="menu-link">
-                            <span class="icon">👥</span>
-                            <span class="label">Users</span>
-                        </a>
-                    </li>
-                    
-                    <li class="menu-item" data-section="agents">
-                        <a href="#agents" class="menu-link">
-                            <span class="icon">🤝</span>
-                            <span class="label">Agents</span>
-                        </a>
-                    </li>
-                    
-                    <li class="menu-item">
-                        <a href="#" class="menu-link menu-toggle" data-target="games-submenu">
-                            <span class="icon">🎮</span>
-                            <span class="label">Games</span>
-                            <span class="arrow">▼</span>
-                        </a>
-                        <ul class="submenu" id="games-submenu">
-                            <li><a href="#games" data-game="silver">🐸 Silver</a></li>
-                            <li><a href="#games" data-game="gold">⚽ Gold</a></li>
-                            <li><a href="#games" data-game="diamond">🏹 Diamond</a></li>
-                            <li><a href="#games" data-game="platinum">🪂 Platinum</a></li>
-                        </ul>
-                    </li>
-                    
-                    <li class="menu-item" data-section="revenue">
-                        <a href="#revenue" class="menu-link">
-                            <span class="icon">💰</span>
-                            <span class="label">Revenue</span>
-                        </a>
-                    </li>
-                    
-                    <li class="menu-item" data-section="tickets">
-                        <a href="#tickets" class="menu-link">
-                            <span class="icon">🎫</span>
-                            <span class="label">Tickets</span>
-                        </a>
-                    </li>
-                    
-                    <li class="menu-item" data-section="settings">
-                        <a href="#settings" class="menu-link">
-                            <span class="icon">⚙️</span>
-                            <span class="label">Settings</span>
-                        </a>
-                    </li>
-                </ul>
-            </nav>
-            
-            <div class="sidebar-footer">
-                <a href="/logout" class="logout-btn">
-                    <span class="icon">🚪</span>
-                    <span>Logout</span>
-                </a>
-            </div>
-        </aside>
+        <div class="sidebar">
+            <h2>⚙️ Admin</h2>
+            <ul>
+                <li><a class="menu-link active" data-section="dashboard">📊 Dashboard</a></li>
+                <li><a class="menu-link" data-section="users">👥 Users</a></li>
+                <li><a class="menu-link" data-section="games">🎮 Games</a></li>
+                <li><hr style="margin: 20px 0; border: none; border-top: 1px solid #374151;"></li>
+                <li><a class="logout-link" onclick="logout()">🚪 Logout</a></li>
+            </ul>
+        </div>
 
-        <!-- Main Content -->
-        <main class="main-content">
-            <!-- Header -->
-            <header class="header">
-                <div class="header-left">
-                    <h1>User Management</h1>
-                    <p id="header-subtitle">Manage and monitor all users</p>
-                </div>
-                <div class="header-right">
-                    <div class="admin-info">
-                        <span class="admin-username" id="admin-username">Admin</span>
-                        <span class="admin-role">Administrator</span>
+        <div class="main-content">
+            <div class="header">
+                <h1 id="pageTitle">Dashboard</h1>
+                <button class="logout-btn" onclick="logout()">Logout</button>
+            </div>
+
+            <!-- DASHBOARD SECTION -->
+            <div id="dashboard" class="section active">
+                <div class="stats-grid" id="statsContainer">
+                    <div class="stat-card">
+                        <h3>Total Users</h3>
+                        <div class="value" id="totalUsers">0</div>
+                    </div>
+                    <div class="stat-card">
+                        <h3>Active Games</h3>
+                        <div class="value" id="activeGames">0</div>
+                    </div>
+                    <div class="stat-card">
+                        <h3>Total Revenue</h3>
+                        <div class="value" id="totalRevenue">₹0</div>
+                    </div>
+                    <div class="stat-card">
+                        <h3>Blocked Users</h3>
+                        <div class="value" id="blockedUsers">0</div>
                     </div>
                 </div>
-            </header>
+            </div>
 
-            <!-- Users Section -->
-            <section id="users" class="section active">
-                <div class="section-header">
-                    <h2>All Users</h2>
-                    <div class="section-controls">
-                        <input type="text" id="search-users" class="search-input" placeholder="Search by username or ID...">
-                        <button class="refresh-btn-table" id="refresh-users">🔄 Refresh</button>
-                    </div>
+            <!-- USERS SECTION -->
+            <div id="users" class="section">
+                <div class="search-box">
+                    <input type="text" id="searchUsers" placeholder="Search by username or email...">
+                    <button onclick="loadUsers()">🔍 Search</button>
                 </div>
-
-                <!-- Users Table -->
-                <div class="table-container">
-                    <table class="users-table">
+                
+                <div id="usersLoading" class="loading">Loading users...</div>
+                
+                <div class="table-wrapper" id="usersWrapper" style="display:none;">
+                    <table class="data-table">
                         <thead>
                             <tr>
-                                <th class="col-sno">S.No</th>
-                                <th class="col-userid">User ID</th>
-                                <th class="col-referid">Refer ID</th>
-                                <th class="col-joined">Date of Joining</th>
-                                <th class="col-balance">Wallet Balance</th>
-                                <th class="col-games">Games</th>
-                                <th class="col-won">Won</th>
-                                <th class="col-coinswon">Coins Won</th>
-                                <th class="col-login">Login Details</th>
-                                <th class="col-action">Block/UnBlock</th>
+                                <th>ID</th>
+                                <th>Username</th>
+                                <th>Email</th>
+                                <th>Balance (₹)</th>
+                                <th>Status</th>
+                                <th>Joined</th>
+                                <th>Actions</th>
                             </tr>
                         </thead>
-                        <tbody id="users-table-body">
-                            <!-- Populated by JavaScript -->
-                        </tbody>
+                        <tbody id="usersTableBody"></tbody>
                     </table>
-                    <div id="loading-indicator" class="loading">
-                        <span>Loading users...</span>
-                    </div>
-                    <div id="no-users" class="no-data" style="display: none;">
-                        <span>No users found</span>
-                    </div>
                 </div>
+            </div>
 
-                <!-- Pagination -->
-                <div class="pagination">
-                    <button id="prev-page" class="pagination-btn">← Previous</button>
-                    <span id="page-info" class="page-info">Page 1</span>
-                    <button id="next-page" class="pagination-btn">Next →</button>
+            <!-- GAMES SECTION -->
+            <div id="games" class="section">
+                <div id="gamesLoading" class="loading">Loading games...</div>
+                
+                <div class="table-wrapper" id="gamesWrapper" style="display:none;">
+                    <table class="data-table">
+                        <thead>
+                            <tr>
+                                <th>Round Code</th>
+                                <th>Game Type</th>
+                                <th>Players</th>
+                                <th>Status</th>
+                                <th>Total Bets</th>
+                                <th>Result</th>
+                                <th>Started</th>
+                            </tr>
+                        </thead>
+                        <tbody id="gamesTableBody"></tbody>
+                    </table>
                 </div>
-            </section>
-
-            <!-- Dashboard Section (Hidden) -->
-            <section id="dashboard" class="section">
-                <div class="section-header">
-                    <h2>Dashboard Overview</h2>
-                    <p>Real-time statistics and analytics</p>
-                </div>
-                <div class="stats-row">
-                    <div class="stat-card">
-                        <div class="stat-icon users-icon">👥</div>
-                        <div class="stat-content">
-                            <h3>Total Users</h3>
-                            <p class="stat-value" id="total-users">-</p>
-                        </div>
-                    </div>
-                    <div class="stat-card">
-                        <div class="stat-icon active-icon">✅</div>
-                        <div class="stat-content">
-                            <h3>Active Users</h3>
-                            <p class="stat-value" id="active-users">-</p>
-                        </div>
-                    </div>
-                    <div class="stat-card">
-                        <div class="stat-icon inactive-icon">❌</div>
-                        <div class="stat-content">
-                            <h3>Inactive Users</h3>
-                            <p class="stat-value" id="inactive-users">-</p>
-                        </div>
-                    </div>
-                </div>
-                <div class="stats-row">
-                    <div class="stat-card">
-                        <div class="stat-icon revenue-icon">💹</div>
-                        <div class="stat-content">
-                            <h3>Total Revenue</h3>
-                            <p class="stat-value" id="total-revenue">₹-</p>
-                        </div>
-                    </div>
-                    <div class="stat-card">
-                        <div class="stat-icon deposit-icon">📈</div>
-                        <div class="stat-content">
-                            <h3>Total Deposit</h3>
-                            <p class="stat-value" id="total-deposit">₹-</p>
-                        </div>
-                    </div>
-                    <div class="stat-card">
-                        <div class="stat-icon withdrawal-icon">📉</div>
-                        <div class="stat-content">
-                            <h3>Total Withdrawal</h3>
-                            <p class="stat-value" id="total-withdrawal">₹-</p>
-                        </div>
-                    </div>
-                </div>
-                <div class="stats-row">
-                    <div class="stat-card">
-                        <div class="stat-icon games-icon">🎮</div>
-                        <div class="stat-content">
-                            <h3>Games Played Today</h3>
-                            <p class="stat-value" id="active-games">-</p>
-                        </div>
-                    </div>
-                    <div class="stat-card">
-                        <div class="stat-icon tickets-icon">🎫</div>
-                        <div class="stat-content">
-                            <h3>Active Tickets</h3>
-                            <p class="stat-value" id="open-tickets">-</p>
-                        </div>
-                    </div>
-                    <div class="stat-card">
-                        <div class="stat-icon blocked-icon">🚫</div>
-                        <div class="stat-content">
-                            <h3>Blocked Users</h3>
-                            <p class="stat-value" id="blocked-users">-</p>
-                        </div>
-                    </div>
-                </div>
-                <div class="last-updated">
-                    Last updated: <span id="last-update">Just now</span>
-                    <button class="refresh-btn" id="refresh-stats">🔄 Refresh</button>
-                </div>
-            </section>
-
-            <!-- Other Sections -->
-            <section id="agents" class="section">
-                <div class="section-header">
-                    <h2>Agents Management</h2>
-                    <p>Manage affiliate agents</p>
-                </div>
-                <div class="content-placeholder">Agents management will be implemented next</div>
-            </section>
-
-            <section id="games" class="section">
-                <div class="section-header">
-                    <h2>Game Management</h2>
-                    <p>Monitor active games and statistics</p>
-                </div>
-                <div class="content-placeholder">Games management will be implemented next</div>
-            </section>
-
-            <section id="revenue" class="section">
-                <div class="section-header">
-                    <h2>Revenue Analytics</h2>
-                    <p>Detailed revenue and financial reports</p>
-                </div>
-                <div class="content-placeholder">Revenue analytics will be implemented next</div>
-            </section>
-
-            <section id="tickets" class="section">
-                <div class="section-header">
-                    <h2>Support Tickets</h2>
-                    <p>Manage customer support tickets</p>
-                </div>
-                <div class="content-placeholder">Tickets management will be implemented next</div>
-            </section>
-
-            <section id="settings" class="section">
-                <div class="section-header">
-                    <h2>Settings</h2>
-                    <p>System and admin settings</p>
-                </div>
-                <div class="content-placeholder">Settings will be implemented next</div>
-            </section>
-        </main>
+            </div>
+        </div>
     </div>
 
-    <!-- Modals -->
-    
-    <!-- Login Details Modal -->
-    <div id="login-modal" class="modal">
+    <!-- EDIT USER MODAL -->
+    <div id="editModal" class="modal">
         <div class="modal-content">
-            <div class="modal-header">
-                <h2>Login Details</h2>
-                <button class="modal-close">&times;</button>
-            </div>
-            <div class="modal-body">
-                <div class="login-detail-row">
-                    <label>User ID:</label>
-                    <div class="login-detail-value" id="modal-userid">-</div>
-                    <button class="copy-btn" onclick="copyToClipboard('#modal-userid')">📋 Copy</button>
+            <h2>Edit User</h2>
+            <form onsubmit="saveUserEdit(event)">
+                <div class="form-group">
+                    <label>User ID</label>
+                    <input type="text" id="editUserId" readonly>
                 </div>
-                <div class="login-detail-row">
-                    <label>Username:</label>
-                    <div class="login-detail-value" id="modal-username">-</div>
-                    <button class="copy-btn" onclick="copyToClipboard('#modal-username')">📋 Copy</button>
+                <div class="form-group">
+                    <label>Username</label>
+                    <input type="text" id="editUsername" readonly>
                 </div>
-                <div class="login-detail-row">
-                    <label>Password:</label>
-                    <div class="login-detail-value password-field">
-                        <input type="password" id="modal-password" readonly>
-                        <button class="toggle-password-btn" onclick="togglePassword()">👁️ Show</button>
-                        <button class="copy-btn" onclick="copyPassword()">📋 Copy</button>
-                    </div>
+                <div class="form-group">
+                    <label>Email</label>
+                    <input type="email" id="editEmail">
                 </div>
-            </div>
-        </div>
-    </div>
-
-    <!-- Refer ID Modal -->
-    <div id="refer-modal" class="modal">
-        <div class="modal-content modal-medium">
-            <div class="modal-header">
-                <h2>Referral Information</h2>
-                <button class="modal-close">&times;</button>
-            </div>
-            <div class="modal-body">
-                <div class="refer-info-row">
-                    <label>Refer ID:</label>
-                    <div class="refer-info-value" id="modal-referid">-</div>
+                <div class="form-group">
+                    <label>Wallet Balance (₹)</label>
+                    <input type="number" id="editBalance" min="0">
                 </div>
-                <div class="refer-info-row">
-                    <label>Agent Name:</label>
-                    <div class="refer-info-value" id="modal-agentname">-</div>
+                <div class="form-group">
+                    <label>Status</label>
+                    <select id="editStatus">
+                        <option value="active">Active</option>
+                        <option value="blocked">Blocked</option>
+                    </select>
                 </div>
-                <div class="refer-info-row">
-                    <label>Referral Date:</label>
-                    <div class="refer-info-value" id="modal-referdate">-</div>
+                <div class="form-group" id="blockReasonGroup" style="display:none;">
+                    <label>Block Reason</label>
+                    <textarea id="editBlockReason" placeholder="Enter reason for blocking..."></textarea>
                 </div>
-            </div>
-        </div>
-    </div>
-
-    <!-- Wallet Balance Modal -->
-    <div id="wallet-modal" class="modal">
-        <div class="modal-content modal-medium">
-            <div class="modal-header">
-                <h2>Wallet Details</h2>
-                <button class="modal-close">&times;</button>
-            </div>
-            <div class="modal-body">
-                <div class="wallet-info-row">
-                    <label>Current Balance:</label>
-                    <div class="wallet-info-value" id="modal-balance">₹-</div>
+                <div class="modal-buttons">
+                    <button type="submit" class="btn-save">Save Changes</button>
+                    <button type="button" class="btn-cancel" onclick="closeModal()">Cancel</button>
                 </div>
-                <div class="wallet-info-row">
-                    <label>Total Earned:</label>
-                    <div class="wallet-info-value" id="modal-earned">₹-</div>
-                </div>
-                <div class="wallet-info-row">
-                    <label>Total Spent:</label>
-                    <div class="wallet-info-value" id="modal-spent">₹-</div>
-                </div>
-                <div class="wallet-action-row">
-                    <input type="number" id="amount-input" placeholder="Enter amount">
-                    <button class="action-btn add-btn" onclick="creditAmount()">➕ Credit</button>
-                    <button class="action-btn debit-btn" onclick="debitAmount()">➖ Debit</button>
-                </div>
-            </div>
-        </div>
-    </div>
-
-    <!-- Games Statistics Modal -->
-    <div id="games-modal" class="modal">
-        <div class="modal-content modal-large">
-            <div class="modal-header">
-                <h2>Game Statistics</h2>
-                <button class="modal-close">&times;</button>
-            </div>
-            <div class="modal-body">
-                <div class="game-stats-row">
-                    <div class="game-stat-item">
-                        <label>Total Games Played:</label>
-                        <span class="game-stat-value" id="modal-totalgames">-</span>
-                    </div>
-                    <div class="game-stat-item">
-                        <label>Total Games Won:</label>
-                        <span class="game-stat-value" id="modal-gameswon">-</span>
-                    </div>
-                    <div class="game-stat-item">
-                        <label>Win Rate:</label>
-                        <span class="game-stat-value" id="modal-winrate">-</span>
-                    </div>
-                </div>
-                <div class="game-stats-row">
-                    <div class="game-stat-item">
-                        <label>Total Coins Spent:</label>
-                        <span class="game-stat-value" id="modal-coinsspent">₹-</span>
-                    </div>
-                    <div class="game-stat-item">
-                        <label>Total Coins Won:</label>
-                        <span class="game-stat-value" id="modal-coinswon-stat">₹-</span>
-                    </div>
-                    <div class="game-stat-item">
-                        <label>Net Profit/Loss:</label>
-                        <span class="game-stat-value" id="modal-netprofit">₹-</span>
-                    </div>
-                </div>
-                <div class="game-history-section">
-                    <h3>Recent Games</h3>
-                    <div id="game-history-list" class="game-history-list">
-                        <!-- Populated by JavaScript -->
-                    </div>
-                </div>
-            </div>
-        </div>
-    </div>
-
-    <!-- Block/Unblock Confirmation Modal -->
-    <div id="block-modal" class="modal">
-        <div class="modal-content modal-small">
-            <div class="modal-header">
-                <h2>Block User</h2>
-                <button class="modal-close">&times;</button>
-            </div>
-            <div class="modal-body">
-                <p id="block-message">Are you sure you want to block this user?</p>
-                <textarea id="block-reason" placeholder="Enter block reason (optional)" class="block-reason-textarea"></textarea>
-            </div>
-            <div class="modal-footer">
-                <button class="btn btn-cancel" onclick="closeBlockModal()">Cancel</button>
-                <button class="btn btn-confirm" onclick="confirmBlockUser()">Confirm Block</button>
-            </div>
+            </form>
         </div>
     </div>
 
     <script>
-        // Session storage
-        const adminUsername = sessionStorage.getItem('username') || 'Admin';
-        document.getElementById('admin-username').textContent = adminUsername;
-
-        // Global variables
-        let allUsers = [];
-        let filteredUsers = [];
-        let currentPage = 1;
-        const usersPerPage = 10;
         let currentUserId = null;
-        let currentBlockAction = null;
 
-        // Sidebar navigation
-        document.querySelectorAll('.menu-item').forEach(item => {
-            item.addEventListener('click', function(e) {
-                if (this.classList.contains('menu-item') && !e.target.closest('.menu-toggle')) {
-                    const section = this.getAttribute('data-section');
-                    if (section) {
-                        showSection(section);
-                        document.querySelectorAll('.menu-item').forEach(m => m.classList.remove('active'));
-                        this.classList.add('active');
-                    }
-                }
-            });
+        // Initialize
+        document.addEventListener('DOMContentLoaded', function() {
+            setupMenuLinks();
+            loadStats();
         });
 
-        // Submenu toggle
-        document.querySelectorAll('.menu-toggle').forEach(toggle => {
-            toggle.addEventListener('click', function(e) {
-                e.preventDefault();
-                const target = this.getAttribute('data-target');
-                const submenu = document.getElementById(target);
-                submenu.classList.toggle('open');
-                this.classList.toggle('open');
+        // Menu navigation
+        function setupMenuLinks() {
+            document.querySelectorAll('.menu-link').forEach(link => {
+                link.addEventListener('click', function(e) {
+                    e.preventDefault();
+                    const section = this.dataset.section;
+                    switchSection(section);
+                    document.querySelectorAll('.menu-link').forEach(l => l.classList.remove('active'));
+                    this.classList.add('active');
+                });
             });
-        });
+        }
 
-        // Section display
-        function showSection(sectionId) {
+        function switchSection(section) {
             document.querySelectorAll('.section').forEach(s => s.classList.remove('active'));
-            const section = document.getElementById(sectionId);
-            if (section) {
-                section.classList.add('active');
-                document.getElementById('header-subtitle').textContent = 
-                    section.querySelector('h2').textContent;
-                
-                if (sectionId === 'users') {
-                    loadUsers();
-                } else if (sectionId === 'dashboard') {
-                    loadStats();
-                }
-            }
+            document.getElementById(section).classList.add('active');
+            
+            let titles = {
+                'dashboard': 'Dashboard',
+                'users': 'Users Management',
+                'games': 'Active Games'
+            };
+            document.getElementById('pageTitle').textContent = titles[section] || 'Admin Panel';
+
+            if (section === 'users') loadUsers();
+            if (section === 'games') loadGames();
+            if (section === 'dashboard') loadStats();
+        }
+
+        // Load Dashboard Stats
+        function loadStats() {
+            fetch('/api/admin/stats')
+                .then(r => r.json())
+                .then(data => {
+                    document.getElementById('totalUsers').textContent = data.total_users;
+                    document.getElementById('activeGames').textContent = data.active_games;
+                    document.getElementById('totalRevenue').textContent = '₹' + data.total_revenue.toLocaleString('en-IN');
+                    document.getElementById('blockedUsers').textContent = data.blocked_users;
+                })
+                .catch(err => console.error('Error loading stats:', err));
         }
 
         // Load Users
-        async function loadUsers() {
-            try {
-                document.getElementById('loading-indicator').style.display = 'block';
-                document.getElementById('no-users').style.display = 'none';
-                
-                const response = await fetch('/api/admin/users');
-                allUsers = await response.json();
-                filteredUsers = allUsers;
-                currentPage = 1;
-                
-                displayUsers();
-                document.getElementById('loading-indicator').style.display = 'none';
-            } catch (error) {
-                console.error('Error loading users:', error);
-                document.getElementById('loading-indicator').style.display = 'none';
-                document.getElementById('no-users').style.display = 'block';
-            }
+        function loadUsers() {
+            document.getElementById('usersLoading').style.display = 'block';
+            document.getElementById('usersWrapper').style.display = 'none';
+
+            const search = document.getElementById('searchUsers').value.toLowerCase();
+
+            fetch('/api/admin/users')
+                .then(r => {
+                    if (r.status === 403) {
+                        window.location.href = '/login';
+                        return null;
+                    }
+                    return r.json();
+                })
+                .then(data => {
+                    if (!data) return;
+                    
+                    const tbody = document.getElementById('usersTableBody');
+                    tbody.innerHTML = '';
+
+                    let filteredData = data;
+                    if (search) {
+                        filteredData = data.filter(user => 
+                            user.username.toLowerCase().includes(search) || 
+                            user.email.toLowerCase().includes(search)
+                        );
+                    }
+
+                    if (filteredData.length === 0) {
+                        tbody.innerHTML = '<tr><td colspan="7" class="no-data">No users found</td></tr>';
+                    } else {
+                        filteredData.forEach(user => {
+                            const row = document.createElement('tr');
+                            row.innerHTML = `
+                                <td>${user.id}</td>
+                                <td>${user.username}</td>
+                                <td>${user.email || '-'}</td>
+                                <td>${user.balance.toLocaleString('en-IN')}</td>
+                                <td><span class="status-badge status-${user.status}">${user.status.toUpperCase()}</span></td>
+                                <td>${user.created_at}</td>
+                                <td>
+                                    <button class="action-btn btn-edit" onclick="editUser(${user.id}, '${user.username}', '${user.email}', ${user.balance}, '${user.status}')">✏️ Edit</button>
+                                    ${user.status === 'active' 
+                                        ? `<button class="action-btn btn-block" onclick="blockUserConfirm(${user.id})">🔒 Block</button>`
+                                        : `<button class="action-btn btn-unblock" onclick="unblockUser(${user.id})">🔓 Unblock</button>`
+                                    }
+                                </td>
+                            `;
+                            tbody.appendChild(row);
+                        });
+                    }
+
+                    document.getElementById('usersLoading').style.display = 'none';
+                    document.getElementById('usersWrapper').style.display = 'block';
+                })
+                .catch(err => {
+                    console.error('Error loading users:', err);
+                    document.getElementById('usersLoading').innerHTML = `<div class="error">Error loading users: ${err.message}</div>`;
+                });
         }
 
-        // Display Users
-        function displayUsers() {
-            const tbody = document.getElementById('users-table-body');
-            tbody.innerHTML = '';
+        // Load Games
+        function loadGames() {
+            document.getElementById('gamesLoading').style.display = 'block';
+            document.getElementById('gamesWrapper').style.display = 'none';
 
-            if (filteredUsers.length === 0) {
-                document.getElementById('no-users').style.display = 'block';
-                return;
-            }
+            fetch('/api/admin/games')
+                .then(r => r.json())
+                .then(data => {
+                    const tbody = document.getElementById('gamesTableBody');
+                    tbody.innerHTML = '';
 
-            document.getElementById('no-users').style.display = 'none';
+                    if (!data || data.length === 0) {
+                        tbody.innerHTML = '<tr><td colspan="7" class="no-data">No active games</td></tr>';
+                    } else {
+                        data.forEach(game => {
+                            const row = document.createElement('tr');
+                            row.innerHTML = `
+                                <td><strong>${game.round_code}</strong></td>
+                                <td>${game.game_type}</td>
+                                <td>${game.players}/${game.max_players}</td>
+                                <td><span class="status-badge status-${game.status}">${game.status.toUpperCase()}</span></td>
+                                <td>₹${game.total_bets.toLocaleString('en-IN')}</td>
+                                <td>${game.result !== null ? game.result : '-'}</td>
+                                <td>${game.started_at}</td>
+                            `;
+                            tbody.appendChild(row);
+                        });
+                    }
 
-            const startIdx = (currentPage - 1) * usersPerPage;
-            const endIdx = startIdx + usersPerPage;
-            const pageUsers = filteredUsers.slice(startIdx, endIdx);
-
-            pageUsers.forEach((user, idx) => {
-                const rowNum = startIdx + idx + 1;
-                const createdDate = new Date(user.created_at);
-                const formattedDate = createdDate.toLocaleDateString('en-IN') + ' ' + 
-                                     createdDate.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
-                
-                // Calculate game stats
-                const gameStats = calculateGameStats(user.id);
-                
-                const row = document.createElement('tr');
-                row.innerHTML = `
-                    <td class="col-sno">${rowNum}</td>
-                    <td class="col-userid">${user.id}</td>
-                    <td class="col-referid">
-                        ${user.refer_id ? `<button class="link-btn" onclick="showReferModal('${user.refer_id}')">REF-${user.refer_id}</button>` : '-'}
-                    </td>
-                    <td class="col-joined">${formattedDate}</td>
-                    <td class="col-balance">
-                        <button class="link-btn balance-btn" onclick="showWalletModal(${user.id})">₹${user.balance}</button>
-                    </td>
-                    <td class="col-games">
-                        <button class="link-btn games-btn" onclick="showGamesModal(${user.id})">
-                            ${gameStats.total}
-                        </button>
-                    </td>
-                    <td class="col-won">${gameStats.won}</td>
-                    <td class="col-coinswon">₹${gameStats.coinsWon}</td>
-                    <td class="col-login">
-                        <button class="link-btn login-btn" onclick="showLoginModal(${user.id}, '${user.username}')">View</button>
-                    </td>
-                    <td class="col-action">
-                        <button class="action-toggle-btn ${user.status === 'blocked' ? 'blocked' : 'active'}" 
-                                onclick="toggleBlockUser(${user.id}, '${user.status}')"
-                                data-status="${user.status}">
-                            ${user.status === 'blocked' ? 'Unblock' : 'Block'}
-                        </button>
-                    </td>
-                `;
-                tbody.appendChild(row);
-            });
-
-            updatePagination();
+                    document.getElementById('gamesLoading').style.display = 'none';
+                    document.getElementById('gamesWrapper').style.display = 'block';
+                })
+                .catch(err => {
+                    console.error('Error loading games:', err);
+                    document.getElementById('gamesLoading').innerHTML = `<div class="error">Error loading games: ${err.message}</div>`;
+                });
         }
 
-        // Calculate game stats
-        function calculateGameStats(userId) {
-            // This will be populated from API in next step
-            // For now, returning placeholder
-            return {
-                total: 0,
-                won: 0,
-                coinsWon: 0
+        // Edit User
+        function editUser(id, username, email, balance, status) {
+            currentUserId = id;
+            document.getElementById('editUserId').value = id;
+            document.getElementById('editUsername').value = username;
+            document.getElementById('editEmail').value = email;
+            document.getElementById('editBalance').value = balance;
+            document.getElementById('editStatus').value = status;
+            document.getElementById('editBlockReason').value = '';
+            
+            document.getElementById('blockReasonGroup').style.display = status === 'blocked' ? 'block' : 'none';
+            
+            document.getElementById('editStatus').onchange = function() {
+                document.getElementById('blockReasonGroup').style.display = this.value === 'blocked' ? 'block' : 'none';
             };
+
+            document.getElementById('editModal').classList.add('active');
         }
 
-        // Search functionality
-        document.getElementById('search-users').addEventListener('keyup', function(e) {
-            const searchTerm = e.target.value.toLowerCase();
-            filteredUsers = allUsers.filter(user => 
-                user.username.toLowerCase().includes(searchTerm) ||
-                user.id.toString().includes(searchTerm)
-            );
-            currentPage = 1;
-            displayUsers();
-        });
-
-        // Pagination
-        function updatePagination() {
-            const totalPages = Math.ceil(filteredUsers.length / usersPerPage);
-            document.getElementById('page-info').textContent = `Page ${currentPage} of ${totalPages}`;
+        function saveUserEdit(event) {
+            event.preventDefault();
             
-            document.getElementById('prev-page').disabled = currentPage === 1;
-            document.getElementById('next-page').disabled = currentPage === totalPages;
+            const data = {
+                email: document.getElementById('editEmail').value,
+                balance: parseInt(document.getElementById('editBalance').value) || 0,
+                status: document.getElementById('editStatus').value,
+                block_reason: document.getElementById('editBlockReason').value || 'Blocked by admin'
+            };
+
+            fetch(`/api/admin/users/${currentUserId}`, {
+                method: 'PUT',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify(data)
+            })
+            .then(r => r.json())
+            .then(res => {
+                alert(res.message);
+                closeModal();
+                loadUsers();
+                loadStats();
+            })
+            .catch(err => alert('Error: ' + err));
         }
 
-        document.getElementById('prev-page').addEventListener('click', function() {
-            if (currentPage > 1) {
-                currentPage--;
-                displayUsers();
-                window.scrollTo(0, 0);
-            }
-        });
-
-        document.getElementById('next-page').addEventListener('click', function() {
-            const totalPages = Math.ceil(filteredUsers.length / usersPerPage);
-            if (currentPage < totalPages) {
-                currentPage++;
-                displayUsers();
-                window.scrollTo(0, 0);
-            }
-        });
-
-        // Refresh users
-        document.getElementById('refresh-users').addEventListener('click', loadUsers);
-
-        // Modal functions
-        function closeModal(modalId) {
-            document.getElementById(modalId).style.display = 'none';
-        }
-
-        document.querySelectorAll('.modal-close').forEach(btn => {
-            btn.addEventListener('click', function() {
-                this.closest('.modal').style.display = 'none';
-            });
-        });
-
-        window.addEventListener('click', function(e) {
-            if (e.target.classList.contains('modal')) {
-                e.target.style.display = 'none';
-            }
-        });
-
-        // Show Login Modal
-        function showLoginModal(userId, username) {
-            currentUserId = userId;
-            document.getElementById('modal-userid').textContent = userId;
-            document.getElementById('modal-username').textContent = username;
-            document.getElementById('modal-password').value = '••••••••';
-            document.getElementById('login-modal').style.display = 'flex';
-        }
-
-        // Show Refer Modal
-        function showReferModal(referId) {
-            document.getElementById('modal-referid').textContent = referId;
-            document.getElementById('modal-agentname').textContent = 'Agent Name';
-            document.getElementById('modal-referdate').textContent = new Date().toLocaleDateString('en-IN');
-            document.getElementById('refer-modal').style.display = 'flex';
-        }
-
-        // Show Wallet Modal
-        function showWalletModal(userId) {
-            currentUserId = userId;
-            const user = allUsers.find(u => u.id === userId);
-            document.getElementById('modal-balance').textContent = `₹${user.balance}`;
-            document.getElementById('modal-earned').textContent = `₹${user.balance}`;
-            document.getElementById('modal-spent').textContent = `₹0`;
-            document.getElementById('wallet-modal').style.display = 'flex';
-        }
-
-        // Show Games Modal
-        function showGamesModal(userId) {
-            currentUserId = userId;
-            document.getElementById('modal-totalgames').textContent = '0';
-            document.getElementById('modal-gameswon').textContent = '0';
-            document.getElementById('modal-winrate').textContent = '0%';
-            document.getElementById('modal-coinsspent').textContent = '₹0';
-            document.getElementById('modal-coinswon-stat').textContent = '₹0';
-            document.getElementById('modal-netprofit').textContent = '₹0';
-            document.getElementById('game-history-list').innerHTML = '<p>No games found</p>';
-            document.getElementById('games-modal').style.display = 'flex';
-        }
-
-        // Copy to clipboard
-        function copyToClipboard(selector) {
-            const element = document.querySelector(selector);
-            const text = element.textContent;
-            navigator.clipboard.writeText(text).then(() => {
-                alert('Copied to clipboard!');
-            });
-        }
-
-        // Toggle password visibility
-        function togglePassword() {
-            const input = document.getElementById('modal-password');
-            const btn = event.target;
-            if (input.type === 'password') {
-                input.type = 'text';
-                btn.textContent = '🙈 Hide';
-            } else {
-                input.type = 'password';
-                btn.textContent = '👁️ Show';
-            }
-        }
-
-        // Copy password
-        function copyPassword() {
-            const input = document.getElementById('modal-password');
-            const tempInput = document.createElement('input');
-            tempInput.type = 'text';
-            tempInput.value = input.value;
-            document.body.appendChild(tempInput);
-            tempInput.select();
-            document.execCommand('copy');
-            document.body.removeChild(tempInput);
-            alert('Password copied to clipboard!');
-        }
-
-        // Block/Unblock user
-        function toggleBlockUser(userId, status) {
-            currentUserId = userId;
-            currentBlockAction = status === 'blocked' ? 'unblock' : 'block';
-            const action = currentBlockAction === 'block' ? 'Block' : 'Unblock';
-            document.querySelector('.modal-header h2').textContent = currentBlockAction === 'block' ? 'Block User' : 'Unblock User';
-            document.getElementById('block-message').textContent = `Are you sure you want to ${action.toLowerCase()} this user?`;
-            document.getElementById('block-reason').style.display = currentBlockAction === 'block' ? 'block' : 'none';
-            document.getElementById('block-modal').style.display = 'flex';
-        }
-
-        function closeBlockModal() {
-            document.getElementById('block-modal').style.display = 'none';
-            document.getElementById('block-reason').value = '';
-        }
-
-        async function confirmBlockUser() {
-            const endpoint = currentBlockAction === 'block' 
-                ? `/api/admin/users/${currentUserId}/block`
-                : `/api/admin/users/${currentUserId}/unblock`;
+        function blockUserConfirm(userId) {
+            const reason = prompt('Enter block reason:');
+            if (!reason) return;
             
-            const data = currentBlockAction === 'block' 
-                ? { reason: document.getElementById('block-reason').value }
-                : {};
+            fetch(`/api/admin/users/${userId}/block`, {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({reason})
+            })
+            .then(r => r.json())
+            .then(res => {
+                alert(res.message);
+                loadUsers();
+                loadStats();
+            })
+            .catch(err => alert('Error: ' + err));
+        }
+
+        function unblockUser(userId) {
+            if (!confirm('Unblock this user?')) return;
             
-            try {
-                const response = await fetch(endpoint, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(data)
-                });
-                
-                if (response.ok) {
-                    alert(`User ${currentBlockAction === 'block' ? 'blocked' : 'unblocked'} successfully!`);
-                    closeBlockModal();
-                    loadUsers();
-                } else {
-                    alert('Error updating user status');
-                }
-            } catch (error) {
-                console.error('Error:', error);
-                alert('Error updating user status');
-            }
+            fetch(`/api/admin/users/${userId}/unblock`, {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'}
+            })
+            .then(r => r.json())
+            .then(res => {
+                alert(res.message);
+                loadUsers();
+                loadStats();
+            })
+            .catch(err => alert('Error: ' + err));
         }
 
-        // Load dashboard stats
-        async function loadStats() {
-            try {
-                const response = await fetch('/api/admin/stats');
-                const stats = await response.json();
-                
-                document.getElementById('total-users').textContent = stats.total_users;
-                document.getElementById('active-users').textContent = stats.active_users;
-                document.getElementById('inactive-users').textContent = stats.inactive_users;
-                document.getElementById('total-revenue').textContent = `₹${stats.total_revenue.toLocaleString()}`;
-                document.getElementById('total-deposit').textContent = `₹${stats.total_deposit.toLocaleString()}`;
-                document.getElementById('total-withdrawal').textContent = `₹${stats.total_withdrawal.toLocaleString()}`;
-                document.getElementById('active-games').textContent = stats.active_games;
-                document.getElementById('open-tickets').textContent = stats.open_tickets;
-                document.getElementById('blocked-users').textContent = stats.blocked_users;
-                
-                const now = new Date();
-                document.getElementById('last-update').textContent = now.toLocaleTimeString();
-            } catch (error) {
-                console.error('Error loading stats:', error);
-            }
+        function closeModal() {
+            document.getElementById('editModal').classList.remove('active');
         }
 
-        // Refresh stats
-        document.getElementById('refresh-stats').addEventListener('click', loadStats);
-
-        // Initial load
-        loadUsers();
-
-        // Credit amount
-        function creditAmount() {
-            const amount = document.getElementById('amount-input').value;
-            if (!amount || isNaN(amount) || amount <= 0) {
-                alert('Please enter a valid amount');
-                return;
-            }
-            updateBalance(currentUserId, 'add', parseFloat(amount));
+        function logout() {
+            window.location.href = '/logout';
         }
 
-        // Debit amount
-        function debitAmount() {
-            const amount = document.getElementById('amount-input').value;
-            if (!amount || isNaN(amount) || amount <= 0) {
-                alert('Please enter a valid amount');
-                return;
+        // Close modal when clicking outside
+        document.addEventListener('click', function(event) {
+            const modal = document.getElementById('editModal');
+            if (event.target === modal) {
+                closeModal();
             }
-            updateBalance(currentUserId, 'debit', parseFloat(amount));
-        }
-
-        // Update balance
-        async function updateBalance(userId, type, amount) {
-            try {
-                const response = await fetch(`/api/admin/users/${userId}/balance`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        type: type,
-                        amount: amount,
-                        reason: 'Admin transaction'
-                    })
-                });
-                
-                if (response.ok) {
-                    const data = await response.json();
-                    alert(data.message);
-                    document.getElementById('amount-input').value = '';
-                    loadUsers();
-                    closeModal('wallet-modal');
-                }
-            } catch (error) {
-                console.error('Error:', error);
-                alert('Error updating balance');
-            }
-        }
+        });
     </script>
 </body>
 </html>
