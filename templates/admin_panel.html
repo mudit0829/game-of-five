@@ -553,53 +553,45 @@
         </div>
     </div>
 
-    <!-- EDIT USER MODAL -->
-    <div id="editModal" class="modal">
+    <!-- BLOCK/UNBLOCK MODAL -->
+    <div id="blockModal" class="modal">
         <div class="modal-content">
-            <h2>Edit User</h2>
-            <form onsubmit="saveUserEdit(event)">
-                <div class="form-group">
-                    <label>User ID</label>
-                    <input type="text" id="editUserId" readonly>
-                </div>
-                <div class="form-group">
-                    <label>Username</label>
-                    <input type="text" id="editUsername" readonly>
-                </div>
-                <div class="form-group">
-                    <label>Email</label>
-                    <input type="email" id="editEmail">
-                </div>
-                <div class="form-group">
-                    <label>Wallet Balance (₹)</label>
-                    <input type="number" id="editBalance" min="0">
-                </div>
-                <div class="form-group">
-                    <label>Status</label>
-                    <select id="editStatus">
-                        <option value="active">Active</option>
-                        <option value="blocked">Blocked</option>
-                    </select>
-                </div>
-                <div class="form-group" id="blockReasonGroup" style="display:none;">
-                    <label>Block Reason</label>
-                    <textarea id="editBlockReason" placeholder="Enter reason for blocking..."></textarea>
-                </div>
-                <div class="modal-buttons">
-                    <button type="submit" class="btn-save">Save Changes</button>
-                    <button type="button" class="btn-cancel" onclick="closeModal()">Cancel</button>
-                </div>
-            </form>
+            <h2>Block User</h2>
+            <div class="form-group">
+                <label>Block Reason (Optional)</label>
+                <textarea id="blockReason" placeholder="Enter reason for blocking user..."></textarea>
+            </div>
+            <div class="modal-buttons">
+                <button class="btn-save" onclick="confirmBlock()">Confirm Block</button>
+                <button class="btn-cancel" onclick="closeBlockModal()">Cancel</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- UNBLOCK CONFIRMATION MODAL -->
+    <div id="unblockModal" class="modal">
+        <div class="modal-content">
+            <h2>Unblock User</h2>
+            <p style="margin-bottom: 20px; color: #d1d5db;">Are you sure you want to unblock this user?</p>
+            <div class="modal-buttons">
+                <button class="btn-save" onclick="confirmUnblock()">Confirm Unblock</button>
+                <button class="btn-cancel" onclick="closeUnblockModal()">Cancel</button>
+            </div>
         </div>
     </div>
 
     <script>
         let currentUserId = null;
+        let allUsers = [];
+        let filteredUsers = [];
+        let currentPage = 1;
+        const usersPerPage = 10;
 
         // Initialize
         document.addEventListener('DOMContentLoaded', function() {
             setupMenuLinks();
             loadStats();
+            loadUsers();
         });
 
         // Menu navigation
@@ -649,8 +641,6 @@
             document.getElementById('usersLoading').style.display = 'block';
             document.getElementById('usersWrapper').style.display = 'none';
 
-            const search = document.getElementById('searchUsers').value.toLowerCase();
-
             fetch('/api/admin/users')
                 .then(r => {
                     if (r.status === 403) {
@@ -662,41 +652,8 @@
                 .then(data => {
                     if (!data) return;
                     
-                    const tbody = document.getElementById('usersTableBody');
-                    tbody.innerHTML = '';
-
-                    let filteredData = data;
-                    if (search) {
-                        filteredData = data.filter(user => 
-                            user.username.toLowerCase().includes(search) || 
-                            user.email.toLowerCase().includes(search)
-                        );
-                    }
-
-                    if (filteredData.length === 0) {
-                        tbody.innerHTML = '<tr><td colspan="7" class="no-data">No users found</td></tr>';
-                    } else {
-                        filteredData.forEach(user => {
-                            const row = document.createElement('tr');
-                            row.innerHTML = `
-                                <td>${user.id}</td>
-                                <td>${user.username}</td>
-                                <td>${user.email || '-'}</td>
-                                <td>${user.balance.toLocaleString('en-IN')}</td>
-                                <td><span class="status-badge status-${user.status}">${user.status.toUpperCase()}</span></td>
-                                <td>${user.created_at}</td>
-                                <td>
-                                    <button class="action-btn btn-edit" onclick="editUser(${user.id}, '${user.username}', '${user.email}', ${user.balance}, '${user.status}')">✏️ Edit</button>
-                                    ${user.status === 'active' 
-                                        ? `<button class="action-btn btn-block" onclick="blockUserConfirm(${user.id})">🔒 Block</button>`
-                                        : `<button class="action-btn btn-unblock" onclick="unblockUser(${user.id})">🔓 Unblock</button>`
-                                    }
-                                </td>
-                            `;
-                            tbody.appendChild(row);
-                        });
-                    }
-
+                    allUsers = data;
+                    filterAndDisplayUsers();
                     document.getElementById('usersLoading').style.display = 'none';
                     document.getElementById('usersWrapper').style.display = 'block';
                 })
@@ -704,6 +661,99 @@
                     console.error('Error loading users:', err);
                     document.getElementById('usersLoading').innerHTML = `<div class="error">Error loading users: ${err.message}</div>`;
                 });
+        }
+
+        // Filter and display users
+        function filterAndDisplayUsers() {
+            const search = document.getElementById('searchUsers').value.toLowerCase();
+            
+            filteredUsers = allUsers.filter(user => 
+                user.username.toLowerCase().includes(search) || 
+                user.email.toLowerCase().includes(search)
+            );
+
+            displayUsers();
+        }
+
+        // Display Users
+        function displayUsers() {
+            const tbody = document.getElementById('usersTableBody');
+            tbody.innerHTML = '';
+
+            if (filteredUsers.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="7" class="no-data">No users found</td></tr>';
+                return;
+            }
+
+            const startIdx = (currentPage - 1) * usersPerPage;
+            const endIdx = startIdx + usersPerPage;
+            const pageUsers = filteredUsers.slice(startIdx, endIdx);
+
+            pageUsers.forEach(user => {
+                const row = document.createElement('tr');
+                const createdDate = new Date(user.created_at);
+                const formattedDate = createdDate.toLocaleDateString('en-IN') + ' ' + 
+                                     createdDate.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' });
+                
+                row.innerHTML = `
+                    <td>${user.id}</td>
+                    <td>${user.username}</td>
+                    <td>${user.email || '-'}</td>
+                    <td>${user.balance.toLocaleString('en-IN')}</td>
+                    <td><span class="status-badge status-${user.status}">${user.status.toUpperCase()}</span></td>
+                    <td>${formattedDate}</td>
+                    <td>
+                        <button class="action-btn btn-edit" onclick="editUser(${user.id}, '${user.username}', '${user.email}', ${user.balance}, '${user.status}')">✏️ Edit</button>
+                        ${user.status === 'active' 
+                            ? `<button class="action-btn btn-block" onclick="openBlockModal(${user.id})">🔒 Block</button>`
+                            : `<button class="action-btn btn-unblock" onclick="openUnblockModal(${user.id})">🔓 Unblock</button>`
+                        }
+                    </td>
+                `;
+                tbody.appendChild(row);
+            });
+
+            updatePagination();
+        }
+
+        // Search users
+        document.getElementById('searchUsers')?.addEventListener('keyup', function() {
+            currentPage = 1;
+            filterAndDisplayUsers();
+        });
+
+        // Update pagination
+        function updatePagination() {
+            const totalPages = Math.ceil(filteredUsers.length / usersPerPage);
+            const paginationHtml = `
+                <button onclick="prevPage()" ${currentPage === 1 ? 'disabled' : ''}>← Previous</button>
+                <span style="color: #9ca3af;">Page ${currentPage} of ${totalPages}</span>
+                <button onclick="nextPage()" ${currentPage === totalPages ? 'disabled' : ''}>Next →</button>
+            `;
+            
+            let paginationDiv = document.querySelector('.pagination');
+            if (!paginationDiv) {
+                paginationDiv = document.createElement('div');
+                paginationDiv.className = 'pagination';
+                document.getElementById('usersWrapper')?.parentElement.appendChild(paginationDiv);
+            }
+            paginationDiv.innerHTML = paginationHtml;
+        }
+
+        // Pagination functions
+        function prevPage() {
+            if (currentPage > 1) {
+                currentPage--;
+                displayUsers();
+            }
+        }
+
+        function nextPage() {
+            const totalPages = Math.ceil(filteredUsers.length / usersPerPage);
+            if (currentPage < totalPages) {
+                currentPage++;
+                displayUsers();
+            }
         }
 
         // Load Games
@@ -747,30 +797,23 @@
         // Edit User
         function editUser(id, username, email, balance, status) {
             currentUserId = id;
-            document.getElementById('editUserId').value = id;
-            document.getElementById('editUsername').value = username;
-            document.getElementById('editEmail').value = email;
-            document.getElementById('editBalance').value = balance;
-            document.getElementById('editStatus').value = status;
-            document.getElementById('editBlockReason').value = '';
             
-            document.getElementById('blockReasonGroup').style.display = status === 'blocked' ? 'block' : 'none';
+            const reason = prompt('Edit user:\n\nCurrent Balance: ₹' + balance.toLocaleString('en-IN') + '\n\nEnter new balance (leave blank to keep same):');
             
-            document.getElementById('editStatus').onchange = function() {
-                document.getElementById('blockReasonGroup').style.display = this.value === 'blocked' ? 'block' : 'none';
-            };
+            if (reason === null) return;
+            
+            const newBalance = reason ? parseInt(reason) : balance;
+            
+            if (isNaN(newBalance) || newBalance < 0) {
+                alert('Invalid balance amount');
+                return;
+            }
 
-            document.getElementById('editModal').classList.add('active');
-        }
-
-        function saveUserEdit(event) {
-            event.preventDefault();
-            
             const data = {
-                email: document.getElementById('editEmail').value,
-                balance: parseInt(document.getElementById('editBalance').value) || 0,
-                status: document.getElementById('editStatus').value,
-                block_reason: document.getElementById('editBlockReason').value || 'Blocked by admin'
+                email: email,
+                balance: newBalance,
+                status: status,
+                block_reason: 'Edited by admin'
             };
 
             fetch(`/api/admin/users/${currentUserId}`, {
@@ -781,18 +824,24 @@
             .then(r => r.json())
             .then(res => {
                 alert(res.message);
-                closeModal();
                 loadUsers();
                 loadStats();
             })
             .catch(err => alert('Error: ' + err));
         }
 
-        function blockUserConfirm(userId) {
-            const reason = prompt('Enter block reason:');
-            if (!reason) return;
+        // Open Block Modal
+        function openBlockModal(userId) {
+            currentUserId = userId;
+            document.getElementById('blockReason').value = '';
+            document.getElementById('blockModal').classList.add('active');
+        }
+
+        // Confirm Block
+        function confirmBlock() {
+            const reason = document.getElementById('blockReason').value || 'Blocked by admin';
             
-            fetch(`/api/admin/users/${userId}/block`, {
+            fetch(`/api/admin/users/${currentUserId}/block`, {
                 method: 'POST',
                 headers: {'Content-Type': 'application/json'},
                 body: JSON.stringify({reason})
@@ -800,43 +849,53 @@
             .then(r => r.json())
             .then(res => {
                 alert(res.message);
+                closeBlockModal();
                 loadUsers();
                 loadStats();
             })
             .catch(err => alert('Error: ' + err));
         }
 
-        function unblockUser(userId) {
-            if (!confirm('Unblock this user?')) return;
-            
-            fetch(`/api/admin/users/${userId}/unblock`, {
+        function closeBlockModal() {
+            document.getElementById('blockModal').classList.remove('active');
+        }
+
+        // Open Unblock Modal
+        function openUnblockModal(userId) {
+            currentUserId = userId;
+            document.getElementById('unblockModal').classList.add('active');
+        }
+
+        // Confirm Unblock
+        function confirmUnblock() {
+            fetch(`/api/admin/users/${currentUserId}/unblock`, {
                 method: 'POST',
                 headers: {'Content-Type': 'application/json'}
             })
             .then(r => r.json())
             .then(res => {
                 alert(res.message);
+                closeUnblockModal();
                 loadUsers();
                 loadStats();
             })
             .catch(err => alert('Error: ' + err));
         }
 
-        function closeModal() {
-            document.getElementById('editModal').classList.remove('active');
-        }
-
-        function logout() {
-            window.location.href = '/logout';
+        function closeUnblockModal() {
+            document.getElementById('unblockModal').classList.remove('active');
         }
 
         // Close modal when clicking outside
         document.addEventListener('click', function(event) {
-            const modal = document.getElementById('editModal');
-            if (event.target === modal) {
-                closeModal();
+            if (event.target.classList.contains('modal')) {
+                event.target.classList.remove('active');
             }
         });
+
+        function logout() {
+            window.location.href = '/logout';
+        }
     </script>
 </body>
 </html>
