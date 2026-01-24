@@ -1,4 +1,4 @@
-/ ================= BASIC SETUP =================
+// ================= BASIC SETUP =================
 const GAME = window.GAME_TYPE || "silver";
 const FIXED_BET_AMOUNT = window.FIXED_BET_AMOUNT || 10;
 const urlParams = new URLSearchParams(window.location.search);
