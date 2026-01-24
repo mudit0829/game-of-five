@@ -1,9 +1,3 @@
-# ===============================================
-# GAME OF FIVE - RENDER PRODUCTION READY
-# ===============================================
-# Python 3.13 compatible (no eventlet)
-
-import os
 from flask import (
     Flask,
     render_template,
@@ -20,55 +14,37 @@ from datetime import datetime, timedelta
 import threading
 import random
 import time
+import os
 import hashlib
 import secrets
 from functools import wraps
 
+# ---------------------------------------------------
+# Flask / DB / Socket setup
+# ---------------------------------------------------
+
 app = Flask(__name__)
-app.config["SECRET_KEY"] = os.environ.get('SECRET_KEY', 'your-secret-key-here-change-this-in-production')
+app.config["SECRET_KEY"] = "your-secret-key-here-change-this-in-production"
 app.config["PROPAGATE_EXCEPTIONS"] = True
 app.config["SESSION_COOKIE_HTTPONLY"] = True
 app.config["SESSION_COOKIE_SAMESITE"] = "Lax"
 app.config["PERMANENT_SESSION_LIFETIME"] = timedelta(days=7)
 
-# ===== Database: Render PostgreSQL or SQLite =====
-if os.environ.get("DATABASE_URL"):
-    db_uri = os.environ.get("DATABASE_URL")
-    if db_uri.startswith("postgresql://"):
-        db_uri = db_uri.replace("postgresql://", "postgresql+psycopg2://", 1)
-    app.config["SQLALCHEMY_DATABASE_URI"] = db_uri
-else:
-    db_path = os.path.join(os.path.dirname(__file__), 'game.db')
-    app.config["SQLALCHEMY_DATABASE_URI"] = f"sqlite:///{db_path}"
-
+# DB config - uses sqlite in current directory
+db_path = os.path.join(os.path.dirname(__file__), 'game.db')
+app.config["SQLALCHEMY_DATABASE_URI"] = f"sqlite:///{db_path}"
 app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
-app.config["SQLALCHEMY_ENGINE_OPTIONS"] = {
-    "pool_pre_ping": True,
-    "pool_recycle": 3600,
-}
 
 db = SQLAlchemy(app)
 
-# ===== CORS + Socket.IO (THREADING MODE - Render compatible) =====
-ALLOWED_ORIGINS = os.environ.get('ALLOWED_ORIGINS', '*')
-if ALLOWED_ORIGINS != '*':
-    ALLOWED_ORIGINS = ALLOWED_ORIGINS.split(',')
-
-CORS(app,
-     resources={r"/*": {"origins": ALLOWED_ORIGINS}},
-     supports_credentials=True,
-     allow_headers=['Content-Type'])
-
-# ✅ THREADING MODE (works on Render Python 3.13 - eventlet removed)
+CORS(app, resources={r"/*": {"origins": "*"}})
 socketio = SocketIO(
     app,
-    cors_allowed_origins=ALLOWED_ORIGINS,
-    async_mode='threading',
+    cors_allowed_origins="*",
+    async_mode="threading",
     ping_timeout=60,
     ping_interval=25,
-    logger=False
 )
-print("[init] ✅ Socket.IO ready (threading mode)")
 
 # ---------------------------------------------------
 # Game configurations
