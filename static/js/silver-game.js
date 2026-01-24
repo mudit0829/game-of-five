@@ -1,4 +1,4 @@
-// ================= BASIC SETUP =================
+/ ================= BASIC SETUP =================
 const GAME = window.GAME_TYPE || "silver";
 const FIXED_BET_AMOUNT = window.FIXED_BET_AMOUNT || 10;
 const urlParams = new URLSearchParams(window.location.search);
@@ -260,15 +260,18 @@ async function fetchTableData() {
       : data.tables[0];
     if (!table) return;
     currentTable = table;
-    updateGameUI(table);
+    
+    // ✅ ONLY update game result/timer from polling
+    // ✅ DO NOT update pads/bets (Socket.IO handles that in real-time)
+    updateGameUIMinimal(table);
   } catch (err) {
-    console.error("fetch error", err);
+    console.error("[fetch] error:", err);
   }
 }
 
-function updateGameUI(table) {
+function updateGameUIMinimal(table) {
+  // Update ONLY what polling should handle: round ID, timer, and game result
   roundIdSpan.textContent = table.round_code || "-";
-  playerCountSpan.textContent = table.players || 0;
 
   if (!gameFinished) {
     const oldSec = displayRemainingSeconds;
@@ -276,8 +279,8 @@ function updateGameUI(table) {
     if (oldSec !== displayRemainingSeconds) renderTimer();
   }
 
-  updatePadsFromBets(table.bets || []);
-  updateMyBets(table.bets || []);
+  // ✅ DO NOT call updatePadsFromBets() here - Socket.IO handles it LIVE
+  // ✅ DO NOT call updateMyBets() here - Socket.IO handles it LIVE
 
   if (placeBetBtn && !gameFinished) {
     placeBetBtn.disabled = displayRemainingSeconds <= 15 || 
@@ -293,6 +296,7 @@ function updateGameUI(table) {
     return;
   }
 
+  // ✅ ONLY polling should handle game results (not Socket.IO)
   if (table.result != null && table.result !== lastResultShown) {
     console.log(`[result] Received ${table.result} at ${displayRemainingSeconds}s left`);
     lastResultShown = table.result;
