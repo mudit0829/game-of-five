@@ -342,36 +342,133 @@ async function fetchBalance() {
     const res = await fetch(`/balance/${USER_ID}`);
     const { balance } = await res.json();
     if (typeof balance === "number") updateWallet(balance);
-  } catch (e) {}
+  } catch (e) {
+    console.error("[balance] fetch error:", e);
+  }
 }
 
 socket.on("connect", () => {
+  console.log("[socket] Connected to server");
   socket.emit("join_game", { game_type: GAME, user_id: USER_ID });
   fetchBalance();
   fetchTableData();
 });
 
-socket.on("bet_success", payload => {
-  if (gameFinished) return;
-  userHasBet = true;
-  setStatus("Bet placed", "ok");
-  if (payload.new_balance != null) updateWallet(payload.new_balance);
-  fetchTableData();
+socket.on("disconnect", () => {
+  console.log("[socket] Disconnected from server");
 });
 
-socket.on("bet_error", payload => setStatus(payload.message || "Bet error", "error"));
+socket.on("connect_error", (error) => {
+  console.error("[socket] Connection error:", error);
+});
 
+// ✅ LISTEN FOR OWN BET SUCCESS (direct response to place_bet)
+socket.on("bet_success", payload => {
+  console.log("[bet_success] Own bet placed:", payload);
+  if (gameFinished) return;
+  
+  userHasBet = true;
+  setStatus("Bet placed ✓", "ok");
+  
+  // Update wallet immediately
+  if (payload.new_balance != null) {
+    updateWallet(payload.new_balance);
+  }
+  
+  // Update lily pads IMMEDIATELY with all players data
+  if (payload.players && Array.isArray(payload.players)) {
+    console.log("[bet_success] Updating pads with players:", payload.players);
+    updatePadsFromBets(payload.players);
+    updateMyBets(payload.players);
+    
+    // Update player count
+    if (playerCountSpan) {
+      playerCountSpan.textContent = payload.players.length;
+    }
+  }
+  
+  // Update round info if provided
+  if (payload.round_code && roundIdSpan) {
+    roundIdSpan.textContent = payload.round_code;
+  }
+});
+
+// ✅ LISTEN FOR BROADCAST TABLE UPDATES (other players' bets in real-time)
+socket.on("update_table", payload => {
+  console.log("[update_table] Broadcast received - table update:", payload);
+  if (gameFinished) return;
+  
+  // Update player count and lily pads with all players
+  if (payload.players && Array.isArray(payload.players)) {
+    console.log("[update_table] Players data received, updating UI:", payload.players);
+    playerCountSpan.textContent = payload.players.length;
+    
+    // IMMEDIATELY update lily pads with all players' bets
+    updatePadsFromBets(payload.players);
+    updateMyBets(payload.players);
+  }
+  
+  // Update timer if provided
+  if (payload.time_remaining != null) {
+    displayRemainingSeconds = payload.time_remaining;
+    renderTimer();
+  }
+  
+  // Update slots available
+  if (payload.slots_available != null && placeBetBtn) {
+    const slotsEmpty = payload.slots_available > 0;
+    placeBetBtn.disabled = !slotsEmpty || displayRemainingSeconds <= 15;
+  }
+  
+  // Disable betting if closed
+  if (payload.is_betting_closed) {
+    disableBettingUI();
+  }
+  
+  // Update round info
+  if (payload.round_code && roundIdSpan) {
+    roundIdSpan.textContent = payload.round_code;
+  }
+});
+
+// ✅ LISTEN FOR BET ERRORS
+socket.on("bet_error", payload => {
+  console.error("[bet_error]", payload.message || "Unknown error");
+  setStatus(payload.message || "Bet error", "error");
+});
+
+// ================= EVENT LISTENERS =================
+
+// Number chip selection
 numChips.forEach(chip => {
   chip.addEventListener("click", () => {
-    if (!gameFinished) setSelectedNumber(parseInt(chip.dataset.number, 10));
+    if (!gameFinished && !chip.disabled) {
+      setSelectedNumber(parseInt(chip.dataset.number, 10));
+    }
   });
 });
 
+// Place bet button
 placeBetBtn?.addEventListener("click", () => {
-  if (gameFinished) return setStatus("Game finished", "error");
-  if (!currentTable) return setStatus("Game not ready", "error");
-  if (walletBalance < FIXED_BET_AMOUNT) return setStatus("Insufficient balance", "error");
-  if (selectedNumber == null) return setStatus("Select number", "error");
+  if (gameFinished) {
+    return setStatus("Game finished", "error");
+  }
+  if (!currentTable) {
+    return setStatus("Game not ready", "error");
+  }
+  if (walletBalance < FIXED_BET_AMOUNT) {
+    return setStatus("Insufficient balance", "error");
+  }
+  if (selectedNumber == null || selectedNumber < 0) {
+    return setStatus("Select a number", "error");
+  }
+
+  console.log("[place_bet] Emitting to backend:", {
+    game_type: GAME,
+    user_id: USER_ID,
+    username: USERNAME,
+    number: selectedNumber
+  });
 
   socket.emit("place_bet", {
     game_type: GAME,
@@ -381,14 +478,20 @@ placeBetBtn?.addEventListener("click", () => {
   });
 });
 
-popupHomeBtn?.addEventListener("click", () => window.location.href = HOME_URL);
-popupLobbyBtn?.addEventListener("click", () => window.history.back());
+// Popup buttons
+popupHomeBtn?.addEventListener("click", () => {
+  window.location.href = HOME_URL;
+});
 
-// ================= START =================
+popupLobbyBtn?.addEventListener("click", () => {
+  window.history.back();
+});
+
+// ================= INITIALIZATION =================
+console.log(`[init] Game initialized - user=${USER_ID} | username=${USERNAME} | game=${GAME} | bet_amount=${FIXED_BET_AMOUNT}`);
+
 fetchBalance();
 startPolling();
 startLocalTimer();
 setSelectedNumber(0);
 setStatus("");
-
-console.log(`[init] user=${USER_ID} | game=${GAME} | bet=${FIXED_BET_AMOUNT}`);
