@@ -1,7 +1,7 @@
-import eventlet
-eventlet.monkey_patch()  # FIRST before ANY other imports!
+# ===============================================
+# RENDER DEPLOYMENT - NO EVENTLET (Python 3.13 fix)
+# ===============================================
 
-# NOW safe to import Flask modules
 import os
 from flask import Flask, render_template, request, jsonify, redirect, url_for, session
 from flask_sqlalchemy import SQLAlchemy
@@ -26,64 +26,45 @@ app.config["SESSION_COOKIE_HTTPONLY"] = True
 app.config["SESSION_COOKIE_SAMESITE"] = "Lax"
 app.config["PERMANENT_SESSION_LIFETIME"] = timedelta(days=7)
 
-# ===== FIX #1: Database URL Configuration =====
+# ===== Database URL Configuration (Render PostgreSQL) =====
 if os.environ.get("DATABASE_URL"):
-    # Production: Use PostgreSQL from env (Render, Heroku, etc.)
-    db_uri = os.environ.get("DATABASE_URL")
-    # Handle postgresql:// → postgresql+psycopg2://
-    if db_uri.startswith("postgresql://"):
-        db_uri = db_uri.replace("postgresql://", "postgresql+psycopg2://", 1)
+    # Render auto-provides PostgreSQL
+    db_uri = os.environ["DATABASE_URL"].replace("://", "+psycopg://")
     app.config["SQLALCHEMY_DATABASE_URI"] = db_uri
+    print("[init] 🔗 Using Render PostgreSQL")
 else:
-    # Development: Use SQLite
+    # Local dev SQLite
     db_path = os.path.join(os.path.dirname(__file__), 'game.db')
     app.config["SQLALCHEMY_DATABASE_URI"] = f"sqlite:///{db_path}"
+    print("[init] 🐌 Using local SQLite")
 
 app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
 app.config["SQLALCHEMY_ENGINE_OPTIONS"] = {
-    "pool_pre_ping": True,  # Test connections before using
-    "pool_recycle": 3600,   # Recycle connections every hour
+    "pool_pre_ping": True,
+    "pool_recycle": 3600,
 }
 
 db = SQLAlchemy(app)
 
-# ===== FIX #4: CORS + Socket.IO Configuration =====
+# ===== CORS Configuration =====
 ALLOWED_ORIGINS = os.environ.get('ALLOWED_ORIGINS', '*')
 if ALLOWED_ORIGINS != '*':
     ALLOWED_ORIGINS = ALLOWED_ORIGINS.split(',')
 
-CORS(app,
+CORS(app, 
      resources={r"/*": {"origins": ALLOWED_ORIGINS}},
-     supports_credentials=True,
-     allow_headers=['Content-Type'])
+     supports_credentials=True)
 
-# ===== FIX #1: Use eventlet for better threading =====
-try:
-    import eventlet
-    eventlet.monkey_patch()  # Apply patches before SocketIO
-    socketio = SocketIO(
-        app,
-        cors_allowed_origins=ALLOWED_ORIGINS,
-        async_mode='eventlet',
-        ping_timeout=60,
-        ping_interval=25,
-        logger=False
-    )
-    USE_EVENTLET = True
-    print("[init] ✅ Using Eventlet async mode (production-ready)")
-except ImportError:
-    # Fallback to threading
-    socketio = SocketIO(
-        app,
-        cors_allowed_origins=ALLOWED_ORIGINS,
-        async_mode='threading',
-        ping_timeout=60,
-        ping_interval=25,
-        logger=False
-    )
-    USE_EVENTLET = False
-    print("[init] ⚠️  Using threading async mode (fallback)")
-
+# ===== Socket.IO - THREADING MODE (Render Python 3.13 compatible) =====
+socketio = SocketIO(
+    app,
+    cors_allowed_origins=ALLOWED_ORIGINS,
+    async_mode='threading',  # ✅ Render stable, full Socket.IO support
+    ping_timeout=60,
+    ping_interval=25,
+    logger=False
+)
+print("[init] ✅ Socket.IO ready (threading mode)")
 # ---------------------------------------------------
 # Game configurations
 # ---------------------------------------------------
