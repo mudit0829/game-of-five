@@ -1,5 +1,3 @@
-check my codes are working in github and render but not in webmin VPS,,check my app.py and find whether it has any issue form here
-
 from flask import (
     Flask,
     render_template,
