@@ -1,9 +1,8 @@
-gunicorn==21.2.0
-flask==3.0.0
-flask-socketio==5.3.5
-flask-sqlalchemy==3.1.1
-flask-cors==4.0.0
-python-socketio==5.9.0
-python-engineio==4.7.1
-psycopg2-binary==2.9.9
-Werkzeug==3.0.1
+gunicorn
+flask
+flask-socketio
+flask-sqlalchemy
+flask-cors
+python-socketio
+python-engineio
+psycopg2-binary
