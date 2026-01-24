@@ -1,14 +1,9 @@
+import eventlet
+eventlet.monkey_patch()  # FIRST before ANY other imports!
+
+# NOW safe to import Flask modules
 import os
-import sys
-from flask import (
-    Flask,
-    render_template,
-    request,
-    jsonify,
-    redirect,
-    url_for,
-    session,
-)
+from flask import Flask, render_template, request, jsonify, redirect, url_for, session
 from flask_sqlalchemy import SQLAlchemy
 from flask_socketio import SocketIO, emit, join_room
 from flask_cors import CORS
