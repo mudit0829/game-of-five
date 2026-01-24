@@ -1,3 +1,5 @@
+check my codes are working in github and render but not in webmin VPS,,check my app.py and find whether it has any issue form here
+
 from flask import (
     Flask,
     render_template,
@@ -1323,93 +1325,93 @@ def handle_place_bet(data):
         emit("bet_error", {"message": "Admin cannot place bets"})
         return
 
-    # ===== FIX #1: USE THREADING LOCK =====
-    with game_tables_lock:
-        tables = game_tables.get(game_type)
-        if not tables:
-            emit("bet_error", {"message": "No tables for this game"})
+    tables = game_tables.get(game_type)
+    if not tables:
+        emit("bet_error", {"message": "No tables for this game"})
+        return
+
+    table = None
+    if round_code:
+        for t in tables:
+            if t.round_code == round_code:
+                table = t
+                break
+        if not table:
+            emit(
+                "bet_error",
+                {
+                    "message": "This game round is no longer available. Please join a new game."
+                },
+            )
+            return
+    else:
+        for t in tables:
+            if not t.is_betting_closed and not t.is_finished and len(t.bets) < t.max_players:
+                table = t
+                break
+        if not table:
+            emit("bet_error", {"message": "No open game table"})
             return
 
-        table = None
-        if round_code:
-            for t in tables:
-                if t.round_code == round_code:
-                    table = t
-                    break
-            if not table:
-                emit("bet_error", {"message": "This game round is no longer available. Please join a new game."})
-                return
-        else:
-            for t in tables:
-                if not t.is_betting_closed and not t.is_finished and len(t.bets) < t.max_players:
-                    table = t
-                    break
-            if not table:
-                emit("bet_error", {"message": "No open game table"})
-                return
+    if table.is_finished or table.is_betting_closed:
+        emit("bet_error", {"message": "Betting is closed for this game"})
+        return
 
-        if table.is_finished or table.is_betting_closed:
-            emit("bet_error", {"message": "Betting is closed for this game"})
-            return
+    if len(table.bets) >= table.max_players:
+        emit("bet_error", {"message": "All slots are full"})
+        return
 
-        if len(table.bets) >= table.max_players:
-            emit("bet_error", {"message": "All slots are full"})
-            return
+    bet_amount = table.config["bet_amount"]
 
-        bet_amount = table.config["bet_amount"]
+    if wallet.balance < bet_amount:
+        emit("bet_error", {"message": "Insufficient balance"})
+        return
 
-        if wallet.balance < bet_amount:
-            emit("bet_error", {"message": "Insufficient balance"})
-            return
+    success, message = table.add_bet(user_id, username, number)
+    if not success:
+        emit("bet_error", {"message": message})
+        return
 
-        success, message = table.add_bet(user_id, username, number)
-        if not success:
-            emit("bet_error", {"message": message})
-            return
+    wallet.balance -= bet_amount
+    db.session.commit()
 
-        # Deduct balance
-        wallet.balance -= bet_amount
-        db.session.commit()
-
-        # ===== FIX #2: PREPARE PLAYER DATA =====
-        players_data = []
-        for bet in table.bets:
-            players_data.append({
-                'username': bet['username'],
-                'number': bet['number'],
-                'is_bot': bet.get('is_bot', False)
-            })
-
-        # Send success to current user
-        emit(
-            "bet_success",
-            {
-                "message": message,
-                "new_balance": wallet.balance,
-                "round_code": table.round_code,
-                "table_number": table.table_number,
-                "players": players_data,
-                "slots_available": table.get_slots_available()
-            },
-        )
-
-        # Broadcast table update to ALL players
-        emit(
-            "update_table",
-            {
-                "game_type": game_type,
-                "table_number": table.table_number,
-                "round_code": table.round_code,
-                "players": players_data,
-                "slots_available": table.get_slots_available(),
-                "time_remaining": table.get_time_remaining(),
-                "is_betting_closed": table.is_betting_closed
-            },
-            broadcast=True,
-            include_self=True,
-            to=game_type
-        )
-
+    # ========== NEW CODE: Prepare player data ==========
+    players_data = []
+    for bet in table.bets:
+        players_data.append({
+            'username': bet['username'],
+            'number': bet['number'],
+            'is_bot': bet.get('is_bot', False)
+        })
+    
+    # Send success to current user
+    emit(
+        "bet_success",
+        {
+            "message": message,
+            "new_balance": wallet.balance,
+            "round_code": table.round_code,
+            "table_number": table.table_number,
+            "players": players_data,  # ← Players with numbers
+            "slots_available": table.get_slots_available()
+        },
+    )
+    
+    # Broadcast table update to ALL players in this game
+    emit(
+        "update_table",
+        {
+            "game_type": game_type,
+            "table_number": table.table_number,
+            "round_code": table.round_code,
+            "players": players_data,
+            "slots_available": table.get_slots_available(),
+            "time_remaining": table.get_time_remaining(),
+            "is_betting_closed": table.is_betting_closed
+        },
+        broadcast=True,  # Send to ALL connected users
+        include_self=True
+    )
     # ========== END NEW CODE ==========
 
 # ---------------------------------------------------
