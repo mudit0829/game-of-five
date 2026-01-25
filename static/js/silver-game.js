@@ -344,6 +344,16 @@ function updateGameUIMinimal(table) {
     return;
   }
 
+  // ✅ CRITICAL: Update lily pads from polling data (for initial load + other players' bets)
+  if (table.bets && Array.isArray(table.bets) && table.bets.length > 0) {
+    console.log("[polling] Updating pads from API bets:", table.bets.length);
+    updatePadsFromBets(table.bets);
+    updateMyBets(table.bets);
+    if (playerCountSpan) {
+      playerCountSpan.textContent = table.bets.length;
+    }
+  }
+
   // ✅ CRITICAL: Handle game result
   if (table.result != null && table.result !== lastResultShown) {
     console.log(`[GAME RESULT] Result announced: ${table.result}, time remaining: ${displayRemainingSeconds}s, userHasBet: ${userHasBet}`);
