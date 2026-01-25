@@ -1,16 +1,14 @@
-// ================= BASIC SETUP (DB USER) =================
+// ================= BASIC SETUP =================
+// ✅ CRITICAL: Use window.* variables
 
-const GAME = GAME_TYPE || "diamond";
+const GAME = window.GAME_TYPE || "diamond";
+const FIXED_BET_AMOUNT = window.FIXED_BET_AMOUNT || 100;
 
-// optional: support multi-table via ?table=ROUND_CODE
 const urlParams = new URLSearchParams(window.location.search);
-const TABLE_CODE = urlParams.get("table") || null;
+let tableCodeFromUrl = urlParams.get("table") || null;
 
-// Real logged-in user from Flask session
-const USER_ID = GAME_USER_ID;
-const USERNAME = GAME_USERNAME || "Player";
-
-// Where the "Home" button on popup goes
+const USER_ID = window.GAME_USER_ID;
+const USERNAME = window.GAME_USERNAME || "Player";
 const HOME_URL = "/home";
 
 // ================= DOM REFERENCES =================
@@ -21,7 +19,7 @@ const archerImg = document.getElementById("archerSprite");
 const targets = Array.from(document.querySelectorAll(".target.pad"));
 
 const numChips = Array.from(document.querySelectorAll(".num-chip"));
-const betInput = document.getElementById("betAmount"); // visual only
+const betInput = document.getElementById("betAmount");
 const placeBetBtn = document.getElementById("placeBetBtn");
 
 const roundIdSpan = document.getElementById("roundId");
@@ -35,7 +33,6 @@ const userNameLabel = document.getElementById("userName");
 const userBetCountLabel = document.getElementById("userBetCount");
 const myBetsRow = document.getElementById("myBetsRow");
 
-// popup elements
 const popupEl = document.getElementById("resultPopup");
 const popupTitleEl = document.getElementById("popupTitle");
 const popupMsgEl = document.getElementById("popupMessage");
@@ -48,17 +45,12 @@ if (userNameLabel) {
 
 let walletBalance = 0;
 let selectedNumber = 0;
-
 let currentTable = null;
 let lastResultShown = null;
-
-// flags / intervals
 let gameFinished = false;
 let tablePollInterval = null;
 let localTimerInterval = null;
 let displayRemainingSeconds = 0;
-
-// once the user has bet in this round, stays true
 let userHasBet = false;
 
 // ================= UI HELPERS =================
@@ -101,10 +93,12 @@ function setSelectedNumber(n) {
   });
 }
 
+// ✅ FIXED: Update my bets display
 function updateMyBets(bets) {
-  const myBets = (bets || []).filter(
-    (b) => String(b.user_id) === String(USER_ID)
-  );
+  const myBets = (bets || []).filter(b => {
+    const betUserId = String(b.user_id || b.userId || "");
+    return betUserId === String(USER_ID);
+  });
 
   if (myBets.length > 0) {
     userHasBet = true;
@@ -115,31 +109,17 @@ function updateMyBets(bets) {
   }
 
   if (!myBetsRow) return;
-  myBetsRow.innerHTML = "";
-
   if (myBets.length === 0) {
-    const span = document.createElement("span");
-    span.style.color = "#6b7280";
-    span.style.fontSize = "11px";
-    span.textContent = "none";
-    myBetsRow.appendChild(span);
-    return;
+    myBetsRow.innerHTML = '<span style="color:#6b7280;font-size:11px;">none</span>';
+  } else {
+    const numbers = myBets.map(b => b.number).sort((a, b) => a - b);
+    myBetsRow.innerHTML = numbers.map(n => `<span class="my-bet-chip">${n}</span>`).join(", ");
   }
 
-  myBets.forEach((b, index) => {
-    const chip = document.createElement("span");
-    chip.className = "my-bet-chip";
-    chip.textContent = b.number;
-    myBetsRow.appendChild(chip);
-    if (index < myBets.length - 1) {
-      myBetsRow.appendChild(document.createTextNode(", "));
-    }
-  });
+  console.log("[updateMyBets] Count:", myBets.length, "Numbers:", myBets.map(b => b.number).join(","));
 }
 
-/**
- * Use up to 6 bets, one per target.
- */
+// ✅ FIXED: Update targets from bets
 function updateTargetsFromBets(bets) {
   const list = (bets || []).slice(0, 6);
 
@@ -159,11 +139,10 @@ function updateTargetsFromBets(bets) {
       if (userSpan) userSpan.textContent = "";
     }
   });
+
+  console.log("[updateTargetsFromBets] Updated", list.length, "targets from bets");
 }
 
-/**
- * Ensure at least one target shows the winning number so arrow has somewhere to land.
- */
 function ensureTargetForWinningNumber(winningNumber) {
   if (winningNumber === null || winningNumber === undefined) return;
 
@@ -208,17 +187,14 @@ function showEndPopup(outcomeInfo) {
   const { outcome } = outcomeInfo;
 
   let title = "Game Finished";
-  let message =
-    "This game has ended. Please keep playing to keep your winning chances high.";
+  let message = "This game has ended. Please keep playing to keep your winning chances high.";
 
   if (outcome === "win") {
-    title = "Congratulations!";
-    message =
-      "You have won the game. Please keep playing to keep your winning chances high.";
+    title = "Congratulations! 🎉";
+    message = "You have won the game. Please keep playing to keep your winning chances high.";
   } else if (outcome === "lose") {
-    title = "Hard Luck!";
-    message =
-      "You have lost the game. Please keep playing to keep your winning chances high.";
+    title = "Hard Luck! 😢";
+    message = "You have lost the game. Please keep playing to keep your winning chances high.";
   }
 
   if (popupTitleEl) popupTitleEl.textContent = title;
@@ -231,9 +207,7 @@ function showSlotsFullPopup() {
   if (!popupEl) return;
 
   if (popupTitleEl) popupTitleEl.textContent = "All slots are full";
-  if (popupMsgEl)
-    popupMsgEl.textContent =
-      "This game is already full. You will be redirected to lobby to join another table.";
+  if (popupMsgEl) popupMsgEl.textContent = "This game is already full. You will be redirected to lobby to join another table.";
 
   popupEl.style.display = "flex";
 
@@ -250,70 +224,137 @@ function syncUrlWithTable(roundCode) {
     if (currentParam === roundCode) return;
     url.searchParams.set("table", roundCode);
     window.history.replaceState({}, "", url.toString());
+    tableCodeFromUrl = roundCode;
   } catch (err) {
     console.warn("Unable to sync URL with table code", err);
   }
 }
 
-// ================= ARROW ANIMATION =================
+// ================= ARROW ANIMATION (ENHANCED) =================
+
+function ensureArrowStyles() {
+  if (document.getElementById("arrow-anim-styles")) return;
+  const style = document.createElement("style");
+  style.id = "arrow-anim-styles";
+  style.textContent = `
+    @keyframes archerDraw {
+      0% { transform: scaleX(1) rotate(0deg); }
+      50% { transform: scaleX(0.85) rotate(-5deg); }
+      100% { transform: scaleX(1) rotate(0deg); }
+    }
+    @keyframes targetFlash {
+      0% { opacity: 0; transform: translate(-50%, -50%) scale(0.6); }
+      50% { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+      100% { opacity: 0; transform: translate(-50%, -50%) scale(1.3); }
+    }
+  `;
+  document.head.appendChild(style);
+}
 
 function shootArrowToWinningNumber(winningNumber) {
-  if (!rangeEl || !arrowImg || !archerImg) return;
+  if (!rangeEl || !arrowImg || !archerImg) {
+    console.warn("[arrow] Missing DOM elements");
+    return;
+  }
 
   const target = targets.find(
     (t) => t.dataset.number === String(winningNumber)
   );
   if (!target) {
-    console.log("Winning number not on any target:", winningNumber);
+    console.log("[arrow] Winning number not on any target:", winningNumber);
     return;
   }
+
+  console.log("[arrow] Shooting arrow to target with number:", winningNumber);
+  ensureArrowStyles();
 
   const rangeRect = rangeEl.getBoundingClientRect();
   const arrowRect = arrowImg.getBoundingClientRect();
   const targetRect = target.getBoundingClientRect();
 
-  // start: arrow near bow
+  // Calculate positions relative to range
   const startX = arrowRect.left + arrowRect.width * 0.2 - rangeRect.left;
   const startY = arrowRect.top + arrowRect.height * 0.5 - rangeRect.top;
 
-  // end: centre of target
   const endX = targetRect.left + targetRect.width * 0.5 - rangeRect.left;
   const endY = targetRect.top + targetRect.height * 0.5 - rangeRect.top;
 
   const deltaX = endX - startX;
   const deltaY = endY - startY;
+  const distance = Math.sqrt(deltaX * deltaX + deltaY * deltaY);
   const duration = 650;
-  const peak = -80;
+  const peak = -Math.min(150, distance * 0.4);
   const startTime = performance.now();
 
-  // trigger archer shoot animation
-  archerImg.classList.add("shoot");
-  setTimeout(() => archerImg.classList.remove("shoot"), 350);
+  // ✅ ARCHER SHOOT ANIMATION
+  console.log("[archer] Playing shoot animation");
+  archerImg.style.animation = "archerDraw 0.4s ease-in-out";
+  setTimeout(() => {
+    archerImg.style.animation = "none";
+  }, 400);
 
+  // Reset arrow to starting position
   arrowImg.style.transition = "none";
+  arrowImg.style.left = "auto";
+  arrowImg.style.top = "auto";
+  arrowImg.style.position = "relative";
 
   function step(now) {
-    const tRaw = (now - startTime) / duration;
+    const elapsed = now - startTime;
+    const tRaw = elapsed / duration;
     const t = Math.min(Math.max(tRaw, 0), 1);
 
-    const ease = t < 0.5 ? 2 * t * t : -1 + (4 - 2 * t) * t;
+    // Easing: ease-out-cubic
+    const ease = 1 - Math.pow(1 - t, 3);
+    
     const x = startX + deltaX * ease;
     const yLinear = startY + deltaY * ease;
     const yArc = yLinear + peak * (4 * t * (1 - t));
 
-    const relX = x - arrowRect.width * 0.2;
-    const relY = yArc - arrowRect.height * 0.5;
+    // Calculate angle for arrow rotation
     const angle = Math.atan2(deltaY, deltaX) * (180 / Math.PI);
+    
+    // Scale arrow slightly smaller as it travels
+    const scale = 1 - t * 0.15;
 
-    arrowImg.style.transform = `translate(${relX}px, ${relY}px) rotate(${angle}deg)`;
+    arrowImg.style.position = "fixed";
+    arrowImg.style.left = x + "px";
+    arrowImg.style.top = yArc + "px";
+    arrowImg.style.transform = `translate(-50%, -50%) rotate(${angle}deg) scale(${scale})`;
+    arrowImg.style.zIndex = "1000";
 
     if (t < 1) {
       requestAnimationFrame(step);
     } else {
+      // ✅ TARGET HIT ANIMATION
+      console.log("[target] Hit! Playing victory animation");
       target.classList.add("win");
+
+      // Flash effect at impact
+      const flash = document.createElement("div");
+      flash.style.position = "absolute";
+      flash.style.top = "50%";
+      flash.style.left = "50%";
+      flash.style.width = "180%";
+      flash.style.height = "180%";
+      flash.style.background = "radial-gradient(circle, rgba(59,130,246,0.8) 0%, rgba(59,130,246,0.3) 50%, transparent 100%)";
+      flash.style.borderRadius = "50%";
+      flash.style.pointerEvents = "none";
+      flash.style.animation = "targetFlash 0.6s ease-out forwards";
+      flash.style.zIndex = "100";
+      target.appendChild(flash);
+
+      setTimeout(() => flash.remove(), 600);
+
+      // Arrow stays in target for 700ms, then returns
       setTimeout(() => {
-        arrowImg.style.transition = "transform 0.5s ease-out";
-        arrowImg.style.transform = "translate(0, 0) rotate(0deg)";
+        console.log("[arrow] Returning to starting position");
+        arrowImg.style.transition = "all 0.5s ease-out";
+        arrowImg.style.position = "relative";
+        arrowImg.style.left = "auto";
+        arrowImg.style.top = "auto";
+        arrowImg.style.transform = "translate(0, 0) rotate(0deg) scale(1)";
+        arrowImg.style.zIndex = "10";
       }, 700);
     }
   }
@@ -321,7 +362,7 @@ function shootArrowToWinningNumber(winningNumber) {
   requestAnimationFrame(step);
 }
 
-// ================= TIMER (LOCAL 1-SECOND COUNTDOWN) =================
+// ================= TIMER =================
 
 function startLocalTimer() {
   if (localTimerInterval) clearInterval(localTimerInterval);
@@ -334,7 +375,7 @@ function startLocalTimer() {
   }, 1000);
 }
 
-// ================= BACKEND POLLING (TABLE DATA) =================
+// ================= POLLING =================
 
 async function fetchTableData() {
   if (gameFinished) return;
@@ -350,14 +391,31 @@ async function fetchTableData() {
 
     let table = null;
 
-    if (TABLE_CODE) {
-      table = data.tables.find((t) => t.round_code === TABLE_CODE) || null;
-    }
-    if (!table) {
-      table = data.tables[0];
-    }
+    if (tableCodeFromUrl) {
+      table = data.tables.find((t) => t.round_code === tableCodeFromUrl) || null;
 
-    syncUrlWithTable(table.round_code);
+      if (!table) {
+        gameFinished = true;
+        disableBettingUI();
+        if (tablePollInterval) {
+          clearInterval(tablePollInterval);
+          tablePollInterval = null;
+        }
+        if (localTimerInterval) {
+          clearInterval(localTimerInterval);
+          localTimerInterval = null;
+        }
+
+        setStatus("This game has finished. You'll be taken back to lobby to join a new one.", "error");
+        setTimeout(() => {
+          window.history.back();
+        }, 2000);
+        return;
+      }
+    } else {
+      table = data.tables[0];
+      syncUrlWithTable(table.round_code);
+    }
 
     currentTable = table;
     updateGameUI(table);
@@ -370,39 +428,35 @@ function updateGameUI(table) {
   if (!table) return;
 
   if (roundIdSpan) roundIdSpan.textContent = table.round_code || "-";
-  if (playerCountSpan) playerCountSpan.textContent = table.players || 0;
 
   displayRemainingSeconds = table.time_remaining || 0;
   renderTimer();
 
-  updateTargetsFromBets(table.bets || []);
-  updateMyBets(table.bets || []);
-
-  // disable button also when slots are full
-  if (placeBetBtn && !gameFinished) {
-    const maxPlayers =
-      typeof table.max_players === "number" ? table.max_players : null;
-    const slotsFull =
-      !!table.is_full ||
-      (maxPlayers !== null && table.players >= maxPlayers);
-
-    placeBetBtn.disabled =
-      !!table.is_betting_closed || !!table.is_finished || slotsFull;
+  // ✅ CRITICAL: Update targets from polling (for initial load + other players' bets)
+  if (table.bets && Array.isArray(table.bets) && table.bets.length > 0) {
+    console.log("[polling] Updating targets from API bets:", table.bets.length);
+    updateTargetsFromBets(table.bets);
+    updateMyBets(table.bets);
+    if (playerCountSpan) {
+      playerCountSpan.textContent = table.bets.length;
+    }
   }
 
-  // urgent timer style
+  if (placeBetBtn && !gameFinished) {
+    const maxPlayers = typeof table.max_players === "number" ? table.max_players : null;
+    const slotsFull = !!table.is_full || (maxPlayers !== null && table.players >= maxPlayers);
+
+    placeBetBtn.disabled = !!table.is_betting_closed || !!table.is_finished || slotsFull;
+  }
+
   if (displayRemainingSeconds <= 10) {
     timerPill && timerPill.classList.add("urgent");
   } else {
     timerPill && timerPill.classList.remove("urgent");
   }
 
-  // ==== SLOTS FULL CHECK (for spectators with no bet) ====
-  const maxPlayers =
-    typeof table.max_players === "number" ? table.max_players : null;
-  const isFull =
-    table.is_full === true ||
-    (maxPlayers !== null && table.players >= maxPlayers);
+  const maxPlayers = typeof table.max_players === "number" ? table.max_players : null;
+  const isFull = table.is_full === true || (maxPlayers !== null && table.players >= maxPlayers);
 
   if (!gameFinished && !userHasBet && isFull) {
     gameFinished = true;
@@ -419,9 +473,7 @@ function updateGameUI(table) {
     return;
   }
 
-  // ===== Result handling =====
-  const hasResult =
-    table.result !== null && table.result !== undefined && table.result !== "";
+  const hasResult = table.result !== null && table.result !== undefined && table.result !== "";
 
   if (hasResult && table.result !== lastResultShown) {
     lastResultShown = table.result;
@@ -463,7 +515,7 @@ function startPolling() {
   }, 2000);
 }
 
-// ================= BALANCE / SOCKET =================
+// ================= SOCKET =================
 
 const socket = io();
 
@@ -487,25 +539,67 @@ function joinGameRoom() {
 }
 
 socket.on("connect", () => {
+  console.log("[socket] CONNECTED");
   joinGameRoom();
   fetchBalance();
   fetchTableData();
 });
 
+socket.on("disconnect", () => {
+  console.log("[socket] DISCONNECTED");
+});
+
+socket.on("connect_error", (error) => {
+  console.error("[socket] CONNECTION ERROR:", error);
+});
+
+// ✅ LISTEN FOR OWN BET SUCCESS
 socket.on("bet_success", (payload) => {
+  console.log("[bet_success] Received - players:", payload.players?.length || 0);
   if (gameFinished) return;
 
   userHasBet = true;
-
-  setStatus(payload.message || "Bet placed", "ok");
+  setStatus(payload.message || "Bet placed ✓", "ok");
   if (typeof payload.new_balance === "number") {
     updateWallet(payload.new_balance);
   }
-  fetchTableData();
+
+  if (payload.players && Array.isArray(payload.players)) {
+    console.log("[bet_success] Updating UI with", payload.players.length, "players");
+    updateTargetsFromBets(payload.players);
+    updateMyBets(payload.players);
+    if (playerCountSpan) {
+      playerCountSpan.textContent = payload.players.length;
+    }
+  }
 });
 
+// ✅ LISTEN FOR BROADCAST TABLE UPDATES
+socket.on("update_table", (payload) => {
+  console.log("[update_table] BROADCAST received - players:", payload.players?.length || 0);
+  if (gameFinished) return;
+
+  if (payload.players && Array.isArray(payload.players)) {
+    console.log("[update_table] Updating UI with", payload.players.length, "players");
+    playerCountSpan.textContent = payload.players.length;
+    updateTargetsFromBets(payload.players);
+    updateMyBets(payload.players);
+  }
+
+  if (payload.time_remaining != null) {
+    displayRemainingSeconds = payload.time_remaining;
+    renderTimer();
+  }
+
+  if (payload.is_betting_closed) {
+    disableBettingUI();
+  }
+});
+
+// ✅ LISTEN FOR BET ERRORS
 socket.on("bet_error", (payload) => {
   if (gameFinished) return;
+  console.error("[bet_error]:", payload.message);
   setStatus(payload.message || "Bet error", "error");
 });
 
@@ -531,14 +625,8 @@ if (placeBetBtn) {
       return;
     }
 
-    // HARD STOP: no bet once all slots are full (for everyone)
-    const maxPlayers =
-      typeof currentTable.max_players === "number"
-        ? currentTable.max_players
-        : null;
-    const slotsFull =
-      currentTable.is_full === true ||
-      (maxPlayers !== null && currentTable.players >= maxPlayers);
+    const maxPlayers = typeof currentTable.max_players === "number" ? currentTable.max_players : null;
+    const slotsFull = currentTable.is_full === true || (maxPlayers !== null && currentTable.players >= maxPlayers);
 
     if (slotsFull) {
       setStatus("All slots are full for this game.", "error");
@@ -556,11 +644,6 @@ if (placeBetBtn) {
       return;
     }
 
-    // IMPORTANT:
-    // We do NOT try to detect "number already taken" on the frontend
-    // because that was causing false errors when list was out of sync.
-    // Backend will enforce uniqueness and send bet_error if needed.
-
     socket.emit("place_bet", {
       game_type: GAME,
       user_id: USER_ID,
@@ -570,7 +653,6 @@ if (placeBetBtn) {
   });
 }
 
-// popup buttons
 if (popupHomeBtn) {
   popupHomeBtn.addEventListener("click", () => {
     window.location.href = HOME_URL;
@@ -584,6 +666,8 @@ if (popupLobbyBtn) {
 }
 
 // ================= INIT =================
+
+console.log(`[INIT] Game=${GAME}, User=${USER_ID}, Username=${USERNAME}, Bet=${FIXED_BET_AMOUNT}`);
 
 fetchBalance();
 startPolling();
