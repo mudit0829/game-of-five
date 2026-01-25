@@ -1,6 +1,7 @@
 // ================= BASIC SETUP (DB USER) =================
 
 const GAME = GAME_TYPE || "gold";
+const FIXED_BET_AMOUNT = window.FIXED_BET_AMOUNT || 50;
 
 // optional: support multi-table via ?table=ROUND_CODE
 const urlParams = new URLSearchParams(window.location.search);
@@ -62,6 +63,10 @@ let displayRemainingSeconds = 0;
 // once true, never false – used for "slots full" logic
 let userHasBet = false;
 
+// ✅ Video player variables
+let videoPlayer = null;
+let videoVisible = false;
+
 // ================= UI HELPERS =================
 
 function setStatus(msg, type = "") {
@@ -102,13 +107,15 @@ function setSelectedNumber(n) {
   });
 }
 
+// ✅ FIXED: Update my bets display with correct format
 function updateMyBets(bets) {
-  const myBets = (bets || []).filter(
-    (b) => String(b.user_id) === String(USER_ID)
-  );
+  const myBets = (bets || []).filter(b => {
+    const betUserId = String(b.user_id || b.userId || "");
+    return betUserId === String(USER_ID);
+  });
 
   if (myBets.length > 0) {
-    userHasBet = true; // lock as betting user
+    userHasBet = true;
   }
 
   if (userBetCountLabel) {
@@ -116,23 +123,14 @@ function updateMyBets(bets) {
   }
 
   if (!myBetsRow) return;
-  myBetsRow.innerHTML = "";
-
   if (myBets.length === 0) {
-    myBetsRow.innerHTML =
-      '<span style="color:#6b7280;font-size:11px;">none</span>';
-    return;
+    myBetsRow.innerHTML = '<span style="color:#6b7280;font-size:11px;">none</span>';
+  } else {
+    const numbers = myBets.map(b => b.number).sort((a, b) => a - b);
+    myBetsRow.innerHTML = numbers.map(n => `<span class="my-bet-chip">${n}</span>`).join(", ");
   }
 
-  myBets.forEach((b, index) => {
-    const chip = document.createElement("span");
-    chip.className = "my-bet-chip";
-    chip.textContent = b.number;
-    myBetsRow.appendChild(chip);
-    if (index < myBets.length - 1) {
-      myBetsRow.appendChild(document.createTextNode(", "));
-    }
-  });
+  console.log("[updateMyBets] Count:", myBets.length, "Numbers:", myBets.map(b => b.number).join(","));
 }
 
 /**
@@ -157,6 +155,8 @@ function updateGoalsFromBets(bets) {
       if (userSpan) userSpan.textContent = "";
     }
   });
+
+  console.log("[updateGoalsFromBets] Updated", list.length, "goals from bets");
 }
 
 /**
@@ -210,11 +210,11 @@ function showEndPopup(outcomeInfo) {
     "This game has ended. Please keep playing to keep your winning chances high.";
 
   if (outcome === "win") {
-    title = "Congratulations!";
+    title = "Congratulations! 🎉";
     message =
       "You have won the game. Please keep playing to keep your winning chances high.";
   } else if (outcome === "lose") {
-    title = "Hard Luck!";
+    title = "Hard Luck! 😢";
     message =
       "You have lost the game. Please keep playing to keep your winning chances high.";
   }
@@ -252,6 +252,56 @@ function syncUrlWithTable(roundCode) {
   } catch (err) {
     console.warn("Unable to sync URL with table code", err);
   }
+}
+
+// ================= PLAYER VIDEO ANIMATION =================
+
+/**
+ * ✅ Shows video at 5 seconds, plays 3-second animation
+ * Video ends at ~2 seconds (kicking position)
+ */
+function showPlayerKickVideo() {
+  if (videoVisible) return;
+
+  console.log("[video] Showing player kick video at", displayRemainingSeconds, 'seconds remaining');
+
+  if (!playerArea) {
+    console.warn("[video] playerArea not found");
+    return;
+  }
+
+  videoVisible = true;
+
+  // Create video element
+  const video = document.createElement("video");
+  video.id = "playerKickVideo";
+  video.src = "/static/video/gold_game_video_Play.mp4";
+  video.style.width = "100%";
+  video.style.height = "100%";
+  video.style.objectFit = "cover";
+  video.style.objectPosition = "center";
+  video.muted = true;
+  video.autoplay = true;
+  video.playsinline = true;
+
+  playerArea.appendChild(video);
+  videoPlayer = video;
+
+  // Show playerArea with video
+  playerArea.classList.add("visible");
+
+  // Play video
+  video.play().catch(err => console.warn("[video] Play error:", err));
+
+  // At 2 seconds remaining, hide video (keep it positioned)
+  // Video is 3 seconds, so it will have 1 second left when timer hits 2s
+  const hideVideoInterval = setInterval(() => {
+    if (displayRemainingSeconds <= 2 && videoPlayer) {
+      console.log("[video] Timer hit 2s, pausing video");
+      videoPlayer.pause();
+      clearInterval(hideVideoInterval);
+    }
+  }, 100);
 }
 
 // ================= BALL SHOOTING ANIMATION =================
@@ -335,8 +385,6 @@ function shootBallToWinningNumber(winningNumber) {
 
   createTrajectoryLine(pitchStartX, pitchStartY, pitchEndX, pitchEndY, peak);
 
-  if (cssPlayer) cssPlayer.classList.add("kick");
-
   setTimeout(() => {
     const originalTransform = ballImg.style.transform;
 
@@ -398,8 +446,6 @@ function shootBallToWinningNumber(winningNumber) {
 
     requestAnimationFrame(step);
   }, 280);
-
-  setTimeout(() => cssPlayer && cssPlayer.classList.remove("kick"), 800);
 }
 
 // ================= TIMER (LOCAL 1-SECOND COUNTDOWN) =================
@@ -411,6 +457,11 @@ function startLocalTimer() {
     if (displayRemainingSeconds > 0) {
       displayRemainingSeconds -= 1;
       renderTimer();
+
+      // ✅ Show video at 5 seconds
+      if (displayRemainingSeconds === 5 && !videoVisible) {
+        showPlayerKickVideo();
+      }
     }
   }, 1000);
 }
@@ -432,12 +483,9 @@ async function fetchTableData() {
     let table = null;
 
     if (tableCodeFromUrl) {
-      // strict: only use the table that matches what lobby gave us
-      table =
-        data.tables.find((t) => t.round_code === tableCodeFromUrl) || null;
+      table = data.tables.find((t) => t.round_code === tableCodeFromUrl) || null;
 
       if (!table) {
-        // that game finished and disappeared – don't silently switch to another
         gameFinished = true;
         disableBettingUI();
         if (tablePollInterval) {
@@ -459,7 +507,6 @@ async function fetchTableData() {
         return;
       }
     } else {
-      // no ?table= in URL – pick first table and lock URL to it
       table = data.tables[0];
       syncUrlWithTable(table.round_code);
     }
@@ -475,13 +522,19 @@ function updateGameUI(table) {
   if (!table) return;
 
   if (roundIdSpan) roundIdSpan.textContent = table.round_code || "-";
-  if (playerCountSpan) playerCountSpan.textContent = table.players || 0;
 
   displayRemainingSeconds = table.time_remaining || 0;
   renderTimer();
 
-  updateGoalsFromBets(table.bets || []);
-  updateMyBets(table.bets || []);
+  // ✅ CRITICAL: Update goals from polling data (for initial load + other players' bets)
+  if (table.bets && Array.isArray(table.bets) && table.bets.length > 0) {
+    console.log("[polling] Updating goals from API bets:", table.bets.length);
+    updateGoalsFromBets(table.bets);
+    updateMyBets(table.bets);
+    if (playerCountSpan) {
+      playerCountSpan.textContent = table.bets.length;
+    }
+  }
 
   if (placeBetBtn && !gameFinished) {
     placeBetBtn.disabled =
@@ -495,15 +548,6 @@ function updateGameUI(table) {
     timerPill && timerPill.classList.add("urgent");
   } else {
     timerPill && timerPill.classList.remove("urgent");
-  }
-
-  // Show player animation in last 15s (optional)
-  if (playerArea) {
-    if (displayRemainingSeconds <= 15) {
-      playerArea.classList.add("visible");
-    } else {
-      playerArea.classList.remove("visible");
-    }
   }
 
   // ==== SLOTS FULL CHECK (only if userHasBet is still false) ====
@@ -596,25 +640,72 @@ function joinGameRoom() {
 }
 
 socket.on("connect", () => {
+  console.log("[socket] CONNECTED");
   joinGameRoom();
   fetchBalance();
   fetchTableData();
 });
 
+socket.on("disconnect", () => {
+  console.log("[socket] DISCONNECTED");
+});
+
+socket.on("connect_error", (error) => {
+  console.error("[socket] CONNECTION ERROR:", error);
+});
+
+// ✅ LISTEN FOR OWN BET SUCCESS
 socket.on("bet_success", (payload) => {
-  if (gameFinished) return;
+  console.log("[bet_success] Received - players:", payload.players?.length || 0);
+  if (gameFinished) {
+    console.log("[bet_success] Game finished, ignoring");
+    return;
+  }
 
-  userHasBet = true; // as soon as our bet is accepted
+  userHasBet = true;
 
-  setStatus(payload.message || "Bet placed", "ok");
+  setStatus(payload.message || "Bet placed ✓", "ok");
   if (typeof payload.new_balance === "number") {
     updateWallet(payload.new_balance);
   }
-  fetchTableData();
+
+  // ✅ Update from Socket.IO with full players data
+  if (payload.players && Array.isArray(payload.players)) {
+    console.log("[bet_success] Updating UI with", payload.players.length, "players");
+    updateGoalsFromBets(payload.players);
+    updateMyBets(payload.players);
+    if (playerCountSpan) {
+      playerCountSpan.textContent = payload.players.length;
+    }
+  }
 });
 
+// ✅ LISTEN FOR BROADCAST TABLE UPDATES
+socket.on("update_table", (payload) => {
+  console.log("[update_table] BROADCAST received - players:", payload.players?.length || 0);
+  if (gameFinished) return;
+
+  if (payload.players && Array.isArray(payload.players)) {
+    console.log("[update_table] Updating UI with", payload.players.length, "players");
+    playerCountSpan.textContent = payload.players.length;
+    updateGoalsFromBets(payload.players);
+    updateMyBets(payload.players);
+  }
+
+  if (payload.time_remaining != null) {
+    displayRemainingSeconds = payload.time_remaining;
+    renderTimer();
+  }
+
+  if (payload.is_betting_closed) {
+    disableBettingUI();
+  }
+});
+
+// ✅ LISTEN FOR BET ERRORS
 socket.on("bet_error", (payload) => {
   if (gameFinished) return;
+  console.error("[bet_error]:", payload.message);
   setStatus(payload.message || "Bet error", "error");
 });
 
@@ -640,7 +731,6 @@ if (placeBetBtn) {
       return;
     }
 
-    // hard stop: no bet if all 6 slots are full
     const maxPlayers =
       typeof currentTable.max_players === "number"
         ? currentTable.max_players
@@ -659,9 +749,6 @@ if (placeBetBtn) {
       setStatus("Select a number first", "error");
       return;
     }
-
-    // Duplicate-number rule is enforced on backend only.
-    // We don't block here to avoid false “already taken” errors.
 
     socket.emit("place_bet", {
       game_type: GAME,
@@ -686,6 +773,8 @@ if (popupLobbyBtn) {
 }
 
 // ================= INIT =================
+
+console.log(`[INIT] Game=${GAME}, User=${USER_ID}, Username=${USERNAME}, Bet=${FIXED_BET_AMOUNT}`);
 
 fetchBalance();
 startPolling();
