@@ -402,7 +402,7 @@ function updateGameUIMinimal(table) {
 
 function startPolling() {
   console.log("[init] Starting polling");
-  fetchTableData();  // ✅ CRITICAL: Fetch immediately, don't wait 1.5s
+  fetchTableData();
   tablePollInterval = setInterval(fetchTableData, 1500);
 }
 
@@ -420,25 +420,25 @@ async function fetchBalance() {
 }
 
 socket.on("connect", () => {
-  console.log("[socket] ✅ CONNECTED");
+  console.log("[socket] CONNECTED");
   socket.emit("join_game", { game_type: GAME, user_id: USER_ID });
   fetchBalance();
-  fetchTableData();  // ✅ CRITICAL: Load initial bets immediately
+  fetchTableData();
 });
 
 socket.on("disconnect", () => {
-  console.log("[socket] ❌ DISCONNECTED");
+  console.log("[socket] DISCONNECTED");
 });
 
 socket.on("connect_error", (error) => {
-  console.error("[socket] ❌ CONNECTION ERROR:", error);
+  console.error("[socket] CONNECTION ERROR:", error);
 });
 
 // ✅ LISTEN FOR OWN BET SUCCESS
 socket.on("bet_success", payload => {
-  console.log("[bet_success] 📨 Received - players:", payload.players?.length || 0);
+  console.log("[bet_success] Received - players:", payload.players?.length || 0);
   if (gameFinished) {
-    console.log("[bet_success] ⚠️ Game finished, ignoring");
+    console.log("[bet_success] Game finished, ignoring");
     return;
   }
   
@@ -450,7 +450,7 @@ socket.on("bet_success", payload => {
   }
   
   if (payload.players && Array.isArray(payload.players)) {
-    console.log("[bet_success] 🎯 Updating UI with', payload.players.length, 'players');
+    console.log("[bet_success] Updating UI with", payload.players.length, "players");
     updatePadsFromBets(payload.players);
     updateMyBets(payload.players);
     
@@ -466,10 +466,10 @@ socket.on("bet_success", payload => {
 
 // ✅ LISTEN FOR BROADCAST TABLE UPDATES
 socket.on("update_table", payload => {
-  console.log("[update_table] 📢 BROADCAST received - players:', payload.players?.length || 0);
+  console.log("[update_table] BROADCAST received - players:", payload.players?.length || 0);
   
   if (payload.players && Array.isArray(payload.players)) {
-    console.log("[update_table] 🎯 Updating UI with', payload.players.length, 'players');
+    console.log("[update_table] Updating UI with", payload.players.length, "players");
     playerCountSpan.textContent = payload.players.length;
     updatePadsFromBets(payload.players);
     updateMyBets(payload.players);
@@ -496,7 +496,7 @@ socket.on("update_table", payload => {
 
 // ✅ LISTEN FOR BET ERRORS
 socket.on("bet_error", payload => {
-  console.error("[bet_error] ❌:", payload.message);
+  console.error("[bet_error]:", payload.message);
   setStatus(payload.message || "Bet error", "error");
 });
 
@@ -524,7 +524,7 @@ placeBetBtn?.addEventListener("click", () => {
     return setStatus("Select a number", "error");
   }
 
-  console.log("[place_bet] 📤 Emitting:', selectedNumber);
+  console.log("[place_bet] Emitting:", selectedNumber);
   socket.emit("place_bet", {
     game_type: GAME,
     user_id: USER_ID,
