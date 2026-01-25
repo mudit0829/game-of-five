@@ -1,35 +1,20 @@
-// ================= BASIC SETUP (DB USER) =================
+// ================= BASIC SETUP =================
+// ✅ CRITICAL FIX: Use window.* variables, NEVER redeclare if HTML already set them
 
-// ✅ FIX: Check if already defined to avoid duplicate declaration
-if (typeof GAME === 'undefined') {
-  window.GAME = window.GAME_TYPE || "gold";
-}
-const GAME = window.GAME;
+const GAME = window.GAME_TYPE || "gold";
+const FIXED_BET_AMOUNT = window.FIXED_BET_AMOUNT || 50;
 
-// ✅ FIX: Get from window, don't redeclare if exists
-if (typeof FIXED_BET_AMOUNT === 'undefined') {
-  window.FIXED_BET_AMOUNT = 50;
-}
-const FIXED_BET_AMOUNT = window.FIXED_BET_AMOUNT;
-
-// optional: support multi-table via ?table=ROUND_CODE
 const urlParams = new URLSearchParams(window.location.search);
-// mutable so we can keep it in sync
 let tableCodeFromUrl = urlParams.get("table") || null;
 
-// Real logged-in user from Flask session (passed in HTML)
 const USER_ID = window.GAME_USER_ID;
 const USERNAME = window.GAME_USERNAME || "Player";
-
-// Where "Home" button on popup goes
 const HOME_URL = "/home";
 
 // ================= DOM REFERENCES =================
 
 const pitch = document.querySelector(".pitch");
 const ballImg = document.getElementById("ballSprite");
-// ✅ REMOVED: cssPlayer is no longer needed (we use video now)
-// const cssPlayer = document.getElementById("cssPlayer");
 const playerArea = document.querySelector(".player-area");
 const goals = Array.from(document.querySelectorAll(".goal.pad"));
 
@@ -47,7 +32,6 @@ const userNameLabel = document.getElementById("userName");
 const userBetCountLabel = document.getElementById("userBetCount");
 const myBetsRow = document.getElementById("myBetsRow");
 
-// popup elements
 const popupEl = document.getElementById("resultPopup");
 const popupTitleEl = document.getElementById("popupTitle");
 const popupMsgEl = document.getElementById("popupMessage");
@@ -60,20 +44,13 @@ if (userNameLabel) {
 
 let walletBalance = 0;
 let selectedNumber = 0;
-
 let currentTable = null;
 let lastResultShown = null;
-
-// flags / intervals
 let gameFinished = false;
 let tablePollInterval = null;
 let localTimerInterval = null;
 let displayRemainingSeconds = 0;
-
-// once true, never false – used for "slots full" logic
 let userHasBet = false;
-
-// ✅ Video player variables
 let videoPlayer = null;
 let videoVisible = false;
 
@@ -117,7 +94,7 @@ function setSelectedNumber(n) {
   });
 }
 
-// ✅ FIXED: Update my bets display with correct format
+// ✅ Update my bets display
 function updateMyBets(bets) {
   const myBets = (bets || []).filter(b => {
     const betUserId = String(b.user_id || b.userId || "");
@@ -143,9 +120,7 @@ function updateMyBets(bets) {
   console.log("[updateMyBets] Count:", myBets.length, "Numbers:", myBets.map(b => b.number).join(","));
 }
 
-/**
- * Use up to 6 bets, one per goal.
- */
+// Update goals from bets
 function updateGoalsFromBets(bets) {
   const list = (bets || []).slice(0, 6);
 
@@ -169,9 +144,7 @@ function updateGoalsFromBets(bets) {
   console.log("[updateGoalsFromBets] Updated", list.length, "goals from bets");
 }
 
-/**
- * Ensure at least one goal shows winning number so the ball can target it.
- */
+// Ensure winning number is on a goal
 function ensureGoalForWinningNumber(winningNumber) {
   if (winningNumber === null || winningNumber === undefined) return;
 
@@ -216,17 +189,14 @@ function showEndPopup(outcomeInfo) {
   const { outcome } = outcomeInfo;
 
   let title = "Game Finished";
-  let message =
-    "This game has ended. Please keep playing to keep your winning chances high.";
+  let message = "This game has ended. Please keep playing to keep your winning chances high.";
 
   if (outcome === "win") {
     title = "Congratulations! 🎉";
-    message =
-      "You have won the game. Please keep playing to keep your winning chances high.";
+    message = "You have won the game. Please keep playing to keep your winning chances high.";
   } else if (outcome === "lose") {
     title = "Hard Luck! 😢";
-    message =
-      "You have lost the game. Please keep playing to keep your winning chances high.";
+    message = "You have lost the game. Please keep playing to keep your winning chances high.";
   }
 
   if (popupTitleEl) popupTitleEl.textContent = title;
@@ -239,9 +209,7 @@ function showSlotsFullPopup() {
   if (!popupEl) return;
 
   if (popupTitleEl) popupTitleEl.textContent = "All slots are full";
-  if (popupMsgEl)
-    popupMsgEl.textContent =
-      "This game is already full. You will be redirected to lobby to join another table.";
+  if (popupMsgEl) popupMsgEl.textContent = "This game is already full. You will be redirected to lobby to join another table.";
 
   popupEl.style.display = "flex";
 
@@ -264,12 +232,8 @@ function syncUrlWithTable(roundCode) {
   }
 }
 
-// ================= PLAYER VIDEO ANIMATION =================
+// ================= VIDEO ANIMATION =================
 
-/**
- * ✅ Shows video at 5 seconds, plays 3-second animation
- * Video ends at ~2 seconds (kicking position)
- */
 function showPlayerKickVideo() {
   if (videoVisible) return;
 
@@ -282,7 +246,6 @@ function showPlayerKickVideo() {
 
   videoVisible = true;
 
-  // Create video element
   const video = document.createElement("video");
   video.id = "playerKickVideo";
   video.src = "/static/video/gold_game_video_Play.mp4";
@@ -297,13 +260,10 @@ function showPlayerKickVideo() {
   playerArea.appendChild(video);
   videoPlayer = video;
 
-  // Show playerArea with video
   playerArea.classList.add("visible");
 
-  // Play video
   video.play().catch(err => console.warn("[video] Play error:", err));
 
-  // At 2 seconds remaining, pause video (keep it positioned)
   const hideVideoInterval = setInterval(() => {
     if (displayRemainingSeconds <= 2 && videoPlayer) {
       console.log("[video] Timer hit 2s, pausing video");
@@ -313,7 +273,7 @@ function showPlayerKickVideo() {
   }, 100);
 }
 
-// ================= BALL SHOOTING ANIMATION =================
+// ================= BALL ANIMATION =================
 
 function ensureTrajectoryStyles() {
   if (document.getElementById("trajectory-styles")) return;
@@ -432,8 +392,7 @@ function shootBallToWinningNumber(winningNumber) {
         flash.style.transform = "translate(-50%, -50%)";
         flash.style.width = "150%";
         flash.style.height = "150%";
-        flash.style.background =
-          "radial-gradient(circle, rgba(34,197,94,0.6) 0%, transparent 70%)";
+        flash.style.background = "radial-gradient(circle, rgba(34,197,94,0.6) 0%, transparent 70%)";
         flash.style.borderRadius = "50%";
         flash.style.pointerEvents = "none";
         flash.style.animation = "goalFlash 0.6s ease-out";
@@ -457,7 +416,7 @@ function shootBallToWinningNumber(winningNumber) {
   }, 280);
 }
 
-// ================= TIMER (LOCAL 1-SECOND COUNTDOWN) =================
+// ================= TIMER =================
 
 function startLocalTimer() {
   if (localTimerInterval) clearInterval(localTimerInterval);
@@ -467,7 +426,6 @@ function startLocalTimer() {
       displayRemainingSeconds -= 1;
       renderTimer();
 
-      // ✅ Show video at 5 seconds
       if (displayRemainingSeconds === 5 && !videoVisible) {
         showPlayerKickVideo();
       }
@@ -475,7 +433,7 @@ function startLocalTimer() {
   }, 1000);
 }
 
-// ================= BACKEND POLLING (TABLE DATA) =================
+// ================= POLLING =================
 
 async function fetchTableData() {
   if (gameFinished) return;
@@ -506,10 +464,7 @@ async function fetchTableData() {
           localTimerInterval = null;
         }
 
-        setStatus(
-          "This game has finished. You'll be taken back to lobby to join a new one.",
-          "error"
-        );
+        setStatus("This game has finished. You'll be taken back to lobby to join a new one.", "error");
         setTimeout(() => {
           window.history.back();
         }, 2000);
@@ -535,7 +490,7 @@ function updateGameUI(table) {
   displayRemainingSeconds = table.time_remaining || 0;
   renderTimer();
 
-  // ✅ CRITICAL: Update goals from polling data (for initial load + other players' bets)
+  // ✅ Update goals from polling
   if (table.bets && Array.isArray(table.bets) && table.bets.length > 0) {
     console.log("[polling] Updating goals from API bets:", table.bets.length);
     updateGoalsFromBets(table.bets);
@@ -552,19 +507,14 @@ function updateGameUI(table) {
         table.players >= table.max_players);
   }
 
-  // Highlight urgent timer when low
   if (displayRemainingSeconds <= 10) {
     timerPill && timerPill.classList.add("urgent");
   } else {
     timerPill && timerPill.classList.remove("urgent");
   }
 
-  // ==== SLOTS FULL CHECK (only if userHasBet is still false) ====
-  const maxPlayers =
-    typeof table.max_players === "number" ? table.max_players : null;
-  const isFull =
-    table.is_full === true ||
-    (maxPlayers !== null && table.players >= maxPlayers);
+  const maxPlayers = typeof table.max_players === "number" ? table.max_players : null;
+  const isFull = table.is_full === true || (maxPlayers !== null && table.players >= maxPlayers);
 
   if (!gameFinished && !userHasBet && isFull) {
     gameFinished = true;
@@ -581,9 +531,7 @@ function updateGameUI(table) {
     return;
   }
 
-  // ===== Result handling =====
-  const hasResult =
-    table.result !== null && table.result !== undefined && table.result !== "";
+  const hasResult = table.result !== null && table.result !== undefined && table.result !== "";
 
   if (hasResult && table.result !== lastResultShown) {
     lastResultShown = table.result;
@@ -625,7 +573,7 @@ function startPolling() {
   }, 2000);
 }
 
-// ================= BALANCE / SOCKET =================
+// ================= SOCKET =================
 
 const socket = io();
 
@@ -663,22 +611,16 @@ socket.on("connect_error", (error) => {
   console.error("[socket] CONNECTION ERROR:", error);
 });
 
-// ✅ LISTEN FOR OWN BET SUCCESS
 socket.on("bet_success", (payload) => {
   console.log("[bet_success] Received - players:", payload.players?.length || 0);
-  if (gameFinished) {
-    console.log("[bet_success] Game finished, ignoring");
-    return;
-  }
+  if (gameFinished) return;
 
   userHasBet = true;
-
   setStatus(payload.message || "Bet placed ✓", "ok");
   if (typeof payload.new_balance === "number") {
     updateWallet(payload.new_balance);
   }
 
-  // ✅ Update from Socket.IO with full players data
   if (payload.players && Array.isArray(payload.players)) {
     console.log("[bet_success] Updating UI with", payload.players.length, "players");
     updateGoalsFromBets(payload.players);
@@ -689,7 +631,6 @@ socket.on("bet_success", (payload) => {
   }
 });
 
-// ✅ LISTEN FOR BROADCAST TABLE UPDATES
 socket.on("update_table", (payload) => {
   console.log("[update_table] BROADCAST received - players:", payload.players?.length || 0);
   if (gameFinished) return;
@@ -711,7 +652,6 @@ socket.on("update_table", (payload) => {
   }
 });
 
-// ✅ LISTEN FOR BET ERRORS
 socket.on("bet_error", (payload) => {
   if (gameFinished) return;
   console.error("[bet_error]:", payload.message);
@@ -740,10 +680,7 @@ if (placeBetBtn) {
       return;
     }
 
-    const maxPlayers =
-      typeof currentTable.max_players === "number"
-        ? currentTable.max_players
-        : null;
+    const maxPlayers = typeof currentTable.max_players === "number" ? currentTable.max_players : null;
     if (maxPlayers !== null && currentTable.players >= maxPlayers) {
       setStatus("All slots are full for this game.", "error");
       disableBettingUI();
@@ -768,7 +705,6 @@ if (placeBetBtn) {
   });
 }
 
-// popup buttons
 if (popupHomeBtn) {
   popupHomeBtn.addEventListener("click", () => {
     window.location.href = HOME_URL;
