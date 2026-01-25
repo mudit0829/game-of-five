@@ -15,7 +15,6 @@ from datetime import datetime, timedelta
 from datetime import datetime
 from functools import wraps
 from flask import session
-from bson import ObjectId
 import threading
 import random
 import time
@@ -874,34 +873,66 @@ def help_page():
 @login_required
 def coins_page():
     user_id = session.get('user_id')
-    user = users_collection.find_one({'_id': ObjectId(user_id)})
-    balance = user.get('balance', 0) if user else 0
+    user = User.query.get(user_id)
+    
+    if not user:
+        return redirect(url_for('logout'))
+    
+    wallet = ensure_wallet_for_user(user)
+    balance = wallet.balance if wallet else 0
     
     return render_template('coins.html', balance=balance)
 
+
 @app.route('/api/balance', methods=['GET'])
 @login_required
-def get_balance():
+def get_balance_api():
     user_id = session.get('user_id')
-    user = users_collection.find_one({'_id': ObjectId(user_id)})
-    balance = user.get('balance', 0) if user else 0
+    user = User.query.get(user_id)
+    
+    if not user:
+        return jsonify({'balance': 0}), 401
+    
+    wallet = ensure_wallet_for_user(user)
+    balance = wallet.balance if wallet else 0
     
     return jsonify({'balance': balance})
+
 
 @app.route('/api/coins/redeem', methods=['POST'])
 @login_required
 def redeem_coins():
     user_id = session.get('user_id')
-    data = request.get_json()
-    amount = data.get('amount', 0)
+    user = User.query.get(user_id)
     
-    if not isinstance(amount, int) or amount <= 0:
+    if not user:
+        return jsonify({'success': False, 'message': 'User not found'}), 401
+    
+    data = request.get_json()
+    
+    try:
+        amount = int(data.get('amount', 0))
+    except (TypeError, ValueError):
         return jsonify({'success': False, 'message': 'Invalid amount'}), 400
     
-    user = users_collection.find_one({'_id': ObjectId(user_id)})
-    if not user or user.get('balance', 0) < amount:
+    if amount <= 0:
+        return jsonify({'success': False, 'message': 'Amount must be greater than 0'}), 400
+    
+    wallet = ensure_wallet_for_user(user)
+    
+    if not wallet or wallet.balance < amount:
         return jsonify({'success': False, 'message': 'Insufficient balance'}), 400
     
+    # Deduct from wallet
+    wallet.balance -= amount
+    db.session.commit()
+    
+    return jsonify({
+        'success': True,
+        'message': f'Successfully redeemed {amount} coins!',
+        'new_balance': wallet.balance
+    })
+
     # Update balance
     new_balance = user.get('balance', 0) - amount
     users_collection.update_one(
