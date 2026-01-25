@@ -42,7 +42,7 @@
         <div class="targets targets-top">
           {% for i in range(1,4) %}
           <div class="target pad" data-pad="{{ i }}">
-            <div class="target-emoji">🎯</div>
+            <img src="{{ url_for('static', filename='img/diamond_target.png') }}" alt="Target">
             <span class="pad-number"></span>
             <span class="pad-user"></span>
           </div>
@@ -52,25 +52,27 @@
         <div class="targets targets-bottom">
           {% for i in range(4,7) %}
           <div class="target pad" data-pad="{{ i }}">
-            <div class="target-emoji">🎯</div>
+            <img src="{{ url_for('static', filename='img/diamond_target.png') }}" alt="Target">
             <span class="pad-number"></span>
             <span class="pad-user"></span>
           </div>
           {% endfor %}
         </div>
 
-        <!-- Archer & arrow (using emoji instead of images) -->
+        <!-- Archer & arrow -->
         <div class="archer-layer">
-          <div
+          <img
             id="archerSprite"
             class="archer"
-            style="font-size: 60px; line-height: 1; display: flex; align-items: center; justify-content: center;"
-          >🏹</div>
-          <div
+            src="{{ url_for('static', filename='img/diamond_archer.png') }}"
+            alt="Archer"
+          >
+          <img
             id="arrowSprite"
             class="arrow"
-            style="font-size: 40px; line-height: 1; display: flex; align-items: center; justify-content: center;"
-          >➡️</div>
+            src="{{ url_for('static', filename='img/diamond_arrow.png') }}"
+            alt="Arrow"
+          >
         </div>
       </section>
     </main>
