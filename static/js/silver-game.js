@@ -66,6 +66,7 @@ let jumpStarted = false;
 let storedResult = null;
 let userHasBet = false;
 let pendingOutcomeInfo = null;
+let myCurrentBets = [];  // ✅ Track all my bets in current round
 
 // ================= HELPERS =================
 function setStatus(msg, type = "") {
@@ -95,14 +96,38 @@ function setSelectedNumber(n) {
   });
 }
 
+// ✅ FIXED: Handle both old structure and new structure
 function updateMyBets(bets) {
-  const myBets = (bets || []).filter(b => String(b.user_id) === String(USER_ID));
-  if (myBets.length > 0) userHasBet = true;
-  if (userBetCountLabel) userBetCountLabel.textContent = myBets.length;
+  // Get all my bets from the bets array
+  const myBets = (bets || []).filter(b => {
+    // Handle both user_id and userId field names
+    const betUserId = String(b.user_id || b.userId || "");
+    return betUserId === String(USER_ID);
+  });
+  
+  // Update global tracker
+  myCurrentBets = myBets;
+  
+  if (myBets.length > 0) {
+    userHasBet = true;
+  }
+  
+  // Update bet count in top-left
+  if (userBetCountLabel) {
+    userBetCountLabel.textContent = myBets.length;
+  }
+  
+  // Update my bets display
   if (!myBetsRow) return;
-  myBetsRow.innerHTML = myBets.length === 0 
-    ? '<span style="color:#6b7280;font-size:11px;">none</span>'
-    : myBets.map(b => `<span class="my-bet-chip">${b.number}</span>`).join(", ");
+  if (myBets.length === 0) {
+    myBetsRow.innerHTML = '<span style="color:#6b7280;font-size:11px;">none</span>';
+  } else {
+    // Extract just the numbers and display them
+    const numbers = myBets.map(b => b.number).sort((a, b) => a - b);
+    myBetsRow.innerHTML = numbers.map(n => `<span class="my-bet-chip">${n}</span>`).join(", ");
+  }
+  
+  console.log("[updateMyBets] My bets:", myBets.length, "Numbers:", myBets.map(b => b.number));
 }
 
 function updatePadsFromBets(bets) {
@@ -110,17 +135,25 @@ function updatePadsFromBets(bets) {
   pads.forEach((pad, i) => {
     const numSpan = pad.querySelector(".pad-number");
     const userSpan = pad.querySelector(".pad-user");
-    pad.classList.remove("win");
+    
+    // Don't remove win class if game is finished
+    if (!gameFinished) {
+      pad.classList.remove("win");
+    }
+    
     if (i < list.length) {
-      pad.dataset.number = String(list[i].number);
-      if (numSpan) numSpan.textContent = list[i].number;
-      if (userSpan) userSpan.textContent = list[i].username;
+      const bet = list[i];
+      pad.dataset.number = String(bet.number);
+      if (numSpan) numSpan.textContent = bet.number;
+      if (userSpan) userSpan.textContent = bet.username;
     } else {
       pad.dataset.number = "";
       if (numSpan) numSpan.textContent = "";
       if (userSpan) userSpan.textContent = "";
     }
   });
+  
+  console.log("[updatePadsFromBets] Updated with", list.length, 'bets');
 }
 
 function ensurePadForWinningNumber(winningNumber) {
@@ -146,12 +179,23 @@ function determineUserOutcome(table) {
   return { outcome: myBets.some(b => String(b.number) === String(result)) ? "win" : "lose", result };
 }
 
-function showEndPopup(outcomeInfo) {
+// ✅ FIXED: Show correct popup for game result
+function showResultPopup(outcomeInfo) {
   if (!popupEl) return;
   const { outcome } = outcomeInfo;
-  popupTitleEl.textContent = outcome === "win" ? "Congratulations!" : outcome === "lose" ? "Hard Luck!" : "Game Finished";
+  
+  let title = "Game Finished";
+  if (outcome === "win") {
+    title = "Congratulations! 🎉";
+  } else if (outcome === "lose") {
+    title = "Hard Luck! 😢";
+  }
+  
+  popupTitleEl.textContent = title;
   popupMsgEl.textContent = "Please keep playing to keep your winning chances high.";
   popupEl.style.display = "flex";
+  
+  // Auto-redirect after 5 seconds
   setTimeout(() => window.history.back(), 5000);
 }
 
@@ -224,8 +268,9 @@ function hopFrogToWinningNumber(winningNumber) {
       frogContainer.classList.remove("jumping", "jump-left", "jump-front", "jump-right");
     }, 1800);
 
+    // Show result popup
     if (pendingOutcomeInfo) {
-      showEndPopup(pendingOutcomeInfo);
+      showResultPopup(pendingOutcomeInfo);
       pendingOutcomeInfo = null;
     }
   };
@@ -305,8 +350,13 @@ function updateGameUIMinimal(table) {
     lockedWinningPad = findPadForNumber(table.result);
     pendingOutcomeInfo = determineUserOutcome(table);
 
-    if (!userHasBet) return showSlotsFullPopup();
+    if (!userHasBet) {
+      // User didn't bet, just show game finished popup
+      showSlotsFullPopup();
+      return;
+    }
 
+    // User did bet, trigger frog jump
     if (!jumpStarted && displayRemainingSeconds <= 12) {
       console.log("[force] Late result → starting jump now");
       hopFrogToWinningNumber(storedResult);
@@ -320,6 +370,7 @@ function updateGameUIMinimal(table) {
     lastResultShown = null;
     gameFinished = false;
     userHasBet = false;
+    myCurrentBets = [];  // ✅ Reset my bets for new round
     pendingOutcomeInfo = null;
     lockedWinningPad = null;
     pads.forEach(p => p.classList.remove("win"));
@@ -330,6 +381,14 @@ function updateGameUIMinimal(table) {
     frogIdleVideo.style.display = "block";
     frogIdleVideo.play();
     if (popupEl) popupEl.style.display = "none";
+    
+    // Reset UI for new round
+    if (userBetCountLabel) userBetCountLabel.textContent = "0";
+    if (myBetsRow) myBetsRow.innerHTML = '<span style="color:#6b7280;font-size:11px;">none</span>';
+    
+    // Re-enable betting UI
+    if (placeBetBtn) placeBetBtn.disabled = false;
+    numChips.forEach(c => c.disabled = false);
   }
 }
 
@@ -400,7 +459,7 @@ socket.on("bet_success", payload => {
 // ✅ LISTEN FOR BROADCAST TABLE UPDATES (other players' bets in real-time)
 socket.on("update_table", payload => {
   console.log("[update_table] Broadcast received - table update:", payload);
-  if (gameFinished) return;
+  // ✅ REMOVED: if (gameFinished) return; - Allow updates during game finish for last bets
   
   // Update player count and lily pads with all players
   if (payload.players && Array.isArray(payload.players)) {
