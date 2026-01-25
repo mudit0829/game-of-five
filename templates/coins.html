@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Redeem Coins – Game of Five</title>
+  <title>Coins – Game of Five</title>
   <link rel="stylesheet" href="{{ url_for('static', filename='css/coins.css') }}" />
 </head>
 <body>
@@ -19,65 +19,97 @@
         ←
       </button>
       <h1>Coins</h1>
-      <div style="width: 40px;"></div>
+      <div style="width: 32px;"></div>
     </header>
 
-    <!-- BALANCE CARD -->
-    <section class="balance-card">
-      <div class="balance-label">Total Coins Available</div>
-      <div class="balance-value" id="coinsAvailable">
-        {{ balance or 0 }}
-      </div>
-      <div class="balance-sub">
-        Redeemable: <span id="coinsRedeemable">{{ balance or 0 }}</span>
-      </div>
-    </section>
+    <!-- TABS -->
+    <div class="section-tabs">
+      <button class="tab active" data-tab="redeem">Redeem</button>
+      <button class="tab" data-tab="history">History</button>
+    </div>
 
-    <!-- REDEEM FORM SECTION -->
-    <section class="redeem-section">
-      <h2>Redeem Your Coins</h2>
-      <p class="redeem-help">
-        Enter the number of coins you want to redeem. Only whole numbers allowed.
-      </p>
+    <!-- REDEEM TAB -->
+    <div class="tab-content active" data-tab-content="redeem">
+      <!-- BALANCE CARD -->
+      <section class="balance-card">
+        <div class="balance-label">Total Coins Available</div>
+        <div class="balance-value" id="coinsAvailable">{{ balance or 0 }}</div>
+        <div class="balance-sub">
+          Redeemable: <span id="coinsRedeemable">{{ balance or 0 }}</span>
+        </div>
+      </section>
 
-      <form id="redeemForm" class="redeem-form" novalidate>
-        <div class="form-group">
-          <label for="redeemAmount">Amount to Redeem</label>
-          <input
-            id="redeemAmount"
-            type="number"
-            name="redeemAmount"
-            min="1"
-            step="1"
-            placeholder="Enter amount (e.g., 500)"
-            required
-            aria-label="Coins to redeem"
-          />
+      <!-- REDEEM FORM SECTION -->
+      <section class="redeem-section">
+        <h2>Redeem Your Coins</h2>
+        <p class="redeem-help">
+          Enter the number of coins you want to redeem. Only whole numbers allowed.
+        </p>
+
+        <form id="redeemForm" class="redeem-form" novalidate>
+          <div class="form-group">
+            <label for="redeemAmount">Amount to Redeem</label>
+            <input
+              id="redeemAmount"
+              type="number"
+              name="redeemAmount"
+              min="1"
+              step="1"
+              placeholder="Enter amount (e.g., 500)"
+              required
+              aria-label="Coins to redeem"
+            />
+          </div>
+
+          <button type="submit" class="redeem-btn">
+            Redeem Now
+          </button>
+        </form>
+
+        <div id="redeemStatus" class="redeem-status" role="alert"></div>
+      </section>
+    </div>
+
+    <!-- HISTORY TAB -->
+    <div class="tab-content" data-tab-content="history">
+      <section class="history-section">
+        <h3>Transaction History</h3>
+        
+        <div class="txn-header-row">
+          <div>Date</div>
+          <div>Type</div>
+          <div>Details</div>
+          <div style="text-align: right;">Amount</div>
         </div>
 
-        <button type="submit" class="redeem-btn">
-          Redeem Now
-        </button>
-      </form>
-
-      <div id="redeemStatus" class="redeem-status" role="alert"></div>
-    </section>
-
-    <!-- INFO SECTION -->
-    <section class="info-section">
-      <h3>About Coins</h3>
-      <p>
-        ✓ Earn coins by playing games<br />
-        ✓ Redeem coins for real rewards<br />
-        ✓ No hidden charges or fees
-      </p>
-    </section>
+        <div class="txn-list" id="txnList">
+          <div class="empty-state">No transactions yet</div>
+        </div>
+      </section>
+    </div>
   </div>
 
   <script>
     // Pass balance from Flask template to JavaScript
     const INITIAL_BALANCE = {{ balance|int if balance else 0 }};
     console.log("[coins.html] Initial balance:", INITIAL_BALANCE);
+
+    // Tab switching
+    document.querySelectorAll('.tab').forEach(tab => {
+      tab.addEventListener('click', () => {
+        const tabName = tab.dataset.tab;
+        
+        // Update active tab button
+        document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+        tab.classList.add('active');
+        
+        // Update active content
+        document.querySelectorAll('.tab-content').forEach(content => {
+          content.classList.remove('active');
+        });
+        document.querySelector(`[data-tab-content="${tabName}"]`).classList.add('active');
+      });
+    });
   </script>
 
   <script src="{{ url_for('static', filename='js/coins.js') }}"></script>
