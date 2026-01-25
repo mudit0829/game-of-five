@@ -499,10 +499,9 @@ def start_all_game_tables():
 # API: tables and history
 # ---------------------------------------------------
 
-
 @app.route("/api/tables/<game_type>")
 def get_game_tables_api(game_type):
-    """Get all tables for a game type"""
+    """Get all tables for a game type - NOW WITH FULL BET OBJECTS"""
     try:
         game_type = game_type.lower()
         if game_type not in GAME_CONFIGS:
@@ -520,11 +519,23 @@ def get_game_tables_api(game_type):
         serialized_tables = []
         for table in tables_list:
             if table:  # Check if table exists
+                # ✅ BUILD BETS ARRAY WITH FULL BET OBJECTS
+                bets_list = []
+                if table.bets:
+                    for bet in table.bets:
+                        bets_list.append({
+                            'user_id': str(bet.get('user_id', '')),
+                            'username': bet.get('username', 'Unknown'),
+                            'number': bet.get('number', 0)
+                        })
+                
                 serialized_tables.append({
                     'table_number': table.table_number,
                     'game_type': table.game_type,
                     'round_code': table.round_code,
-                    'players': len(table.bets),
+                    'players': len(bets_list),  # ✅ Count of actual bets
+                    'bets': bets_list,  # ✅ CRITICAL: Send full bet objects
+                    'result': table.result,  # ✅ Include result
                     'max_players': table.max_players,
                     'slots_available': table.get_slots_available(),
                     'time_remaining': table.get_time_remaining(),
