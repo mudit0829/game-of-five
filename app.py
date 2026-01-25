@@ -1385,16 +1385,16 @@ def handle_place_bet(data):
     wallet.balance -= bet_amount
     db.session.commit()
 
-    # ========== NEW CODE: Prepare player data ==========
+    # ✅ FIXED: Build correct players data with user_id
     players_data = []
     for bet in table.bets:
         players_data.append({
+            'user_id': str(bet['user_id']),      # ✅ CRITICAL: Include user_id
             'username': bet['username'],
-            'number': bet['number'],
-            'is_bot': bet.get('is_bot', False)
+            'number': bet['number']
         })
     
-    # Send success to current user
+    # ✅ Send success to current user with ALL players data
     emit(
         "bet_success",
         {
@@ -1402,26 +1402,27 @@ def handle_place_bet(data):
             "new_balance": wallet.balance,
             "round_code": table.round_code,
             "table_number": table.table_number,
-            "players": players_data,  # ← Players with numbers
+            "players": players_data,  # ✅ Full bet objects with user_id
             "slots_available": table.get_slots_available()
         },
     )
     
-    # Broadcast table update to ALL players in this game
+    # ✅ Broadcast table update to ALL players
     emit(
         "update_table",
         {
             "game_type": game_type,
             "table_number": table.table_number,
             "round_code": table.round_code,
-            "players": players_data,
+            "players": players_data,  # ✅ Full bet objects with user_id
             "slots_available": table.get_slots_available(),
             "time_remaining": table.get_time_remaining(),
             "is_betting_closed": table.is_betting_closed
         },
-        broadcast=True,  # Send to ALL connected users
+        broadcast=True,
         include_self=True
     )
+
     # ========== END NEW CODE ==========
 
 # ---------------------------------------------------
