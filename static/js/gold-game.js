@@ -1,7 +1,16 @@
 // ================= BASIC SETUP (DB USER) =================
 
-const GAME = GAME_TYPE || "gold";
-const FIXED_BET_AMOUNT = window.FIXED_BET_AMOUNT || 50;
+// ✅ FIX: Check if already defined to avoid duplicate declaration
+if (typeof GAME === 'undefined') {
+  window.GAME = window.GAME_TYPE || "gold";
+}
+const GAME = window.GAME;
+
+// ✅ FIX: Get from window, don't redeclare if exists
+if (typeof FIXED_BET_AMOUNT === 'undefined') {
+  window.FIXED_BET_AMOUNT = 50;
+}
+const FIXED_BET_AMOUNT = window.FIXED_BET_AMOUNT;
 
 // optional: support multi-table via ?table=ROUND_CODE
 const urlParams = new URLSearchParams(window.location.search);
@@ -9,8 +18,8 @@ const urlParams = new URLSearchParams(window.location.search);
 let tableCodeFromUrl = urlParams.get("table") || null;
 
 // Real logged-in user from Flask session (passed in HTML)
-const USER_ID = GAME_USER_ID;
-const USERNAME = GAME_USERNAME || "Player";
+const USER_ID = window.GAME_USER_ID;
+const USERNAME = window.GAME_USERNAME || "Player";
 
 // Where "Home" button on popup goes
 const HOME_URL = "/home";
@@ -19,7 +28,8 @@ const HOME_URL = "/home";
 
 const pitch = document.querySelector(".pitch");
 const ballImg = document.getElementById("ballSprite");
-const cssPlayer = document.getElementById("cssPlayer");
+// ✅ REMOVED: cssPlayer is no longer needed (we use video now)
+// const cssPlayer = document.getElementById("cssPlayer");
 const playerArea = document.querySelector(".player-area");
 const goals = Array.from(document.querySelectorAll(".goal.pad"));
 
@@ -293,8 +303,7 @@ function showPlayerKickVideo() {
   // Play video
   video.play().catch(err => console.warn("[video] Play error:", err));
 
-  // At 2 seconds remaining, hide video (keep it positioned)
-  // Video is 3 seconds, so it will have 1 second left when timer hits 2s
+  // At 2 seconds remaining, pause video (keep it positioned)
   const hideVideoInterval = setInterval(() => {
     if (displayRemainingSeconds <= 2 && videoPlayer) {
       console.log("[video] Timer hit 2s, pausing video");
