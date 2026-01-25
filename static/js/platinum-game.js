@@ -306,7 +306,42 @@ function showFullSlotAndGoBack(messageText) {
   document.body.appendChild(overlay);
 }
 
-// ============== PARATROOPER ANIMATION (IMAGE) ==============
+// ============== PARATROOPER ANIMATION (ENHANCED) ==============
+
+function ensureParatrooperAnimationStyles() {
+  if (document.getElementById("paratrooper-anim-styles")) return;
+  
+  const style = document.createElement("style");
+  style.id = "paratrooper-anim-styles";
+  style.textContent = `
+    @keyframes paratrooperLand {
+      0% {
+        transform: translate(-50%, -50%) scale(1) rotateZ(0deg);
+      }
+      85% {
+        transform: translate(-50%, -50%) scale(1.05) rotateZ(2deg);
+      }
+      100% {
+        transform: translate(-50%, -50%) scale(0.95) rotateZ(-1deg);
+      }
+    }
+    
+    @keyframes boatBounce {
+      0% { transform: translateY(0); }
+      25% { transform: translateY(-8px); }
+      50% { transform: translateY(0); }
+      75% { transform: translateY(-4px); }
+      100% { transform: translateY(0); }
+    }
+    
+    @keyframes boatGlow {
+      0% { box-shadow: 0 0 0 rgba(34, 197, 94, 0); }
+      50% { box-shadow: 0 0 30px 10px rgba(34, 197, 94, 0.6); }
+      100% { box-shadow: 0 0 0 rgba(34, 197, 94, 0); }
+    }
+  `;
+  document.head.appendChild(style);
+}
 
 function dropParatrooperToWinningNumber(winningNumber) {
   if (!paratrooper) return;
@@ -319,57 +354,73 @@ function dropParatrooperToWinningNumber(winningNumber) {
     return;
   }
 
+  ensureParatrooperAnimationStyles();
+
   const boatRect = targetBoat.getBoundingClientRect();
 
-  // Where the paratrooper should land
+  // Landing position: center of boat
   const targetX = boatRect.left + boatRect.width / 2;
-  const targetY = boatRect.top + boatRect.height * 0.25;
+  const targetY = boatRect.top + boatRect.height / 2;
 
-  // Starting pos (off-screen top, centered)
+  // Starting position: top center of screen
   const startY = -220;
   const startX = window.innerWidth / 2;
 
-  const endY = targetY - 80; // slightly above boat
-  const endX = targetX;
-
-  const duration = 1300;
+  const duration = 1200; // 1.2 seconds for drop
   const startTime = performance.now();
 
-  // Reset transition for fresh animation
+  // ✅ Reset and show paratrooper
   paratrooper.style.transition = "none";
   paratrooper.style.opacity = "1";
   paratrooper.style.top = `${startY}px`;
   paratrooper.style.left = `${startX}px`;
+  paratrooper.style.transform = "translate(-50%, -50%) scale(1)";
 
   function step(now) {
-    const tRaw = (now - startTime) / duration;
+    const elapsed = now - startTime;
+    const tRaw = elapsed / duration;
     const t = Math.min(Math.max(tRaw, 0), 1);
 
-    // smooth easing
+    // ✅ Smooth easing: ease-out-cubic
     const ease = 1 - Math.pow(1 - t, 3);
 
-    const currentX = startX + (endX - startX) * ease;
-    const currentY = startY + (endY - startY) * ease;
+    const currentX = startX + (targetX - startX) * ease;
+    const currentY = startY + (targetY - startY) * ease;
+
+    // ✅ Slight scale decrease as falls (parachute getting smaller)
+    const scale = 1 - t * 0.15;
 
     paratrooper.style.top = `${currentY}px`;
     paratrooper.style.left = `${currentX}px`;
-    paratrooper.style.transform = "translate(-50%, -50%)";
+    paratrooper.style.transform = `translate(-50%, -50%) scale(${scale})`;
 
     if (t < 1) {
       requestAnimationFrame(step);
     } else {
+      // ✅ LANDING: Play landing animation
+      console.log("[paratrooper] Landing on boat with number:", winningNumber);
+      
+      paratrooper.style.animation = "paratrooperLand 0.5s ease-out forwards";
       targetBoat.classList.add("win");
-      // send him back up after a while
-      setTimeout(() => {
-        paratrooper.style.transition = "top 0.6s ease-out, opacity 0.4s";
-        paratrooper.style.top = "-260px";
-        paratrooper.style.opacity = "0";
+      
+      // ✅ Boat bounce + glow effect
+      targetBoat.style.animation = "boatBounce 0.6s ease-in-out";
+      targetBoat.style.boxShadow = "0 0 0 rgba(34, 197, 94, 0)";
+      targetBoat.style.animation = "boatGlow 0.8s ease-out";
 
-        // after hide, remove transition so next drop starts clean
+      // ✅ Keep paratrooper on boat for 1.2 seconds, then fade out
+      setTimeout(() => {
+        paratrooper.style.animation = "none";
+        paratrooper.style.transition = "opacity 0.5s ease-out, top 0.6s ease-out";
+        paratrooper.style.opacity = "0";
+        paratrooper.style.top = "-260px";
+
+        // Reset transition after fade
         setTimeout(() => {
           paratrooper.style.transition = "none";
+          paratrooper.style.animation = "none";
         }, 600);
-      }, 800);
+      }, 1200);
     }
   }
 
@@ -393,12 +444,9 @@ async function fetchTableData() {
     let table = null;
 
     if (tableCodeFromUrl) {
-      // Strict: use ONLY the table that matches the code from URL
-      table =
-        data.tables.find((t) => t.round_code === tableCodeFromUrl) || null;
+      table = data.tables.find((t) => t.round_code === tableCodeFromUrl) || null;
 
       if (!table) {
-        // The game you came for no longer exists (finished + cleaned)
         gameFinished = true;
         disableBettingUI();
         setStatus(
@@ -418,7 +466,6 @@ async function fetchTableData() {
         return;
       }
     } else {
-      // No table in URL – pick first table and lock the URL to it
       table = data.tables[0];
       syncUrlWithTable(table.round_code);
     }
@@ -468,7 +515,6 @@ function updateGameUI(table) {
       table.players >= table.max_players) ||
     table.is_full === true;
 
-  // if slots are full / betting closed / finished AND user has no bet, auto back
   if (
     !hasUserBet &&
     (slotsFull || table.is_betting_closed || table.is_finished) &&
@@ -484,18 +530,15 @@ function updateGameUI(table) {
     return;
   }
 
-  // Disable betting when betting closed / finished / slots full
   if (table.is_betting_closed || table.is_finished || slotsFull) {
     disableBettingUI();
   } else {
-    // enable if still open and not full
     placeBetBtn.disabled = false;
     document.querySelectorAll(".num-chip").forEach((chip) => {
       chip.disabled = false;
     });
   }
 
-  // Handle finished game -> animation + result popup
   if (
     table.is_finished &&
     table.result !== null &&
@@ -503,14 +546,13 @@ function updateGameUI(table) {
   ) {
     const roundId = table.round_code;
 
-    // animate paratrooper only once per round
     if (resultAnimationShownForRound !== roundId) {
       resultAnimationShownForRound = roundId;
+      console.log("[updateGameUI] Triggering paratrooper drop for result:", table.result);
       dropParatrooperToWinningNumber(table.result);
       setStatus(`Winning number: ${table.result}`, "ok");
     }
 
-    // show congratulations/hard luck popup only once per round
     if (resultModalShownForRound !== roundId && hasUserBet) {
       resultModalShownForRound = roundId;
       gameFinished = true;
@@ -520,21 +562,23 @@ function updateGameUI(table) {
       }
 
       const userWon = myBets.some((b) => b.number === table.result);
-      const title = userWon ? "Congratulations!" : "Hard Luck!";
+      const title = userWon ? "Congratulations! 🎉" : "Hard Luck! 😢";
       const msg = userWon
         ? "You have WON this game. Keep playing to keep your winning chances high."
         : "You LOST this game. Keep playing to keep your winning chances high.";
 
-      showResultModal({
-        title,
-        message: msg,
-        onHome: () => {
-          window.location.href = "/home";
-        },
-        onLobby: () => {
-          window.location.href = "/game/platinum";
-        },
-      });
+      setTimeout(() => {
+        showResultModal({
+          title,
+          message: msg,
+          onHome: () => {
+            window.location.href = "/home";
+          },
+          onLobby: () => {
+            window.location.href = "/game/platinum";
+          },
+        });
+      }, 800);
     }
   }
 }
@@ -563,6 +607,7 @@ function joinGameRoom() {
 }
 
 socket.on("connect", () => {
+  console.log("[socket] Connected to game room");
   joinGameRoom();
   fetchBalance();
   fetchTableData();
@@ -603,7 +648,6 @@ if (placeBetBtn) {
         currentTable.players >= currentTable.max_players) ||
       currentTable.is_full === true;
 
-    // HARD STOP: once all 6 slots are full, no more bets from anyone
     if (slotsFull) {
       setStatus("All slots are full for this game.", "error");
       disableBettingUI();
@@ -620,7 +664,6 @@ if (placeBetBtn) {
       return;
     }
 
-    // per-user duplicate prevention (safe, uses only this user's bets)
     const myBets =
       (currentTable.bets || []).filter(
         (b) => String(b.user_id) === String(USER_ID)
@@ -644,12 +687,13 @@ if (placeBetBtn) {
 
 // ================== INIT ==================
 
+console.log(`[INIT] Platinum Game - User: ${USERNAME}, ID: ${USER_ID}`);
+
 fetchBalance();
 fetchTableData();
 setSelectedNumber(0);
 setStatus("");
 
 if (!tablePollInterval) {
-  // poll every 1 second so timer moves by 1 second steps
   tablePollInterval = setInterval(fetchTableData, 1000);
 }
