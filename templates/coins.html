@@ -2,12 +2,9 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <title>Redeem Coins – TRADEERA</title>
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <link
-    rel="stylesheet"
-    href="{{ url_for('static', filename='css/coins.css') }}"
-  />
+  <title>Redeem Coins – Game of Five</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/coins.css') }}" />
 </head>
 <body>
   <div class="coins-screen">
@@ -16,55 +13,73 @@
       <button
         type="button"
         class="back-btn"
-        onclick="window.location.href='{{ url_for('home') }}'"
+        aria-label="Go back"
+        onclick="window.history.back()"
       >
-        &#8592;
+        ←
       </button>
       <h1>Coins</h1>
+      <div style="width: 40px;"></div>
     </header>
 
     <!-- BALANCE CARD -->
     <section class="balance-card">
       <div class="balance-label">Total Coins Available</div>
       <div class="balance-value" id="coinsAvailable">
-        {{ balance }}
+        {{ balance or 0 }}
       </div>
       <div class="balance-sub">
-        Total Redeemable Coins: <span id="coinsRedeemable">{{ balance }}</span>
+        Redeemable: <span id="coinsRedeemable">{{ balance or 0 }}</span>
       </div>
     </section>
 
-    <!-- REDEEM FORM -->
+    <!-- REDEEM FORM SECTION -->
     <section class="redeem-section">
-      <h2>Redeem Coins</h2>
+      <h2>Redeem Your Coins</h2>
       <p class="redeem-help">
-        Enter how many coins you want to redeem. Only whole numbers are allowed.
+        Enter the number of coins you want to redeem. Only whole numbers allowed.
       </p>
 
-      <form id="redeemForm" class="redeem-form">
-        <label for="redeemAmount">Coins to redeem</label>
-        <input
-          id="redeemAmount"
-          name="redeemAmount"
-          type="number"
-          min="1"
-          step="1"
-          placeholder="Enter coins (e.g. 500)"
-          required
-        />
+      <form id="redeemForm" class="redeem-form" novalidate>
+        <div class="form-group">
+          <label for="redeemAmount">Amount to Redeem</label>
+          <input
+            id="redeemAmount"
+            type="number"
+            name="redeemAmount"
+            min="1"
+            step="1"
+            placeholder="Enter amount (e.g., 500)"
+            required
+            aria-label="Coins to redeem"
+          />
+        </div>
 
         <button type="submit" class="redeem-btn">
-          Redeem
+          Redeem Now
         </button>
       </form>
 
-      <div id="redeemStatus" class="redeem-status"></div>
+      <div id="redeemStatus" class="redeem-status" role="alert"></div>
+    </section>
+
+    <!-- INFO SECTION -->
+    <section class="info-section">
+      <h3>About Coins</h3>
+      <p>
+        ✓ Earn coins by playing games<br />
+        ✓ Redeem coins for real rewards<br />
+        ✓ No hidden charges or fees
+      </p>
     </section>
   </div>
 
   <script>
-    const INITIAL_BALANCE = {{ balance|int }};
+    // Pass balance from Flask template to JavaScript
+    const INITIAL_BALANCE = {{ balance|int if balance else 0 }};
+    console.log("[coins.html] Initial balance:", INITIAL_BALANCE);
   </script>
+
   <script src="{{ url_for('static', filename='js/coins.js') }}"></script>
 </body>
 </html>
