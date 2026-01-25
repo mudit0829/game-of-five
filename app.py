@@ -12,6 +12,10 @@ from flask_sqlalchemy import SQLAlchemy
 from flask_socketio import SocketIO, emit, join_room
 from flask_cors import CORS
 from datetime import datetime, timedelta
+from datetime import datetime
+from functools import wraps
+from flask import session
+from bson import ObjectId
 import threading
 import random
 import time
@@ -865,6 +869,60 @@ def profile_update():
 @login_required
 def help_page():
     return render_template("help.html")
+
+@app.route('/coins', methods=['GET'])
+@login_required
+def coins_page():
+    user_id = session.get('user_id')
+    user = users_collection.find_one({'_id': ObjectId(user_id)})
+    balance = user.get('balance', 0) if user else 0
+    
+    return render_template('coins.html', balance=balance)
+
+@app.route('/api/balance', methods=['GET'])
+@login_required
+def get_balance():
+    user_id = session.get('user_id')
+    user = users_collection.find_one({'_id': ObjectId(user_id)})
+    balance = user.get('balance', 0) if user else 0
+    
+    return jsonify({'balance': balance})
+
+@app.route('/api/coins/redeem', methods=['POST'])
+@login_required
+def redeem_coins():
+    user_id = session.get('user_id')
+    data = request.get_json()
+    amount = data.get('amount', 0)
+    
+    if not isinstance(amount, int) or amount <= 0:
+        return jsonify({'success': False, 'message': 'Invalid amount'}), 400
+    
+    user = users_collection.find_one({'_id': ObjectId(user_id)})
+    if not user or user.get('balance', 0) < amount:
+        return jsonify({'success': False, 'message': 'Insufficient balance'}), 400
+    
+    # Update balance
+    new_balance = user.get('balance', 0) - amount
+    users_collection.update_one(
+        {'_id': ObjectId(user_id)},
+        {'$set': {'balance': new_balance}}
+    )
+    
+    # Log redemption
+    redeem_logs_collection.insert_one({
+        'user_id': user_id,
+        'amount': amount,
+        'timestamp': datetime.now(),
+        'status': 'completed'
+    })
+    
+    return jsonify({
+        'success': True,
+        'message': f'Successfully redeemed {amount} coins!',
+        'new_balance': new_balance
+    })
+
 
 
 @app.route("/api/help/tickets", methods=["GET", "POST"])
