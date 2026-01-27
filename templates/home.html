@@ -5,8 +5,66 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>PlayOn – Home</title>
   <link rel="stylesheet" href="{{ url_for('static', filename='css/home.css') }}">
+  <!-- NEW: Animations CSS for game effects -->
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/animations.css') }}">
 </head>
 <body>
+
+  <!-- NEW: AUDIO SYSTEM (GLOBAL) -->
+  
+  <!-- Background Music -->
+  <audio id="bgMusic" preload="auto" loop>
+    <source src="{{ url_for('static', filename='audio/game-bg.wav') }}" type="audio/wav">
+  </audio>
+
+  <!-- Sound Effects -->
+  <audio data-sound="win" preload="auto">
+    <source src="{{ url_for('static', filename='audio/win.wav') }}" type="audio/wav">
+  </audio>
+
+  <audio data-sound="lose" preload="auto">
+    <source src="{{ url_for('static', filename='audio/lose.wav') }}" type="audio/wav">
+  </audio>
+
+  <audio data-sound="bet" preload="auto">
+    <source src="{{ url_for('static', filename='audio/bet.wav') }}" type="audio/wav">
+  </audio>
+
+  <audio data-sound="click" preload="auto">
+    <source src="{{ url_for('static', filename='audio/click.wav') }}" type="audio/wav">
+  </audio>
+
+  <audio data-sound="gameover" preload="auto">
+    <source src="{{ url_for('static', filename='audio/gameover.wav') }}" type="audio/wav">
+  </audio>
+
+  <!-- NEW: MUTE BUTTON (TOP-RIGHT) -->
+  <button
+    id="muteBtn"
+    onclick="if (window.audioManager) window.audioManager.toggleMute()"
+    title="Toggle sound"
+    style="
+      position: fixed;
+      top: 10px;
+      right: 10px;
+      z-index: 1000;
+      background: rgba(15,23,42,0.9);
+      border: none;
+      border-radius: 999px;
+      width: 40px;
+      height: 40px;
+      cursor: pointer;
+      font-size: 18px;
+      color: #e5e7eb;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: all 0.2s ease;
+    "
+  >
+    🔊
+  </button>
+
   <div class="app-container">
 
     <!-- TOP HEADER -->
@@ -125,6 +183,32 @@
     </nav>
 
   </div>
+
+  <!-- NEW: Audio Manager Scripts -->
   <script src="{{ url_for('static', filename='js/home.js') }}"></script>
+  <script src="{{ url_for('static', filename='js/audio-manager.js') }}"></script>
+
+  <script>
+    // NEW: Initialize audio manager and wire background music + mute button
+    if (typeof AudioManager !== 'undefined') {
+      window.audioManager = new AudioManager();
+
+      // First user click starts music (needed on mobile/iOS)
+      document.addEventListener('click', () => {
+        if (window.audioManager && !window.audioManager.isMuted) {
+          window.audioManager.playBg();
+        }
+      }, { once: true });
+
+      // Update mute button icon when toggled
+      window.addEventListener('muteToggled', (e) => {
+        const muteBtn = document.getElementById('muteBtn');
+        if (muteBtn) {
+          muteBtn.textContent = e.detail.isMuted ? '🔇' : '🔊';
+        }
+      });
+    }
+  </script>
+
 </body>
 </html>
