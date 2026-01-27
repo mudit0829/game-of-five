@@ -209,6 +209,27 @@
       });
     }
   </script>
+<script>
+  // Test audio file loading
+  const bgMusic = document.getElementById('bgMusic');
+  
+  console.log('=== AUDIO FILE TEST ===');
+  console.log('BG Music element:', bgMusic);
+  console.log('BG Music duration:', bgMusic.duration);
+  console.log('BG Music readyState:', bgMusic.readyState);
+  
+  bgMusic.addEventListener('loadedmetadata', () => {
+    console.log('✅ Audio loaded! Duration:', bgMusic.duration);
+  });
+  
+  bgMusic.addEventListener('error', (e) => {
+    console.error('❌ Audio failed to load:', e);
+  });
+  
+  bgMusic.addEventListener('canplay', () => {
+    console.log('✅ Audio can play!');
+  });
+</script>
 
 </body>
 </html>
