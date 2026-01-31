@@ -431,24 +431,25 @@
             background: rgba(16, 185, 129, 0.3);
         }
 
-        /* MODAL */
-        .modal {
-            display: none;
-            position: fixed;
-            top: 0;
-            left: 0;
-            right: 0;
-            bottom: 0;
-            background: rgba(0, 0, 0, 0.7);
-            z-index: 1000;
-            align-items: center;
-            justify-content: center;
-            overflow-y: auto;
-        }
+/* MODAL - FIXED */
+.modal {
+  display: none !important;  /* Force hidden */
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.7);
+  z-index: 1000;
+  align-items: center;
+  justify-content: center;
+  overflow-y: auto;
+}
 
-        .modal.active {
-            display: flex;
-        }
+.modal.active {
+  display: flex !important;  /* Only show when active class added */
+}
+
 
         .modal-content {
             background: #1e293b;
