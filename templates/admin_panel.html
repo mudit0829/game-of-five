@@ -1,2048 +1,1854 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Admin Panel - Game of Five</title>
-    <style>
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-        }
-
-        html, body {
-            width: 100%;
-            height: 100%;
-            margin: 0;
-            padding: 0;
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            background: #0f172a;
-            color: #e2e8f0;
-        }
-
-        .admin-wrapper {
-            display: flex;
-            height: 100vh;
-            width: 100%;
-        }
-
-        /* SIDEBAR */
-        .sidebar {
-            width: 280px;
-            background: linear-gradient(180deg, #1e293b 0%, #0f172a 100%);
-            border-right: 2px solid #334155;
-            padding: 25px 0;
-            overflow-y: auto;
-            position: fixed;
-            left: 0;
-            top: 0;
-            height: 100vh;
-            z-index: 100;
-        }
-
-        .sidebar-header {
-            padding: 0 20px 30px 20px;
-            border-bottom: 2px solid #334155;
-            margin-bottom: 20px;
-        }
-
-        .sidebar-header h1 {
-            font-size: 24px;
-            font-weight: bold;
-            color: #10b981;
-            display: flex;
-            align-items: center;
-            gap: 12px;
-            margin: 0;
-        }
-
-        .sidebar-menu {
-            list-style: none;
-            padding: 0;
-            margin: 0;
-        }
-
-        .sidebar-menu li {
-            margin: 0;
-            padding: 0;
-        }
-
-        .sidebar-menu a {
-            display: block;
-            padding: 15px 25px;
-            color: #cbd5e1;
-            text-decoration: none;
-            transition: all 0.3s ease;
-            border-left: 4px solid transparent;
-            cursor: pointer;
-            font-size: 15px;
-            font-weight: 500;
-        }
-
-        .sidebar-menu a:hover {
-            background: rgba(16, 185, 129, 0.1);
-            color: #10b981;
-            border-left-color: #10b981;
-            padding-left: 28px;
-        }
-
-        .sidebar-menu a.active {
-            background: rgba(16, 185, 129, 0.15);
-            color: #10b981;
-            border-left-color: #10b981;
-            font-weight: 600;
-        }
-
-        .menu-divider {
-            height: 1px;
-            background: #334155;
-            margin: 15px 0;
-        }
-
-        /* MAIN CONTENT */
-        .main-content {
-            margin-left: 280px;
-            flex: 1;
-            display: flex;
-            flex-direction: column;
-            width: calc(100% - 280px);
-            height: 100vh;
-            overflow: hidden;
-        }
-
-        .top-header {
-            background: linear-gradient(90deg, #1e293b 0%, #0f172a 100%);
-            border-bottom: 2px solid #334155;
-            padding: 20px 40px;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.3);
-        }
-
-        .top-header h1 {
-            font-size: 32px;
-            font-weight: bold;
-            color: #e2e8f0;
-            margin: 0;
-        }
-
-        .logout-btn {
-            background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
-            color: white;
-            border: none;
-            padding: 12px 24px;
-            border-radius: 8px;
-            cursor: pointer;
-            font-size: 15px;
-            font-weight: 600;
-            transition: all 0.3s ease;
-            box-shadow: 0 4px 12px rgba(239, 68, 68, 0.3);
-        }
-
-        .logout-btn:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 6px 16px rgba(239, 68, 68, 0.4);
-        }
-
-        /* CONTENT */
-        .content-area {
-            flex: 1;
-            overflow-y: auto;
-            padding: 40px;
-            background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
-        }
-
-        .section {
-            display: none;
-            animation: fadeIn 0.3s ease-in;
-        }
-
-        .section.active {
-            display: block;
-        }
-
-        @keyframes fadeIn {
-            from { opacity: 0; transform: translateY(10px); }
-            to { opacity: 1; transform: translateY(0); }
-        }
-
-        /* DASHBOARD */
-        .dashboard-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
-            gap: 25px;
-            margin-bottom: 40px;
-        }
-
-        .stat-card {
-            background: linear-gradient(135deg, #1e293b 0%, #334155 100%);
-            border: 2px solid #334155;
-            border-radius: 12px;
-            padding: 30px;
-            transition: all 0.3s ease;
-            cursor: pointer;
-            position: relative;
-            overflow: hidden;
-        }
-
-        .stat-card::before {
-            content: '';
-            position: absolute;
-            top: 0;
-            left: 0;
-            right: 0;
-            height: 4px;
-            background: linear-gradient(90deg, #10b981, #06b6d4);
-        }
-
-        .stat-card:hover {
-            border-color: #10b981;
-            transform: translateY(-5px);
-            box-shadow: 0 10px 30px rgba(16, 185, 129, 0.2);
-        }
-
-        .stat-label {
-            color: #94a3b8;
-            font-size: 13px;
-            text-transform: uppercase;
-            letter-spacing: 1px;
-            font-weight: 600;
-            margin-bottom: 12px;
-        }
-
-        .stat-value {
-            color: #10b981;
-            font-size: 42px;
-            font-weight: bold;
-            margin: 0;
-        }
-
-        .stat-icon {
-            position: absolute;
-            right: 20px;
-            top: 20px;
-            font-size: 32px;
-            opacity: 0.2;
-        }
-
-        /* SECTION */
-        .section-header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-bottom: 30px;
-        }
-
-        .section-title {
-            font-size: 28px;
-            font-weight: bold;
-            color: #e2e8f0;
-            margin: 0;
-        }
-
-        .controls {
-            display: flex;
-            gap: 12px;
-            margin-bottom: 25px;
-            flex-wrap: wrap;
-        }
-
-        .search-box {
-            display: flex;
-            gap: 12px;
-            flex: 1;
-            min-width: 300px;
-        }
-
-        .search-box input {
-            flex: 1;
-            padding: 12px 16px;
-            background: #1e293b;
-            border: 2px solid #334155;
-            color: #e2e8f0;
-            border-radius: 8px;
-            font-size: 14px;
-            transition: all 0.3s ease;
-        }
-
-        .search-box input:focus {
-            outline: none;
-            border-color: #10b981;
-            box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.1);
-        }
-
-        .search-box button,
-        .btn-primary {
-            padding: 12px 24px;
-            background: linear-gradient(135deg, #10b981 0%, #059669 100%);
-            color: white;
-            border: none;
-            border-radius: 8px;
-            cursor: pointer;
-            font-size: 14px;
-            font-weight: 600;
-            transition: all 0.3s ease;
-        }
-
-        .search-box button:hover,
-        .btn-primary:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 6px 16px rgba(16, 185, 129, 0.3);
-        }
-
-        /* TABLE */
-        .table-container {
-            background: #1e293b;
-            border: 2px solid #334155;
-            border-radius: 12px;
-            overflow: hidden;
-            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
-            margin-bottom: 20px;
-        }
-
-        .data-table {
-            width: 100%;
-            border-collapse: collapse;
-            font-size: 14px;
-        }
-
-        .data-table thead {
-            background: linear-gradient(90deg, #0f172a 0%, #1e293b 100%);
-            border-bottom: 2px solid #334155;
-        }
-
-        .data-table th {
-            padding: 18px 20px;
-            text-align: left;
-            color: #94a3b8;
-            font-weight: 700;
-            text-transform: uppercase;
-            letter-spacing: 0.5px;
-            font-size: 12px;
-        }
-
-        .data-table td {
-            padding: 16px 20px;
-            border-bottom: 1px solid #334155;
-            color: #cbd5e1;
-        }
-
-        .data-table tbody tr:hover {
-            background: rgba(16, 185, 129, 0.05);
-        }
-
-        /* BADGES */
-        .badge {
-            display: inline-block;
-            padding: 6px 12px;
-            border-radius: 6px;
-            font-size: 12px;
-            font-weight: 600;
-            text-transform: capitalize;
-        }
-
-        .badge-active {
-            background: rgba(16, 185, 129, 0.2);
-            color: #10b981;
-            border: 1px solid rgba(16, 185, 129, 0.3);
-        }
-
-        .badge-blocked {
-            background: rgba(239, 68, 68, 0.2);
-            color: #ef4444;
-            border: 1px solid rgba(239, 68, 68, 0.3);
-        }
-
-        .badge-pending {
-            background: rgba(245, 158, 11, 0.2);
-            color: #f59e0b;
-            border: 1px solid rgba(245, 158, 11, 0.3);
-        }
-
-        .badge-deposit {
-            background: rgba(34, 197, 94, 0.2);
-            color: #22c55e;
-            border: 1px solid rgba(34, 197, 94, 0.3);
-        }
-
-        .badge-withdrawal {
-            background: rgba(239, 68, 68, 0.2);
-            color: #ef4444;
-            border: 1px solid rgba(239, 68, 68, 0.3);
-        }
-
-        /* BUTTONS */
-        .action-buttons {
-            display: flex;
-            gap: 8px;
-            flex-wrap: wrap;
-        }
-
-        .btn-small {
-            padding: 8px 14px;
-            border: none;
-            border-radius: 6px;
-            cursor: pointer;
-            font-size: 12px;
-            font-weight: 600;
-            transition: all 0.2s ease;
-            white-space: nowrap;
-        }
-
-        .btn-edit {
-            background: rgba(59, 130, 246, 0.2);
-            color: #3b82f6;
-            border: 1px solid rgba(59, 130, 246, 0.3);
-        }
-
-        .btn-edit:hover {
-            background: rgba(59, 130, 246, 0.3);
-        }
-
-        .btn-view {
-            background: rgba(6, 182, 212, 0.2);
-            color: #06b6d4;
-            border: 1px solid rgba(6, 182, 212, 0.3);
-        }
-
-        .btn-view:hover {
-            background: rgba(6, 182, 212, 0.3);
-        }
-
-        .btn-block {
-            background: rgba(239, 68, 68, 0.2);
-            color: #ef4444;
-            border: 1px solid rgba(239, 68, 68, 0.3);
-        }
-
-        .btn-block:hover {
-            background: rgba(239, 68, 68, 0.3);
-        }
-
-        .btn-unblock {
-            background: rgba(16, 185, 129, 0.2);
-            color: #10b981;
-            border: 1px solid rgba(16, 185, 129, 0.3);
-        }
-
-        .btn-unblock:hover {
-            background: rgba(16, 185, 129, 0.3);
-        }
-
-/* MODAL - FIXED */
-.modal {
-  display: none !important;  /* Force hidden */
-  position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background: rgba(0, 0, 0, 0.7);
-  z-index: 1000;
-  align-items: center;
-  justify-content: center;
-  overflow-y: auto;
-}
-
-.modal.active {
-  display: flex !important;  /* Only show when active class added */
-}
-
-
-        .modal-content {
-            background: #1e293b;
-            border: 2px solid #334155;
-            border-radius: 12px;
-            padding: 40px;
-            width: 90%;
-            max-width: 600px;
-            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
-            margin: 20px auto;
-        }
-
-        .modal-header {
-            margin-bottom: 25px;
-        }
-
-        .modal-header h2 {
-            color: #e2e8f0;
-            font-size: 24px;
-            margin: 0;
-            font-weight: bold;
-        }
-
-        .modal-header p {
-            color: #94a3b8;
-            margin: 8px 0 0 0;
-        }
-
-        .form-group {
-            margin-bottom: 20px;
-        }
-
-        .form-group label {
-            display: block;
-            color: #94a3b8;
-            font-size: 13px;
-            font-weight: 600;
-            text-transform: uppercase;
-            margin-bottom: 8px;
-            letter-spacing: 0.5px;
-        }
-
-        .form-group input,
-        .form-group textarea,
-        .form-group select {
-            width: 100%;
-            padding: 12px 16px;
-            background: #0f172a;
-            border: 2px solid #334155;
-            color: #e2e8f0;
-            border-radius: 8px;
-            font-family: inherit;
-            font-size: 14px;
-            transition: all 0.3s ease;
-        }
-
-        .form-group input:focus,
-        .form-group textarea:focus,
-        .form-group select:focus {
-            outline: none;
-            border-color: #10b981;
-            box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.1);
-        }
-
-        .form-group textarea {
-            resize: vertical;
-            min-height: 100px;
-        }
-
-        .form-row {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 15px;
-        }
-
-        .modal-footer {
-            display: flex;
-            gap: 12px;
-            margin-top: 30px;
-        }
-
-        .btn-modal {
-            flex: 1;
-            padding: 12px 20px;
-            border: none;
-            border-radius: 8px;
-            cursor: pointer;
-            font-size: 14px;
-            font-weight: 600;
-            transition: all 0.3s ease;
-        }
-
-        .btn-save {
-            background: linear-gradient(135deg, #10b981 0%, #059669 100%);
-            color: white;
-        }
-
-        .btn-save:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 6px 16px rgba(16, 185, 129, 0.3);
-        }
-
-        .btn-cancel {
-            background: #334155;
-            color: #cbd5e1;
-        }
-
-        .btn-cancel:hover {
-            background: #475569;
-        }
-
-        /* DETAILS */
-        .details-grid {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 20px;
-            margin-bottom: 20px;
-        }
-
-        .detail-item {
-            background: #0f172a;
-            padding: 15px;
-            border-radius: 8px;
-            border: 1px solid #334155;
-        }
-
-        .detail-label {
-            color: #94a3b8;
-            font-size: 12px;
-            text-transform: uppercase;
-            margin-bottom: 5px;
-            font-weight: 600;
-        }
-
-        .detail-value {
-            color: #10b981;
-            font-size: 18px;
-            font-weight: bold;
-        }
-
-        /* STATES */
-        .loading {
-            text-align: center;
-            padding: 60px 20px;
-            color: #94a3b8;
-            font-size: 16px;
-        }
-
-        .no-data {
-            text-align: center;
-            padding: 60px 20px;
-            color: #64748b;
-            font-size: 15px;
-        }
-
-        /* PAGINATION */
-        .pagination {
-            display: flex;
-            justify-content: center;
-            gap: 12px;
-            margin-top: 25px;
-        }
-
-        .pagination button {
-            padding: 10px 16px;
-            background: #334155;
-            color: #cbd5e1;
-            border: none;
-            border-radius: 6px;
-            cursor: pointer;
-            font-size: 14px;
-            font-weight: 600;
-            transition: all 0.2s ease;
-        }
-
-        .pagination button:hover:not(:disabled) {
-            background: #10b981;
-            color: white;
-        }
-
-        .pagination button:disabled {
-            opacity: 0.5;
-            cursor: not-allowed;
-        }
-
-        .pagination span {
-            color: #94a3b8;
-            padding: 10px 16px;
-        }
-
-        /* SCROLLBAR */
-        ::-webkit-scrollbar {
-            width: 8px;
-        }
-
-        ::-webkit-scrollbar-track {
-            background: #0f172a;
-        }
-
-        ::-webkit-scrollbar-thumb {
-            background: #334155;
-            border-radius: 4px;
-        }
-
-        ::-webkit-scrollbar-thumb:hover {
-            background: #475569;
-        }
-
-        /* RESPONSIVE */
-        @media (max-width: 1024px) {
-            .sidebar {
-                width: 260px;
-            }
-
-            .main-content {
-                width: calc(100% - 260px);
-                margin-left: 260px;
-            }
-
-            .form-row {
-                grid-template-columns: 1fr;
-            }
-        }
-
-        @media (max-width: 768px) {
-            .admin-wrapper {
-                flex-direction: column;
-            }
-
-            .sidebar {
-                width: 100%;
-                height: auto;
-                border-right: none;
-                border-bottom: 2px solid #334155;
-                position: relative;
-            }
-
-            .main-content {
-                width: 100%;
-                margin-left: 0;
-            }
-
-            .modal-content {
-                width: 95%;
-            }
-        }
-    </style>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Admin Panel - Game of Five</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    html, body {
+      width: 100%;
+      height: 100%;
+      margin: 0;
+      padding: 0;
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      background: #0f172a;
+      color: #e2e8f0;
+    }
+
+    .admin-wrapper { display: flex; height: 100vh; width: 100%; }
+
+    /* SIDEBAR */
+    .sidebar {
+      width: 280px;
+      background: linear-gradient(180deg, #1e293b 0%, #0f172a 100%);
+      border-right: 2px solid #334155;
+      padding: 25px 0;
+      overflow-y: auto;
+      position: fixed;
+      left: 0;
+      top: 0;
+      height: 100vh;
+      z-index: 100;
+    }
+
+    .sidebar-header {
+      padding: 0 20px 30px 20px;
+      border-bottom: 2px solid #334155;
+      margin-bottom: 20px;
+    }
+
+    .sidebar-header h1 {
+      font-size: 24px;
+      font-weight: bold;
+      color: #10b981;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      margin: 0;
+    }
+
+    .sidebar-menu { list-style: none; padding: 0; margin: 0; }
+    .sidebar-menu li { margin: 0; padding: 0; }
+
+    .sidebar-menu a {
+      display: block;
+      padding: 15px 25px;
+      color: #cbd5e1;
+      text-decoration: none;
+      transition: all 0.3s ease;
+      border-left: 4px solid transparent;
+      cursor: pointer;
+      font-size: 15px;
+      font-weight: 500;
+    }
+
+    .sidebar-menu a:hover {
+      background: rgba(16, 185, 129, 0.1);
+      color: #10b981;
+      border-left-color: #10b981;
+      padding-left: 28px;
+    }
+
+    .sidebar-menu a.active {
+      background: rgba(16, 185, 129, 0.15);
+      color: #10b981;
+      border-left-color: #10b981;
+      font-weight: 600;
+    }
+
+    .menu-divider { height: 1px; background: #334155; margin: 15px 0; }
+
+    /* MAIN CONTENT */
+    .main-content {
+      margin-left: 280px;
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      width: calc(100% - 280px);
+      height: 100vh;
+      overflow: hidden;
+    }
+
+    .top-header {
+      background: linear-gradient(90deg, #1e293b 0%, #0f172a 100%);
+      border-bottom: 2px solid #334155;
+      padding: 20px 40px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      box-shadow: 0 2px 10px rgba(0,0,0,0.3);
+    }
+
+    .top-header h1 { font-size: 32px; font-weight: bold; color: #e2e8f0; margin: 0; }
+
+    .logout-btn {
+      background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
+      color: white;
+      border: none;
+      padding: 12px 24px;
+      border-radius: 8px;
+      cursor: pointer;
+      font-size: 15px;
+      font-weight: 600;
+      transition: all 0.3s ease;
+      box-shadow: 0 4px 12px rgba(239,68,68,0.3);
+    }
+
+    .logout-btn:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 6px 16px rgba(239,68,68,0.4);
+    }
+
+    /* CONTENT */
+    .content-area {
+      flex: 1;
+      overflow-y: auto;
+      padding: 40px;
+      background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
+    }
+
+    .section { display: none; animation: fadeIn 0.3s ease-in; }
+    .section.active { display: block; }
+
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(10px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    /* DASHBOARD */
+    .dashboard-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+      gap: 25px;
+      margin-bottom: 40px;
+    }
+
+    .stat-card {
+      background: linear-gradient(135deg, #1e293b 0%, #334155 100%);
+      border: 2px solid #334155;
+      border-radius: 12px;
+      padding: 30px;
+      transition: all 0.3s ease;
+      cursor: pointer;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .stat-card::before {
+      content: '';
+      position: absolute;
+      top: 0; left: 0; right: 0;
+      height: 4px;
+      background: linear-gradient(90deg, #10b981, #06b6d4);
+    }
+
+    .stat-card:hover {
+      border-color: #10b981;
+      transform: translateY(-5px);
+      box-shadow: 0 10px 30px rgba(16,185,129,0.2);
+    }
+
+    .stat-label {
+      color: #94a3b8;
+      font-size: 13px;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      font-weight: 600;
+      margin-bottom: 12px;
+    }
+
+    .stat-value { color: #10b981; font-size: 42px; font-weight: bold; margin: 0; }
+
+    .stat-icon {
+      position: absolute;
+      right: 20px;
+      top: 20px;
+      font-size: 32px;
+      opacity: 0.2;
+    }
+
+    /* SECTION */
+    .section-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 30px;
+    }
+
+    .section-title { font-size: 28px; font-weight: bold; color: #e2e8f0; margin: 0; }
+
+    .controls { display: flex; gap: 12px; margin-bottom: 25px; flex-wrap: wrap; }
+
+    .search-box { display: flex; gap: 12px; flex: 1; min-width: 300px; }
+
+    .search-box input {
+      flex: 1;
+      padding: 12px 16px;
+      background: #1e293b;
+      border: 2px solid #334155;
+      color: #e2e8f0;
+      border-radius: 8px;
+      font-size: 14px;
+      transition: all 0.3s ease;
+    }
+
+    .search-box input:focus {
+      outline: none;
+      border-color: #10b981;
+      box-shadow: 0 0 0 3px rgba(16,185,129,0.1);
+    }
+
+    .search-box button, .btn-primary {
+      padding: 12px 24px;
+      background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+      color: white;
+      border: none;
+      border-radius: 8px;
+      cursor: pointer;
+      font-size: 14px;
+      font-weight: 600;
+      transition: all 0.3s ease;
+    }
+
+    .search-box button:hover, .btn-primary:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 6px 16px rgba(16,185,129,0.3);
+    }
+
+    /* TABLE */
+    .table-container {
+      background: #1e293b;
+      border: 2px solid #334155;
+      border-radius: 12px;
+      overflow: hidden;
+      box-shadow: 0 10px 30px rgba(0,0,0,0.3);
+      margin-bottom: 20px;
+    }
+
+    .data-table { width: 100%; border-collapse: collapse; font-size: 14px; }
+    .data-table thead {
+      background: linear-gradient(90deg, #0f172a 0%, #1e293b 100%);
+      border-bottom: 2px solid #334155;
+    }
+    .data-table th {
+      padding: 18px 20px;
+      text-align: left;
+      color: #94a3b8;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      font-size: 12px;
+    }
+    .data-table td {
+      padding: 16px 20px;
+      border-bottom: 1px solid #334155;
+      color: #cbd5e1;
+    }
+    .data-table tbody tr:hover { background: rgba(16,185,129,0.05); }
+
+    /* BADGES */
+    .badge {
+      display: inline-block;
+      padding: 6px 12px;
+      border-radius: 6px;
+      font-size: 12px;
+      font-weight: 600;
+      text-transform: capitalize;
+    }
+
+    .badge-active {
+      background: rgba(16,185,129,0.2);
+      color: #10b981;
+      border: 1px solid rgba(16,185,129,0.3);
+    }
+    .badge-blocked {
+      background: rgba(239,68,68,0.2);
+      color: #ef4444;
+      border: 1px solid rgba(239,68,68,0.3);
+    }
+    .badge-pending {
+      background: rgba(245,158,11,0.2);
+      color: #f59e0b;
+      border: 1px solid rgba(245,158,11,0.3);
+    }
+    .badge-deposit {
+      background: rgba(34,197,94,0.2);
+      color: #22c55e;
+      border: 1px solid rgba(34,197,94,0.3);
+    }
+    .badge-withdrawal {
+      background: rgba(239,68,68,0.2);
+      color: #ef4444;
+      border: 1px solid rgba(239,68,68,0.3);
+    }
+
+    /* BUTTONS */
+    .action-buttons { display: flex; gap: 8px; flex-wrap: wrap; }
+    .btn-small {
+      padding: 8px 14px;
+      border: none;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 12px;
+      font-weight: 600;
+      transition: all 0.2s ease;
+      white-space: nowrap;
+    }
+
+    .btn-edit {
+      background: rgba(59,130,246,0.2);
+      color: #3b82f6;
+      border: 1px solid rgba(59,130,246,0.3);
+    }
+    .btn-edit:hover { background: rgba(59,130,246,0.3); }
+
+    .btn-view {
+      background: rgba(6,182,212,0.2);
+      color: #06b6d4;
+      border: 1px solid rgba(6,182,212,0.3);
+    }
+    .btn-view:hover { background: rgba(6,182,212,0.3); }
+
+    .btn-block {
+      background: rgba(239,68,68,0.2);
+      color: #ef4444;
+      border: 1px solid rgba(239,68,68,0.3);
+    }
+    .btn-block:hover { background: rgba(239,68,68,0.3); }
+
+    .btn-unblock {
+      background: rgba(16,185,129,0.2);
+      color: #10b981;
+      border: 1px solid rgba(16,185,129,0.3);
+    }
+    .btn-unblock:hover { background: rgba(16,185,129,0.3); }
+
+    /* MODAL */
+    .modal {
+      display: none !important;
+      position: fixed;
+      top: 0; left: 0; right: 0; bottom: 0;
+      background: rgba(0,0,0,0.7);
+      z-index: 1000;
+      align-items: center;
+      justify-content: center;
+      overflow-y: auto;
+    }
+    .modal.active { display: flex !important; }
+
+    .modal-content {
+      background: #1e293b;
+      border: 2px solid #334155;
+      border-radius: 12px;
+      padding: 40px;
+      width: 90%;
+      max-width: 650px;
+      box-shadow: 0 20px 60px rgba(0,0,0,0.5);
+      margin: 20px auto;
+    }
+
+    .modal-header { margin-bottom: 25px; }
+    .modal-header h2 { color: #e2e8f0; font-size: 24px; margin: 0; font-weight: bold; }
+    .modal-header p { color: #94a3b8; margin: 8px 0 0 0; }
+
+    .form-group { margin-bottom: 20px; }
+    .form-group label {
+      display: block;
+      color: #94a3b8;
+      font-size: 13px;
+      font-weight: 600;
+      text-transform: uppercase;
+      margin-bottom: 8px;
+      letter-spacing: 0.5px;
+    }
+
+    .form-group input, .form-group textarea, .form-group select {
+      width: 100%;
+      padding: 12px 16px;
+      background: #0f172a;
+      border: 2px solid #334155;
+      color: #e2e8f0;
+      border-radius: 8px;
+      font-family: inherit;
+      font-size: 14px;
+      transition: all 0.3s ease;
+    }
+
+    .form-group input:focus, .form-group textarea:focus, .form-group select:focus {
+      outline: none;
+      border-color: #10b981;
+      box-shadow: 0 0 0 3px rgba(16,185,129,0.1);
+    }
+
+    .form-group textarea { resize: vertical; min-height: 100px; }
+    .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; }
+
+    .modal-footer { display: flex; gap: 12px; margin-top: 30px; }
+    .btn-modal {
+      flex: 1;
+      padding: 12px 20px;
+      border: none;
+      border-radius: 8px;
+      cursor: pointer;
+      font-size: 14px;
+      font-weight: 600;
+      transition: all 0.3s ease;
+    }
+
+    .btn-save {
+      background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+      color: white;
+    }
+
+    .btn-save:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 6px 16px rgba(16,185,129,0.3);
+    }
+
+    .btn-cancel { background: #334155; color: #cbd5e1; }
+    .btn-cancel:hover { background: #475569; }
+
+    /* DETAILS */
+    .details-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom: 20px; }
+    .detail-item { background: #0f172a; padding: 15px; border-radius: 8px; border: 1px solid #334155; }
+    .detail-label { color: #94a3b8; font-size: 12px; text-transform: uppercase; margin-bottom: 5px; font-weight: 600; }
+    .detail-value { color: #10b981; font-size: 18px; font-weight: bold; }
+
+    /* STATES */
+    .loading { text-align: center; padding: 60px 20px; color: #94a3b8; font-size: 16px; }
+    .no-data { text-align: center; padding: 60px 20px; color: #64748b; font-size: 15px; }
+
+    /* SCROLLBAR */
+    ::-webkit-scrollbar { width: 8px; }
+    ::-webkit-scrollbar-track { background: #0f172a; }
+    ::-webkit-scrollbar-thumb { background: #334155; border-radius: 4px; }
+    ::-webkit-scrollbar-thumb:hover { background: #475569; }
+
+    /* RESPONSIVE */
+    @media (max-width: 1024px) {
+      .sidebar { width: 260px; }
+      .main-content { width: calc(100% - 260px); margin-left: 260px; }
+      .form-row { grid-template-columns: 1fr; }
+    }
+    @media (max-width: 768px) {
+      .admin-wrapper { flex-direction: column; }
+      .sidebar {
+        width: 100%;
+        height: auto;
+        border-right: none;
+        border-bottom: 2px solid #334155;
+        position: relative;
+      }
+      .main-content { width: 100%; margin-left: 0; }
+      .modal-content { width: 95%; }
+      .details-grid { grid-template-columns: 1fr; }
+    }
+  </style>
 </head>
+
 <body>
-    <div class="admin-wrapper">
-        <!-- SIDEBAR -->
-        <div class="sidebar">
-            <div class="sidebar-header">
-                <h1>⚙️ Admin Panel</h1>
-            </div>
+  <div class="admin-wrapper">
+    <!-- SIDEBAR -->
+    <div class="sidebar">
+      <div class="sidebar-header">
+        <h1>⚙️ Admin Panel</h1>
+      </div>
 
-            <ul class="sidebar-menu">
-                <li><a class="menu-link active" data-section="dashboard">📊 Dashboard</a></li>
-                <li><a class="menu-link" data-section="users">👥 Users</a></li>
-                <li><a class="menu-link" data-section="agents">👨‍💼 Agents</a></li>
-                <li><a class="menu-link" data-section="games">🎮 Games</a></li>
-                <li><a class="menu-link" data-section="transactions">💰 Transactions</a></li>
-                <li><a class="menu-link" data-section="wallet">💸 Wallet</a></li>
-                <li><a class="menu-link" data-section="referrals">👨‍👩‍👧‍👦 Referrals</a></li>
-                <li><a class="menu-link" data-section="promos">🎫 Promos</a></li>
-                <li><a class="menu-link" data-section="announcements">📢 Announcements</a></li>
-                <li><a class="menu-link" data-section="reports">📈 Reports</a></li>
-                <li><a class="menu-link" data-section="security">🛡️ Security</a></li>
-                
-                <li><div class="menu-divider"></div></li>
-                
-                <li><a class="menu-link" onclick="logout()" style="color: #ef4444;">🚪 Logout</a></li>
-            </ul>
-        </div>
+      <ul class="sidebar-menu">
+        <li><a class="menu-link active" data-section="dashboard">📊 Dashboard</a></li>
+        <li><a class="menu-link" data-section="users">👥 Users</a></li>
+        <li><a class="menu-link" data-section="agents">👨‍💼 Agents</a></li>
+        <li><a class="menu-link" data-section="games">🎮 Games</a></li>
+        <li><a class="menu-link" data-section="transactions">💰 Transactions</a></li>
+        <li><a class="menu-link" data-section="wallet">💸 Wallet</a></li>
+        <li><a class="menu-link" data-section="referrals">👨‍👩‍👧‍👦 Referrals</a></li>
+        <li><a class="menu-link" data-section="promos">🎫 Promos</a></li>
+        <li><a class="menu-link" data-section="announcements">📢 Announcements</a></li>
+        <li><a class="menu-link" data-section="reports">📈 Reports</a></li>
+        <li><a class="menu-link" data-section="security">🛡️ Security</a></li>
 
-        <!-- MAIN CONTENT -->
-        <div class="main-content">
-            <div class="top-header">
-                <h1 id="pageTitle">Dashboard</h1>
-                <button class="logout-btn" onclick="logout()">🚪 Logout</button>
-            </div>
-
-            <div class="content-area">
-                <!-- DASHBOARD -->
-                <div id="dashboard" class="section active">
-                    <div class="dashboard-grid">
-                        <div class="stat-card">
-                            <div class="stat-icon">👥</div>
-                            <div class="stat-label">Total Users</div>
-                            <p class="stat-value" id="totalUsers">0</p>
-                        </div>
-                        <div class="stat-card">
-                            <div class="stat-icon">👨‍💼</div>
-                            <div class="stat-label">Total Agents</div>
-                            <p class="stat-value" id="totalAgents">0</p>
-                        </div>
-                        <div class="stat-card">
-                            <div class="stat-icon">🎮</div>
-                            <div class="stat-label">Active Games</div>
-                            <p class="stat-value" id="activeGames">0</p>
-                        </div>
-                        <div class="stat-card">
-                            <div class="stat-icon">💰</div>
-                            <div class="stat-label">Total Revenue</div>
-                            <p class="stat-value" id="totalRevenue">₹0</p>
-                        </div>
-                        <div class="stat-card">
-                            <div class="stat-icon">📈</div>
-                            <div class="stat-label">Total Deposits</div>
-                            <p class="stat-value" id="totalDeposits">₹0</p>
-                        </div>
-                        <div class="stat-card">
-                            <div class="stat-icon">📉</div>
-                            <div class="stat-label">Total Withdrawals</div>
-                            <p class="stat-value" id="totalWithdrawals">₹0</p>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- USERS -->
-                <div id="users" class="section">
-                    <div class="section-header">
-                        <h2 class="section-title">Users Management</h2>
-                    </div>
-                    <div class="controls">
-                        <div class="search-box">
-                            <input type="text" id="searchUsers" placeholder="Search by username or email...">
-                            <button onclick="loadUsers()">🔍 Search</button>
-                        </div>
-                    </div>
-                    <div id="usersLoading" class="loading">Loading users...</div>
-                    <div id="usersTableContainer" style="display:none;">
-                        <div class="table-container">
-                            <table class="data-table">
-                                <thead>
-                                    <tr>
-                                        <th>ID</th>
-                                        <th>Username</th>
-                                        <th>Email</th>
-                                        <th>Agent</th>
-                                        <th>Balance (₹)</th>
-                                        <th>Games</th>
-                                        <th>Status</th>
-                                        <th>Joined</th>
-                                        <th>Actions</th>
-                                    </tr>
-                                </thead>
-                                <tbody id="usersTableBody"></tbody>
-                            </table>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- AGENTS -->
-                <div id="agents" class="section">
-                    <div class="section-header">
-                        <h2 class="section-title">Agents Management</h2>
-                        <button class="btn-primary" onclick="openAddAgentModal()">➕ Add Agent</button>
-                    </div>
-                    <div id="agentsLoading" class="loading">Loading agents...</div>
-                    <div id="agentsTableContainer" style="display:none;">
-                        <div class="table-container">
-                            <table class="data-table">
-                                <thead>
-                                    <tr>
-                                        <th>ID</th>
-                                        <th>Agent Name</th>
-                                        <th>Email</th>
-                                        <th>Salary %</th>
-                                        <th>Users</th>
-                                        <th>Total Deposits</th>
-                                        <th>Total Withdrawals</th>
-                                        <th>Commission</th>
-                                        <th>Status</th>
-                                        <th>Actions</th>
-                                    </tr>
-                                </thead>
-                                <tbody id="agentsTableBody"></tbody>
-                            </table>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- GAMES -->
-                <div id="games" class="section">
-                    <div class="section-header">
-                        <h2 class="section-title">Game Statistics</h2>
-                    </div>
-                    <div id="gamesLoading" class="loading">Loading games...</div>
-                    <div id="gamesTableContainer" style="display:none;">
-                        <div class="table-container">
-                            <table class="data-table">
-                                <thead>
-                                    <tr>
-                                        <th>Round Code</th>
-                                        <th>Game Type</th>
-                                        <th>Players</th>
-                                        <th>Winning #</th>
-                                        <th>Total Bets</th>
-                                        <th>Payout</th>
-                                        <th>Date/Time</th>
-                                        <th>Status</th>
-                                        <th>Actions</th>
-                                    </tr>
-                                </thead>
-                                <tbody id="gamesTableBody"></tbody>
-                            </table>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- TRANSACTIONS -->
-                <div id="transactions" class="section">
-                    <div class="section-header">
-                        <h2 class="section-title">Transactions Log</h2>
-                    </div>
-                    <div class="controls">
-                        <div class="search-box">
-                            <input type="text" id="searchTransactions" placeholder="Search by user or transaction ID...">
-                            <button onclick="loadTransactions()">🔍 Search</button>
-                        </div>
-                    </div>
-                    <div id="transactionsLoading" class="loading">Loading transactions...</div>
-                    <div id="transactionsTableContainer" style="display:none;">
-                        <div class="table-container">
-                            <table class="data-table">
-                                <thead>
-                                    <tr>
-                                        <th>Txn ID</th>
-                                        <th>User</th>
-                                        <th>Type</th>
-                                        <th>Amount (₹)</th>
-                                        <th>Status</th>
-                                        <th>Date/Time</th>
-                                        <th>Reference</th>
-                                        <th>Actions</th>
-                                    </tr>
-                                </thead>
-                                <tbody id="transactionsTableBody"></tbody>
-                            </table>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- WALLET MANAGEMENT -->
-                <div id="wallet" class="section">
-                    <div class="section-header">
-                        <h2 class="section-title">Wallet Management</h2>
-                    </div>
-                    <div class="controls">
-                        <div class="search-box">
-                            <input type="text" id="searchWallet" placeholder="Search by username...">
-                            <button onclick="loadWalletUsers()">🔍 Search</button>
-                        </div>
-                        <button class="btn-primary" onclick="openAddFundsModal()">➕ Add Funds</button>
-                        <button class="btn-primary" onclick="openDeductFundsModal()">➖ Deduct Funds</button>
-                    </div>
-                    <div id="walletLoading" class="loading">Loading wallet users...</div>
-                    <div id="walletTableContainer" style="display:none;">
-                        <div class="table-container">
-                            <table class="data-table">
-                                <thead>
-                                    <tr>
-                                        <th>User</th>
-                                        <th>Current Balance</th>
-                                        <th>Total Deposits</th>
-                                        <th>Total Withdrawals</th>
-                                        <th>Actions</th>
-                                    </tr>
-                                </thead>
-                                <tbody id="walletTableBody"></tbody>
-                            </table>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- REFERRALS -->
-                <div id="referrals" class="section">
-                    <div class="section-header">
-                        <h2 class="section-title">Referral & MLM System</h2>
-                    </div>
-                    <div class="controls">
-                        <div class="search-box">
-                            <input type="text" id="searchReferral" placeholder="Search by agent name...">
-                            <button onclick="loadReferrals()">🔍 Search</button>
-                        </div>
-                    </div>
-                    <div id="referralsLoading" class="loading">Loading referral data...</div>
-                    <div id="referralsTableContainer" style="display:none;">
-                        <div class="table-container">
-                            <table class="data-table">
-                                <thead>
-                                    <tr>
-                                        <th>Agent</th>
-                                        <th>Referred Users</th>
-                                        <th>Active Users</th>
-                                        <th>User Deposits</th>
-                                        <th>User Withdrawals</th>
-                                        <th>Commission Rate</th>
-                                        <th>Total Commission</th>
-                                        <th>Actions</th>
-                                    </tr>
-                                </thead>
-                                <tbody id="referralsTableBody"></tbody>
-                            </table>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- PROMOS -->
-                <div id="promos" class="section">
-                    <div class="section-header">
-                        <h2 class="section-title">Promo Codes</h2>
-                        <button class="btn-primary" onclick="openAddPromoModal()">➕ Create Promo</button>
-                    </div>
-                    <div id="promosLoading" class="loading">Loading promos...</div>
-                    <div id="promosTableContainer" style="display:none;">
-                        <div class="table-container">
-                            <table class="data-table">
-                                <thead>
-                                    <tr>
-                                        <th>Code</th>
-                                        <th>Type</th>
-                                        <th>Discount</th>
-                                        <th>Max Uses</th>
-                                        <th>Used</th>
-                                        <th>Valid Till</th>
-                                        <th>Status</th>
-                                        <th>Actions</th>
-                                    </tr>
-                                </thead>
-                                <tbody id="promosTableBody"></tbody>
-                            </table>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- ANNOUNCEMENTS -->
-                <div id="announcements" class="section">
-                    <div class="section-header">
-                        <h2 class="section-title">Announcements</h2>
-                        <button class="btn-primary" onclick="openAnnounceModal()">📢 Send Announcement</button>
-                    </div>
-                    <div id="announcementsLoading" class="loading">Loading announcements...</div>
-                    <div id="announcementsTableContainer" style="display:none;">
-                        <div class="table-container">
-                            <table class="data-table">
-                                <thead>
-                                    <tr>
-                                        <th>Title</th>
-                                        <th>Message</th>
-                                        <th>Target</th>
-                                        <th>Sent Date</th>
-                                        <th>Status</th>
-                                        <th>Actions</th>
-                                    </tr>
-                                </thead>
-                                <tbody id="announcementsTableBody"></tbody>
-                            </table>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- REPORTS -->
-                <div id="reports" class="section">
-                    <div class="section-header">
-                        <h2 class="section-title">Reports & Analytics</h2>
-                    </div>
-                    <div class="dashboard-grid">
-                        <div class="stat-card">
-                            <div class="stat-icon">👥</div>
-                            <div class="stat-label">New Users (30d)</div>
-                            <p class="stat-value" id="newUsers30d">0</p>
-                        </div>
-                        <div class="stat-card">
-                            <div class="stat-icon">💰</div>
-                            <div class="stat-label">Revenue (30d)</div>
-                            <p class="stat-value" id="revenue30d">₹0</p>
-                        </div>
-                        <div class="stat-card">
-                            <div class="stat-icon">🎮</div>
-                            <div class="stat-label">Games Played (30d)</div>
-                            <p class="stat-value" id="gamesPlayed30d">0</p>
-                        </div>
-                        <div class="stat-card">
-                            <div class="stat-icon">📊</div>
-                            <div class="stat-label">Avg Win Rate</div>
-                            <p class="stat-value" id="avgWinRate">0%</p>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- SECURITY -->
-                <div id="security" class="section">
-                    <div class="section-header">
-                        <h2 class="section-title">Security Settings</h2>
-                    </div>
-                    <div class="controls">
-                        <button class="btn-primary" onclick="openSecurityModal()">🔒 Manage Security</button>
-                    </div>
-                    <div class="no-data">Security settings and 2FA configuration coming soon...</div>
-                </div>
-            </div>
-        </div>
+        <li><div class="menu-divider"></div></li>
+        <li><a class="menu-link" onclick="logout()" style="color:#ef4444;">🚪 Logout</a></li>
+      </ul>
     </div>
 
-    <!-- MODALS -->
-    <!-- Add Agent -->
-    <div id="addAgentModal" class="modal">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h2>➕ Add New Agent</h2>
-                <p>Create a new agent account</p>
+    <!-- MAIN CONTENT -->
+    <div class="main-content">
+      <div class="top-header">
+        <h1 id="pageTitle">Dashboard</h1>
+        <button class="logout-btn" onclick="logout()">🚪 Logout</button>
+      </div>
+
+      <div class="content-area">
+        <!-- DASHBOARD -->
+        <div id="dashboard" class="section active">
+          <div class="dashboard-grid">
+            <div class="stat-card">
+              <div class="stat-icon">👥</div>
+              <div class="stat-label">Total Users</div>
+              <p class="stat-value" id="totalUsers">0</p>
             </div>
-            <form id="addAgentForm">
-                <div class="form-group">
-                    <label>Agent Name</label>
-                    <input type="text" id="agentName" placeholder="Enter agent name" required>
-                </div>
-                <div class="form-group">
-                    <label>Email</label>
-                    <input type="email" id="agentEmail" placeholder="agent@example.com" required>
-                </div>
-                <div class="form-row">
-                    <div class="form-group">
-                        <label>Username</label>
-                        <input type="text" id="agentUsername" placeholder="agent_username" required>
-                    </div>
-                    <div class="form-group">
-                        <label>Password</label>
-                        <input type="password" id="agentPassword" placeholder="Password" required>
-                    </div>
-                </div>
-                <div class="form-group">
-                    <label>Salary Percentage (%)</label>
-                    <input type="number" id="agentSalaryPercent" placeholder="5" min="0" max="100" required>
-                </div>
-                <div class="modal-footer">
-                    <button type="submit" class="btn-modal btn-save">Add Agent</button>
-                    <button type="button" class="btn-modal btn-cancel" onclick="closeAddAgentModal()">Cancel</button>
-                </div>
-            </form>
+            <div class="stat-card">
+              <div class="stat-icon">👨‍💼</div>
+              <div class="stat-label">Total Agents</div>
+              <p class="stat-value" id="totalAgents">0</p>
+            </div>
+            <div class="stat-card">
+              <div class="stat-icon">🎮</div>
+              <div class="stat-label">Active Games</div>
+              <p class="stat-value" id="activeGames">0</p>
+            </div>
+            <div class="stat-card">
+              <div class="stat-icon">💰</div>
+              <div class="stat-label">Total Revenue</div>
+              <p class="stat-value" id="totalRevenue">₹0</p>
+            </div>
+            <div class="stat-card">
+              <div class="stat-icon">📈</div>
+              <div class="stat-label">Total Deposits</div>
+              <p class="stat-value" id="totalDeposits">₹0</p>
+            </div>
+            <div class="stat-card">
+              <div class="stat-icon">📉</div>
+              <div class="stat-label">Total Withdrawals</div>
+              <p class="stat-value" id="totalWithdrawals">₹0</p>
+            </div>
+          </div>
         </div>
-    </div>
 
-    <!-- Add Funds -->
-    <div id="addFundsModal" class="modal">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h2>➕ Add Funds</h2>
-                <p>Add funds to user wallet</p>
+        <!-- USERS -->
+        <div id="users" class="section">
+          <div class="section-header">
+            <h2 class="section-title">Users Management</h2>
+          </div>
+
+          <div class="controls">
+            <div class="search-box">
+              <input type="text" id="searchUsers" placeholder="Search by username or email..." />
+              <button onclick="loadUsers()">🔍 Search</button>
             </div>
-            <form id="addFundsForm">
-                <div class="form-group">
-                    <label>Select User</label>
-                    <input type="text" id="addFundsUser" placeholder="Search user..." required>
-                </div>
-                <div class="form-group">
-                    <label>Amount (₹)</label>
-                    <input type="number" id="addFundsAmount" placeholder="1000" min="0" required>
-                </div>
-                <div class="form-group">
-                    <label>Reason</label>
-                    <textarea id="addFundsReason" placeholder="Reason for adding funds..."></textarea>
-                </div>
-                <div class="modal-footer">
-                    <button type="submit" class="btn-modal btn-save">Add Funds</button>
-                    <button type="button" class="btn-modal btn-cancel" onclick="closeAddFundsModal()">Cancel</button>
-                </div>
-            </form>
+          </div>
+
+          <div id="usersLoading" class="loading">Loading users...</div>
+
+          <div id="usersTableContainer" style="display:none;">
+            <div class="table-container">
+              <table class="data-table">
+                <thead>
+                  <tr>
+                    <th>ID</th>
+                    <th>Username</th>
+                    <th>Email</th>
+                    <th>Agent</th>
+                    <th>Balance (₹)</th>
+                    <th>Games</th>
+                    <th>Status</th>
+                    <th>Joined</th>
+                    <th>Actions</th>
+                  </tr>
+                </thead>
+                <tbody id="usersTableBody"></tbody>
+              </table>
+            </div>
+          </div>
         </div>
-    </div>
 
-    <!-- Deduct Funds -->
-    <div id="deductFundsModal" class="modal">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h2>➖ Deduct Funds</h2>
-                <p>Deduct funds from user wallet</p>
+        <!-- AGENTS -->
+        <div id="agents" class="section">
+          <div class="section-header">
+            <h2 class="section-title">Agents Management</h2>
+            <button class="btn-primary" onclick="openAddAgentModal()">➕ Add Agent</button>
+          </div>
+          <div id="agentsLoading" class="loading">Loading agents...</div>
+          <div id="agentsTableContainer" style="display:none;">
+            <div class="table-container">
+              <table class="data-table">
+                <thead>
+                  <tr>
+                    <th>ID</th>
+                    <th>Agent Name</th>
+                    <th>Email</th>
+                    <th>Salary %</th>
+                    <th>Users</th>
+                    <th>Total Deposits</th>
+                    <th>Total Withdrawals</th>
+                    <th>Commission</th>
+                    <th>Status</th>
+                    <th>Actions</th>
+                  </tr>
+                </thead>
+                <tbody id="agentsTableBody"></tbody>
+              </table>
             </div>
-            <form id="deductFundsForm">
-                <div class="form-group">
-                    <label>Select User</label>
-                    <input type="text" id="deductFundsUser" placeholder="Search user..." required>
-                </div>
-                <div class="form-group">
-                    <label>Amount (₹)</label>
-                    <input type="number" id="deductFundsAmount" placeholder="1000" min="0" required>
-                </div>
-                <div class="form-group">
-                    <label>Reason</label>
-                    <textarea id="deductFundsReason" placeholder="Reason for deducting funds..."></textarea>
-                </div>
-                <div class="modal-footer">
-                    <button type="submit" class="btn-modal btn-save">Deduct Funds</button>
-                    <button type="button" class="btn-modal btn-cancel" onclick="closeDeductFundsModal()">Cancel</button>
-                </div>
-            </form>
+          </div>
         </div>
-    </div>
 
-    <!-- Add Promo -->
-    <div id="addPromoModal" class="modal">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h2>🎫 Create Promo Code</h2>
-                <p>Create a new promotional code</p>
+        <!-- GAMES -->
+        <div id="games" class="section">
+          <div class="section-header">
+            <h2 class="section-title">Game Statistics</h2>
+          </div>
+
+          <div class="controls">
+            <div class="search-box">
+              <input type="text" id="searchGames" placeholder="Search by round code or game type..." />
+              <button onclick="loadGames()">🔍 Search</button>
             </div>
-            <form id="addPromoForm">
-                <div class="form-group">
-                    <label>Promo Code</label>
-                    <input type="text" id="promoCode" placeholder="PROMO50" required>
-                </div>
-                <div class="form-row">
-                    <div class="form-group">
-                        <label>Type</label>
-                        <select id="promoType" required>
-                            <option value="percentage">Percentage Discount</option>
-                            <option value="flat">Flat Amount</option>
-                        </select>
-                    </div>
-                    <div class="form-group">
-                        <label>Discount Value</label>
-                        <input type="number" id="promoValue" placeholder="50" min="0" required>
-                    </div>
-                </div>
-                <div class="form-row">
-                    <div class="form-group">
-                        <label>Max Uses</label>
-                        <input type="number" id="promoMaxUses" placeholder="100" min="0" required>
-                    </div>
-                    <div class="form-group">
-                        <label>Valid Till</label>
-                        <input type="date" id="promoValidTill" required>
-                    </div>
-                </div>
-                <div class="modal-footer">
-                    <button type="submit" class="btn-modal btn-save">Create Promo</button>
-                    <button type="button" class="btn-modal btn-cancel" onclick="closeAddPromoModal()">Cancel</button>
-                </div>
-            </form>
+          </div>
+
+          <div id="gamesLoading" class="loading">Loading games...</div>
+          <div id="gamesTableContainer" style="display:none;">
+            <div class="table-container">
+              <table class="data-table">
+                <thead>
+                  <tr>
+                    <th>Round Code</th>
+                    <th>Game Type</th>
+                    <th>Players</th>
+                    <th>Winning #</th>
+                    <th>Total Bets</th>
+                    <th>Payout</th>
+                    <th>Date/Time</th>
+                    <th>Status</th>
+                    <th>Actions</th>
+                  </tr>
+                </thead>
+                <tbody id="gamesTableBody"></tbody>
+              </table>
+            </div>
+          </div>
         </div>
-    </div>
 
-    <!-- Announcement -->
-    <div id="announceModal" class="modal">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h2>📢 Send Announcement</h2>
-                <p>Send message to users</p>
+        <!-- TRANSACTIONS -->
+        <div id="transactions" class="section">
+          <div class="section-header">
+            <h2 class="section-title">Transactions Log</h2>
+          </div>
+
+          <div class="controls">
+            <div class="search-box">
+              <input type="text" id="searchTransactions" placeholder="Search by user or transaction ID..." />
+              <button onclick="loadTransactions()">🔍 Search</button>
             </div>
-            <form id="announceForm">
-                <div class="form-group">
-                    <label>Title</label>
-                    <input type="text" id="announceTitle" placeholder="Announcement title" required>
-                </div>
-                <div class="form-group">
-                    <label>Message</label>
-                    <textarea id="announceMessage" placeholder="Enter announcement message..." required></textarea>
-                </div>
-                <div class="form-group">
-                    <label>Target Users</label>
-                    <select id="announceTarget" required>
-                        <option value="all">All Users</option>
-                        <option value="active">Active Users Only</option>
-                        <option value="inactive">Inactive Users</option>
-                    </select>
-                </div>
-                <div class="modal-footer">
-                    <button type="submit" class="btn-modal btn-save">Send Announcement</button>
-                    <button type="button" class="btn-modal btn-cancel" onclick="closeAnnounceModal()">Cancel</button>
-                </div>
-            </form>
+          </div>
+
+          <div id="transactionsLoading" class="loading">Loading transactions...</div>
+          <div id="transactionsTableContainer" style="display:none;">
+            <div class="table-container">
+              <table class="data-table">
+                <thead>
+                  <tr>
+                    <th>Txn ID</th>
+                    <th>User</th>
+                    <th>Type</th>
+                    <th>Amount (₹)</th>
+                    <th>Status</th>
+                    <th>Date/Time</th>
+                    <th>Reference</th>
+                    <th>Actions</th>
+                  </tr>
+                </thead>
+                <tbody id="transactionsTableBody"></tbody>
+              </table>
+            </div>
+          </div>
         </div>
-    </div>
 
-    <!-- Details -->
-    <div id="detailsModal" class="modal">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h2 id="detailsTitle">Details</h2>
+        <!-- WALLET -->
+        <div id="wallet" class="section">
+          <div class="section-header">
+            <h2 class="section-title">Wallet Management</h2>
+          </div>
+
+          <div class="controls">
+            <div class="search-box">
+              <input type="text" id="searchWallet" placeholder="Search by username..." />
+              <button onclick="loadWalletUsers()">🔍 Search</button>
             </div>
-            <div id="detailsContent"></div>
-            <div class="modal-footer">
-                <button class="btn-modal btn-cancel" onclick="closeDetailsModal()">Close</button>
+            <button class="btn-primary" onclick="openAddFundsModal()">➕ Add Funds</button>
+            <button class="btn-primary" onclick="openDeductFundsModal()">➖ Deduct Funds</button>
+          </div>
+
+          <div id="walletLoading" class="loading">Loading wallet users...</div>
+          <div id="walletTableContainer" style="display:none;">
+            <div class="table-container">
+              <table class="data-table">
+                <thead>
+                  <tr>
+                    <th>User</th>
+                    <th>Current Balance</th>
+                    <th>Total Deposits</th>
+                    <th>Total Withdrawals</th>
+                    <th>Actions</th>
+                  </tr>
+                </thead>
+                <tbody id="walletTableBody"></tbody>
+              </table>
             </div>
+          </div>
         </div>
+
+        <!-- REFERRALS -->
+        <div id="referrals" class="section">
+          <div class="section-header">
+            <h2 class="section-title">Referral & MLM System</h2>
+          </div>
+
+          <div class="controls">
+            <div class="search-box">
+              <input type="text" id="searchReferral" placeholder="Search by agent name..." />
+              <button onclick="loadReferrals()">🔍 Search</button>
+            </div>
+          </div>
+
+          <div id="referralsLoading" class="loading">Loading referral data...</div>
+          <div id="referralsTableContainer" style="display:none;">
+            <div class="table-container">
+              <table class="data-table">
+                <thead>
+                  <tr>
+                    <th>Agent</th>
+                    <th>Referred Users</th>
+                    <th>Active Users</th>
+                    <th>User Deposits</th>
+                    <th>User Withdrawals</th>
+                    <th>Commission Rate</th>
+                    <th>Total Commission</th>
+                    <th>Actions</th>
+                  </tr>
+                </thead>
+                <tbody id="referralsTableBody"></tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+
+        <!-- PROMOS -->
+        <div id="promos" class="section">
+          <div class="section-header">
+            <h2 class="section-title">Promo Codes</h2>
+            <button class="btn-primary" onclick="openAddPromoModal()">➕ Create Promo</button>
+          </div>
+
+          <div id="promosLoading" class="loading">Loading promos...</div>
+          <div id="promosTableContainer" style="display:none;">
+            <div class="table-container">
+              <table class="data-table">
+                <thead>
+                  <tr>
+                    <th>Code</th>
+                    <th>Type</th>
+                    <th>Discount</th>
+                    <th>Max Uses</th>
+                    <th>Used</th>
+                    <th>Valid Till</th>
+                    <th>Status</th>
+                    <th>Actions</th>
+                  </tr>
+                </thead>
+                <tbody id="promosTableBody"></tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+
+        <!-- ANNOUNCEMENTS -->
+        <div id="announcements" class="section">
+          <div class="section-header">
+            <h2 class="section-title">Announcements</h2>
+            <button class="btn-primary" onclick="openAnnounceModal()">📢 Send Announcement</button>
+          </div>
+
+          <div id="announcementsLoading" class="loading">Loading announcements...</div>
+          <div id="announcementsTableContainer" style="display:none;">
+            <div class="table-container">
+              <table class="data-table">
+                <thead>
+                  <tr>
+                    <th>Title</th>
+                    <th>Message</th>
+                    <th>Target</th>
+                    <th>Sent Date</th>
+                    <th>Status</th>
+                    <th>Actions</th>
+                  </tr>
+                </thead>
+                <tbody id="announcementsTableBody"></tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+
+        <!-- REPORTS -->
+        <div id="reports" class="section">
+          <div class="section-header">
+            <h2 class="section-title">Reports & Analytics</h2>
+          </div>
+
+          <div class="dashboard-grid">
+            <div class="stat-card">
+              <div class="stat-icon">👥</div>
+              <div class="stat-label">New Users (30d)</div>
+              <p class="stat-value" id="newUsers30d">0</p>
+            </div>
+            <div class="stat-card">
+              <div class="stat-icon">💰</div>
+              <div class="stat-label">Revenue (30d)</div>
+              <p class="stat-value" id="revenue30d">₹0</p>
+            </div>
+            <div class="stat-card">
+              <div class="stat-icon">🎮</div>
+              <div class="stat-label">Games Played (30d)</div>
+              <p class="stat-value" id="gamesPlayed30d">0</p>
+            </div>
+            <div class="stat-card">
+              <div class="stat-icon">📊</div>
+              <div class="stat-label">Avg Win Rate</div>
+              <p class="stat-value" id="avgWinRate">0%</p>
+            </div>
+          </div>
+        </div>
+
+        <!-- SECURITY -->
+        <div id="security" class="section">
+          <div class="section-header">
+            <h2 class="section-title">Security Settings</h2>
+          </div>
+          <div class="controls">
+            <button class="btn-primary" onclick="openSecurityModal()">🔒 Manage Security</button>
+          </div>
+          <div class="no-data">Security settings and 2FA configuration coming soon...</div>
+        </div>
+      </div>
     </div>
+  </div>
 
-    <script>
-        let allUsers = [];
-        let allAgents = [];
-        let allGames = [];
-        let currentPage = 1;
-        const itemsPerPage = 10;
+  <!-- MODALS -->
 
-        document.addEventListener('DOMContentLoaded', function() {
-            setupMenuLinks();
-            loadStats();
-            loadUsers();
-            
-            document.getElementById('addAgentForm')?.addEventListener('submit', submitAddAgent);
-            document.getElementById('addFundsForm')?.addEventListener('submit', submitAddFunds);
-            document.getElementById('deductFundsForm')?.addEventListener('submit', submitDeductFunds);
-            document.getElementById('addPromoForm')?.addEventListener('submit', submitAddPromo);
-            document.getElementById('announceForm')?.addEventListener('submit', submitAnnounce);
-        });
+  <!-- Add Agent -->
+  <div id="addAgentModal" class="modal">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h2>➕ Add New Agent</h2>
+        <p>Create a new agent account</p>
+      </div>
+      <form id="addAgentForm">
+        <div class="form-group">
+          <label>Agent Name</label>
+          <input type="text" id="agentName" placeholder="Enter agent name" required />
+        </div>
+        <div class="form-group">
+          <label>Email</label>
+          <input type="email" id="agentEmail" placeholder="agent@example.com" required />
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label>Username</label>
+            <input type="text" id="agentUsername" placeholder="agent_username" required />
+          </div>
+          <div class="form-group">
+            <label>Password</label>
+            <input type="password" id="agentPassword" placeholder="Password" required />
+          </div>
+        </div>
+        <div class="form-group">
+          <label>Salary Percentage (%)</label>
+          <input type="number" id="agentSalaryPercent" placeholder="5" min="0" max="100" required />
+        </div>
+        <div class="modal-footer">
+          <button type="submit" class="btn-modal btn-save">Add Agent</button>
+          <button type="button" class="btn-modal btn-cancel" onclick="closeAddAgentModal()">Cancel</button>
+        </div>
+      </form>
+    </div>
+  </div>
 
-        function setupMenuLinks() {
-            document.querySelectorAll('.menu-link').forEach(link => {
-                link.addEventListener('click', function(e) {
-                    if (this.getAttribute('onclick')) return;
-                    e.preventDefault();
-                    const section = this.dataset.section;
-                    switchSection(section);
-                    document.querySelectorAll('.menu-link').forEach(l => l.classList.remove('active'));
-                    this.classList.add('active');
-                });
-            });
-        }
+  <!-- Add Funds -->
+  <div id="addFundsModal" class="modal">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h2>➕ Add Funds</h2>
+        <p>Add funds to user wallet</p>
+      </div>
+      <form id="addFundsForm">
+        <div class="form-group">
+          <label>Select User</label>
+          <input type="text" id="addFundsUser" placeholder="Search user..." required />
+        </div>
+        <div class="form-group">
+          <label>Amount (₹)</label>
+          <input type="number" id="addFundsAmount" placeholder="1000" min="0" required />
+        </div>
+        <div class="form-group">
+          <label>Reason</label>
+          <textarea id="addFundsReason" placeholder="Reason for adding funds..."></textarea>
+        </div>
+        <div class="modal-footer">
+          <button type="submit" class="btn-modal btn-save">Add Funds</button>
+          <button type="button" class="btn-modal btn-cancel" onclick="closeAddFundsModal()">Cancel</button>
+        </div>
+      </form>
+    </div>
+  </div>
 
-        function switchSection(section) {
-            document.querySelectorAll('.section').forEach(s => s.classList.remove('active'));
-            const el = document.getElementById(section);
-            if (el) el.classList.add('active');
-            
-            let titles = {
-                'dashboard': 'Dashboard',
-                'users': 'Users Management',
-                'agents': 'Agents Management',
-                'games': 'Game Statistics',
-                'transactions': 'Transactions Log',
-                'wallet': 'Wallet Management',
-                'referrals': 'Referral System',
-                'promos': 'Promo Codes',
-                'announcements': 'Announcements',
-                'reports': 'Reports & Analytics',
-                'security': 'Security Settings'
-            };
-            document.getElementById('pageTitle').textContent = titles[section] || 'Admin Panel';
+  <!-- Deduct Funds -->
+  <div id="deductFundsModal" class="modal">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h2>➖ Deduct Funds</h2>
+        <p>Deduct funds from user wallet</p>
+      </div>
+      <form id="deductFundsForm">
+        <div class="form-group">
+          <label>Select User</label>
+          <input type="text" id="deductFundsUser" placeholder="Search user..." required />
+        </div>
+        <div class="form-group">
+          <label>Amount (₹)</label>
+          <input type="number" id="deductFundsAmount" placeholder="1000" min="0" required />
+        </div>
+        <div class="form-group">
+          <label>Reason</label>
+          <textarea id="deductFundsReason" placeholder="Reason for deducting funds..."></textarea>
+        </div>
+        <div class="modal-footer">
+          <button type="submit" class="btn-modal btn-save">Deduct Funds</button>
+          <button type="button" class="btn-modal btn-cancel" onclick="closeDeductFundsModal()">Cancel</button>
+        </div>
+      </form>
+    </div>
+  </div>
 
-            if (section === 'users') loadUsers();
-            if (section === 'agents') loadAgents();
-            if (section === 'games') loadGames();
-            if (section === 'transactions') loadTransactions();
-            if (section === 'wallet') loadWalletUsers();
-            if (section === 'referrals') loadReferrals();
-            if (section === 'promos') loadPromos();
-            if (section === 'announcements') loadAnnouncements();
-            if (section === 'reports') loadReports();
-            if (section === 'dashboard') loadStats();
-        }
+  <!-- Add Promo -->
+  <div id="addPromoModal" class="modal">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h2>🎫 Create Promo Code</h2>
+        <p>Create a new promotional code</p>
+      </div>
+      <form id="addPromoForm">
+        <div class="form-group">
+          <label>Promo Code</label>
+          <input type="text" id="promoCode" placeholder="PROMO50" required />
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label>Type</label>
+            <select id="promoType" required>
+              <option value="percentage">Percentage Discount</option>
+              <option value="flat">Flat Amount</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>Discount Value</label>
+            <input type="number" id="promoValue" placeholder="50" min="0" required />
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label>Max Uses</label>
+            <input type="number" id="promoMaxUses" placeholder="100" min="0" required />
+          </div>
+          <div class="form-group">
+            <label>Valid Till</label>
+            <input type="date" id="promoValidTill" required />
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="submit" class="btn-modal btn-save">Create Promo</button>
+          <button type="button" class="btn-modal btn-cancel" onclick="closeAddPromoModal()">Cancel</button>
+        </div>
+      </form>
+    </div>
+  </div>
 
-        function loadStats() {
-  fetch('/api/admin/stats')
-    .then(r => r.json())
-    .then(data => {
-      document.getElementById('totalUsers').textContent = data.total_users ?? 0;
-      document.getElementById('totalAgents').textContent = 0; // backend has no total_agents [file:87]
-      document.getElementById('activeGames').textContent = data.active_games ?? 0;
-      document.getElementById('totalRevenue').textContent = (data.total_revenue ?? 0).toLocaleString('en-IN');
-      document.getElementById('totalDeposits').textContent = (data.total_deposit ?? 0).toLocaleString('en-IN');
-      document.getElementById('totalWithdrawals').textContent = (data.total_withdrawal ?? 0).toLocaleString('en-IN');
-    })
-    .catch(err => console.error('Error loading stats:', err));
-}
+  <!-- Announcement -->
+  <div id="announceModal" class="modal">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h2>📢 Send Announcement</h2>
+        <p>Send message to users</p>
+      </div>
+      <form id="announceForm">
+        <div class="form-group">
+          <label>Title</label>
+          <input type="text" id="announceTitle" placeholder="Announcement title" required />
+        </div>
+        <div class="form-group">
+          <label>Message</label>
+          <textarea id="announceMessage" placeholder="Enter announcement message..." required></textarea>
+        </div>
+        <div class="form-group">
+          <label>Target Users</label>
+          <select id="announceTarget" required>
+            <option value="all">All Users</option>
+            <option value="active">Active Users Only</option>
+            <option value="inactive">Inactive Users</option>
+          </select>
+        </div>
+        <div class="modal-footer">
+          <button type="submit" class="btn-modal btn-save">Send Announcement</button>
+          <button type="button" class="btn-modal btn-cancel" onclick="closeAnnounceModal()">Cancel</button>
+        </div>
+      </form>
+    </div>
+  </div>
 
+  <!-- Details -->
+  <div id="detailsModal" class="modal">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h2 id="detailsTitle">Details</h2>
+      </div>
+      <div id="detailsContent"></div>
+      <div class="modal-footer">
+        <button class="btn-modal btn-cancel" onclick="closeDetailsModal()">Close</button>
+      </div>
+    </div>
+  </div>
 
-        function loadUsers() {
-            document.getElementById('usersLoading').style.display = 'block';
-            document.getElementById('usersTableContainer').style.display = 'none';
+  <script>
+    let allUsers = [];
+    let allAgents = [];
+    let allGames = [];
+    let allTxns = [];
+    let allWalletUsers = [];
 
-            fetch('/api/admin/users')
-                .then(r => r.json())
-                .then(data => {
-                    allUsers = data || [];
-                    filterAndDisplayUsers();
-                    document.getElementById('usersLoading').style.display = 'none';
-                    document.getElementById('usersTableContainer').style.display = 'block';
-                })
-                .catch(err => {
-                    console.error('Error loading users:', err);
-                    document.getElementById('usersLoading').innerHTML = `<div style="color: #ef4444;">Error: ${err.message}</div>`;
-                });
-        }
+    document.addEventListener('DOMContentLoaded', function () {
+      setupMenuLinks();
+      loadStats();
+      loadUsers();
 
-        function filterAndDisplayUsers() {
-            const search = document.getElementById('searchUsers')?.value.toLowerCase() || '';
-            let filtered = allUsers.filter(user => 
-                user.username.toLowerCase().includes(search) || 
-                (user.email && user.email.toLowerCase().includes(search))
-            );
+      document.getElementById('addAgentForm')?.addEventListener('submit', submitAddAgent);
+      document.getElementById('addFundsForm')?.addEventListener('submit', submitAddFunds);
+      document.getElementById('deductFundsForm')?.addEventListener('submit', submitDeductFunds);
+      document.getElementById('addPromoForm')?.addEventListener('submit', submitAddPromo);
+      document.getElementById('announceForm')?.addEventListener('submit', submitAnnounce);
 
-            const tbody = document.getElementById('usersTableBody');
-            tbody.innerHTML = '';
-
-            if (filtered.length === 0) {
-                tbody.innerHTML = '<tr><td colspan="9" class="no-data">No users found</td></tr>';
-                return;
-            }
-
-            filtered.forEach(user => {
-                const row = document.createElement('tr');
-                const createdDate = new Date(user.created_at);
-                const formattedDate = createdDate.toLocaleDateString('en-IN');
-                
-                row.innerHTML = `
-                    <td>${user.id}</td>
-                    <td><strong>${user.username}</strong></td>
-                    <td>${user.email || '-'}</td>
-                    <td>${user.agent_name || '-'}</td>
-                    <td>₹${user.balance.toLocaleString('en-IN')}</td>
-                    <td><a href="javascript:" onclick="viewUserGames(${user.id})" style="color: #10b981; cursor: pointer;">${user.games_played || 0}</a></td>
-                    <td><span class="badge badge-${user.status}">${user.status.toUpperCase()}</span></td>
-                    <td>${formattedDate}</td>
-                    <td>
-                        <div class="action-buttons">
-                            <button class="btn-small btn-edit" onclick="editUserBalance(${user.id}, '${user.username}', ${user.balance})">✏️ Edit</button>
-                            ${user.status === 'active' 
-                                ? `<button class="btn-small btn-block" onclick="blockUser(${user.id})">🔒 Block</button>`
-                                : `<button class="btn-small btn-unblock" onclick="unblockUser(${user.id})">🔓 Unblock</button>`
-                            }
-                        </div>
-                    </td>
-                `;
-                tbody.appendChild(row);
-            });
-        }
-
-        function viewUserGames(userId) {
-            fetch(`/api/admin/users/${userId}/games`)
-                .then(r => r.json())
-                .then(games => {
-                    let html = '<div class="details-grid">';
-                    if (games && games.length > 0) {
-                        games.forEach(game => {
-                            html += `
-                                <div class="detail-item">
-                                    <div class="detail-label">Game: ${game.game_type}</div>
-                                    <div class="detail-value">${game.round_code}</div>
-                                    <div style="color: #94a3b8; margin-top: 5px;">Date: ${game.game_date}</div>
-                                    <div style="color: #10b981; margin-top: 5px;">Bet: ₹${game.bet_amount} | Won/Lost: ₹${game.payout}</div>
-                                </div>
-                            `;
-                        });
-                    } else {
-                        html = '<div class="no-data">No games played</div>';
-                    }
-                    html += '</div>';
-
-                    document.getElementById('detailsTitle').textContent = 'User Games';
-                    document.getElementById('detailsContent').innerHTML = html;
-                    document.getElementById('detailsModal').classList.add('active');
-                })
-                .catch(err => alert('Error loading games'));
-        }
-
-        function editUserBalance(userId, username, balance) {
-            const newBalance = prompt(`Edit Balance for: ${username}\n\nCurrent: ₹${balance.toLocaleString('en-IN')}\n\nNew Balance:`);
-            if (newBalance === null) return;
-
-            const value = parseInt(newBalance);
-            if (isNaN(value) || value < 0) {
-                alert('Invalid amount');
-                return;
-            }
-
-            fetch(`/api/admin/users/${userId}`, {
-                method: 'PUT',
-                headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify({balance: value})
-            })
-            .then(r => r.json())
-            .then(res => {
-                alert(res.message);
-                loadUsers();
-                loadStats();
-            })
-            .catch(err => alert('Error: ' + err));
-        }
-
-        function blockUser(userId) {
-            if (confirm('Block this user?')) {
-                fetch(`/api/admin/users/${userId}/block`, {
-                    method: 'POST',
-                    headers: {'Content-Type': 'application/json'}
-                })
-                .then(r => r.json())
-                .then(res => {
-                    alert(res.message);
-                    loadUsers();
-                    loadStats();
-                })
-                .catch(err => alert('Error: ' + err));
-            }
-        }
-
-        function unblockUser(userId) {
-            if (confirm('Unblock this user?')) {
-                fetch(`/api/admin/users/${userId}/unblock`, {
-                    method: 'POST',
-                    headers: {'Content-Type': 'application/json'}
-                })
-                .then(r => r.json())
-                .then(res => {
-                    alert(res.message);
-                    loadUsers();
-                    loadStats();
-                })
-                .catch(err => alert('Error: ' + err));
-            }
-        }
-
-        document.getElementById('searchUsers')?.addEventListener('keyup', filterAndDisplayUsers);
-
-        function loadAgents() {
-            document.getElementById('agentsLoading').style.display = 'block';
-            document.getElementById('agentsTableContainer').style.display = 'none';
-
-            fetch('/api/admin/agents')
-                .then(r => r.json())
-                .then(data => {
-                    allAgents = data || [];
-                    displayAgents();
-                    document.getElementById('agentsLoading').style.display = 'none';
-                    document.getElementById('agentsTableContainer').style.display = 'block';
-                })
-                .catch(err => {
-                    console.error('Error:', err);
-                    document.getElementById('agentsLoading').innerHTML = `<div style="color: #ef4444;">Error: ${err.message}</div>`;
-                });
-        }
-
-        function displayAgents() {
-            const tbody = document.getElementById('agentsTableBody');
-            tbody.innerHTML = '';
-
-            if (!allAgents.length) {
-                tbody.innerHTML = '<tr><td colspan="10" class="no-data">No agents found</td></tr>';
-                return;
-            }
-
-            allAgents.forEach(agent => {
-                const row = document.createElement('tr');
-                const commission = (agent.total_deposits * agent.salary_percent / 100) || 0;
-                
-                row.innerHTML = `
-                    <td>${agent.id}</td>
-                    <td><strong>${agent.name}</strong></td>
-                    <td>${agent.email}</td>
-                    <td>${agent.salary_percent}%</td>
-                    <td><a href="javascript:" onclick="viewAgentUsers(${agent.id})" style="color: #10b981; cursor: pointer;">${agent.user_count || 0}</a></td>
-                    <td>₹${(agent.total_deposits || 0).toLocaleString('en-IN')}</td>
-                    <td>₹${(agent.total_withdrawals || 0).toLocaleString('en-IN')}</td>
-                    <td>₹${commission.toLocaleString('en-IN')}</td>
-                    <td><span class="badge badge-${agent.status}">${agent.status.toUpperCase()}</span></td>
-                    <td>
-                        <div class="action-buttons">
-                            <button class="btn-small btn-edit" onclick="editAgent(${agent.id})">✏️ Edit</button>
-                            <button class="btn-small btn-view" onclick="viewAgentUsers(${agent.id})">👁️ View</button>
-                        </div>
-                    </td>
-                `;
-                tbody.appendChild(row);
-            });
-        }
-
-        function viewAgentUsers(agentId) {
-            fetch(`/api/admin/agents/${agentId}/users`)
-                .then(r => r.json())
-                .then(users => {
-                    let html = '<div style="max-height: 400px; overflow-y: auto;"><table style="width: 100%; font-size: 12px;">';
-                    html += '<tr style="background: #334155;"><th>User</th><th>Deposits</th><th>Withdrawals</th><th>Status</th></tr>';
-                    
-                    if (users && users.length > 0) {
-                        users.forEach(user => {
-                            html += `<tr style="border-bottom: 1px solid #334155;">
-                                <td>${user.username}</td>
-                                <td>₹${(user.total_deposits || 0).toLocaleString('en-IN')}</td>
-                                <td>₹${(user.total_withdrawals || 0).toLocaleString('en-IN')}</td>
-                                <td><span class="badge badge-${user.status}">${user.status}</span></td>
-                            </tr>`;
-                        });
-                    } else {
-                        html += '<tr><td colspan="4" class="no-data">No users</td></tr>';
-                    }
-                    html += '</table></div>';
-
-                    document.getElementById('detailsTitle').textContent = 'Agent Users';
-                    document.getElementById('detailsContent').innerHTML = html;
-                    document.getElementById('detailsModal').classList.add('active');
-                })
-                .catch(err => alert('Error loading users'));
-        }
-
-        function submitAddAgent(e) {
-            e.preventDefault();
-            const data = {
-                name: document.getElementById('agentName').value,
-                email: document.getElementById('agentEmail').value,
-                username: document.getElementById('agentUsername').value,
-                password: document.getElementById('agentPassword').value,
-                salary_percent: parseFloat(document.getElementById('agentSalaryPercent').value)
-            };
-
-            fetch('/api/admin/agents', {
-                method: 'POST',
-                headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify(data)
-            })
-            .then(r => r.json())
-            .then(res => {
-                alert(res.message);
-                closeAddAgentModal();
-                loadAgents();
-                loadStats();
-            })
-            .catch(err => alert('Error: ' + err));
-        }
-
-        function openAddAgentModal() {
-            document.getElementById('addAgentModal').classList.add('active');
-        }
-
-        function closeAddAgentModal() {
-            document.getElementById('addAgentModal').classList.remove('active');
-            document.getElementById('addAgentForm').reset();
-        }
-
-       function loadGames() {
-  document.getElementById('gamesLoading').style.display = 'block';
-  document.getElementById('gamesTableContainer').style.display = 'none';
-
-  fetch('/api/admin/games')
-    .then(r => r.json())
-    .then(data => {
-      allGames = data || [];
-      displayGames();
-      document.getElementById('gamesLoading').style.display = 'none';
-      document.getElementById('gamesTableContainer').style.display = 'block';
-    })
-    .catch(err => {
-      console.error('Error loading games:', err);
-      document.getElementById('gamesLoading').innerHTML =
-        `<div style="color:#ef4444">Error: ${err.message}</div>`;
+      document.getElementById('searchUsers')?.addEventListener('keyup', filterAndDisplayUsers);
+      document.getElementById('searchTransactions')?.addEventListener('keyup', displayTransactions);
+      document.getElementById('searchWallet')?.addEventListener('keyup', displayWalletUsers);
+      document.getElementById('searchGames')?.addEventListener('keyup', displayGames);
     });
-}
 
-function displayGames() {
-  const tbody = document.getElementById('gamesTableBody');
-  tbody.innerHTML = '';
-
-  if (!allGames || !allGames.length) {
-    tbody.innerHTML = `<tr><td colspan="9" class="no-data">No games</td></tr>`;
-    return;
-  }
-
-  allGames.forEach((game) => {
-    const row = document.createElement('tr');
-
-    const roundCode = game.round_code || '-';
-    const gameType = game.game_type || '-';
-    const players = `${game.players ?? 0}/${game.max_players ?? 0}`;
-    const winning = (game.result === null || game.result === undefined) ? '-' : game.result;
-    const totalBets = (game.total_bets ?? 0).toLocaleString('en-IN');
-    const startedAt = game.started_at || '-';
-    const status = game.status || '-';
-
-    // Your table has columns: Round Code, Game Type, Players, Winning, Total Bets, Payout, DateTime, Status, Action [file:88]
-    // Backend does not provide payout, so show '-' unless you add it in backend. [file:87]
-    row.innerHTML = `
-      <td><strong>${roundCode}</strong></td>
-      <td>${gameType}</td>
-      <td>${players}</td>
-      <td>${winning}</td>
-      <td>${totalBets}</td>
-      <td>-</td>
-      <td>${startedAt}</td>
-      <td><span class="badge badge-pending">${status}</span></td>
-      <td><button class="btn-small btn-view" onclick="viewGameDetails('${roundCode}')">Details</button></td>
-    `;
-
-    tbody.appendChild(row);
-  });
-}
-
-function viewGameDetails(roundCode) {
-  const game = (allGames || []).find(g => (g.round_code || '') === roundCode);
-  if (!game) return;
-
-  const winning = (game.result === null || game.result === undefined) ? 'NA' : game.result;
-
-  const html = `
-    <div class="details-grid">
-      <div class="detail-item">
-        <div class="detail-label">Round Code</div>
-        <div class="detail-value">${game.round_code || '-'}</div>
-      </div>
-      <div class="detail-item">
-        <div class="detail-label">Game Type</div>
-        <div class="detail-value">${game.game_type || '-'}</div>
-      </div>
-      <div class="detail-item">
-        <div class="detail-label">Winning Number</div>
-        <div class="detail-value" style="color:#f59e0b">${winning}</div>
-      </div>
-      <div class="detail-item">
-        <div class="detail-label">Players</div>
-        <div class="detail-value">${game.players ?? 0}/${game.max_players ?? 0}</div>
-      </div>
-      <div class="detail-item">
-        <div class="detail-label">Total Bets</div>
-        <div class="detail-value">${(game.total_bets ?? 0).toLocaleString('en-IN')}</div>
-      </div>
-      <div class="detail-item">
-        <div class="detail-label">Started At</div>
-        <div class="detail-value">${game.started_at || '-'}</div>
-      </div>
-      <div class="detail-item">
-        <div class="detail-label">Status</div>
-        <div class="detail-value">${game.status || '-'}</div>
-      </div>
-    </div>
-  `;
-
-  document.getElementById('detailsTitle').textContent = 'Game Details';
-  document.getElementById('detailsContent').innerHTML = html;
-  document.getElementById('detailsModal').classList.add('active');
-}
-
-        function loadTransactions() {
-            document.getElementById('transactionsLoading').style.display = 'block';
-            document.getElementById('transactionsTableContainer').style.display = 'none';
-
-            fetch('/api/admin/transactions')
-                .then(r => r.json())
-                .then(data => {
-                    const tbody = document.getElementById('transactionsTableBody');
-                    tbody.innerHTML = '';
-
-                    if (!data || !data.length) {
-                        tbody.innerHTML = '<tr><td colspan="8" class="no-data">No transactions</td></tr>';
-                    } else {
-                        data.forEach(txn => {
-                            const row = document.createElement('tr');
-                            row.innerHTML = `
-                                <td>${txn.txn_id}</td>
-                                <td>${txn.username}</td>
-                                <td><span class="badge badge-${txn.type.toLowerCase()}">${txn.type.toUpperCase()}</span></td>
-                                <td>₹${(txn.amount || 0).toLocaleString('en-IN')}</td>
-                                <td><span class="badge badge-${txn.status}">${txn.status.toUpperCase()}</span></td>
-                                <td>${txn.txn_date}</td>
-                                <td>${txn.reference || '-'}</td>
-                                <td><button class="btn-small btn-view" onclick="alert('Txn: ${txn.txn_id}')">📋 View</button></td>
-                            `;
-                            tbody.appendChild(row);
-                        });
-                    }
-
-                    document.getElementById('transactionsLoading').style.display = 'none';
-                    document.getElementById('transactionsTableContainer').style.display = 'block';
-                })
-                .catch(err => {
-                    console.error('Error:', err);
-                    document.getElementById('transactionsLoading').innerHTML = `<div style="color: #ef4444;">Error: ${err.message}</div>`;
-                });
-        }
-
-        document.getElementById('searchTransactions')?.addEventListener('keyup', loadTransactions);
-
-        function loadWalletUsers() {
-            document.getElementById('walletLoading').style.display = 'block';
-            document.getElementById('walletTableContainer').style.display = 'none';
-
-            fetch('/api/admin/wallet')
-                .then(r => r.json())
-                .then(data => {
-                    const tbody = document.getElementById('walletTableBody');
-                    tbody.innerHTML = '';
-
-                    if (!data || !data.length) {
-                        tbody.innerHTML = '<tr><td colspan="5" class="no-data">No users</td></tr>';
-                    } else {
-                        data.forEach(user => {
-                            const row = document.createElement('tr');
-                            row.innerHTML = `
-                                <td><strong>${user.username}</strong></td>
-                                <td>₹${(user.balance || 0).toLocaleString('en-IN')}</td>
-                                <td>₹${(user.total_deposits || 0).toLocaleString('en-IN')}</td>
-                                <td>₹${(user.total_withdrawals || 0).toLocaleString('en-IN')}</td>
-                                <td>
-                                    <div class="action-buttons">
-                                        <button class="btn-small btn-edit" onclick="selectUserForFunds('${user.username}', 'add')">➕ Add</button>
-                                        <button class="btn-small btn-block" onclick="selectUserForFunds('${user.username}', 'deduct')">➖ Deduct</button>
-                                    </div>
-                                </td>
-                            `;
-                            tbody.appendChild(row);
-                        });
-                    }
-
-                    document.getElementById('walletLoading').style.display = 'none';
-                    document.getElementById('walletTableContainer').style.display = 'block';
-                })
-                .catch(err => {
-                    console.error('Error:', err);
-                    document.getElementById('walletLoading').innerHTML = `<div style="color: #ef4444;">Error: ${err.message}</div>`;
-                });
-        }
-
-        function selectUserForFunds(username, type) {
-            if (type === 'add') {
-                document.getElementById('addFundsUser').value = username;
-                openAddFundsModal();
-            } else {
-                document.getElementById('deductFundsUser').value = username;
-                openDeductFundsModal();
-            }
-        }
-
-        function submitAddFunds(e) {
-            e.preventDefault();
-            const user = document.getElementById('addFundsUser').value;
-            const amount = parseFloat(document.getElementById('addFundsAmount').value);
-            const reason = document.getElementById('addFundsReason').value;
-
-            fetch('/api/admin/wallet/add', {
-                method: 'POST',
-                headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify({user, amount, reason})
-            })
-            .then(r => r.json())
-            .then(res => {
-                alert(res.message);
-                closeAddFundsModal();
-                loadWalletUsers();
-                loadStats();
-            })
-            .catch(err => alert('Error: ' + err));
-        }
-
-        function submitDeductFunds(e) {
-            e.preventDefault();
-            const user = document.getElementById('deductFundsUser').value;
-            const amount = parseFloat(document.getElementById('deductFundsAmount').value);
-            const reason = document.getElementById('deductFundsReason').value;
-
-            fetch('/api/admin/wallet/deduct', {
-                method: 'POST',
-                headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify({user, amount, reason})
-            })
-            .then(r => r.json())
-            .then(res => {
-                alert(res.message);
-                closeDeductFundsModal();
-                loadWalletUsers();
-                loadStats();
-            })
-            .catch(err => alert('Error: ' + err));
-        }
-
-        function openAddFundsModal() {
-            document.getElementById('addFundsModal').classList.add('active');
-        }
-
-        function closeAddFundsModal() {
-            document.getElementById('addFundsModal').classList.remove('active');
-            document.getElementById('addFundsForm').reset();
-        }
-
-        function openDeductFundsModal() {
-            document.getElementById('deductFundsModal').classList.add('active');
-        }
-
-        function closeDeductFundsModal() {
-            document.getElementById('deductFundsModal').classList.remove('active');
-            document.getElementById('deductFundsForm').reset();
-        }
-
-        document.getElementById('searchWallet')?.addEventListener('keyup', loadWalletUsers);
-
-        function loadReferrals() {
-            document.getElementById('referralsLoading').style.display = 'block';
-            document.getElementById('referralsTableContainer').style.display = 'none';
-
-            fetch('/api/admin/referrals')
-                .then(r => r.json())
-                .then(data => {
-                    const tbody = document.getElementById('referralsTableBody');
-                    tbody.innerHTML = '';
-
-                    if (!data || !data.length) {
-                        tbody.innerHTML = '<tr><td colspan="8" class="no-data">No referral data</td></tr>';
-                    } else {
-                        data.forEach(agent => {
-                            const commission = (agent.user_deposits * agent.commission_rate / 100) || 0;
-                            const row = document.createElement('tr');
-                            row.innerHTML = `
-                                <td><strong>${agent.agent_name}</strong></td>
-                                <td>${agent.referred_users}</td>
-                                <td>${agent.active_users}</td>
-                                <td>₹${(agent.user_deposits || 0).toLocaleString('en-IN')}</td>
-                                <td>₹${(agent.user_withdrawals || 0).toLocaleString('en-IN')}</td>
-                                <td>${agent.commission_rate}%</td>
-                                <td>₹${commission.toLocaleString('en-IN')}</td>
-                                <td><button class="btn-small btn-view" onclick="alert('Agent: ${agent.agent_name}')">📊 View</button></td>
-                            `;
-                            tbody.appendChild(row);
-                        });
-                    }
-
-                    document.getElementById('referralsLoading').style.display = 'none';
-                    document.getElementById('referralsTableContainer').style.display = 'block';
-                })
-                .catch(err => {
-                    console.error('Error:', err);
-                    document.getElementById('referralsLoading').innerHTML = `<div style="color: #ef4444;">Error: ${err.message}</div>`;
-                });
-        }
-
-        document.getElementById('searchReferral')?.addEventListener('keyup', loadReferrals);
-
-        function loadPromos() {
-            document.getElementById('promosLoading').style.display = 'block';
-            document.getElementById('promosTableContainer').style.display = 'none';
-
-            fetch('/api/admin/promos')
-                .then(r => r.json())
-                .then(data => {
-                    const tbody = document.getElementById('promosTableBody');
-                    tbody.innerHTML = '';
-
-                    if (!data || !data.length) {
-                        tbody.innerHTML = '<tr><td colspan="8" class="no-data">No promos</td></tr>';
-                    } else {
-                        data.forEach(promo => {
-                            const row = document.createElement('tr');
-                            const validTill = new Date(promo.valid_till).toLocaleDateString('en-IN');
-                            row.innerHTML = `
-                                <td><strong>${promo.code}</strong></td>
-                                <td>${promo.type.toUpperCase()}</td>
-                                <td>${promo.type === 'percentage' ? promo.discount + '%' : '₹' + promo.discount}</td>
-                                <td>${promo.max_uses}</td>
-                                <td>${promo.used_count || 0}</td>
-                                <td>${validTill}</td>
-                                <td><span class="badge badge-${promo.status}">${promo.status}</span></td>
-                                <td><button class="btn-small btn-block" onclick="deletePromo(${promo.id})">🗑️ Delete</button></td>
-                            `;
-                            tbody.appendChild(row);
-                        });
-                    }
-
-                    document.getElementById('promosLoading').style.display = 'none';
-                    document.getElementById('promosTableContainer').style.display = 'block';
-                })
-                .catch(err => {
-                    console.error('Error:', err);
-                    document.getElementById('promosLoading').innerHTML = `<div style="color: #ef4444;">Error: ${err.message}</div>`;
-                });
-        }
-
-        function submitAddPromo(e) {
-            e.preventDefault();
-            const data = {
-                code: document.getElementById('promoCode').value,
-                type: document.getElementById('promoType').value,
-                discount: parseFloat(document.getElementById('promoValue').value),
-                max_uses: parseInt(document.getElementById('promoMaxUses').value),
-                valid_till: document.getElementById('promoValidTill').value
-            };
-
-            fetch('/api/admin/promos', {
-                method: 'POST',
-                headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify(data)
-            })
-            .then(r => r.json())
-            .then(res => {
-                alert(res.message);
-                closeAddPromoModal();
-                loadPromos();
-            })
-            .catch(err => alert('Error: ' + err));
-        }
-
-        function openAddPromoModal() {
-            document.getElementById('addPromoModal').classList.add('active');
-        }
-
-        function closeAddPromoModal() {
-            document.getElementById('addPromoModal').classList.remove('active');
-            document.getElementById('addPromoForm').reset();
-        }
-
-        function loadAnnouncements() {
-            document.getElementById('announcementsLoading').style.display = 'block';
-            document.getElementById('announcementsTableContainer').style.display = 'none';
-
-            fetch('/api/admin/announcements')
-                .then(r => r.json())
-                .then(data => {
-                    const tbody = document.getElementById('announcementsTableBody');
-                    tbody.innerHTML = '';
-
-                    if (!data || !data.length) {
-                        tbody.innerHTML = '<tr><td colspan="6" class="no-data">No announcements</td></tr>';
-                    } else {
-                        data.forEach(announce => {
-                            const row = document.createElement('tr');
-                            row.innerHTML = `
-                                <td><strong>${announce.title}</strong></td>
-                                <td>${announce.message.substring(0, 30)}...</td>
-                                <td>${announce.target}</td>
-                                <td>${announce.sent_date}</td>
-                                <td><span class="badge badge-active">SENT</span></td>
-                                <td><button class="btn-small btn-view" onclick="alert('${announce.message}')">👁️ View</button></td>
-                            `;
-                            tbody.appendChild(row);
-                        });
-                    }
-
-                    document.getElementById('announcementsLoading').style.display = 'none';
-                    document.getElementById('announcementsTableContainer').style.display = 'block';
-                })
-                .catch(err => {
-                    console.error('Error:', err);
-                    document.getElementById('announcementsLoading').innerHTML = `<div style="color: #ef4444;">Error: ${err.message}</div>`;
-                });
-        }
-
-        function submitAnnounce(e) {
-            e.preventDefault();
-            const data = {
-                title: document.getElementById('announceTitle').value,
-                message: document.getElementById('announceMessage').value,
-                target: document.getElementById('announceTarget').value
-            };
-
-            fetch('/api/admin/announcements', {
-                method: 'POST',
-                headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify(data)
-            })
-            .then(r => r.json())
-            .then(res => {
-                alert(res.message);
-                closeAnnounceModal();
-                loadAnnouncements();
-            })
-            .catch(err => alert('Error: ' + err));
-        }
-
-        function openAnnounceModal() {
-            document.getElementById('announceModal').classList.add('active');
-        }
-
-        function closeAnnounceModal() {
-            document.getElementById('announceModal').classList.remove('active');
-            document.getElementById('announceForm').reset();
-        }
-
-        function loadReports() {
-            fetch('/api/admin/reports')
-                .then(r => r.json())
-                .then(data => {
-                    document.getElementById('newUsers30d').textContent = data.new_users_30d || 0;
-                    document.getElementById('revenue30d').textContent = '₹' + (data.revenue_30d || 0).toLocaleString('en-IN');
-                    document.getElementById('gamesPlayed30d').textContent = data.games_played_30d || 0;
-                    document.getElementById('avgWinRate').textContent = (data.avg_win_rate || 0).toFixed(1) + '%';
-                })
-                .catch(err => console.error('Error:', err));
-        }
-
-        function openSecurityModal() {
-            alert('Security settings: 2FA, IP whitelist management coming soon...');
-        }
-
-        function closeDetailsModal() {
-            document.getElementById('detailsModal').classList.remove('active');
-        }
-
-        function logout() {
-            if (confirm('Logout?')) {
-                window.location.href = '/logout';
-            }
-        }
-
-        document.addEventListener('click', function(e) {
-            if (e.target.classList.contains('modal')) {
-                e.target.classList.remove('active');
-            }
+    function setupMenuLinks() {
+      document.querySelectorAll('.menu-link').forEach((link) => {
+        link.addEventListener('click', function (e) {
+          if (this.getAttribute('onclick')) return;
+          e.preventDefault();
+          const section = this.dataset.section;
+          switchSection(section);
+          document.querySelectorAll('.menu-link').forEach((l) => l.classList.remove('active'));
+          this.classList.add('active');
         });
-    </script>
+      });
+    }
+
+    function switchSection(section) {
+      document.querySelectorAll('.section').forEach((s) => s.classList.remove('active'));
+      const el = document.getElementById(section);
+      if (el) el.classList.add('active');
+
+      const titles = {
+        dashboard: 'Dashboard',
+        users: 'Users Management',
+        agents: 'Agents Management',
+        games: 'Game Statistics',
+        transactions: 'Transactions Log',
+        wallet: 'Wallet Management',
+        referrals: 'Referral System',
+        promos: 'Promo Codes',
+        announcements: 'Announcements',
+        reports: 'Reports & Analytics',
+        security: 'Security Settings',
+      };
+      document.getElementById('pageTitle').textContent = titles[section] || 'Admin Panel';
+
+      if (section === 'dashboard') loadStats();
+      if (section === 'users') loadUsers();
+      if (section === 'agents') loadAgents();
+      if (section === 'games') loadGames();
+      if (section === 'transactions') loadTransactions();
+      if (section === 'wallet') loadWalletUsers();
+      if (section === 'referrals') loadReferrals();
+      if (section === 'promos') loadPromos();
+      if (section === 'announcements') loadAnnouncements();
+      if (section === 'reports') loadReports();
+    }
+
+    function fmtINR(n) {
+      const v = Number(n || 0);
+      return '₹' + v.toLocaleString('en-IN');
+    }
+
+    function userStatusBadgeClass(status) {
+      return (status || '').toLowerCase() === 'blocked' ? 'badge-blocked' : 'badge-active';
+    }
+
+    function gameStatusBadgeClass(status) {
+      const s = (status || '').toLowerCase();
+      if (s === 'active') return 'badge-active';
+      if (s === 'completed' || s === 'betting_closed') return 'badge-pending';
+      if (s === 'finished') return 'badge-deposit';
+      return 'badge-pending';
+    }
+
+    function txnTypeBadgeClass(type) {
+      const t = (type || '').toUpperCase();
+      if (t === 'WIN') return 'badge-active';
+      if (t === 'BET') return 'badge-pending';
+      if (t === 'ADDED') return 'badge-deposit';
+      if (t === 'REDEEM') return 'badge-withdrawal';
+      return 'badge-pending';
+    }
+
+    function txnStatusBadgeClass(status) {
+      const s = (status || '').toUpperCase();
+      return s === 'DONE' ? 'badge-active' : 'badge-pending';
+    }
+
+    // -------------------------
+    // Dashboard stats
+    // -------------------------
+    function loadStats() {
+      fetch('/api/admin/stats')
+        .then((r) => r.json())
+        .then((data) => {
+          document.getElementById('totalUsers').textContent = data.totalusers ?? 0;
+          document.getElementById('totalAgents').textContent = data.totalagents ?? 0;
+          document.getElementById('activeGames').textContent = data.activegames ?? 0;
+          document.getElementById('totalRevenue').textContent = fmtINR(data.totalrevenue ?? 0);
+          document.getElementById('totalDeposits').textContent = fmtINR(data.totaldeposits ?? 0);
+          document.getElementById('totalWithdrawals').textContent = fmtINR(data.totalwithdrawals ?? 0);
+        })
+        .catch((err) => console.error('Error loading stats:', err));
+    }
+
+    // -------------------------
+    // Users
+    // -------------------------
+    function loadUsers() {
+      document.getElementById('usersLoading').style.display = 'block';
+      document.getElementById('usersTableContainer').style.display = 'none';
+
+      fetch('/api/admin/users')
+        .then((r) => r.json())
+        .then((data) => {
+          allUsers = data || [];
+          filterAndDisplayUsers();
+          document.getElementById('usersLoading').style.display = 'none';
+          document.getElementById('usersTableContainer').style.display = 'block';
+        })
+        .catch((err) => {
+          console.error('Error loading users:', err);
+          document.getElementById('usersLoading').innerHTML =
+            `<div style="color:#ef4444;">Error: ${err.message}</div>`;
+        });
+    }
+
+    function filterAndDisplayUsers() {
+      const search = (document.getElementById('searchUsers')?.value || '').toLowerCase();
+
+      const filtered = (allUsers || []).filter((u) => {
+        const uname = (u.username || '').toLowerCase();
+        const email = (u.email || '').toLowerCase();
+        return uname.includes(search) || email.includes(search);
+      });
+
+      const tbody = document.getElementById('usersTableBody');
+      tbody.innerHTML = '';
+
+      if (!filtered.length) {
+        tbody.innerHTML = '<tr><td colspan="9" class="no-data">No users found</td></tr>';
+        return;
+      }
+
+      filtered.forEach((user) => {
+        const row = document.createElement('tr');
+        const status = (user.status || 'active').toLowerCase();
+
+        row.innerHTML = `
+          <td>${user.id}</td>
+          <td><strong>${user.username || '-'}</strong></td>
+          <td>${user.email || '-'}</td>
+          <td>${user.agentname || '-'}</td>
+          <td>${fmtINR(user.balance)}</td>
+          <td>
+            <a href="javascript:;" onclick="viewUserGames(${user.id})"
+               style="color:#10b981; cursor:pointer;">
+              ${user.gamesplayed ?? 0}
+            </a>
+          </td>
+          <td><span class="badge ${userStatusBadgeClass(status)}">${status.toUpperCase()}</span></td>
+          <td>${user.createdat || '-'}</td>
+          <td>
+            <div class="action-buttons">
+              <button class="btn-small btn-edit"
+                onclick="editUserBalance(${user.id}, '${(user.username||'').replace(/'/g, "\\'")}', ${Number(user.balance||0)})">
+                ✏️ Edit
+              </button>
+              ${
+                status === 'active'
+                ? `<button class="btn-small btn-block" onclick="blockUser(${user.id})">🔒 Block</button>`
+                : `<button class="btn-small btn-unblock" onclick="unblockUser(${user.id})">🔓 Unblock</button>`
+              }
+            </div>
+          </td>
+        `;
+        tbody.appendChild(row);
+      });
+    }
+
+    function viewUserGames(userId) {
+      fetch(`/api/admin/users/${userId}/games`)
+        .then((r) => r.json())
+        .then((games) => {
+          let html = '<div class="details-grid">';
+
+          if (games && games.length) {
+            games.forEach((g) => {
+              const nums = (g.numbers || []).join(', ');
+              const status = (g.status || 'pending').toUpperCase();
+              const winNo = (g.winningnumber === null || g.winningnumber === undefined) ? '-' : g.winningnumber;
+
+              html += `
+                <div class="detail-item">
+                  <div class="detail-label">Game: ${g.gametype || '-'}</div>
+                  <div class="detail-value">${g.roundcode || '-'}</div>
+                  <div style="color:#94a3b8; margin-top:5px;">Date: ${g.gamedate || '-'}</div>
+                  <div style="color:#94a3b8; margin-top:5px;">Numbers: ${nums || '-'}</div>
+                  <div style="color:#94a3b8; margin-top:5px;">Winning #: ${winNo}</div>
+                  <div style="color:#10b981; margin-top:5px;">
+                    Bet: ${fmtINR(g.betamount || 0)} | Result: ${status} | Net: ${fmtINR(g.payout || 0)}
+                  </div>
+                </div>
+              `;
+            });
+          } else {
+            html = '<div class="no-data">No games played</div>';
+          }
+
+          html += '</div>';
+
+          document.getElementById('detailsTitle').textContent = 'User Games';
+          document.getElementById('detailsContent').innerHTML = html;
+          document.getElementById('detailsModal').classList.add('active');
+        })
+        .catch(() => alert('Error loading games'));
+    }
+
+    function editUserBalance(userId, username, balance) {
+      const newBalance = prompt(
+        `Edit Balance for: ${username}\n\nCurrent: ${fmtINR(balance)}\n\nNew Balance:`
+      );
+      if (newBalance === null) return;
+
+      const value = parseInt(newBalance, 10);
+      if (isNaN(value) || value < 0) {
+        alert('Invalid amount');
+        return;
+      }
+
+      fetch(`/api/admin/users/${userId}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ balance: value }),
+      })
+        .then((r) => r.json())
+        .then((res) => {
+          alert(res.message || 'Updated');
+          loadUsers();
+          loadStats();
+        })
+        .catch((err) => alert('Error: ' + err));
+    }
+
+    function blockUser(userId) {
+      if (!confirm('Block this user?')) return;
+      fetch(`/api/admin/users/${userId}/block`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ reason: 'Blocked by admin' }),
+      })
+        .then((r) => r.json())
+        .then((res) => {
+          alert(res.message || 'Blocked');
+          loadUsers();
+          loadStats();
+        })
+        .catch((err) => alert('Error: ' + err));
+    }
+
+    function unblockUser(userId) {
+      if (!confirm('Unblock this user?')) return;
+      fetch(`/api/admin/users/${userId}/unblock`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+      })
+        .then((r) => r.json())
+        .then((res) => {
+          alert(res.message || 'Unblocked');
+          loadUsers();
+          loadStats();
+        })
+        .catch((err) => alert('Error: ' + err));
+    }
+
+    // -------------------------
+    // Agents (placeholder API)
+    // -------------------------
+    function loadAgents() {
+      document.getElementById('agentsLoading').style.display = 'block';
+      document.getElementById('agentsTableContainer').style.display = 'none';
+
+      fetch('/api/admin/agents')
+        .then((r) => r.json())
+        .then((data) => {
+          allAgents = data || [];
+          displayAgents();
+          document.getElementById('agentsLoading').style.display = 'none';
+          document.getElementById('agentsTableContainer').style.display = 'block';
+        })
+        .catch((err) => {
+          console.error('Error:', err);
+          document.getElementById('agentsLoading').innerHTML =
+            `<div style="color:#ef4444;">Error: ${err.message}</div>`;
+        });
+    }
+
+    function displayAgents() {
+      const tbody = document.getElementById('agentsTableBody');
+      tbody.innerHTML = '';
+
+      if (!allAgents.length) {
+        tbody.innerHTML = '<tr><td colspan="10" class="no-data">No agents found</td></tr>';
+        return;
+      }
+
+      allAgents.forEach((agent) => {
+        const row = document.createElement('tr');
+        const commission = 0;
+
+        row.innerHTML = `
+          <td>${agent.id ?? '-'}</td>
+          <td><strong>${agent.name ?? '-'}</strong></td>
+          <td>${agent.email ?? '-'}</td>
+          <td>${agent.salarypercent ?? 0}%</td>
+          <td>${agent.usercount ?? 0}</td>
+          <td>${fmtINR(agent.totaldeposits ?? 0)}</td>
+          <td>${fmtINR(agent.totalwithdrawals ?? 0)}</td>
+          <td>${fmtINR(commission)}</td>
+          <td><span class="badge badge-pending">N/A</span></td>
+          <td>
+            <div class="action-buttons">
+              <button class="btn-small btn-edit" onclick="alert('Not implemented')">✏️ Edit</button>
+              <button class="btn-small btn-view" onclick="alert('Not implemented')">👁️ View</button>
+            </div>
+          </td>
+        `;
+        tbody.appendChild(row);
+      });
+    }
+
+    function submitAddAgent(e) {
+      e.preventDefault();
+      const data = {
+        name: document.getElementById('agentName').value,
+        email: document.getElementById('agentEmail').value,
+        username: document.getElementById('agentUsername').value,
+        password: document.getElementById('agentPassword').value,
+        salarypercent: parseFloat(document.getElementById('agentSalaryPercent').value),
+      };
+
+      fetch('/api/admin/agents', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data),
+      })
+        .then((r) => r.json())
+        .then((res) => {
+          alert(res.message || 'Saved');
+          closeAddAgentModal();
+          loadAgents();
+          loadStats();
+        })
+        .catch((err) => alert('Error: ' + err));
+    }
+
+    function openAddAgentModal() {
+      document.getElementById('addAgentModal').classList.add('active');
+    }
+    function closeAddAgentModal() {
+      document.getElementById('addAgentModal').classList.remove('active');
+      document.getElementById('addAgentForm').reset();
+    }
+
+    // -------------------------
+    // Games
+    // -------------------------
+    function loadGames() {
+      document.getElementById('gamesLoading').style.display = 'block';
+      document.getElementById('gamesTableContainer').style.display = 'none';
+
+      fetch('/api/admin/games')
+        .then((r) => r.json())
+        .then((data) => {
+          allGames = data || [];
+          displayGames();
+          document.getElementById('gamesLoading').style.display = 'none';
+          document.getElementById('gamesTableContainer').style.display = 'block';
+        })
+        .catch((err) => {
+          console.error('Error loading games:', err);
+          document.getElementById('gamesLoading').innerHTML =
+            `<div style="color:#ef4444;">Error: ${err.message}</div>`;
+        });
+    }
+
+    function displayGames() {
+      const search = (document.getElementById('searchGames')?.value || '').toLowerCase();
+      const tbody = document.getElementById('gamesTableBody');
+      tbody.innerHTML = '';
+
+      const filtered = (allGames || []).filter((g) => {
+        const rc = (g.roundcode || '').toLowerCase();
+        const gt = (g.gametype || '').toLowerCase();
+        return rc.includes(search) || gt.includes(search);
+      });
+
+      if (!filtered.length) {
+        tbody.innerHTML = '<tr><td colspan="9" class="no-data">No games</td></tr>';
+        return;
+      }
+
+      filtered.forEach((game) => {
+        const row = document.createElement('tr');
+        const dt = `${game.gamedate || '-'} ${game.gametime || ''}`.trim();
+        const win = (game.winningnumber === null || game.winningnumber === undefined) ? '-' : game.winningnumber;
+
+        row.innerHTML = `
+          <td><strong>${game.roundcode || '-'}</strong></td>
+          <td>${game.gametype || '-'}</td>
+          <td>${game.players ?? 0}/${game.maxplayers ?? 0}</td>
+          <td>${win}</td>
+          <td>${fmtINR(game.totalbets ?? 0)}</td>
+          <td>${game.payout === null || game.payout === undefined ? '-' : fmtINR(game.payout)}</td>
+          <td>${dt}</td>
+          <td><span class="badge ${gameStatusBadgeClass(game.status)}">${(game.status || '-').toUpperCase()}</span></td>
+          <td><button class="btn-small btn-view" onclick="viewGameDetails('${(game.roundcode||'').replace(/'/g, "\\'")}')">Details</button></td>
+        `;
+        tbody.appendChild(row);
+      });
+    }
+
+    function viewGameDetails(roundCode) {
+      const game = (allGames || []).find((g) => (g.roundcode || '') === roundCode);
+      if (!game) return;
+
+      const win = (game.winningnumber === null || game.winningnumber === undefined) ? 'NA' : game.winningnumber;
+      const dt = `${game.gamedate || '-'} ${game.gametime || ''}`.trim();
+
+      const html = `
+        <div class="details-grid">
+          <div class="detail-item">
+            <div class="detail-label">Round Code</div>
+            <div class="detail-value">${game.roundcode || '-'}</div>
+          </div>
+          <div class="detail-item">
+            <div class="detail-label">Game Type</div>
+            <div class="detail-value">${game.gametype || '-'}</div>
+          </div>
+          <div class="detail-item">
+            <div class="detail-label">Winning Number</div>
+            <div class="detail-value" style="color:#f59e0b">${win}</div>
+          </div>
+          <div class="detail-item">
+            <div class="detail-label">Players</div>
+            <div class="detail-value">${game.players ?? 0}/${game.maxplayers ?? 0}</div>
+          </div>
+          <div class="detail-item">
+            <div class="detail-label">Total Bets</div>
+            <div class="detail-value">${fmtINR(game.totalbets ?? 0)}</div>
+          </div>
+          <div class="detail-item">
+            <div class="detail-label">Payout</div>
+            <div class="detail-value">${game.payout === null || game.payout === undefined ? '-' : fmtINR(game.payout)}</div>
+          </div>
+          <div class="detail-item">
+            <div class="detail-label">Date/Time</div>
+            <div class="detail-value">${dt}</div>
+          </div>
+          <div class="detail-item">
+            <div class="detail-label">Status</div>
+            <div class="detail-value">${(game.status || '-').toUpperCase()}</div>
+          </div>
+        </div>
+      `;
+
+      document.getElementById('detailsTitle').textContent = 'Game Details';
+      document.getElementById('detailsContent').innerHTML = html;
+      document.getElementById('detailsModal').classList.add('active');
+    }
+
+    // -------------------------
+    // Transactions
+    // -------------------------
+    function loadTransactions() {
+      document.getElementById('transactionsLoading').style.display = 'block';
+      document.getElementById('transactionsTableContainer').style.display = 'none';
+
+      fetch('/api/admin/transactions')
+        .then((r) => r.json())
+        .then((data) => {
+          allTxns = data || [];
+          displayTransactions();
+          document.getElementById('transactionsLoading').style.display = 'none';
+          document.getElementById('transactionsTableContainer').style.display = 'block';
+        })
+        .catch((err) => {
+          console.error('Error:', err);
+          document.getElementById('transactionsLoading').innerHTML =
+            `<div style="color:#ef4444;">Error: ${err.message}</div>`;
+        });
+    }
+
+    function displayTransactions() {
+      const search = (document.getElementById('searchTransactions')?.value || '').toLowerCase();
+      const tbody = document.getElementById('transactionsTableBody');
+      tbody.innerHTML = '';
+
+      const filtered = (allTxns || []).filter((t) => {
+        const idStr = String(t.txnid ?? '').toLowerCase();
+        const uname = (t.username || '').toLowerCase();
+        return idStr.includes(search) || uname.includes(search);
+      });
+
+      if (!filtered.length) {
+        tbody.innerHTML = '<tr><td colspan="8" class="no-data">No transactions</td></tr>';
+        return;
+      }
+
+      filtered.forEach((txn) => {
+        const row = document.createElement('tr');
+        const type = (txn.type || '').toUpperCase();
+        const status = (txn.status || '').toUpperCase();
+
+        row.innerHTML = `
+          <td>${txn.txnid ?? '-'}</td>
+          <td>${txn.username || '-'}</td>
+          <td><span class="badge ${txnTypeBadgeClass(type)}">${type || '-'}</span></td>
+          <td>${fmtINR(txn.amount ?? 0)}</td>
+          <td><span class="badge ${txnStatusBadgeClass(status)}">${status || '-'}</span></td>
+          <td>${txn.txndate || '-'}</td>
+          <td>${txn.reference || '-'}</td>
+          <td><button class="btn-small btn-view" onclick="alert('Txn ID: ${txn.txnid}')">📋 View</button></td>
+        `;
+        tbody.appendChild(row);
+      });
+    }
+
+    // -------------------------
+    // Wallet
+    // -------------------------
+    function loadWalletUsers() {
+      document.getElementById('walletLoading').style.display = 'block';
+      document.getElementById('walletTableContainer').style.display = 'none';
+
+      fetch('/api/admin/wallet')
+        .then((r) => r.json())
+        .then((data) => {
+          allWalletUsers = data || [];
+          displayWalletUsers();
+          document.getElementById('walletLoading').style.display = 'none';
+          document.getElementById('walletTableContainer').style.display = 'block';
+        })
+        .catch((err) => {
+          console.error('Error:', err);
+          document.getElementById('walletLoading').innerHTML =
+            `<div style="color:#ef4444;">Error: ${err.message}</div>`;
+        });
+    }
+
+    function displayWalletUsers() {
+      const search = (document.getElementById('searchWallet')?.value || '').toLowerCase();
+      const tbody = document.getElementById('walletTableBody');
+      tbody.innerHTML = '';
+
+      const filtered = (allWalletUsers || []).filter((u) => (u.username || '').toLowerCase().includes(search));
+
+      if (!filtered.length) {
+        tbody.innerHTML = '<tr><td colspan="5" class="no-data">No users</td></tr>';
+        return;
+      }
+
+      filtered.forEach((user) => {
+        const row = document.createElement('tr');
+        row.innerHTML = `
+          <td><strong>${user.username || '-'}</strong></td>
+          <td>${fmtINR(user.balance ?? 0)}</td>
+          <td>${fmtINR(user.totaldeposits ?? 0)}</td>
+          <td>${fmtINR(user.totalwithdrawals ?? 0)}</td>
+          <td>
+            <div class="action-buttons">
+              <button class="btn-small btn-edit" onclick="selectUserForFunds('${(user.username||'').replace(/'/g, "\\'")}', 'add')">➕ Add</button>
+              <button class="btn-small btn-block" onclick="selectUserForFunds('${(user.username||'').replace(/'/g, "\\'")}', 'deduct')">➖ Deduct</button>
+            </div>
+          </td>
+        `;
+        tbody.appendChild(row);
+      });
+    }
+
+    function selectUserForFunds(username, type) {
+      if (type === 'add') {
+        document.getElementById('addFundsUser').value = username;
+        openAddFundsModal();
+      } else {
+        document.getElementById('deductFundsUser').value = username;
+        openDeductFundsModal();
+      }
+    }
+
+    function submitAddFunds(e) {
+      e.preventDefault();
+      const user = document.getElementById('addFundsUser').value;
+      const amount = parseFloat(document.getElementById('addFundsAmount').value);
+      const reason = document.getElementById('addFundsReason').value;
+
+      fetch('/api/admin/wallet/add', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ user, amount, reason }),
+      })
+        .then((r) => r.json())
+        .then((res) => {
+          alert(res.message || 'Done');
+          closeAddFundsModal();
+          loadWalletUsers();
+          loadStats();
+        })
+        .catch((err) => alert('Error: ' + err));
+    }
+
+    function submitDeductFunds(e) {
+      e.preventDefault();
+      const user = document.getElementById('deductFundsUser').value;
+      const amount = parseFloat(document.getElementById('deductFundsAmount').value);
+      const reason = document.getElementById('deductFundsReason').value;
+
+      fetch('/api/admin/wallet/deduct', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ user, amount, reason }),
+      })
+        .then((r) => r.json())
+        .then((res) => {
+          alert(res.message || 'Done');
+          closeDeductFundsModal();
+          loadWalletUsers();
+          loadStats();
+        })
+        .catch((err) => alert('Error: ' + err));
+    }
+
+    function openAddFundsModal() {
+      document.getElementById('addFundsModal').classList.add('active');
+    }
+    function closeAddFundsModal() {
+      document.getElementById('addFundsModal').classList.remove('active');
+      document.getElementById('addFundsForm').reset();
+    }
+    function openDeductFundsModal() {
+      document.getElementById('deductFundsModal').classList.add('active');
+    }
+    function closeDeductFundsModal() {
+      document.getElementById('deductFundsModal').classList.remove('active');
+      document.getElementById('deductFundsForm').reset();
+    }
+
+    // -------------------------
+    // Referrals/Promos/Announcements/Reports (placeholders)
+    // -------------------------
+    function loadReferrals() {
+      document.getElementById('referralsLoading').style.display = 'block';
+      document.getElementById('referralsTableContainer').style.display = 'none';
+
+      fetch('/api/admin/referrals')
+        .then((r) => r.json())
+        .then((data) => {
+          const tbody = document.getElementById('referralsTableBody');
+          tbody.innerHTML = '';
+          if (!data || !data.length) {
+            tbody.innerHTML = '<tr><td colspan="8" class="no-data">No referral data</td></tr>';
+          }
+          document.getElementById('referralsLoading').style.display = 'none';
+          document.getElementById('referralsTableContainer').style.display = 'block';
+        })
+        .catch((err) => {
+          console.error('Error:', err);
+          document.getElementById('referralsLoading').innerHTML =
+            `<div style="color:#ef4444;">Error: ${err.message}</div>`;
+        });
+    }
+
+    function loadPromos() {
+      document.getElementById('promosLoading').style.display = 'block';
+      document.getElementById('promosTableContainer').style.display = 'none';
+
+      fetch('/api/admin/promos')
+        .then((r) => r.json())
+        .then((data) => {
+          const tbody = document.getElementById('promosTableBody');
+          tbody.innerHTML = '';
+          if (!data || !data.length) {
+            tbody.innerHTML = '<tr><td colspan="8" class="no-data">No promos</td></tr>';
+          }
+          document.getElementById('promosLoading').style.display = 'none';
+          document.getElementById('promosTableContainer').style.display = 'block';
+        })
+        .catch((err) => {
+          console.error('Error:', err);
+          document.getElementById('promosLoading').innerHTML =
+            `<div style="color:#ef4444;">Error: ${err.message}</div>`;
+        });
+    }
+
+    function submitAddPromo(e) {
+      e.preventDefault();
+      const data = {
+        code: document.getElementById('promoCode').value,
+        type: document.getElementById('promoType').value,
+        discount: parseFloat(document.getElementById('promoValue').value),
+        maxuses: parseInt(document.getElementById('promoMaxUses').value, 10),
+        validtill: document.getElementById('promoValidTill').value,
+      };
+
+      fetch('/api/admin/promos', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data),
+      })
+        .then((r) => r.json())
+        .then((res) => {
+          alert(res.message || 'Saved');
+          closeAddPromoModal();
+          loadPromos();
+        })
+        .catch((err) => alert('Error: ' + err));
+    }
+
+    function openAddPromoModal() {
+      document.getElementById('addPromoModal').classList.add('active');
+    }
+    function closeAddPromoModal() {
+      document.getElementById('addPromoModal').classList.remove('active');
+      document.getElementById('addPromoForm').reset();
+    }
+
+    function loadAnnouncements() {
+      document.getElementById('announcementsLoading').style.display = 'block';
+      document.getElementById('announcementsTableContainer').style.display = 'none';
+
+      fetch('/api/admin/announcements')
+        .then((r) => r.json())
+        .then((data) => {
+          const tbody = document.getElementById('announcementsTableBody');
+          tbody.innerHTML = '';
+          if (!data || !data.length) {
+            tbody.innerHTML = '<tr><td colspan="6" class="no-data">No announcements</td></tr>';
+          }
+          document.getElementById('announcementsLoading').style.display = 'none';
+          document.getElementById('announcementsTableContainer').style.display = 'block';
+        })
+        .catch((err) => {
+          console.error('Error:', err);
+          document.getElementById('announcementsLoading').innerHTML =
+            `<div style="color:#ef4444;">Error: ${err.message}</div>`;
+        });
+    }
+
+    function submitAnnounce(e) {
+      e.preventDefault();
+      const data = {
+        title: document.getElementById('announceTitle').value,
+        message: document.getElementById('announceMessage').value,
+        target: document.getElementById('announceTarget').value,
+      };
+
+      fetch('/api/admin/announcements', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data),
+      })
+        .then((r) => r.json())
+        .then((res) => {
+          alert(res.message || 'Sent');
+          closeAnnounceModal();
+          loadAnnouncements();
+        })
+        .catch((err) => alert('Error: ' + err));
+    }
+
+    function openAnnounceModal() {
+      document.getElementById('announceModal').classList.add('active');
+    }
+    function closeAnnounceModal() {
+      document.getElementById('announceModal').classList.remove('active');
+      document.getElementById('announceForm').reset();
+    }
+
+    function loadReports() {
+      fetch('/api/admin/reports')
+        .then((r) => r.json())
+        .then((data) => {
+          document.getElementById('newUsers30d').textContent = data.newusers30d ?? 0;
+          document.getElementById('revenue30d').textContent = fmtINR(data.revenue30d ?? 0);
+          document.getElementById('gamesPlayed30d').textContent = data.gamesplayed30d ?? 0;
+          document.getElementById('avgWinRate').textContent = (data.avgwinrate ?? 0) + '%';
+        })
+        .catch((err) => console.error('Error:', err));
+    }
+
+    // -------------------------
+    // Common UI
+    // -------------------------
+    function openSecurityModal() {
+      alert('Security settings: 2FA, IP whitelist management coming soon...');
+    }
+
+    function closeDetailsModal() {
+      document.getElementById('detailsModal').classList.remove('active');
+    }
+
+    function logout() {
+      if (confirm('Logout?')) window.location.href = '/logout';
+    }
+
+    document.addEventListener('click', function (e) {
+      if (e.target.classList.contains('modal')) e.target.classList.remove('active');
+    });
+  </script>
 </body>
 </html>
