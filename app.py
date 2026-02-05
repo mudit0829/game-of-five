@@ -441,11 +441,10 @@ def manage_game_table(table: GameTable):
                     table.is_finished = True
                     result = table.calculate_result()
                     winners = table.get_winners()
-                    print(
-                        f"{table.game_type} Table {table.table_number}: Game ended. Winner: {result}"
-                    )
+                    print(f"{table.game_type} Table {table.table_number}: Game ended. Winner: {result}")
 
-                                      for bet in table.bets:
+                    # History update
+                    for bet in table.bets:
                         if bet.get("is_bot"):
                             continue
                         uid = bet["user_id"]
@@ -460,22 +459,17 @@ def manage_game_table(table: GameTable):
                                 rec["win"] = bet["number"] == result
                                 rec["status"] = "win" if rec["win"] else "lose"
                                 rec["amount"] = (
-                                    table.config["payout"]
-                                    if rec["win"]
-                                    else -table.config["bet_amount"]
+                                    table.config["payout"] if rec["win"] else -table.config["bet_amount"]
                                 )
                                 rec["is_resolved"] = True
                                 rec["date_time"] = now.strftime("%Y-%m-%d %H:%M")
 
-                    # ✅ WINNERS LOOP - PERFECT INDENTATION
+                    # Winners payout + transaction log
                     for winner in winners:
-                        wallet = Wallet.query.filter_by(
-                            user_id=winner["user_id"]
-                        ).first()
+                        wallet = Wallet.query.filter_by(user_id=winner["user_id"]).first()
                         if wallet:
                             wallet.balance += winner["payout"]
                         
-                        # ✅ LOG WIN TO DATABASE
                         win_tx = Transaction(
                             user_id=winner["user_id"],
                             kind="win",
@@ -496,15 +490,14 @@ def manage_game_table(table: GameTable):
                     table.is_finished = False
                     table.start_time = datetime.now()
                     table.end_time = table.start_time + timedelta(minutes=5)
-                    table.betting_close_time = table.end_time - timedelta(
-                        seconds=15
-                    )
+                    table.betting_close_time = table.end_time - timedelta(seconds=15)
                     table.round_code = table._make_round_code()
                     table.last_bot_added_at = None
-                    print(
-                        f"{table.game_type} Table {table.table_number}: New round started - {table.round_code}"
-                    )
+                    print(f"{table.game_type} Table {table.table_number}: New round started - {table.round_code}")
 
+                time.sleep(1)
+            except Exception as e:
+                print(f"Error managing table {table.game_type} #{table.table_number}: {e}")
                 time.sleep(1)
             except Exception as e:
                 print(
