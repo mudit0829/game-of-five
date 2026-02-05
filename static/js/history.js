@@ -1,4 +1,4 @@
-// ✅ FIXED History page logic
+// ✅ FINAL FIXED History page logic
 
 function formatTime(sec) {
   const s = Math.max(0, parseInt(sec || 0, 10));
@@ -15,7 +15,6 @@ function formatDateTime(dateTimeStr) {
     const date = new Date(dateTimeStr);
     if (isNaN(date.getTime())) return 'N/A';
     
-    // Format: "05 Feb 2026, 6:40 PM"
     const options = {
       day: '2-digit',
       month: 'short',
@@ -60,12 +59,12 @@ function renderGameCard(game, isCurrent) {
 
   const gameType = game.game_type || "silver";
   const roundCode = game.round_code || "-";
-  const userBets = game.user_bets || [];  // ✅ Array of numbers
+  const userBets = game.user_bets || [];
   const status = game.status || (isCurrent ? "pending" : "completed");
   const winningNumber =
     typeof game.winning_number === "number" ? game.winning_number : null;
   const amount = game.amount || 0;
-  const betTime = game.bet_time || game.date_time || null;  // ✅ Get datetime
+  const betTime = game.bet_time || game.date_time || null;
 
   const isWin = status === "win" || amount > 0;
   const isLose = status === "lose" || amount < 0;
@@ -78,7 +77,6 @@ function renderGameCard(game, isCurrent) {
   const statusClass = isCurrent ? "status-pending" : "status-completed";
   const statusLabel = isCurrent ? "Pending" : "Completed";
 
-  // ✅ Format bet numbers as comma-separated list
   const betNumbersDisplay = userBets.length > 0 
     ? userBets.join(', ') 
     : 'N/A';
@@ -127,7 +125,8 @@ function renderGameCard(game, isCurrent) {
     btn.textContent = "Go to game";
     btn.disabled = false;
     btn.addEventListener("click", () => {
-      // ✅ FIX: Navigate directly to the game with round_code parameter
+      // ✅ CRITICAL FIX: Navigate to game page WITH round_code as URL parameter
+      // This tells the game page to JOIN existing game, not create new bet
       window.location.href = `/play/${gameType}?round_code=${encodeURIComponent(roundCode)}`;
     });
   } else {
@@ -191,11 +190,11 @@ document.addEventListener("DOMContentLoaded", () => {
   setupTabs();
   loadHistory();
   
-  // ✅ Auto-refresh current games every 30 seconds
+  // ✅ Auto-refresh current games every 10 seconds to update time
   setInterval(() => {
     const currentTab = document.querySelector('.tab[data-tab="current"]');
     if (currentTab && currentTab.classList.contains('active')) {
       loadHistory();
     }
-  }, 30000);
+  }, 10000);
 });
