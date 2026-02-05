@@ -1,10 +1,35 @@
-// Simple History page logic: tabs + fetch from /api/user-games
+// ✅ FIXED History page logic
 
 function formatTime(sec) {
   const s = Math.max(0, parseInt(sec || 0, 10));
   const m = Math.floor(s / 60);
   const r = s % 60;
   return `${String(m).padStart(2, "0")}:${String(r).padStart(2, "0")}`;
+}
+
+// ✅ NEW: Format datetime for display
+function formatDateTime(dateTimeStr) {
+  if (!dateTimeStr) return 'N/A';
+  
+  try {
+    const date = new Date(dateTimeStr);
+    if (isNaN(date.getTime())) return 'N/A';
+    
+    // Format: "05 Feb 2026, 6:40 PM"
+    const options = {
+      day: '2-digit',
+      month: 'short',
+      year: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
+      hour12: true
+    };
+    
+    return date.toLocaleString('en-IN', options);
+  } catch (e) {
+    console.error('Date formatting error:', e);
+    return 'N/A';
+  }
 }
 
 function setupTabs() {
@@ -30,18 +55,17 @@ function setupTabs() {
 }
 
 function renderGameCard(game, isCurrent) {
-  // game structure comes from /api/user-games in app.py
   const card = document.createElement("div");
   card.className = "game-card";
 
   const gameType = game.game_type || "silver";
   const roundCode = game.round_code || "-";
-  const bets = game.user_bets || [];
-  const betCount = bets.length;
+  const userBets = game.user_bets || [];  // ✅ Array of numbers
   const status = game.status || (isCurrent ? "pending" : "completed");
   const winningNumber =
     typeof game.winning_number === "number" ? game.winning_number : null;
   const amount = game.amount || 0;
+  const betTime = game.bet_time || game.date_time || null;  // ✅ Get datetime
 
   const isWin = status === "win" || amount > 0;
   const isLose = status === "lose" || amount < 0;
@@ -54,6 +78,11 @@ function renderGameCard(game, isCurrent) {
   const statusClass = isCurrent ? "status-pending" : "status-completed";
   const statusLabel = isCurrent ? "Pending" : "Completed";
 
+  // ✅ Format bet numbers as comma-separated list
+  const betNumbersDisplay = userBets.length > 0 
+    ? userBets.join(', ') 
+    : 'N/A';
+
   card.innerHTML = `
     <div class="game-card-header">
       <span class="game-id">${roundCode}</span>
@@ -61,28 +90,31 @@ function renderGameCard(game, isCurrent) {
     </div>
 
     <div class="game-info">
-      <div class="game-name">${gameType}</div>
+      <div class="game-name">${gameType.charAt(0).toUpperCase() + gameType.slice(1)}</div>
+      
       <div class="game-bets">
-        <span>Your bets:</span>
-        <span class="bet-count">${betCount}</span>
+        <span>Your bet${userBets.length > 1 ? 's' : ''} on:</span>
+        <span class="bet-numbers">${betNumbersDisplay}</span>
       </div>
+      
       <div class="game-result-text">
         ${
           isCurrent
             ? "Waiting for result..."
             : isWin
-            ? `You won · Result: ${winningNumber}`
+            ? `✅ You won · Result: ${winningNumber}`
             : isLose
-            ? `You lost · Result: ${winningNumber}`
+            ? `❌ You lost · Result: ${winningNumber}`
             : `Result: ${winningNumber ?? "--"}`
         }
       </div>
+      
       <div class="timer-row">
-        <span class="timer-label">Time:</span>
+        <span class="timer-label">${isCurrent ? 'Time remaining:' : 'Bet placed:'}</span>
         <span class="timer-value">${
-          game.time_remaining != null
-            ? formatTime(game.time_remaining)
-            : "--:--"
+          isCurrent
+            ? (game.time_remaining != null ? formatTime(game.time_remaining) : "--:--")
+            : formatDateTime(betTime)
         }</span>
       </div>
     </div>
@@ -95,14 +127,13 @@ function renderGameCard(game, isCurrent) {
     btn.textContent = "Go to game";
     btn.disabled = false;
     btn.addEventListener("click", () => {
-      // open the correct game + table
-      window.location.href = `/play/${gameType}?table=${encodeURIComponent(
-        roundCode
-      )}`;
+      // ✅ FIX: Navigate to game lobby (not directly to table)
+      // This avoids "all slots full" error
+      window.location.href = `/game/${gameType}`;
     });
   } else {
     btn.textContent = "View result";
-    btn.disabled = true; // just info, no new game
+    btn.disabled = true;
   }
 
   card.appendChild(btn);
@@ -124,6 +155,8 @@ async function loadHistory() {
 
     const currentGames = data.current_games || [];
     const historyGames = data.game_history || [];
+
+    console.log('✅ Loaded games:', { currentGames, historyGames });  // Debug
 
     // CURRENT
     currentWrap.innerHTML = "";
@@ -158,4 +191,12 @@ async function loadHistory() {
 document.addEventListener("DOMContentLoaded", () => {
   setupTabs();
   loadHistory();
+  
+  // ✅ Auto-refresh current games every 30 seconds
+  setInterval(() => {
+    const currentTab = document.querySelector('.tab[data-tab="current"]');
+    if (currentTab && currentTab.classList.contains('active')) {
+      loadHistory();
+    }
+  }, 30000);
 });
