@@ -11,16 +11,13 @@ from flask_sqlalchemy import SQLAlchemy
 from flask_socketio import SocketIO, emit, join_room
 from flask_cors import CORS
 from datetime import datetime, timedelta
-from datetime import datetime
 from functools import wraps
-from flask import session
 import threading
 import random
 import time
 import os
 import hashlib
 import secrets
-from functools import wraps
 
 # ---------------------------------------------------
 # Flask / DB / Socket setup
@@ -499,11 +496,6 @@ def manage_game_table(table: GameTable):
             except Exception as e:
                 print(f"Error managing table {table.game_type} #{table.table_number}: {e}")
                 time.sleep(1)
-            except Exception as e:
-                print(
-                    f"Error managing table {table.game_type} #{table.table_number}: {e}"
-                )
-                time.sleep(1)
 
 
 def start_all_game_tables():
@@ -933,28 +925,6 @@ def redeem_coins():
         'message': f'Successfully redeemed {amount} coins!',
         'new_balance': wallet.balance
     })
-
-    # Update balance
-    new_balance = user.get('balance', 0) - amount
-    users_collection.update_one(
-        {'_id': ObjectId(user_id)},
-        {'$set': {'balance': new_balance}}
-    )
-    
-    # Log redemption
-    redeem_logs_collection.insert_one({
-        'user_id': user_id,
-        'amount': amount,
-        'timestamp': datetime.now(),
-        'status': 'completed'
-    })
-    
-    return jsonify({
-        'success': True,
-        'message': f'Successfully redeemed {amount} coins!',
-        'new_balance': new_balance
-    })
-
 
 
 @app.route("/api/help/tickets", methods=["GET", "POST"])
@@ -1473,18 +1443,18 @@ def handle_place_bet(data):
         return
 
     wallet.balance -= bet_amount
-    # ✅ LOG BET TO DATABASE
-bet_tx = Transaction(
-    user_id=user_id,
-    kind="bet",
-    amount=bet_amount,
-    balance_after=wallet.balance,
-    label="Bet Placed", 
-    game_title=table.config["name"],
-    note=f"Number {number}"
-)
-db.session.add(bet_tx)
-# (your existing db.session.commit() stays here)
+
+    # ✅ LOG BET TO DATABASE (FIXED INDENTATION)
+    bet_tx = Transaction(
+        user_id=user_id,
+        kind="bet",
+        amount=bet_amount,
+        balance_after=wallet.balance,
+        label="Bet Placed", 
+        game_title=table.config["name"],
+        note=f"Number {number}"
+    )
+    db.session.add(bet_tx)
 
     db.session.commit()
 
@@ -1526,7 +1496,6 @@ db.session.add(bet_tx)
         include_self=True
     )
 
-    # ========== END NEW CODE ==========
 
 # ---------------------------------------------------
 # Demo user seeding
