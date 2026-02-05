@@ -604,6 +604,8 @@ def user_games_history_api():
                 "date_time": "",
                 "status": None,
                 "amount": 0,
+                "time_remaining": None,
+                "table_number": b.get("table_number"),
             }
         grouped[key]["user_bets"].append(b["number"])
         if b.get("winning_number") is not None:
@@ -617,6 +619,16 @@ def user_games_history_api():
             grouped[key]["date_time"] = b["date_time"]
 
     all_games = list(grouped.values())
+
+    # ✅ FIX: Populate time_remaining AFTER grouping (only for current/unresolved games)
+    for g in all_games:
+        if not g.get("status"):
+            tables = game_tables.get(g["game_type"], [])
+            for table in tables:
+                if table.round_code == g["round_code"]:
+                    g["time_remaining"] = table.get_time_remaining()
+                    break
+
     game_history = [g for g in all_games if g.get("status")]
     current_games = [g for g in all_games if not g.get("status")]
 
