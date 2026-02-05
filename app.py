@@ -145,6 +145,17 @@ class Ticket(db.Model):
     )
     attachment_name = db.Column(db.String(255))
 
+class Transaction(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey("user.id"), nullable=False, index=True)
+    kind = db.Column(db.String(50), nullable=False)  # 'bet', 'win', 'added', 'redeem'
+    amount = db.Column(db.Integer, nullable=False)
+    balance_after = db.Column(db.Integer, nullable=False)
+    label = db.Column(db.String(100))
+    game_title = db.Column(db.String(100))
+    note = db.Column(db.Text)
+    datetime = db.Column(db.DateTime, default=datetime.utcnow, index=True)
+
 
 # ---------------------------------------------------
 # In-memory structures
@@ -462,6 +473,20 @@ def manage_game_table(table: GameTable):
                         ).first()
                         if wallet:
                             wallet.balance += winner["payout"]
+
+                    # ✅ LOG WIN TO DATABASE
+win_tx = Transaction(
+    user_id=winner["user_id"],
+    kind="win",
+    amount=winner["payout"],
+    balance_after=wallet.balance,
+    label="Game Won",
+    game_title=table.config["name"],
+    note=f"Hit number {table.result}"
+)
+db.session.add(win_tx)
+# (existing db.session.commit() stays)
+
                     db.session.commit()
 
                     time.sleep(3)
@@ -795,54 +820,38 @@ def profile_page():
         return redirect(url_for("logout"))
 
     wallet = ensure_wallet_for_user(user)
+    wallet_balance = wallet.balance if wallet else 0
     joined_at = user.created_at.strftime("%d %b %Y") if user.created_at else "Just now"
 
+    # ✅ REAL TRANSACTIONS FROM DATABASE
+    transactions = Transaction.query.filter_by(user_id=user_id)\
+        .order_by(Transaction.datetime.desc())\
+        .limit(50).all()
+    
     txns = []
-    for rec in user_game_history.get(user_id, []):
-        cfg = GAME_CONFIGS.get(rec["game_type"], {})
-        game_title = cfg.get("name", rec["game_type"])
-        bet_amt = rec.get("bet_amount", cfg.get("bet_amount", 0))
-        dt = rec.get("bet_time", datetime.now())
-        if isinstance(dt, datetime):
-            dt_str = dt.strftime("%Y-%m-%d %H:%M")
-        else:
-            dt_str = str(dt)
-
-        txns.append(
-            {
-                "kind": "bet",
-                "amount": bet_amt,
-                "datetime": dt_str,
-                "label": "Bet",
-                "game_title": game_title,
-                "note": f"Number {rec['number']}",
-            }
-        )
-
-        if rec.get("is_resolved") and rec.get("win"):
-            dt2 = rec.get("date_time") or dt_str
-            txns.append(
-                {
-                    "kind": "win",
-                    "amount": cfg.get("payout", 0),
-                    "datetime": dt2,
-                    "label": "Win",
-                    "game_title": game_title,
-                    "note": f"Result {rec.get('winning_number')}",
-                }
-            )
+    for t in transactions:
+        txns.append({
+            'kind': t.kind,
+            'amount': t.amount,
+            'datetime': t.datetime.isoformat(),
+            'label': t.label or t.kind.title(),
+            'game_title': t.game_title or '',
+            'note': t.note or '',
+            'balance_after': t.balance_after
+        })
 
     return render_template(
         "profile.html",
         username=user.username,
         display_name=user.display_name or user.username,
         joined_at=joined_at,
-        wallet_balance=wallet.balance if wallet else 0,
+        wallet_balance=wallet_balance,
         email=user.email or "",
         country=user.country or "",
         phone=user.phone or "",
-        transactions=txns,
+        transactions=txns  # ✅ SENDS REAL DATA TO JS
     )
+
 
 
 @app.route("/profile/update", methods=["POST"])
@@ -1471,6 +1480,19 @@ def handle_place_bet(data):
         return
 
     wallet.balance -= bet_amount
+    # ✅ LOG BET TO DATABASE
+bet_tx = Transaction(
+    user_id=user_id,
+    kind="bet",
+    amount=bet_amount,
+    balance_after=wallet.balance,
+    label="Bet Placed", 
+    game_title=table.config["name"],
+    note=f"Number {number}"
+)
+db.session.add(bet_tx)
+# (your existing db.session.commit() stays here)
+
     db.session.commit()
 
     # ✅ FIXED: Build correct players data with user_id
