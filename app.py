@@ -1,3 +1,11 @@
+import os
+import time
+import random
+import threading
+import hashlib
+import secrets
+from datetime import datetime, timedelta
+
 from flask import (
     Flask,
     render_template,
@@ -10,34 +18,39 @@ from flask import (
 from flask_sqlalchemy import SQLAlchemy
 from flask_socketio import SocketIO, emit, join_room
 from flask_cors import CORS
-from datetime import datetime, timedelta
 from functools import wraps
-import threading
-import random
-import time
-import os
-import hashlib
-import secrets
 
-# ---------------------------------------------------
-# Flask / DB / Socket setup
-# ---------------------------------------------------
+
+# ============================================================
+# App / Config
+# ============================================================
 
 app = Flask(__name__)
-app.config["SECRET_KEY"] = "your-secret-key-here-change-this-in-production"
+
+# IMPORTANT for Render/GitHub deploy:
+# - Set SECRET_KEY in Render env
+# - Set DATABASE_URL (Postgres) if you want persistence; otherwise SQLite is used.
+app.config["SECRET_KEY"] = os.environ.get("SECRET_KEY", "change-this-secret-in-production")
 app.config["PROPAGATE_EXCEPTIONS"] = True
 app.config["SESSION_COOKIE_HTTPONLY"] = True
 app.config["SESSION_COOKIE_SAMESITE"] = "Lax"
 app.config["PERMANENT_SESSION_LIFETIME"] = timedelta(days=7)
 
-# DB config - uses sqlite in current directory
-db_path = os.path.join(os.path.dirname(__file__), 'game.db')
-app.config["SQLALCHEMY_DATABASE_URI"] = f"sqlite:///{db_path}"
+database_url = os.environ.get("DATABASE_URL")
+if database_url:
+    # Render often provides postgres://, SQLAlchemy expects postgresql://
+    if database_url.startswith("postgres://"):
+        database_url = database_url.replace("postgres://", "postgresql://", 1)
+    app.config["SQLALCHEMY_DATABASE_URI"] = database_url
+else:
+    db_path = os.path.join(os.path.dirname(__file__), "game.db")
+    app.config["SQLALCHEMY_DATABASE_URI"] = f"sqlite:///{db_path}"
+
 app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
 
 db = SQLAlchemy(app)
-
 CORS(app, resources={r"/*": {"origins": "*"}})
+
 socketio = SocketIO(
     app,
     cors_allowed_origins="*",
@@ -46,9 +59,11 @@ socketio = SocketIO(
     ping_interval=25,
 )
 
-# ---------------------------------------------------
-# Game configurations
-# ---------------------------------------------------
+
+# ============================================================
+# Game configs
+# ============================================================
+
 GAME_CONFIGS = {
     "silver": {
         "bet_amount": 10,
@@ -92,29 +107,29 @@ GAME_CONFIGS = {
     },
 }
 
-# ---------------------------------------------------
-# SQLAlchemy Models
-# ---------------------------------------------------
 
+# ============================================================
+# Models
+# ============================================================
 
 class User(db.Model):
     id = db.Column(db.Integer, primary_key=True)
+
     username = db.Column(db.String(80), unique=True, nullable=False, index=True)
     password_hash = db.Column(db.String(128), nullable=False)
+
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
     display_name = db.Column(db.String(120))
     email = db.Column(db.String(200))
     country = db.Column(db.String(100))
     phone = db.Column(db.String(50))
-    
-    # Admin fields
+
     is_admin = db.Column(db.Boolean, default=False)
     is_blocked = db.Column(db.Boolean, default=False)
     block_reason = db.Column(db.Text)
 
     wallet = db.relationship("Wallet", backref="user", uselist=False)
-    tickets = db.relationship("Ticket", backref="user", lazy=True)
 
     def set_password(self, password: str):
         self.password_hash = hashlib.sha256(password.encode()).hexdigest()
@@ -132,40 +147,93 @@ class Wallet(db.Model):
 
 class Ticket(db.Model):
     id = db.Column(db.Integer, primary_key=True)
-    user_id = db.Column(db.Integer, db.ForeignKey("user.id"), nullable=False)
+    user_id = db.Column(db.Integer, db.ForeignKey("user.id"), nullable=False, index=True)
+
     subject = db.Column(db.String(200))
     message = db.Column(db.Text)
     status = db.Column(db.String(20), default="open")
-    created_at = db.Column(db.DateTime, default=datetime.utcnow)
-    updated_at = db.Column(
-        db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow
-    )
+
+    created_at = db.Column(db.DateTime, default=datetime.utcnow, index=True)
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
     attachment_name = db.Column(db.String(255))
+
 
 class Transaction(db.Model):
     id = db.Column(db.Integer, primary_key=True)
+
     user_id = db.Column(db.Integer, db.ForeignKey("user.id"), nullable=False, index=True)
-    kind = db.Column(db.String(50), nullable=False)  # 'bet', 'win', 'added', 'redeem'
+    kind = db.Column(db.String(50), nullable=False)  # bet, win, added, redeem
+
     amount = db.Column(db.Integer, nullable=False)
     balance_after = db.Column(db.Integer, nullable=False)
+
     label = db.Column(db.String(100))
     game_title = db.Column(db.String(100))
     note = db.Column(db.Text)
+
+    game_type = db.Column(db.String(30), index=True)
+    round_code = db.Column(db.String(80), index=True)
+    table_number = db.Column(db.Integer)
+
     datetime = db.Column(db.DateTime, default=datetime.utcnow, index=True)
 
 
-# ---------------------------------------------------
-# In-memory structures
-# ---------------------------------------------------
+class GameRound(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
 
-game_tables = {}
-user_game_history = {}
+    round_code = db.Column(db.String(80), unique=True, nullable=False, index=True)
+    game_type = db.Column(db.String(30), nullable=False, index=True)
+    table_number = db.Column(db.Integer, nullable=False, index=True)
+
+    started_at = db.Column(db.DateTime, nullable=False, index=True)
+    ended_at = db.Column(db.DateTime, nullable=False, index=True)
+
+    status = db.Column(db.String(20), default="finished", index=True)  # finished
+    winning_number = db.Column(db.Integer)
+
+    total_players = db.Column(db.Integer, default=0)
+    total_bets = db.Column(db.Integer, default=0)
+    total_payout = db.Column(db.Integer, default=0)
 
 
-# ---------------------------------------------------
-# Helpers
-# ---------------------------------------------------
+class GameBet(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
 
+    user_id = db.Column(db.Integer, db.ForeignKey("user.id"), nullable=False, index=True)
+
+    round_code = db.Column(db.String(80), nullable=False, index=True)
+    game_type = db.Column(db.String(30), nullable=False, index=True)
+    table_number = db.Column(db.Integer, nullable=False, index=True)
+
+    number = db.Column(db.Integer, nullable=False)
+    bet_amount = db.Column(db.Integer, nullable=False)
+
+    created_at = db.Column(db.DateTime, default=datetime.utcnow, index=True)
+
+    resolved = db.Column(db.Boolean, default=False, index=True)
+    winning_number = db.Column(db.Integer)
+    status = db.Column(db.String(20))  # win / lose
+    amount = db.Column(db.Integer, default=0)  # +payout or -bet_amount per bet
+    resolved_at = db.Column(db.DateTime)
+
+
+class LeaderLock(db.Model):
+    """Prevent multiple Gunicorn workers from starting duplicate game threads."""
+    id = db.Column(db.Integer, primary_key=True)  # always 1
+    leader_id = db.Column(db.String(120), nullable=False)
+    updated_at = db.Column(db.DateTime, nullable=False, index=True)
+
+
+# ============================================================
+# In-memory tables (live game state)
+# ============================================================
+
+game_tables = {}  # {game_type: [GameTable,...]}
+
+
+# ============================================================
+# Auth helpers
+# ============================================================
 
 def login_required(f):
     @wraps(f)
@@ -173,197 +241,81 @@ def login_required(f):
         if "user_id" not in session:
             return redirect(url_for("login_page"))
         return f(*args, **kwargs)
-
     return decorated
 
 
 def admin_required(f):
-    """Check if user is logged in AND is admin"""
     @wraps(f)
     def decorated(*args, **kwargs):
         if "user_id" not in session:
             return redirect(url_for("login_page"))
-        
+
         user = User.query.get(session.get("user_id"))
         if not user:
             session.clear()
             return redirect(url_for("login_page"))
-        
+
         if not user.is_admin:
-            # For API routes, return JSON 403
-            if request.path.startswith('/api/admin/'):
+            if request.path.startswith("/api/admin/"):
                 return jsonify({"error": "Admin access required"}), 403
-            # For /admin page, logout and redirect to login so they can login as admin
-            else:
-                session.clear()
-                return redirect(url_for("login_page"))
-        
+            session.clear()
+            return redirect(url_for("login_page"))
+
         return f(*args, **kwargs)
-    
     return decorated
 
 
 def ensure_wallet_for_user(user: User) -> Wallet:
-    """Ensure the user has a wallet row with starting 10000 coins - ONLY FOR NON-ADMIN USERS"""
+    """Only non-admin users have wallets."""
     if user.is_admin:
         return None
     if not user.wallet:
-        wallet = Wallet(user_id=user.id, balance=10000)
-        db.session.add(wallet)
+        w = Wallet(user_id=user.id, balance=10000)
+        db.session.add(w)
         db.session.commit()
-        return wallet
+        return w
     return user.wallet
 
 
 def generate_bot_name():
-    prefixes = [
-        "Amit",
-        "Sanjay",
-        "Riya",
-        "Kunal",
-        "Anita",
-        "Rohit",
-        "Meera",
-        "Neeraj",
-    ]
-    suffix = random.randint(100, 999)
-    return f"{random.choice(prefixes)}{suffix}"
+    prefixes = ["Amit", "Sanjay", "Riya", "Kunal", "Anita", "Rohit", "Meera", "Neeraj"]
+    return f"{random.choice(prefixes)}{random.randint(100, 999)}"
 
 
-# ---------------------------------------------------
-# GameTable class
-# ---------------------------------------------------
+# ============================================================
+# GameTable
+# ============================================================
 
 class GameTable:
-    def __init__(self, game_type, table_number, initial_delay=0):
+    def __init__(self, game_type: str, table_number: int, initial_delay: int = 0):
         self.game_type = game_type
         self.table_number = table_number
-        self.round_code = self._make_round_code()
         self.config = GAME_CONFIGS[game_type]
-        self.start_time = datetime.now() + timedelta(seconds=initial_delay)
+
+        self.round_code = self._make_round_code()
+        self.start_time = datetime.utcnow() + timedelta(seconds=initial_delay)
         self.end_time = self.start_time + timedelta(minutes=5)
         self.betting_close_time = self.end_time - timedelta(seconds=15)
-        self.bets = []
+
+        self.bets = []  # list of dicts: {user_id, username, number, is_bot, bet_amount, bet_time}
         self.result = None
         self.is_betting_closed = False
         self.is_finished = False
+
         self.max_players = 6
         self.last_bot_added_at = None
 
     def _make_round_code(self):
-        timestamp = int(time.time())
-        return f"{self.game_type[0].upper()}{timestamp}{self.table_number}"
+        ts = int(time.time())
+        return f"{self.game_type[0].upper()}{ts}{self.table_number}"
 
     def get_number_range(self):
         if self.game_type == "roulette":
             return list(range(37))
         return list(range(10))
 
-    def add_bet(self, user_id, username, number, is_bot=False):
-        try:
-            number_int = int(number)
-        except (TypeError, ValueError):
-            return False, "Invalid number"
-        number = number_int
-
-        for bet in self.bets:
-            if bet["number"] == number:
-                return (
-                    False,
-                    "This number is already taken in this game. Please choose another.",
-                )
-
-        if not is_bot:
-            try:
-                user_id_norm = int(user_id)
-            except (TypeError, ValueError):
-                user_id_norm = user_id
-        else:
-            user_id_norm = user_id
-
-        user_bets = [b for b in self.bets if b["user_id"] == user_id_norm]
-        if len(user_bets) >= 4:
-            return False, "Maximum 4 bets per user"
-
-        if len(self.bets) >= self.max_players:
-            return False, "All slots are full"
-
-        bet_obj = {
-            "user_id": user_id_norm,
-            "username": username,
-            "number": number,
-            "is_bot": is_bot,
-            "bet_amount": self.config["bet_amount"],
-            "bet_time": datetime.now(),
-        }
-        self.bets.append(bet_obj)
-
-        if not is_bot:
-            if user_id_norm not in user_game_history:
-                user_game_history[user_id_norm] = []
-            user_game_history[user_id_norm].append(
-                {
-                    "game_type": self.game_type,
-                    "round_code": self.round_code,
-                    "bet_amount": self.config["bet_amount"],
-                    "number": number,
-                    "bet_time": datetime.now(),
-                    "table_number": self.table_number,
-                    "is_resolved": False,
-                }
-            )
-
-        return True, "Bet placed successfully"
-
-    def add_bot_bet(self):
-        if len(self.bets) >= self.max_players:
-            return False
-
-        taken_numbers = {b["number"] for b in self.bets}
-        all_numbers = self.get_number_range()
-        available_numbers = [n for n in all_numbers if n not in taken_numbers]
-
-        if not available_numbers:
-            return False
-
-        bot_name = generate_bot_name()
-        bot_number = random.choice(available_numbers)
-
-        success, _ = self.add_bet(
-            user_id=f"bot_{bot_name}",
-            username=bot_name,
-            number=bot_number,
-            is_bot=True,
-        )
-        return success
-
-    def calculate_result(self):
-        real_user_bets = [b for b in self.bets if not b["is_bot"]]
-        if random.random() < 0.16 and real_user_bets:
-            winning_bet = random.choice(real_user_bets)
-            self.result = winning_bet["number"]
-        else:
-            all_numbers = self.get_number_range()
-            self.result = random.choice(all_numbers)
-        return self.result
-
-    def get_winners(self):
-        if self.result is None:
-            return []
-        winners = []
-        for bet in self.bets:
-            if bet["number"] == self.result and not bet["is_bot"]:
-                winners.append(
-                    {
-                        "user_id": bet["user_id"],
-                        "username": bet["username"],
-                        "payout": self.config["payout"],
-                    }
-                )
-        return winners
-
     def get_time_remaining(self):
-        now = datetime.now()
+        now = datetime.utcnow()
         if now < self.start_time:
             return int((self.end_time - self.start_time).total_seconds())
         if now >= self.end_time:
@@ -374,50 +326,242 @@ class GameTable:
         return self.max_players - len(self.bets)
 
     def is_started(self):
-        return datetime.now() >= self.start_time
+        return datetime.utcnow() >= self.start_time
 
-    def to_dict(self):
+    def add_bet_live(self, user_id, username, number, is_bot=False):
+        """Only updates in-memory state. DB is handled outside."""
+        try:
+            number_int = int(number)
+        except (TypeError, ValueError):
+            return False, "Invalid number"
+
+        # block duplicate number in the table
+        for b in self.bets:
+            if b["number"] == number_int:
+                return False, "This number is already taken in this game. Please choose another."
+
+        # max 4 bets per user per table/round
+        if not is_bot:
+            try:
+                uid = int(user_id)
+            except (TypeError, ValueError):
+                uid = user_id
+        else:
+            uid = user_id
+
+        user_bets = [b for b in self.bets if b["user_id"] == uid]
+        if len(user_bets) >= 4:
+            return False, "Maximum 4 bets per user"
+
+        if len(self.bets) >= self.max_players:
+            return False, "All slots are full"
+
+        self.bets.append({
+            "user_id": uid,
+            "username": username,
+            "number": number_int,
+            "is_bot": is_bot,
+            "bet_amount": int(self.config["bet_amount"]),
+            "bet_time": datetime.utcnow(),
+        })
+        return True, "Bet placed successfully"
+
+    def add_bot_bet(self):
+        if len(self.bets) >= self.max_players:
+            return False
+
+        taken = {b["number"] for b in self.bets}
+        available = [n for n in self.get_number_range() if n not in taken]
+        if not available:
+            return False
+
+        bot_name = generate_bot_name()
+        bot_number = random.choice(available)
+        success, _ = self.add_bet_live(
+            user_id=f"bot_{bot_name}",
+            username=bot_name,
+            number=bot_number,
+            is_bot=True,
+        )
+        return success
+
+    def calculate_result(self):
+        """16% chance pick a real user bet; else random."""
+        real_user_bets = [b for b in self.bets if not b["is_bot"]]
+        if random.random() < 0.16 and real_user_bets:
+            self.result = random.choice(real_user_bets)["number"]
+        else:
+            self.result = random.choice(self.get_number_range())
+        return self.result
+
+    def to_api_dict(self):
+        bets_list = []
+        for b in self.bets:
+            bets_list.append({
+                "user_id": str(b.get("user_id", "")),
+                "username": b.get("username", "Unknown"),
+                "number": b.get("number", 0),
+            })
+
         return {
             "table_number": self.table_number,
-            "round_code": self.round_code,
             "game_type": self.game_type,
-            "players": len(self.bets),
+            "round_code": self.round_code,
+            "players": len(bets_list),
+            "bets": bets_list,
+            "result": self.result,
             "max_players": self.max_players,
             "slots_available": self.get_slots_available(),
             "time_remaining": self.get_time_remaining(),
             "is_betting_closed": self.is_betting_closed,
             "is_finished": self.is_finished,
             "is_started": self.is_started(),
-            "bets": self.bets,
-            "result": self.result,
+            "min_bet": int(self.config.get("bet_amount", 0)),
+            "max_bet": int(self.config.get("payout", 0)),
+            "status": "betting_closed" if self.is_betting_closed else "active",
         }
 
 
-# ---------------------------------------------------
-# Table initialization
-# ---------------------------------------------------
+# ============================================================
+# Leader lock (avoid duplicate threads on multi-worker)
+# ============================================================
 
+def _leader_id():
+    return f"{os.environ.get('RENDER_SERVICE_NAME','service')}|pid={os.getpid()}|{secrets.token_hex(4)}"
+
+
+def try_become_leader(stale_seconds: int = 25) -> bool:
+    """Returns True if this process should run game threads."""
+    now = datetime.utcnow()
+    me = _leader_id()
+    lock = LeaderLock.query.get(1)
+
+    if not lock:
+        lock = LeaderLock(id=1, leader_id=me, updated_at=now)
+        db.session.add(lock)
+        db.session.commit()
+        return True
+
+    # if existing leader heartbeat is recent, do not start threads
+    if (now - lock.updated_at).total_seconds() < stale_seconds:
+        return False
+
+    # take over (stale leader)
+    lock.leader_id = me
+    lock.updated_at = now
+    db.session.commit()
+    return True
+
+
+def start_leader_heartbeat(stop_event: threading.Event, interval: int = 5):
+    def _hb():
+        while not stop_event.is_set():
+            try:
+                with app.app_context():
+                    lock = LeaderLock.query.get(1)
+                    if lock:
+                        lock.updated_at = datetime.utcnow()
+                        db.session.commit()
+            except Exception:
+                pass
+            stop_event.wait(interval)
+
+    t = threading.Thread(target=_hb, daemon=True)
+    t.start()
+
+
+# ============================================================
+# Game lifecycle threads
+# ============================================================
 
 def initialize_game_tables():
     for game_type in GAME_CONFIGS.keys():
         game_tables[game_type] = []
         for i in range(6):
             initial_delay = i * 60
-            table = GameTable(game_type, i + 1, initial_delay)
-            game_tables[game_type].append(table)
-        print(f"Initialized 6 tables for {game_type}")
+            game_tables[game_type].append(GameTable(game_type, i + 1, initial_delay))
+
+
+def _resolve_round_in_db(game_type: str, table: GameTable, ended_at: datetime):
+    """Persist finished round + resolve bets + payout wallets + create transactions."""
+    round_code = table.round_code
+    winning = table.result
+
+    # Store round history (so finished games remain visible)
+    total_bets = sum(int(b.get("bet_amount", 0)) for b in table.bets)
+    total_players = len(table.bets)
+
+    # Resolve each real user bet from DB (one row per number bet)
+    bets = GameBet.query.filter_by(round_code=round_code, game_type=game_type, table_number=table.table_number).all()
+
+    winners_user_ids = []
+    total_payout = 0
+
+    for bet in bets:
+        bet.resolved = True
+        bet.winning_number = int(winning) if winning is not None else None
+        bet.resolved_at = ended_at
+
+        if winning is not None and bet.number == int(winning):
+            bet.status = "win"
+            bet.amount = int(GAME_CONFIGS[game_type]["payout"])
+            winners_user_ids.append(bet.user_id)
+            total_payout += int(GAME_CONFIGS[game_type]["payout"])
+        else:
+            bet.status = "lose"
+            bet.amount = -int(bet.bet_amount)
+
+    # Credit wallets for winners (one win tx per winning bet row)
+    for bet in bets:
+        if bet.status != "win":
+            continue
+        wallet = Wallet.query.filter_by(user_id=bet.user_id).first()
+        if wallet:
+            wallet.balance += int(GAME_CONFIGS[game_type]["payout"])
+            win_tx = Transaction(
+                user_id=bet.user_id,
+                kind="win",
+                amount=int(GAME_CONFIGS[game_type]["payout"]),
+                balance_after=wallet.balance,
+                label="Game Won",
+                game_title=GAME_CONFIGS[game_type]["name"],
+                note=f"Hit number {winning}",
+                game_type=game_type,
+                round_code=round_code,
+                table_number=table.table_number,
+            )
+            db.session.add(win_tx)
+
+    # Persist round snapshot
+    existing = GameRound.query.filter_by(round_code=round_code).first()
+    if not existing:
+        db.session.add(GameRound(
+            round_code=round_code,
+            game_type=game_type,
+            table_number=table.table_number,
+            started_at=table.start_time,
+            ended_at=ended_at,
+            status="finished",
+            winning_number=int(winning) if winning is not None else None,
+            total_players=int(total_players),
+            total_bets=int(total_bets),
+            total_payout=int(total_payout),
+        ))
+
+    db.session.commit()
 
 
 def manage_game_table(table: GameTable):
     with app.app_context():
         while True:
             try:
-                now = datetime.now()
+                now = datetime.utcnow()
 
                 if now < table.start_time:
                     time.sleep(1)
                     continue
 
+                # Add bots while open
                 if (
                     not table.is_betting_closed
                     and len(table.bets) < table.max_players
@@ -430,215 +574,132 @@ def manage_game_table(table: GameTable):
                         if table.add_bot_bet():
                             table.last_bot_added_at = now
 
+                # Close betting
                 if now >= table.betting_close_time and not table.is_betting_closed:
                     table.is_betting_closed = True
-                    print(f"{table.game_type} Table {table.table_number}: Betting closed")
 
+                # Finish round
                 if now >= table.end_time and not table.is_finished:
                     table.is_finished = True
-                    result = table.calculate_result()
-                    winners = table.get_winners()
-                    print(f"{table.game_type} Table {table.table_number}: Game ended. Winner: {result}")
+                    table.calculate_result()
 
-                    # History update
-                    for bet in table.bets:
-                        if bet.get("is_bot"):
-                            continue
-                        uid = bet["user_id"]
-                        for rec in user_game_history.get(uid, []):
-                            if (
-                                not rec.get("is_resolved")
-                                and rec["game_type"] == table.game_type
-                                and rec["round_code"] == table.round_code
-                                and rec["number"] == bet["number"]
-                            ):
-                                rec["winning_number"] = result
-                                rec["win"] = bet["number"] == result
-                                rec["status"] = "win" if rec["win"] else "lose"
-                                rec["amount"] = (
-                                    table.config["payout"] if rec["win"] else -table.config["bet_amount"]
-                                )
-                                rec["is_resolved"] = True
-                                rec["date_time"] = now.strftime("%Y-%m-%d %H:%M")
+                    _resolve_round_in_db(table.game_type, table, ended_at=now)
 
-                    # Winners payout + transaction log
-                    for winner in winners:
-                        wallet = Wallet.query.filter_by(user_id=winner["user_id"]).first()
-                        if wallet:
-                            wallet.balance += winner["payout"]
-                        
-                        win_tx = Transaction(
-                            user_id=winner["user_id"],
-                            kind="win",
-                            amount=winner["payout"],
-                            balance_after=wallet.balance if wallet else 0,
-                            label="Game Won",
-                            game_title=table.config["name"],
-                            note=f"Hit number {table.result}"
-                        )
-                        db.session.add(win_tx)
+                    # Small pause then reset to new round
+                    time.sleep(2)
 
-                    db.session.commit()
-
-                    time.sleep(3)
                     table.bets = []
                     table.result = None
                     table.is_betting_closed = False
                     table.is_finished = False
-                    table.start_time = datetime.now()
+                    table.start_time = datetime.utcnow()
                     table.end_time = table.start_time + timedelta(minutes=5)
                     table.betting_close_time = table.end_time - timedelta(seconds=15)
                     table.round_code = table._make_round_code()
                     table.last_bot_added_at = None
-                    print(f"{table.game_type} Table {table.table_number}: New round started - {table.round_code}")
 
                 time.sleep(1)
-            except Exception as e:
-                print(f"Error managing table {table.game_type} #{table.table_number}: {e}")
+
+            except Exception:
                 time.sleep(1)
 
 
-def start_all_game_tables():
-    for game_type, tables in game_tables.items():
+def start_all_game_threads():
+    for _, tables in game_tables.items():
         for table in tables:
-            threading.Thread(
-                target=manage_game_table, args=(table,), daemon=True
-            ).start()
-    print("All game table threads started!")
+            threading.Thread(target=manage_game_table, args=(table,), daemon=True).start()
 
 
-# ---------------------------------------------------
-# API: tables and history
-# ---------------------------------------------------
+# ============================================================
+# Public APIs (tables + user history)
+# ============================================================
 
 @app.route("/api/tables/<game_type>")
-def get_game_tables_api(game_type):
-    """Get all tables for a game type - NOW WITH FULL BET OBJECTS"""
-    try:
-        game_type = game_type.lower()
-        if game_type not in GAME_CONFIGS:
-            return jsonify({"error": "Invalid game type", "tables": []}), 404
-        
-        tables_list = game_tables.get(game_type, [])
-        
-        if not tables_list:
-            return jsonify({
-                "game_type": game_type,
-                "tables": [],
-                "message": "No tables initialized"
-            }), 200
-        
-        serialized_tables = []
-        for table in tables_list:
-            if table:  # Check if table exists
-                # ✅ BUILD BETS ARRAY WITH FULL BET OBJECTS
-                bets_list = []
-                if table.bets:
-                    for bet in table.bets:
-                        bets_list.append({
-                            'user_id': str(bet.get('user_id', '')),
-                            'username': bet.get('username', 'Unknown'),
-                            'number': bet.get('number', 0)
-                        })
-                
-                serialized_tables.append({
-                    'table_number': table.table_number,
-                    'game_type': table.game_type,
-                    'round_code': table.round_code,
-                    'players': len(bets_list),  # ✅ Count of actual bets
-                    'bets': bets_list,  # ✅ CRITICAL: Send full bet objects
-                    'result': table.result,  # ✅ Include result
-                    'max_players': table.max_players,
-                    'slots_available': table.get_slots_available(),
-                    'time_remaining': table.get_time_remaining(),
-                    'is_betting_closed': table.is_betting_closed,
-                    'is_finished': table.is_finished,
-                    'is_started': table.is_started(),
-                    'min_bet': table.config.get('bet_amount', 0),
-                    'max_bet': table.config.get('payout', 0),
-                    'status': 'betting_closed' if table.is_betting_closed else 'active'
-                })
-        
-        return jsonify({
-            "game_type": game_type,
-            "tables": serialized_tables,
-            "total_tables": len(serialized_tables)
-        }), 200
-        
-    except Exception as e:
-        print(f"Error in get_game_tables_api: {str(e)}")
-        return jsonify({
-            "error": str(e),
-            "game_type": game_type,
-            "tables": []
-        }), 500
+def api_tables_for_game(game_type):
+    gt = (game_type or "").lower().strip()
+    if gt not in GAME_CONFIGS:
+        return jsonify({"error": "Invalid game type", "tables": []}), 404
+
+    tables = game_tables.get(gt, [])
+    out = [t.to_api_dict() for t in tables]
+    return jsonify({"game_type": gt, "tables": out, "total_tables": len(out)}), 200
 
 
 @app.route("/api/tables")
-def get_all_tables():
-    all_tables = {
-        game_type: [table.to_dict() for table in tables]
-        for game_type, tables in game_tables.items()
-    }
-    return jsonify(all_tables)
+def api_tables_all():
+    out = {}
+    for gt, tables in game_tables.items():
+        out[gt] = [t.to_api_dict() for t in tables]
+    return jsonify(out), 200
 
 
 @app.route("/api/user-games")
-def user_games_history_api():
+def api_user_games():
+    """
+    Returns:
+    {
+      current_games: [...],
+      game_history: [...]
+    }
+    """
     user_id = request.args.get("user_id", type=int)
     if not user_id:
-        return jsonify({"current_games": [], "game_history": []})
+        return jsonify({"current_games": [], "game_history": []}), 200
 
-    user_bets = user_game_history.get(user_id, [])
-
+    # Group bets by (game_type, round_code)
+    bets = GameBet.query.filter_by(user_id=user_id).order_by(GameBet.created_at.desc()).limit(500).all()
     grouped = {}
-    for b in user_bets:
-        key = (b["game_type"], b["round_code"])
+
+    for b in bets:
+        key = (b.game_type, b.round_code)
         if key not in grouped:
             grouped[key] = {
-                "game_type": b["game_type"],
-                "round_code": b["round_code"],
-                "bet_amount": GAME_CONFIGS[b["game_type"]]["bet_amount"],
+                "game_type": b.game_type,
+                "round_code": b.round_code,
+                "bet_amount": int(GAME_CONFIGS.get(b.game_type, {}).get("bet_amount", b.bet_amount)),
                 "user_bets": [],
                 "winning_number": None,
                 "date_time": "",
                 "status": None,
                 "amount": 0,
                 "time_remaining": None,
-                "table_number": b.get("table_number"),
+                "table_number": b.table_number,
             }
-        grouped[key]["user_bets"].append(b["number"])
-        if b.get("winning_number") is not None:
-            grouped[key]["winning_number"] = b["winning_number"]
-            grouped[key]["status"] = b["status"]
-            if b["status"] == "win":
-                grouped[key]["amount"] += GAME_CONFIGS[b["game_type"]]["payout"]
-            else:
-                grouped[key]["amount"] -= GAME_CONFIGS[b["game_type"]]["bet_amount"]
-        if b.get("date_time"):
-            grouped[key]["date_time"] = b["date_time"]
+
+        grouped[key]["user_bets"].append(int(b.number))
+
+        if b.resolved:
+            # aggregate resolution
+            grouped[key]["winning_number"] = b.winning_number
+            grouped[key]["amount"] += int(b.amount or 0)
+
+            # if any bet in this round wins => show win; else lose
+            if grouped[key]["status"] != "win":
+                grouped[key]["status"] = "win" if b.status == "win" else "lose"
+
+            if b.resolved_at:
+                grouped[key]["date_time"] = b.resolved_at.strftime("%Y-%m-%d %H:%M")
 
     all_games = list(grouped.values())
 
-    # ✅ FIX: Populate time_remaining AFTER grouping (only for current/unresolved games)
+    # time_remaining only for unresolved current games (find live table by round_code)
     for g in all_games:
         if not g.get("status"):
             tables = game_tables.get(g["game_type"], [])
-            for table in tables:
-                if table.round_code == g["round_code"]:
-                    g["time_remaining"] = table.get_time_remaining()
+            for t in tables:
+                if t.round_code == g["round_code"]:
+                    g["time_remaining"] = t.get_time_remaining()
                     break
 
     game_history = [g for g in all_games if g.get("status")]
     current_games = [g for g in all_games if not g.get("status")]
 
-    return jsonify({"current_games": current_games, "game_history": game_history})
+    return jsonify({"current_games": current_games, "game_history": game_history}), 200
 
 
-# ---------------------------------------------------
-# Auth routes
-# ---------------------------------------------------
-
+# ============================================================
+# Pages (auth + main)
+# ============================================================
 
 @app.route("/")
 def index():
@@ -663,28 +724,19 @@ def login_page():
 @app.route("/login", methods=["POST"])
 def login_post():
     data = request.get_json() or {}
-    username = data.get("username", "").strip()
-    password = data.get("password", "")
-    remember_me = data.get("remember_me", False)
+    username = (data.get("username") or "").strip()
+    password = data.get("password") or ""
+    remember_me = bool(data.get("remember_me", False))
 
     if not username or not password:
-        return (
-            jsonify(
-                {"success": False, "message": "Username and password required"}
-            ),
-            400,
-        )
+        return jsonify({"success": False, "message": "Username and password required"}), 400
 
     user = User.query.filter_by(username=username).first()
     if not user or not user.check_password(password):
-        return jsonify(
-            {"success": False, "message": "Invalid username or password"}
-        ), 401
+        return jsonify({"success": False, "message": "Invalid username or password"}), 401
 
     if user.is_blocked:
-        return jsonify(
-            {"success": False, "message": f"Your account is blocked. Reason: {user.block_reason or 'No reason provided'}"}
-        ), 403
+        return jsonify({"success": False, "message": f"Your account is blocked. Reason: {user.block_reason or 'No reason provided'}"}), 403
 
     if not user.is_admin:
         ensure_wallet_for_user(user)
@@ -695,18 +747,9 @@ def login_post():
         session.permanent = True
 
     token = secrets.token_urlsafe(32)
-
     redirect_url = url_for("admin_panel") if user.is_admin else url_for("home")
 
-    return jsonify(
-        {
-            "success": True,
-            "user_id": user.id,
-            "username": user.username,
-            "token": token,
-            "redirect": redirect_url,
-        }
-    )
+    return jsonify({"success": True, "user_id": user.id, "username": user.username, "token": token, "redirect": redirect_url}), 200
 
 
 @app.route("/register", methods=["GET", "POST"])
@@ -717,26 +760,13 @@ def register_page():
         return render_template("register.html")
 
     data = request.get_json() or {}
-    username = data.get("username", "").strip()
-    password = data.get("password", "")
+    username = (data.get("username") or "").strip()
+    password = data.get("password") or ""
 
     if not username or not password:
-        return (
-            jsonify(
-                {"success": False, "message": "Username and password required"}
-            ),
-            400,
-        )
+        return jsonify({"success": False, "message": "Username and password required"}), 400
     if len(password) < 6:
-        return (
-            jsonify(
-                {
-                    "success": False,
-                    "message": "Password must be at least 6 characters",
-                }
-            ),
-            400,
-        )
+        return jsonify({"success": False, "message": "Password must be at least 6 characters"}), 400
 
     existing = User.query.filter_by(username=username).first()
     if existing:
@@ -752,14 +782,7 @@ def register_page():
     session["user_id"] = user.id
     session["username"] = user.username
 
-    return jsonify(
-        {
-            "success": True,
-            "user_id": user.id,
-            "username": user.username,
-            "redirect": url_for("home"),
-        }
-    )
+    return jsonify({"success": True, "user_id": user.id, "username": user.username, "redirect": url_for("home")}), 200
 
 
 @app.route("/logout")
@@ -768,38 +791,31 @@ def logout():
     return redirect(url_for("login_page"))
 
 
-# ---------------------------------------------------
-# Game pages
-# ---------------------------------------------------
-
-
 @app.route("/home")
 @login_required
 def home():
-    user_id = session.get("user_id")
-    user = User.query.get(user_id)
+    user = User.query.get(session.get("user_id"))
     if user:
         ensure_wallet_for_user(user)
-    username = session.get("username", "Player")
-    return render_template("home.html", games=GAME_CONFIGS, username=username)
+    return render_template("home.html", games=GAME_CONFIGS, username=session.get("username", "Player"))
 
 
 @app.route("/game/<game_type>")
 @login_required
 def game_lobby(game_type):
-    if game_type not in GAME_CONFIGS:
+    gt = (game_type or "").lower().strip()
+    if gt not in GAME_CONFIGS:
         return "Game not found", 404
-    game = GAME_CONFIGS[game_type]
-    return render_template("game-lobby.html", game_type=game_type, game=game)
+    return render_template("game-lobby.html", game_type=gt, game=GAME_CONFIGS[gt])
 
 
 @app.route("/play/<game_type>")
 @login_required
 def play_game(game_type):
-    if game_type not in GAME_CONFIGS:
+    gt = (game_type or "").lower().strip()
+    if gt not in GAME_CONFIGS:
         return "Game not found", 404
-    game = GAME_CONFIGS[game_type]
-    return render_template(f"{game_type}-game.html", game_type=game_type, game=game)
+    return render_template(f"{gt}-game.html", game_type=gt, game=GAME_CONFIGS[gt])
 
 
 @app.route("/history")
@@ -811,8 +827,7 @@ def history_page():
 @app.route("/profile")
 @login_required
 def profile_page():
-    user_id = session.get("user_id")
-    user = User.query.get(user_id)
+    user = User.query.get(session.get("user_id"))
     if not user:
         return redirect(url_for("logout"))
 
@@ -820,21 +835,17 @@ def profile_page():
     wallet_balance = wallet.balance if wallet else 0
     joined_at = user.created_at.strftime("%d %b %Y") if user.created_at else "Just now"
 
-    # ✅ REAL TRANSACTIONS FROM DATABASE
-    transactions = Transaction.query.filter_by(user_id=user_id)\
-        .order_by(Transaction.datetime.desc())\
-        .limit(50).all()
-    
+    txs = Transaction.query.filter_by(user_id=user.id).order_by(Transaction.datetime.desc()).limit(50).all()
     txns = []
-    for t in transactions:
+    for t in txs:
         txns.append({
-            'kind': t.kind,
-            'amount': t.amount,
-            'datetime': t.datetime.isoformat(),
-            'label': t.label or t.kind.title(),
-            'game_title': t.game_title or '',
-            'note': t.note or '',
-            'balance_after': t.balance_after
+            "kind": t.kind,
+            "amount": t.amount,
+            "datetime": t.datetime.isoformat(),
+            "label": t.label or t.kind.title(),
+            "game_title": t.game_title or "",
+            "note": t.note or "",
+            "balance_after": t.balance_after,
         })
 
     return render_template(
@@ -846,16 +857,14 @@ def profile_page():
         email=user.email or "",
         country=user.country or "",
         phone=user.phone or "",
-        transactions=txns  # ✅ SENDS REAL DATA TO JS
+        transactions=txns,
     )
-
 
 
 @app.route("/profile/update", methods=["POST"])
 @login_required
 def profile_update():
-    user_id = session.get("user_id")
-    user = User.query.get(user_id)
+    user = User.query.get(session.get("user_id"))
     if not user:
         return jsonify({"success": False, "message": "User not found"}), 404
 
@@ -864,9 +873,9 @@ def profile_update():
     user.email = data.get("email", user.email or "")
     user.country = data.get("country", user.country or "")
     user.phone = data.get("phone", user.phone or "")
-
     db.session.commit()
-    return jsonify({"success": True, "message": "Profile updated"})
+
+    return jsonify({"success": True, "message": "Profile updated"}), 200
 
 
 @app.route("/help")
@@ -874,180 +883,157 @@ def profile_update():
 def help_page():
     return render_template("help.html")
 
-@app.route('/coins', methods=['GET'])
+
+@app.route("/coins", methods=["GET"])
 @login_required
 def coins_page():
-    user_id = session.get('user_id')
-    user = User.query.get(user_id)
-    
+    user = User.query.get(session.get("user_id"))
     if not user:
-        return redirect(url_for('logout'))
-    
+        return redirect(url_for("logout"))
     wallet = ensure_wallet_for_user(user)
-    balance = wallet.balance if wallet else 0
-    
-    return render_template('coins.html', balance=balance)
+    return render_template("coins.html", balance=(wallet.balance if wallet else 0))
 
 
-@app.route('/api/balance', methods=['GET'])
+@app.route("/api/balance", methods=["GET"])
 @login_required
-def get_balance_api():
-    user_id = session.get('user_id')
-    user = User.query.get(user_id)
-    
+def api_balance():
+    user = User.query.get(session.get("user_id"))
     if not user:
-        return jsonify({'balance': 0}), 401
-    
+        return jsonify({"balance": 0}), 401
     wallet = ensure_wallet_for_user(user)
-    balance = wallet.balance if wallet else 0
-    
-    return jsonify({'balance': balance})
+    return jsonify({"balance": wallet.balance if wallet else 0}), 200
 
 
-@app.route('/api/coins/redeem', methods=['POST'])
+@app.route("/api/coins/redeem", methods=["POST"])
 @login_required
 def redeem_coins():
-    user_id = session.get('user_id')
-    user = User.query.get(user_id)
-    
+    user = User.query.get(session.get("user_id"))
     if not user:
-        return jsonify({'success': False, 'message': 'User not found'}), 401
-    
-    data = request.get_json()
-    
+        return jsonify({"success": False, "message": "User not found"}), 401
+
+    data = request.get_json() or {}
     try:
-        amount = int(data.get('amount', 0))
+        amount = int(data.get("amount", 0))
     except (TypeError, ValueError):
-        return jsonify({'success': False, 'message': 'Invalid amount'}), 400
-    
+        return jsonify({"success": False, "message": "Invalid amount"}), 400
+
     if amount <= 0:
-        return jsonify({'success': False, 'message': 'Amount must be greater than 0'}), 400
-    
+        return jsonify({"success": False, "message": "Amount must be greater than 0"}), 400
+
     wallet = ensure_wallet_for_user(user)
-    
     if not wallet or wallet.balance < amount:
-        return jsonify({'success': False, 'message': 'Insufficient balance'}), 400
-    
-    # Deduct from wallet
+        return jsonify({"success": False, "message": "Insufficient balance"}), 400
+
     wallet.balance -= amount
-    db.session.commit()
-    
-    return jsonify({
-        'success': True,
-        'message': f'Successfully redeemed {amount} coins!',
-        'new_balance': wallet.balance
-    })
 
-
-@app.route("/api/help/tickets", methods=["GET", "POST"])
-@login_required
-def help_tickets_api():
-    user_id = session.get("user_id")
-
-    if request.method == "GET":
-        tickets = (
-            Ticket.query.filter_by(user_id=user_id)
-            .order_by(Ticket.created_at.desc())
-            .all()
-        )
-        out = []
-        for t in tickets:
-            out.append(
-                {
-                    "id": t.id,
-                    "subject": t.subject,
-                    "message": t.message[:200],
-                    "status": t.status,
-                    "created_at": t.created_at.strftime("%Y-%m-%d %H:%M"),
-                    "updated_at": t.updated_at.strftime("%Y-%m-%d %H:%M"),
-                }
-            )
-        return jsonify(out)
-
-    subject = request.form.get("subject", "").strip() or "(no subject)"
-    message = request.form.get("message", "").strip()
-    file = request.files.get("attachment")
-
-    attach_name = None
-    if file and file.filename:
-        upload_dir = os.path.join(os.path.dirname(__file__), "uploads")
-        os.makedirs(upload_dir, exist_ok=True)
-        attach_name = f"{int(time.time())}_{file.filename}"
-        file.save(os.path.join(upload_dir, attach_name))
-
-    ticket = Ticket(
-        user_id=user_id, subject=subject, message=message, attachment_name=attach_name
+    tx = Transaction(
+        user_id=user.id,
+        kind="redeem",
+        amount=amount,
+        balance_after=wallet.balance,
+        label="Redeem",
+        game_title="",
+        note="User redeemed coins",
     )
-    db.session.add(ticket)
+    db.session.add(tx)
     db.session.commit()
 
-    return jsonify({"success": True, "ticket_id": ticket.id})
+    return jsonify({"success": True, "message": f"Successfully redeemed {amount} coins!", "new_balance": wallet.balance}), 200
 
 
-# ---------------------------------------------------
-# Balance API
-# ---------------------------------------------------
-
-
-@app.route("/balance/<user_id>")
-def get_balance(user_id):
-    real_user_id = session.get("user_id")
-    if not real_user_id:
-        return jsonify({"balance": 0})
-
-    user = User.query.get(real_user_id)
-    if not user:
-        return jsonify({"balance": 0})
-
-    wallet = ensure_wallet_for_user(user)
-    return jsonify({"balance": wallet.balance if wallet else 0})
-
-
-# ---------------------------------------------------
-# ADMIN PANEL ROUTES
-# ---------------------------------------------------
-
+# ============================================================
+# Admin Panel + Admin APIs (MATCHES your current admin_panel.html JS)
+# ============================================================
 
 @app.route("/admin")
 @admin_required
 def admin_panel():
-    """Main admin panel page"""
     return render_template("admin_panel.html")
+
+
+@app.route("/api/admin/stats", methods=["GET"])
+@admin_required
+def api_admin_stats():
+    # Keys returned to match your JS (totalusers, activegames, etc.)
+    total_users = User.query.filter(User.is_admin == False).count()
+    blocked_users = User.query.filter(User.is_admin == False, User.is_blocked == True).count()
+
+    # Active games = live tables that are not finished
+    active_games = sum(
+        1 for tables in game_tables.values() for t in tables
+        if (not t.is_finished)
+    )
+
+    # "Revenue" here = sum of all wallet balances (same as your old logic)
+    total_balance = db.session.query(db.func.sum(Wallet.balance)).scalar() or 0
+
+    # Deposits/withdrawals from Transaction table
+    total_deposits = db.session.query(db.func.sum(Transaction.amount)).filter(Transaction.kind == "added").scalar() or 0
+    total_withdrawals = db.session.query(db.func.sum(Transaction.amount)).filter(Transaction.kind == "redeem").scalar() or 0
+
+    payload = {
+        # match current admin_panel.html JS keys
+        "totalusers": int(total_users),
+        "totalagents": 0,
+        "activegames": int(active_games),
+        "totalrevenue": int(total_balance),
+        "totaldeposits": int(total_deposits),
+        "totalwithdrawals": int(total_withdrawals),
+
+        # also provide snake_case (optional future use)
+        "total_users": int(total_users),
+        "blocked_users": int(blocked_users),
+        "active_games": int(active_games),
+        "total_revenue": int(total_balance),
+        "total_deposit": int(total_deposits),
+        "total_withdrawal": int(total_withdrawals),
+    }
+    return jsonify(payload), 200
 
 
 @app.route("/api/admin/users", methods=["GET"])
 @admin_required
-def admin_get_users():
-    """Get all users with wallet info"""
+def api_admin_users():
     users = User.query.filter(User.is_admin == False).all()
-    user_list = []
-    
-    for user in users:
-        wallet = ensure_wallet_for_user(user)
-        user_list.append({
-            "id": user.id,
-            "username": user.username,
-            "email": user.email or "",
-            "password_hash": user.password_hash,
-            "status": "blocked" if user.is_blocked else "active",
-            "balance": wallet.balance if wallet else 0,
-            "created_at": user.created_at.strftime("%Y-%m-%d %H:%M"),
-            "block_reason": user.block_reason or "",
+    out = []
+
+    for u in users:
+        wallet = ensure_wallet_for_user(u)
+        balance = wallet.balance if wallet else 0
+
+        # gamesplayed = distinct rounds played
+        games_played = (
+            db.session.query(db.func.count(db.func.distinct(GameBet.round_code)))
+            .filter(GameBet.user_id == u.id)
+            .scalar()
+            or 0
+        )
+
+        out.append({
+            "id": u.id,
+            "username": u.username,
+            "email": u.email or "",
+            "agentname": "-",  # placeholder to satisfy UI
+            "passwordhash": u.password_hash,  # UI expects it (not recommended for real apps)
+            "status": "blocked" if u.is_blocked else "active",
+            "balance": int(balance),
+            "gamesplayed": int(games_played),
+            "createdat": u.created_at.strftime("%Y-%m-%d %H:%M") if u.created_at else "",
+            "blockreason": u.block_reason or "",
         })
-    
-    return jsonify(user_list)
+
+    return jsonify(out), 200
 
 
 @app.route("/api/admin/users/<int:user_id>", methods=["PUT"])
 @admin_required
-def admin_update_user(user_id):
-    """Update user information"""
+def api_admin_update_user(user_id):
     user = User.query.get(user_id)
     if not user:
         return jsonify({"success": False, "message": "User not found"}), 404
-    
+
     data = request.get_json() or {}
-    
+
     if "username" in data:
         user.username = data["username"]
     if "email" in data:
@@ -1056,331 +1042,346 @@ def admin_update_user(user_id):
         user.set_password(data["password"])
     if "status" in data:
         user.is_blocked = (data["status"] == "blocked")
+    if "blockreason" in data:
+        user.block_reason = data["blockreason"]
+
     if "balance" in data:
         wallet = ensure_wallet_for_user(user)
         if wallet:
-            wallet.balance = data["balance"]
-    if "block_reason" in data:
-        user.block_reason = data["block_reason"]
-    
+            try:
+                wallet.balance = int(data["balance"])
+            except (TypeError, ValueError):
+                pass
+
     db.session.commit()
-    return jsonify({"success": True, "message": "User updated successfully"})
+    return jsonify({"success": True, "message": "User updated successfully"}), 200
 
 
 @app.route("/api/admin/users/<int:user_id>/block", methods=["POST"])
 @admin_required
-def admin_block_user(user_id):
-    """Block a user"""
+def api_admin_block_user(user_id):
     user = User.query.get(user_id)
     if not user:
         return jsonify({"success": False, "message": "User not found"}), 404
-    
     data = request.get_json() or {}
     user.is_blocked = True
     user.block_reason = data.get("reason", "Blocked by admin")
-    
     db.session.commit()
-    return jsonify({"success": True, "message": "User blocked successfully"})
+    return jsonify({"success": True, "message": "User blocked successfully"}), 200
 
 
 @app.route("/api/admin/users/<int:user_id>/unblock", methods=["POST"])
 @admin_required
-def admin_unblock_user(user_id):
-    """Unblock a user"""
+def api_admin_unblock_user(user_id):
     user = User.query.get(user_id)
     if not user:
         return jsonify({"success": False, "message": "User not found"}), 404
-    
     user.is_blocked = False
     user.block_reason = None
-    
     db.session.commit()
-    return jsonify({"success": True, "message": "User unblocked successfully"})
-
-
-@app.route("/api/admin/users/<int:user_id>/balance", methods=["POST"])
-@admin_required
-def admin_credit_debit(user_id):
-    """Credit or debit user balance"""
-    user = User.query.get(user_id)
-    if not user:
-        return jsonify({"success": False, "message": "User not found"}), 404
-    
-    data = request.get_json() or {}
-    transaction_type = data.get("type", "add")
-    amount = float(data.get("amount", 0))
-    reason = data.get("reason", "Admin transaction")
-    
-    wallet = ensure_wallet_for_user(user)
-    
-    if wallet:
-        if transaction_type == "add":
-            wallet.balance += amount
-        else:
-            wallet.balance -= amount
-    
-    db.session.commit()
-    
-    return jsonify({
-        "success": True,
-        "message": f"Transaction processed. New balance: ₹{wallet.balance if wallet else 0}",
-        "new_balance": wallet.balance if wallet else 0
-    })
-
-
-@app.route("/api/admin/games", methods=["GET"])
-@admin_required
-def admin_get_games():
-    """Get all active games"""
-    all_games = []
-    
-    for game_type, tables in game_tables.items():
-        for table in tables:
-            all_games.append({
-                "round_code": table.round_code,
-                "game_type": game_type,
-                "players": len(table.bets),
-                "max_players": table.max_players,
-                "status": "finished" if table.is_finished else "completed" if table.is_betting_closed else "active",
-                "result": table.result,
-                "total_bets": sum(b.get("bet_amount", 0) for b in table.bets),
-                "started_at": table.start_time.strftime("%Y-%m-%d %H:%M"),
-            })
-    
-    return jsonify(all_games)
-
-
-@app.route("/api/admin/stats", methods=["GET"])
-@admin_required
-def admin_get_stats():
-    """Get admin dashboard statistics"""
-    # Get all non-admin users
-    total_users = User.query.filter(User.is_admin == False).count()
-    blocked_users = User.query.filter(User.is_admin == False, User.is_blocked == True).count()
-    
-    # Active users = users with wallet coins AND played game in last 30 days
-    thirty_days_ago = datetime.utcnow() - timedelta(days=30)
-    active_users = 0
-    for user in User.query.filter(User.is_admin == False).all():
-        wallet = ensure_wallet_for_user(user)
-        if wallet and wallet.balance > 0:
-            recent_games = [g for g in user_game_history.get(user.id, []) 
-                           if g.get("bet_time") and isinstance(g["bet_time"], datetime) 
-                           and g["bet_time"] > thirty_days_ago]
-            if recent_games:
-                active_users += 1
-    
-    inactive_users = total_users - active_users
-    
-    # Revenue calculations
-    all_wallets = Wallet.query.all()
-    total_revenue = sum(w.balance for w in all_wallets)
-    
-    # For now, total_deposit and total_withdrawl are assumed to be part of revenue
-    total_deposit = total_revenue
-    total_withdrawal = 0
-    
-    # Active games today
-    active_games = sum(1 for tables in game_tables.values() for t in tables if not t.is_finished)
-    
-    # Open tickets
-    open_tickets = Ticket.query.filter_by(status="open").count()
-    
-    return jsonify({
-        "total_users": total_users,
-        "active_users": active_users,
-        "inactive_users": inactive_users,
-        "active_games": active_games,
-        "total_revenue": total_revenue,
-        "total_deposit": total_deposit,
-        "total_withdrawal": total_withdrawal,
-        "blocked_users": blocked_users,
-        "open_tickets": open_tickets,
-    })
+    return jsonify({"success": True, "message": "User unblocked successfully"}), 200
 
 
 @app.route("/api/admin/users/<int:user_id>/games", methods=["GET"])
 @admin_required
-def admin_user_games(user_id):
-    """Games history for one user (used in admin panel)."""
-    bets = user_game_history.get(user_id, [])
-    out = []
+def api_admin_user_games(user_id):
+    # Group by round (so multiple number bets in same round show as ONE game card)
+    bets = GameBet.query.filter_by(user_id=user_id).order_by(GameBet.created_at.desc()).limit(800).all()
+
+    grouped = {}
     for b in bets:
-        cfg = GAME_CONFIGS.get(b["game_type"], {})
-        out.append({
-            "game_type": b["game_type"],
-            "round_code": b["round_code"],
-            "bet_amount": b.get("bet_amount", cfg.get("bet_amount", 0)),
-            "number": b.get("number"),
-            "table_number": b.get("table_number"),
-            "is_resolved": b.get("is_resolved", False),
-            "status": b.get("status"),
-            "winning_number": b.get("winning_number"),
-            "amount": b.get("amount", 0),
-            "date_time": b.get("date_time") or (
-                b.get("bet_time").strftime("%Y-%m-%d %H:%M")
-                if isinstance(b.get("bet_time"), datetime) else ""
-            ),
-        })
-    return jsonify(out)
+        key = (b.game_type, b.round_code)
+        if key not in grouped:
+            grouped[key] = {
+                "gametype": b.game_type,
+                "roundcode": b.round_code,
+                "numbers": [],
+                "betamount": 0,
+                "payout": 0,
+                "status": None,
+                "winningnumber": None,
+                "gamedate": "",
+            }
+
+        grouped[key]["numbers"].append(int(b.number))
+        grouped[key]["betamount"] += int(b.bet_amount)
+
+        if b.resolved:
+            grouped[key]["payout"] += int(b.amount or 0)
+            if grouped[key]["status"] != "win":
+                grouped[key]["status"] = "win" if b.status == "win" else "lose"
+            grouped[key]["winningnumber"] = b.winning_number
+            if b.resolved_at:
+                grouped[key]["gamedate"] = b.resolved_at.strftime("%Y-%m-%d %H:%M")
+
+    # If still active/unresolved, show bet time as date and keep payout undefined-like values away
+    out = list(grouped.values())
+    for g in out:
+        if not g["gamedate"]:
+            # attempt from round table start_time
+            gr = GameRound.query.filter_by(round_code=g["roundcode"]).first()
+            if gr:
+                g["gamedate"] = gr.started_at.strftime("%Y-%m-%d %H:%M")
+            else:
+                # fallback
+                g["gamedate"] = ""
+
+        if g["status"] is None:
+            g["payout"] = 0
+
+    return jsonify(out), 200
 
 
-@app.route("/api/admin/agents", methods=["GET"])
+@app.route("/api/admin/games", methods=["GET"])
 @admin_required
-def admin_get_agents():
+def api_admin_games():
     """
-    Placeholder agents list.
-    Frontend expects an array; you can wire real MLM/agent data later.
+    Return BOTH live active games and finished games (DB),
+    using the field names your admin_panel.html expects.
     """
-    return jsonify([])
+    out = []
+
+    # Live tables
+    game_type_order = list(GAME_CONFIGS.keys())
+    for gt, tables in game_tables.items():
+        for t in tables:
+            # stable negative id for live entries
+            try:
+                gt_index = game_type_order.index(gt) + 1
+            except ValueError:
+                gt_index = 9
+            live_id = -int(gt_index * 100 + t.table_number)
+
+            started = t.start_time
+            gamedate = started.strftime("%Y-%m-%d")
+            gametime = started.strftime("%H:%M")
+
+            out.append({
+                "id": live_id,
+                "roundcode": t.round_code,
+                "gametype": gt,
+                "players": len(t.bets),
+                "maxplayers": t.max_players,
+                "winningnumber": t.result if t.result is not None else None,
+                "totalbets": sum(int(b.get("bet_amount", 0)) for b in t.bets),
+                "payout": None,
+                "gamedate": gamedate,
+                "gametime": gametime,
+                "status": "active" if (not t.is_finished and not t.is_betting_closed) else ("completed" if t.is_betting_closed else "finished"),
+            })
+
+    # Finished games from DB (latest 200)
+    rounds = GameRound.query.order_by(GameRound.ended_at.desc()).limit(200).all()
+    for r in rounds:
+        out.append({
+            "id": int(r.id),
+            "roundcode": r.round_code,
+            "gametype": r.game_type,
+            "players": int(r.total_players),
+            "maxplayers": 6,
+            "winningnumber": r.winning_number,
+            "totalbets": int(r.total_bets),
+            "payout": int(r.total_payout),
+            "gamedate": r.ended_at.strftime("%Y-%m-%d"),
+            "gametime": r.ended_at.strftime("%H:%M"),
+            "status": "finished",
+        })
+
+    return jsonify(out), 200
+
+
+@app.route("/api/admin/transactions", methods=["GET"])
+@admin_required
+def api_admin_transactions():
+    txs = Transaction.query.order_by(Transaction.datetime.desc()).limit(500).all()
+    out = []
+
+    # map to admin_panel.html expected keys: txnid, username, type, amount, status, txndate, reference
+    for t in txs:
+        u = User.query.get(t.user_id)
+        out.append({
+            "txnid": int(t.id),
+            "username": (u.username if u else f"user_{t.user_id}"),
+            "type": (t.kind or "").upper(),
+            "amount": int(t.amount),
+            "status": "DONE" if t.kind in ("bet", "win", "added", "redeem") else "PENDING",
+            "txndate": t.datetime.strftime("%Y-%m-%d %H:%M"),
+            "reference": (t.game_title or t.round_code or "-"),
+        })
+
+    return jsonify(out), 200
 
 
 @app.route("/api/admin/wallet", methods=["GET"])
 @admin_required
-def admin_get_wallet_stats():
-    """Overall wallet statistics for dashboard."""
-    total_balance = db.session.query(db.func.sum(Wallet.balance)).scalar() or 0
-    wallet_count = Wallet.query.count()
-    return jsonify({
-        "total_balance": total_balance,
-        "wallet_count": wallet_count,
-        "wallets": []
-    })
+def api_admin_wallet():
+    # Return list of users (UI expects an array)
+    users = User.query.filter(User.is_admin == False).all()
+    out = []
+    for u in users:
+        wallet = ensure_wallet_for_user(u)
+        balance = wallet.balance if wallet else 0
+
+        deposits = db.session.query(db.func.sum(Transaction.amount)).filter(
+            Transaction.user_id == u.id, Transaction.kind == "added"
+        ).scalar() or 0
+
+        withdrawals = db.session.query(db.func.sum(Transaction.amount)).filter(
+            Transaction.user_id == u.id, Transaction.kind == "redeem"
+        ).scalar() or 0
+
+        out.append({
+            "username": u.username,
+            "balance": int(balance),
+            "totaldeposits": int(deposits),
+            "totalwithdrawals": int(withdrawals),
+        })
+
+    return jsonify(out), 200
+
+
+@app.route("/api/admin/wallet/add", methods=["POST"])
+@admin_required
+def api_admin_wallet_add():
+    data = request.get_json() or {}
+    username = (data.get("user") or "").strip()
+    reason = data.get("reason", "Admin add funds")
+    try:
+        amount = int(float(data.get("amount", 0)))
+    except (TypeError, ValueError):
+        amount = 0
+
+    if not username or amount <= 0:
+        return jsonify({"success": False, "message": "Invalid user or amount"}), 400
+
+    user = User.query.filter_by(username=username).first()
+    if not user or user.is_admin:
+        return jsonify({"success": False, "message": "User not found"}), 404
+
+    wallet = ensure_wallet_for_user(user)
+    wallet.balance += amount
+
+    tx = Transaction(
+        user_id=user.id,
+        kind="added",
+        amount=amount,
+        balance_after=wallet.balance,
+        label="Admin Added",
+        game_title="Wallet",
+        note=reason,
+    )
+    db.session.add(tx)
+    db.session.commit()
+
+    return jsonify({"success": True, "message": "Funds added", "newbalance": wallet.balance}), 200
+
+
+@app.route("/api/admin/wallet/deduct", methods=["POST"])
+@admin_required
+def api_admin_wallet_deduct():
+    data = request.get_json() or {}
+    username = (data.get("user") or "").strip()
+    reason = data.get("reason", "Admin deduct funds")
+    try:
+        amount = int(float(data.get("amount", 0)))
+    except (TypeError, ValueError):
+        amount = 0
+
+    if not username or amount <= 0:
+        return jsonify({"success": False, "message": "Invalid user or amount"}), 400
+
+    user = User.query.filter_by(username=username).first()
+    if not user or user.is_admin:
+        return jsonify({"success": False, "message": "User not found"}), 404
+
+    wallet = ensure_wallet_for_user(user)
+    if wallet.balance < amount:
+        return jsonify({"success": False, "message": "Insufficient balance"}), 400
+
+    wallet.balance -= amount
+
+    tx = Transaction(
+        user_id=user.id,
+        kind="redeem",
+        amount=amount,
+        balance_after=wallet.balance,
+        label="Admin Deducted",
+        game_title="Wallet",
+        note=reason,
+    )
+    db.session.add(tx)
+    db.session.commit()
+
+    return jsonify({"success": True, "message": "Funds deducted", "newbalance": wallet.balance}), 200
+
+
+# Placeholders (keep UI happy)
+@app.route("/api/admin/agents", methods=["GET", "POST"])
+@admin_required
+def api_admin_agents():
+    if request.method == "GET":
+        return jsonify([]), 200
+    return jsonify({"success": True, "message": "Agent saved (placeholder)"}), 200
 
 
 @app.route("/api/admin/referrals", methods=["GET"])
 @admin_required
-def admin_get_referrals():
-    """Placeholder for referrals list."""
-    return jsonify([])
+def api_admin_referrals():
+    return jsonify([]), 200
 
 
 @app.route("/api/admin/promos", methods=["GET", "POST"])
 @admin_required
-def admin_promos():
-    """Placeholder for promos management."""
+def api_admin_promos():
     if request.method == "GET":
-        return jsonify([])
-    data = request.get_json() or {}
-    return jsonify({"success": True, "message": "Promo saved (placeholder)", "data": data})
+        return jsonify([]), 200
+    return jsonify({"success": True, "message": "Promo saved (placeholder)"}), 200
 
 
 @app.route("/api/admin/announcements", methods=["GET", "POST"])
 @admin_required
-def admin_announcements():
-    """Placeholder for announcements."""
+def api_admin_announcements():
     if request.method == "GET":
-        return jsonify([])
-    data = request.get_json() or {}
-    return jsonify({"success": True, "message": "Announcement saved (placeholder)", "data": data})
+        return jsonify([]), 200
+    return jsonify({"success": True, "message": "Announcement saved (placeholder)"}), 200
 
 
 @app.route("/api/admin/reports", methods=["GET"])
 @admin_required
-def admin_reports():
-    """Aggregate stats used by admin 'Reports' tab."""
-    total_users = User.query.filter(User.is_admin == False).count()
-    total_wallets = Wallet.query.count()
-    total_balance = db.session.query(db.func.sum(Wallet.balance)).scalar() or 0
+def api_admin_reports():
     return jsonify({
-        "total_users": total_users,
-        "total_wallets": total_wallets,
-        "total_balance": total_balance,
-        "top_games": [],
-        "top_users": []
-    })
+        "newusers30d": 0,
+        "revenue30d": 0,
+        "gamesplayed30d": 0,
+        "avgwinrate": 0,
+    }), 200
 
 
-# ---------------------------------------------------
-# ADMIN PANEL - TRANSACTIONS API
-# ---------------------------------------------------
-
-@app.route("/api/admin/transactions", methods=["GET"])
-@admin_required
-def admin_get_transactions():
-    """
-    Return a list of transactions for the admin dashboard.
-
-    For now this is a placeholder built from in-memory user_game_history
-    plus current wallet balances. You can replace with a real Tx table later.
-    """
-    out = []
-
-    # Bets and wins from in‑memory game history
-    for user_id, bets in user_game_history.items():
-        user = User.query.get(user_id)
-        username = user.username if user else f"user_{user_id}"
-
-        for rec in bets:
-            cfg = GAME_CONFIGS.get(rec["game_type"], {})
-            game_title = cfg.get("name", rec["game_type"])
-            bet_amt = rec.get("bet_amount", cfg.get("bet_amount", 0))
-            dt = rec.get("bet_time", datetime.utcnow())
-            if isinstance(dt, datetime):
-                dt_str = dt.strftime("%Y-%m-%d %H:%M")
-            else:
-                dt_str = str(dt)
-
-            # Bet transaction
-            out.append({
-                "user_id": user_id,
-                "username": username,
-                "type": "bet",
-                "game_type": rec["game_type"],
-                "game_title": game_title,
-                "round_code": rec["round_code"],
-                "amount": bet_amt,
-                "status": rec.get("status") or "pending",
-                "datetime": dt_str,
-            })
-
-            # Win transaction (if resolved and win)
-            if rec.get("is_resolved") and rec.get("win"):
-                win_dt = rec.get("date_time") or dt_str
-                out.append({
-                    "user_id": user_id,
-                    "username": username,
-                    "type": "win",
-                    "game_type": rec["game_type"],
-                    "game_title": game_title,
-                    "round_code": rec["round_code"],
-                    "amount": cfg.get("payout", 0),
-                    "status": "win",
-                    "datetime": win_dt,
-                })
-
-    return jsonify(out)
-
-
-# ---------------------------------------------------
-# Socket.IO handlers
-# ---------------------------------------------------
-
+# ============================================================
+# Socket.IO: live betting
+# ============================================================
 
 @socketio.on("connect")
-def handle_connect():
-    print(f"Client connected: {request.sid}")
+def on_connect():
     emit("connection_response", {"data": "Connected"})
 
 
 @socketio.on("disconnect")
-def handle_disconnect():
-    print(f"Client disconnected: {request.sid}")
+def on_disconnect():
+    return
 
 
 @socketio.on("join_game")
-def handle_join_game(data):
-    game_type = data.get("game_type")
-    user_id = data.get("user_id")
-    print(f"User {user_id} joined game {game_type}")
+def on_join_game(data):
+    game_type = (data.get("game_type") or "").lower().strip()
     join_room(game_type)
 
 
 @socketio.on("place_bet")
-def handle_place_bet(data):
-    game_type = data.get("game_type")
+def on_place_bet(data):
+    game_type = (data.get("game_type") or "").lower().strip()
     raw_user_id = data.get("user_id")
-    username = data.get("username")
+    username = data.get("username") or "Player"
     number = data.get("number")
     round_code = data.get("round_code")
 
@@ -1391,7 +1392,8 @@ def handle_place_bet(data):
     try:
         user_id = int(raw_user_id)
     except (TypeError, ValueError):
-        user_id = raw_user_id
+        emit("bet_error", {"message": "Invalid user"})
+        return
 
     user = User.query.get(user_id)
     if not user:
@@ -1407,11 +1409,12 @@ def handle_place_bet(data):
         emit("bet_error", {"message": "Admin cannot place bets"})
         return
 
-    tables = game_tables.get(game_type)
+    tables = game_tables.get(game_type, [])
     if not tables:
         emit("bet_error", {"message": "No tables for this game"})
         return
 
+    # choose table
     table = None
     if round_code:
         for t in tables:
@@ -1419,16 +1422,11 @@ def handle_place_bet(data):
                 table = t
                 break
         if not table:
-            emit(
-                "bet_error",
-                {
-                    "message": "This game round is no longer available. Please join a new game."
-                },
-            )
+            emit("bet_error", {"message": "This game round is no longer available. Please join a new game."})
             return
     else:
         for t in tables:
-            if not t.is_betting_closed and not t.is_finished and len(t.bets) < t.max_players:
+            if (not t.is_betting_closed) and (not t.is_finished) and (len(t.bets) < t.max_players):
                 table = t
                 break
         if not table:
@@ -1439,144 +1437,121 @@ def handle_place_bet(data):
         emit("bet_error", {"message": "Betting is closed for this game"})
         return
 
-    if len(table.bets) >= table.max_players:
-        emit("bet_error", {"message": "All slots are full"})
-        return
-
-    bet_amount = table.config["bet_amount"]
-
+    bet_amount = int(table.config["bet_amount"])
     if wallet.balance < bet_amount:
         emit("bet_error", {"message": "Insufficient balance"})
         return
 
-    success, message = table.add_bet(user_id, username, number)
+    # add to live table (validations: duplicate number, max bets/user, slots)
+    success, message = table.add_bet_live(user_id=user_id, username=username, number=number, is_bot=False)
     if not success:
         emit("bet_error", {"message": message})
         return
 
+    # deduct + persist bet in DB
     wallet.balance -= bet_amount
 
-    # ✅ LOG BET TO DATABASE (FIXED INDENTATION)
+    # store bet row (one per number)
+    bet_row = GameBet(
+        user_id=user_id,
+        round_code=table.round_code,
+        game_type=game_type,
+        table_number=table.table_number,
+        number=int(number),
+        bet_amount=bet_amount,
+        resolved=False,
+    )
+    db.session.add(bet_row)
+
     bet_tx = Transaction(
         user_id=user_id,
         kind="bet",
         amount=bet_amount,
         balance_after=wallet.balance,
-        label="Bet Placed", 
+        label="Bet Placed",
         game_title=table.config["name"],
-        note=f"Number {number}"
+        note=f"Number {number}",
+        game_type=game_type,
+        round_code=table.round_code,
+        table_number=table.table_number,
     )
     db.session.add(bet_tx)
 
     db.session.commit()
 
-    # ✅ FIXED: Build correct players data with user_id
+    # Build players data to broadcast (same structure your front-end expects)
     players_data = []
-    for bet in table.bets:
+    for b in table.bets:
         players_data.append({
-            'user_id': str(bet['user_id']),      # ✅ CRITICAL: Include user_id
-            'username': bet['username'],
-            'number': bet['number']
+            "user_id": str(b["user_id"]),
+            "username": b["username"],
+            "number": b["number"],
         })
-    
-    # ✅ Send success to current user with ALL players data
-    emit(
-        "bet_success",
-        {
-            "message": message,
-            "new_balance": wallet.balance,
-            "round_code": table.round_code,
-            "table_number": table.table_number,
-            "players": players_data,  # ✅ Full bet objects with user_id
-            "slots_available": table.get_slots_available()
-        },
-    )
-    
-    # ✅ Broadcast table update to ALL players
-    emit(
-        "update_table",
-        {
-            "game_type": game_type,
-            "table_number": table.table_number,
-            "round_code": table.round_code,
-            "players": players_data,  # ✅ Full bet objects with user_id
-            "slots_available": table.get_slots_available(),
-            "time_remaining": table.get_time_remaining(),
-            "is_betting_closed": table.is_betting_closed
-        },
-        broadcast=True,
-        include_self=True
-    )
+
+    emit("bet_success", {
+        "message": message,
+        "new_balance": wallet.balance,
+        "round_code": table.round_code,
+        "table_number": table.table_number,
+        "players": players_data,
+        "slots_available": table.get_slots_available(),
+    })
+
+    emit("update_table", {
+        "game_type": game_type,
+        "table_number": table.table_number,
+        "round_code": table.round_code,
+        "players": players_data,
+        "slots_available": table.get_slots_available(),
+        "time_remaining": table.get_time_remaining(),
+        "is_betting_closed": table.is_betting_closed,
+    }, broadcast=True, include_self=True)
 
 
-# ---------------------------------------------------
-# Demo user seeding
-# ---------------------------------------------------
-
+# ============================================================
+# Seed users
+# ============================================================
 
 def seed_demo_users():
-    """Create demo, demo1..demo5 with 10k coins and admin user"""
-    print("\n🔄 Checking/Creating users...")
-    
     demo_usernames = ["demo"] + [f"demo{i}" for i in range(1, 6)]
     for uname in demo_usernames:
-        user = User.query.filter_by(username=uname).first()
-        if not user:
-            user = User(username=uname, display_name=uname)
-            user.set_password("demo123")
-            db.session.add(user)
+        u = User.query.filter_by(username=uname).first()
+        if not u:
+            u = User(username=uname, display_name=uname)
+            u.set_password("demo123")
+            db.session.add(u)
             db.session.commit()
-            print(f"✅ Created user: {uname}")
-        ensure_wallet_for_user(user)
-    
-    # Create or update admin user - NO WALLET for admin
+        ensure_wallet_for_user(u)
+
     admin = User.query.filter_by(username="admin").first()
     if not admin:
-        print("✅ Creating admin user...")
         admin = User(username="admin", display_name="Admin User", is_admin=True)
         admin.set_password("admin123")
         db.session.add(admin)
         db.session.commit()
-        print("✅ Admin user created: is_admin=True (NO WALLET)")
     else:
-        # Ensure existing admin has is_admin=True
         if not admin.is_admin:
-            print("⚠️  Fixing admin user: setting is_admin=True")
             admin.is_admin = True
             db.session.commit()
-        print("✅ Admin user verified: is_admin=True")
-    
-    print("✅ All users ready!\n")
 
 
-# ---------------------------------------------------
-# Main entry
-# ---------------------------------------------------
+# ============================================================
+# Startup (works with Gunicorn/Render)
+# ============================================================
 
-# ===== INITIALIZATION MOVED HERE (runs with Gunicorn) =====
+_leader_stop_event = threading.Event()
+
 with app.app_context():
-    print("🔧 Creating database tables...")
     db.create_all()
-    print("✅ Database tables created")
-    
-    print("👥 Seeding demo users...")
     seed_demo_users()
-    
-    print("🎮 Initializing game tables...")
     initialize_game_tables()
-    
-    print("▶️  Starting game threads...")
-    start_all_game_tables()
-    
-    print("\n" + "="*60)
-    print("🎮 GAME OF FIVE - Admin Panel Ready")
-    print("="*60)
-    print("📍 Admin URL: http://localhost:10000/admin")
-    print("👤 Admin Username: admin")
-    print("🔐 Admin Password: admin123")
-    print("="*60 + "\n")
 
-# This part is ONLY for local development
+    if try_become_leader():
+        start_leader_heartbeat(_leader_stop_event, interval=5)
+        start_all_game_threads()
+
+
+# Local development only
 if __name__ == "__main__":
     socketio.run(
         app,
