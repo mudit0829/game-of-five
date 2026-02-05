@@ -467,27 +467,27 @@ def manage_game_table(table: GameTable):
                                 rec["is_resolved"] = True
                                 rec["date_time"] = now.strftime("%Y-%m-%d %H:%M")
 
-                    for winner in winners:
+                                      for winner in winners:
                         wallet = Wallet.query.filter_by(
                             user_id=winner["user_id"]
                         ).first()
                         if wallet:
                             wallet.balance += winner["payout"]
-
-                    # ✅ LOG WIN TO DATABASE
-win_tx = Transaction(
-    user_id=winner["user_id"],
-    kind="win",
-    amount=winner["payout"],
-    balance_after=wallet.balance,
-    label="Game Won",
-    game_title=table.config["name"],
-    note=f"Hit number {table.result}"
-)
-db.session.add(win_tx)
-# (existing db.session.commit() stays)
+                        
+                        # ✅ FIXED WIN LOGGING - PROPERLY INDENTED
+                        win_tx = Transaction(
+                            user_id=winner["user_id"],
+                            kind="win",
+                            amount=winner["payout"],
+                            balance_after=wallet.balance if wallet else 0,
+                            label="Game Won",
+                            game_title=table.config["name"],
+                            note=f"Hit number {table.result}"
+                        )
+                        db.session.add(win_tx)
 
                     db.session.commit()
+
 
                     time.sleep(3)
                     table.bets = []
