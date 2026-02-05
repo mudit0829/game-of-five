@@ -445,7 +445,7 @@ def manage_game_table(table: GameTable):
                         f"{table.game_type} Table {table.table_number}: Game ended. Winner: {result}"
                     )
 
-                    for bet in table.bets:
+                                      for bet in table.bets:
                         if bet.get("is_bot"):
                             continue
                         uid = bet["user_id"]
@@ -467,14 +467,15 @@ def manage_game_table(table: GameTable):
                                 rec["is_resolved"] = True
                                 rec["date_time"] = now.strftime("%Y-%m-%d %H:%M")
 
-                                      for winner in winners:
+                    # ✅ WINNERS LOOP - PERFECT INDENTATION
+                    for winner in winners:
                         wallet = Wallet.query.filter_by(
                             user_id=winner["user_id"]
                         ).first()
                         if wallet:
                             wallet.balance += winner["payout"]
                         
-                        # ✅ FIXED WIN LOGGING - PROPERLY INDENTED
+                        # ✅ LOG WIN TO DATABASE
                         win_tx = Transaction(
                             user_id=winner["user_id"],
                             kind="win",
@@ -487,7 +488,6 @@ def manage_game_table(table: GameTable):
                         db.session.add(win_tx)
 
                     db.session.commit()
-
 
                     time.sleep(3)
                     table.bets = []
