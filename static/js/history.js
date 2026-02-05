@@ -7,7 +7,7 @@ function formatTime(sec) {
   return `${String(m).padStart(2, "0")}:${String(r).padStart(2, "0")}`;
 }
 
-// ✅ NEW: Format datetime for display
+// ✅ Format datetime for display
 function formatDateTime(dateTimeStr) {
   if (!dateTimeStr) return 'N/A';
   
@@ -127,9 +127,8 @@ function renderGameCard(game, isCurrent) {
     btn.textContent = "Go to game";
     btn.disabled = false;
     btn.addEventListener("click", () => {
-      // ✅ FIX: Navigate to game lobby (not directly to table)
-      // This avoids "all slots full" error
-      window.location.href = `/game/${gameType}`;
+      // ✅ FIX: Navigate directly to the game with round_code parameter
+      window.location.href = `/play/${gameType}?round_code=${encodeURIComponent(roundCode)}`;
     });
   } else {
     btn.textContent = "View result";
@@ -156,7 +155,7 @@ async function loadHistory() {
     const currentGames = data.current_games || [];
     const historyGames = data.game_history || [];
 
-    console.log('✅ Loaded games:', { currentGames, historyGames });  // Debug
+    console.log('✅ Loaded games:', { currentGames, historyGames });
 
     // CURRENT
     currentWrap.innerHTML = "";
