@@ -1,4 +1,4 @@
-// profile.js
+// profile.js - FIXED VERSION (NO API NEEDED)
 
 document.addEventListener("DOMContentLoaded", () => {
   // ===== MAIN TABS (Profile / Coin Transactions) =====
@@ -34,7 +34,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
   showSection("profile"); // default
 
-  // ===== SAVE PROFILE (simple front-end message) =====
+  // ===== SAVE PROFILE =====
   const saveProfileBtn = document.getElementById("saveProfileBtn");
   const profileStatus = document.getElementById("profileStatus");
 
@@ -75,10 +75,10 @@ document.addEventListener("DOMContentLoaded", () => {
   const sumWinEl = document.getElementById("sumWin");
   const sumBalanceEl = document.getElementById("sumBalance");
 
-  // ✅ SAFE: Handle undefined TRANSACTIONS
+  // ✅ GET TRANSACTIONS FROM WINDOW (SET BY TEMPLATE)
   const txns = Array.isArray(window.TRANSACTIONS) ? window.TRANSACTIONS : [];
   
-  console.log("TRANSACTIONS loaded:", txns.length, "items");
+  console.log("✅ TRANSACTIONS from template:", txns.length, "items", txns);
 
   function formatDate(dateString) {
     if (!dateString) return "";
@@ -102,7 +102,9 @@ document.addEventListener("DOMContentLoaded", () => {
   function renderTransactions(filter = "all") {
     if (!txnList) return;
 
-    // no transactions → show empty state & totals only
+    console.log("🔄 Rendering transactions with filter:", filter, "Total txns:", txns.length);
+
+    // no transactions → show empty state
     if (!txns.length) {
       txnList.innerHTML = `
         <div class="empty-state">
@@ -119,7 +121,7 @@ document.addEventListener("DOMContentLoaded", () => {
       return;
     }
 
-    // ✅ SAFE: compute totals with explicit type conversion
+    // compute totals
     let sumAdded = 0, sumBet = 0, sumWin = 0;
     txns.forEach(t => {
       try {
@@ -133,12 +135,14 @@ document.addEventListener("DOMContentLoaded", () => {
       }
     });
 
-    // ✅ SAFE: apply filter with type checking
+    console.log("📊 Totals - Added:", sumAdded, "Bet:", sumBet, "Win:", sumWin);
+
+    // apply filter
     const filtered = txns.filter(t => {
       try {
         const kind = String(t.kind || "").toLowerCase();
         if (filter === "all") return true;
-        if (filter === "balance") return true; // show all rows under Balance tab
+        if (filter === "balance") return true;
         return kind === filter;
       } catch (e) {
         console.error("Error filtering transaction:", t, e);
@@ -146,7 +150,9 @@ document.addEventListener("DOMContentLoaded", () => {
       }
     });
 
-    // ✅ SAFE: build rows with comprehensive error handling
+    console.log("✅ Filtered transactions:", filtered.length);
+
+    // build rows
     const rows = filtered.map(t => {
       try {
         const kind = String(t.kind || "other").toLowerCase();
@@ -159,7 +165,6 @@ document.addEventListener("DOMContentLoaded", () => {
         const amt = Number(t.amount || 0);
         const formattedAmt = `${sign}₹${amt}`;
 
-        // ✅ SAFE: property access with fallbacks
         const label = String(t.label || t.kind || "Transaction");
         const gameInfo = String(t.game_title || t.note || "");
         const balanceAfter = Number(t.balance_after || 0);
@@ -189,13 +194,15 @@ document.addEventListener("DOMContentLoaded", () => {
 
     txnList.innerHTML = rows.join("");
 
-    // ✅ SAFE: update summary cards
+    // update summary cards
     if (sumAddedEl) sumAddedEl.textContent = `₹${sumAdded}`;
     if (sumBetEl) sumBetEl.textContent = `₹${sumBet}`;
     if (sumWinEl) sumWinEl.textContent = `₹${sumWin}`;
     if (sumBalanceEl && typeof WALLET_BALANCE !== "undefined") {
       sumBalanceEl.textContent = `₹${WALLET_BALANCE}`;
     }
+
+    console.log("✅ Render complete");
   }
 
   subTabs.forEach(tab => {
