@@ -1304,18 +1304,19 @@
         }
 
         function loadStats() {
-            fetch('/api/admin/stats')
-                .then(r => r.json())
-                .then(data => {
-                    document.getElementById('totalUsers').textContent = data.total_users || 0;
-                    document.getElementById('totalAgents').textContent = data.total_agents || 0;
-                    document.getElementById('activeGames').textContent = data.active_games || 0;
-                    document.getElementById('totalRevenue').textContent = '₹' + (data.total_revenue || 0).toLocaleString('en-IN');
-                    document.getElementById('totalDeposits').textContent = '₹' + (data.total_deposits || 0).toLocaleString('en-IN');
-                    document.getElementById('totalWithdrawals').textContent = '₹' + (data.total_withdrawals || 0).toLocaleString('en-IN');
-                })
-                .catch(err => console.error('Error loading stats:', err));
-        }
+  fetch('/api/admin/stats')
+    .then(r => r.json())
+    .then(data => {
+      document.getElementById('totalUsers').textContent = data.total_users ?? 0;
+      document.getElementById('totalAgents').textContent = 0; // backend has no total_agents [file:87]
+      document.getElementById('activeGames').textContent = data.active_games ?? 0;
+      document.getElementById('totalRevenue').textContent = (data.total_revenue ?? 0).toLocaleString('en-IN');
+      document.getElementById('totalDeposits').textContent = (data.total_deposit ?? 0).toLocaleString('en-IN');
+      document.getElementById('totalWithdrawals').textContent = (data.total_withdrawal ?? 0).toLocaleString('en-IN');
+    })
+    .catch(err => console.error('Error loading stats:', err));
+}
+
 
         function loadUsers() {
             document.getElementById('usersLoading').style.display = 'block';
@@ -1578,97 +1579,106 @@
             document.getElementById('addAgentForm').reset();
         }
 
-        function loadGames() {
-            document.getElementById('gamesLoading').style.display = 'block';
-            document.getElementById('gamesTableContainer').style.display = 'none';
+       function loadGames() {
+  document.getElementById('gamesLoading').style.display = 'block';
+  document.getElementById('gamesTableContainer').style.display = 'none';
 
-            fetch('/api/admin/games')
-                .then(r => r.json())
-                .then(data => {
-                    allGames = data || [];
-                    displayGames();
-                    document.getElementById('gamesLoading').style.display = 'none';
-                    document.getElementById('gamesTableContainer').style.display = 'block';
-                })
-                .catch(err => {
-                    console.error('Error:', err);
-                    document.getElementById('gamesLoading').innerHTML = `<div style="color: #ef4444;">Error: ${err.message}</div>`;
-                });
-        }
+  fetch('/api/admin/games')
+    .then(r => r.json())
+    .then(data => {
+      allGames = data || [];
+      displayGames();
+      document.getElementById('gamesLoading').style.display = 'none';
+      document.getElementById('gamesTableContainer').style.display = 'block';
+    })
+    .catch(err => {
+      console.error('Error loading games:', err);
+      document.getElementById('gamesLoading').innerHTML =
+        `<div style="color:#ef4444">Error: ${err.message}</div>`;
+    });
+}
 
-        function displayGames() {
-            const tbody = document.getElementById('gamesTableBody');
-            tbody.innerHTML = '';
+function displayGames() {
+  const tbody = document.getElementById('gamesTableBody');
+  tbody.innerHTML = '';
 
-            if (!allGames.length) {
-                tbody.innerHTML = '<tr><td colspan="9" class="no-data">No games</td></tr>';
-                return;
-            }
+  if (!allGames || !allGames.length) {
+    tbody.innerHTML = `<tr><td colspan="9" class="no-data">No games</td></tr>`;
+    return;
+  }
 
-            allGames.forEach(game => {
-                const row = document.createElement('tr');
-                row.innerHTML = `
-                    <td><strong>${game.round_code}</strong></td>
-                    <td>${game.game_type}</td>
-                    <td>${game.players}/${game.max_players}</td>
-                    <td>${game.winning_number || '-'}</td>
-                    <td>₹${(game.total_bets || 0).toLocaleString('en-IN')}</td>
-                    <td>₹${(game.payout || 0).toLocaleString('en-IN')}</td>
-                    <td>${game.game_date} ${game.game_time || ''}</td>
-                    <td><span class="badge badge-${game.status}">${game.status}</span></td>
-                    <td>
-                        <button class="btn-small btn-view" onclick="viewGameDetails(${game.id})">📊 Details</button>
-                    </td>
-                `;
-                tbody.appendChild(row);
-            });
-        }
+  allGames.forEach((game) => {
+    const row = document.createElement('tr');
 
-        function viewGameDetails(gameId) {
-            const game = allGames.find(g => g.id === gameId);
-            if (!game) return;
+    const roundCode = game.round_code || '-';
+    const gameType = game.game_type || '-';
+    const players = `${game.players ?? 0}/${game.max_players ?? 0}`;
+    const winning = (game.result === null || game.result === undefined) ? '-' : game.result;
+    const totalBets = (game.total_bets ?? 0).toLocaleString('en-IN');
+    const startedAt = game.started_at || '-';
+    const status = game.status || '-';
 
-            let html = `
-                <div class="details-grid">
-                    <div class="detail-item">
-                        <div class="detail-label">Round Code</div>
-                        <div class="detail-value">${game.round_code}</div>
-                    </div>
-                    <div class="detail-item">
-                        <div class="detail-label">Game Type</div>
-                        <div class="detail-value">${game.game_type}</div>
-                    </div>
-                    <div class="detail-item">
-                        <div class="detail-label">Winning Number</div>
-                        <div class="detail-value" style="color: #f59e0b;">${game.winning_number || 'N/A'}</div>
-                    </div>
-                    <div class="detail-item">
-                        <div class="detail-label">Total Players</div>
-                        <div class="detail-value">${game.players}</div>
-                    </div>
-                    <div class="detail-item">
-                        <div class="detail-label">Total Bets</div>
-                        <div class="detail-value">₹${(game.total_bets || 0).toLocaleString('en-IN')}</div>
-                    </div>
-                    <div class="detail-item">
-                        <div class="detail-label">Payout</div>
-                        <div class="detail-value">₹${(game.payout || 0).toLocaleString('en-IN')}</div>
-                    </div>
-                    <div class="detail-item">
-                        <div class="detail-label">Date & Time</div>
-                        <div class="detail-value">${game.game_date} ${game.game_time || ''}</div>
-                    </div>
-                    <div class="detail-item">
-                        <div class="detail-label">Status</div>
-                        <div class="detail-value">${game.status}</div>
-                    </div>
-                </div>
-            `;
+    // Your table has columns: Round Code, Game Type, Players, Winning, Total Bets, Payout, DateTime, Status, Action [file:88]
+    // Backend does not provide payout, so show '-' unless you add it in backend. [file:87]
+    row.innerHTML = `
+      <td><strong>${roundCode}</strong></td>
+      <td>${gameType}</td>
+      <td>${players}</td>
+      <td>${winning}</td>
+      <td>${totalBets}</td>
+      <td>-</td>
+      <td>${startedAt}</td>
+      <td><span class="badge badge-pending">${status}</span></td>
+      <td><button class="btn-small btn-view" onclick="viewGameDetails('${roundCode}')">Details</button></td>
+    `;
 
-            document.getElementById('detailsTitle').textContent = 'Game Details';
-            document.getElementById('detailsContent').innerHTML = html;
-            document.getElementById('detailsModal').classList.add('active');
-        }
+    tbody.appendChild(row);
+  });
+}
+
+function viewGameDetails(roundCode) {
+  const game = (allGames || []).find(g => (g.round_code || '') === roundCode);
+  if (!game) return;
+
+  const winning = (game.result === null || game.result === undefined) ? 'NA' : game.result;
+
+  const html = `
+    <div class="details-grid">
+      <div class="detail-item">
+        <div class="detail-label">Round Code</div>
+        <div class="detail-value">${game.round_code || '-'}</div>
+      </div>
+      <div class="detail-item">
+        <div class="detail-label">Game Type</div>
+        <div class="detail-value">${game.game_type || '-'}</div>
+      </div>
+      <div class="detail-item">
+        <div class="detail-label">Winning Number</div>
+        <div class="detail-value" style="color:#f59e0b">${winning}</div>
+      </div>
+      <div class="detail-item">
+        <div class="detail-label">Players</div>
+        <div class="detail-value">${game.players ?? 0}/${game.max_players ?? 0}</div>
+      </div>
+      <div class="detail-item">
+        <div class="detail-label">Total Bets</div>
+        <div class="detail-value">${(game.total_bets ?? 0).toLocaleString('en-IN')}</div>
+      </div>
+      <div class="detail-item">
+        <div class="detail-label">Started At</div>
+        <div class="detail-value">${game.started_at || '-'}</div>
+      </div>
+      <div class="detail-item">
+        <div class="detail-label">Status</div>
+        <div class="detail-value">${game.status || '-'}</div>
+      </div>
+    </div>
+  `;
+
+  document.getElementById('detailsTitle').textContent = 'Game Details';
+  document.getElementById('detailsContent').innerHTML = html;
+  document.getElementById('detailsModal').classList.add('active');
+}
 
         function loadTransactions() {
             document.getElementById('transactionsLoading').style.display = 'block';
