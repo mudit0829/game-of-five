@@ -165,11 +165,14 @@
   </div>
 
   <!-- DATA from backend (safe defaults) -->
-  <script>
-    const WALLET_BALANCE = {{ wallet_balance or 0 }};
-  const TRANSACTIONS = {{ (transactions or []) | tojson | safe }};
-  console.log('TRANSACTIONS loaded:', TRANSACTIONS.length, 'items'); // Debug log
-  </script>
-  <script src="{{ url_for('static', filename='js/profile.js') }}"></script>
+ <!-- DATA from backend (safe defaults) -->
+<script>
+  // ✅ ATTACH TO WINDOW so profile.js can access it
+  window.WALLET_BALANCE = {{ wallet_balance or 0 }};
+  window.TRANSACTIONS = {{ (transactions or []) | tojson | safe }};
+  console.log('✅ TRANSACTIONS loaded:', window.TRANSACTIONS.length, 'items');
+</script>
+<script src="{{ url_for('static', filename='js/profile.js') }}"></script>
+
 </body>
 </html>
