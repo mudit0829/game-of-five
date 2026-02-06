@@ -252,116 +252,87 @@ function ensureArrowStyles() {
 }
 
 function shootArrowToWinningNumber(winningNumber) {
-  if (!rangeEl || !arrowImg || !archerImg) {
-    console.warn("[arrow] Missing DOM elements");
-    return;
-  }
+  if (!rangeEl || !arrowImg || !archerImg) return;
 
-  const target = targets.find(
-    (t) => t.dataset.number === String(winningNumber)
-  );
-  if (!target) {
-    console.log("[arrow] Winning number not on any target:", winningNumber);
-    return;
-  }
-
-  console.log("[arrow] Shooting arrow to target with number:", winningNumber);
-  ensureArrowStyles();
+  const target = targets.find(t => t.dataset.number === String(winningNumber));
+  if (!target) return;
 
   const rangeRect = rangeEl.getBoundingClientRect();
   const arrowRect = arrowImg.getBoundingClientRect();
   const targetRect = target.getBoundingClientRect();
 
-  // Calculate positions relative to range
-  const startX = arrowRect.left + arrowRect.width * 0.2 - rangeRect.left;
-  const startY = arrowRect.top + arrowRect.height * 0.5 - rangeRect.top;
+  // Positions relative to RANGE (for flight)
+  const startX = (arrowRect.left + arrowRect.width * 0.2) - rangeRect.left;
+  const startY = (arrowRect.top + arrowRect.height * 0.5) - rangeRect.top;
 
-  const endX = targetRect.left + targetRect.width * 0.5 - rangeRect.left;
-  const endY = targetRect.top + targetRect.height * 0.5 - rangeRect.top;
+  const endX = (targetRect.left + targetRect.width * 0.55) - rangeRect.left;  // slightly right of center
+  const endY = (targetRect.top + targetRect.height * 0.50) - rangeRect.top;   // center vertically
 
-  const deltaX = endX - startX;
-  const deltaY = endY - startY;
-  const distance = Math.sqrt(deltaX * deltaX + deltaY * deltaY);
+  const dx = endX - startX;
+  const dy = endY - startY;
+  const dist = Math.sqrt(dx * dx + dy * dy);
+
   const duration = 650;
-  const peak = -Math.min(150, distance * 0.4);
+  const peak = -Math.min(150, dist * 0.4);
   const startTime = performance.now();
 
-  // ✅ ARCHER SHOOT ANIMATION
-  console.log("[archer] Playing shoot animation");
-  archerImg.style.animation = "archerDraw 0.4s ease-in-out";
-  setTimeout(() => {
-    archerImg.style.animation = "none";
-  }, 400);
-
-  // Reset arrow to starting position
-  arrowImg.style.transition = "none";
-  arrowImg.style.left = "auto";
-  arrowImg.style.top = "auto";
-  arrowImg.style.position = "relative";
+  // Archer shoot animation (uses your CSS .archer.shoot)
+  archerImg.classList.add("shoot");
+  setTimeout(() => archerImg.classList.remove("shoot"), 400);
 
   function step(now) {
-    const elapsed = now - startTime;
-    const tRaw = elapsed / duration;
+    const tRaw = (now - startTime) / duration;
     const t = Math.min(Math.max(tRaw, 0), 1);
 
-    // Easing: ease-out-cubic
+    // ease-out-cubic
     const ease = 1 - Math.pow(1 - t, 3);
-    
-    const x = startX + deltaX * ease;
-    const yLinear = startY + deltaY * ease;
+
+    const x = startX + dx * ease;
+    const yLinear = startY + dy * ease;
     const yArc = yLinear + peak * (4 * t * (1 - t));
 
-    // Calculate angle for arrow rotation
-    const angle = Math.atan2(deltaY, deltaX) * (180 / Math.PI);
-    
-    // Scale arrow slightly smaller as it travels
-    const scale = 1 - t * 0.15;
+    const angle = Math.atan2(dy, dx) * (180 / Math.PI);
+    const scale = 1 - t * 0.12;
 
+    // Flight: fixed positioning in viewport
     arrowImg.style.position = "fixed";
-    arrowImg.style.left = x + "px";
-    arrowImg.style.top = yArc + "px";
+    arrowImg.style.left = (rangeRect.left + x) + "px";
+    arrowImg.style.top = (rangeRect.top + yArc) + "px";
     arrowImg.style.transform = `translate(-50%, -50%) rotate(${angle}deg) scale(${scale})`;
-    arrowImg.style.zIndex = "1000";
+    arrowImg.style.zIndex = "200"; // below popup
 
     if (t < 1) {
       requestAnimationFrame(step);
-    } else {
-      // ✅ TARGET HIT ANIMATION
-      console.log("[target] Hit! Playing victory animation");
-      target.classList.add("win");
-
-      // Flash effect at impact
-      const flash = document.createElement("div");
-      flash.style.position = "absolute";
-      flash.style.top = "50%";
-      flash.style.left = "50%";
-      flash.style.width = "180%";
-      flash.style.height = "180%";
-      flash.style.background = "radial-gradient(circle, rgba(59,130,246,0.8) 0%, rgba(59,130,246,0.3) 50%, transparent 100%)";
-      flash.style.borderRadius = "50%";
-      flash.style.pointerEvents = "none";
-      flash.style.animation = "targetFlash 0.6s ease-out forwards";
-      flash.style.zIndex = "100";
-      target.appendChild(flash);
-
-      setTimeout(() => flash.remove(), 600);
-
-      // Arrow stays in target for 700ms, then returns
-      setTimeout(() => {
-        console.log("[arrow] Returning to starting position");
-        arrowImg.style.transition = "all 0.5s ease-out";
-        arrowImg.style.position = "relative";
-        arrowImg.style.left = "auto";
-        arrowImg.style.top = "auto";
-        arrowImg.style.transform = "translate(0, 0) rotate(0deg) scale(1)";
-        arrowImg.style.zIndex = "10";
-      }, 700);
+      return;
     }
+
+    // Impact
+    target.classList.add("win");
+
+    // ✅ STICK: move arrow INTO the target so it stays attached
+    // Convert final point to TARGET-local coordinates
+    const stickLeft = (rangeRect.left + endX) - targetRect.left;
+    const stickTop  = (rangeRect.top + endY) - targetRect.top;
+
+    // Append into target (target is position:relative in your CSS)
+    target.appendChild(arrowImg);
+
+    // Now anchor relative to target
+    arrowImg.style.position = "absolute";
+    arrowImg.style.left = stickLeft + "px";
+    arrowImg.style.top = stickTop + "px";
+    arrowImg.style.transform = `translate(-50%, -50%) rotate(${angle}deg) scale(0.92)`;
+    arrowImg.style.zIndex = "50";      // above target image
+    arrowImg.style.transition = "transform 0.15s ease-out";
+
+    // Small settle/bounce so it feels like it "thuds" in
+    requestAnimationFrame(() => {
+      arrowImg.style.transform = `translate(-50%, -50%) rotate(${angle}deg) scale(1)`;
+    });
   }
 
   requestAnimationFrame(step);
 }
-
 // ================= TIMER =================
 
 function startLocalTimer() {
