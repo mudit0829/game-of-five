@@ -337,30 +337,33 @@ class GameTable:
         )
         return success
 
-   def calculateresult(self):
-    """
-    Winner must be a number that was actually bet in this round
-    (so it always exists on a boat).
-    """
-    # all bet numbers placed in this table (bots + real)
-    bet_numbers = [b.get("number") for b in (self.bets or []) if b.get("number") is not None]
+    def calculate_result(self):
+        # Winner must be from numbers that were actually bet this round
+        bet_numbers = [
+            b.get("number")
+            for b in (self.bets or [])
+            if b.get("number") is not None
+        ]
 
-    # fallback: if somehow no bets exist, keep old behavior
-    if not bet_numbers:
-        allnumbers = self.getnumberrange()
-        self.result = random.choice(allnumbers)
+        # If no bets exist, fall back to old behavior
+        if not bet_numbers:
+            self.result = random.choice(self.getnumberrange())
+            return self.result
+
+        # Optional: keep your 16% "favor real user" behavior,
+        # but still only from real users' bet numbers.
+        real_numbers = [
+            b.get("number")
+            for b in (self.bets or [])
+            if not b.get("isbot") and b.get("number") is not None
+        ]
+
+        if real_numbers and random.random() < 0.16:
+            self.result = random.choice(real_numbers)
+        else:
+            self.result = random.choice(bet_numbers)
+
         return self.result
-
-    # Optional: keep your "16% chance to favor a real user" logic,
-    # but still pick ONLY from numbers that were bet.
-    real_numbers = [b.get("number") for b in self.bets if not b.get("isbot")]
-
-    if real_numbers and random.random() < 0.16:
-        self.result = random.choice(real_numbers)
-    else:
-        self.result = random.choice(bet_numbers)
-
-    return self.result
 
 
     def get_winners(self):
