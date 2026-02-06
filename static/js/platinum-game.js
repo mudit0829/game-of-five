@@ -684,6 +684,16 @@ if (placeBetBtn) {
     });
   });
 }
+function syncControlsHeight() {
+  const controls = document.querySelector(".controls");
+  if (!controls) return;
+  const h = Math.ceil(controls.getBoundingClientRect().height);
+  document.documentElement.style.setProperty("--controls-h", `${h}px`);
+}
+
+window.addEventListener("load", syncControlsHeight);
+window.addEventListener("resize", syncControlsHeight);
+if (window.ResizeObserver) new ResizeObserver(syncControlsHeight).observe(document.querySelector(".controls"));
 
 // ================== INIT ==================
 
