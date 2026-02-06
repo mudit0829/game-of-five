@@ -361,26 +361,23 @@ body {
   }
 }
 
-/* ===== IMAGE PARATROOPER ===== */
+/* ===== IMAGE PARATROOPER (ON TOP OF EVERYTHING) ===== */
 
 .paratrooper-layer {
-  position: absolute;
+  position: fixed;      /* was absolute */
   inset: 0;
   pointer-events: none;
-  z-index: 25;
+  z-index: 1200;        /* higher than .result-popup (999) and .controls (30) */
 }
 
 .paratrooper-img {
-  position: absolute;
-  /* start high above the screen */
+  position: fixed;      /* match viewport coordinates used in JS */
   top: -260px;
   left: 50%;
   transform: translate(-50%, -50%);
-  /* ~50% smaller size */
   width: 60px;
   max-width: 14%;
   filter: drop-shadow(0 12px 24px rgba(0, 0, 0, 0.9));
-  /* invisible until JS animation runs */
   opacity: 0;
 }
 
