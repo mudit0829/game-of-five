@@ -16,10 +16,10 @@ const HOME_URL = "/home";
 const rangeEl = document.querySelector(".range");
 const arrowImg = document.getElementById("arrowSprite");
 const archerImg = document.getElementById("archerSprite");
+const archerLayerEl = document.querySelector(".archer-layer");
 const targets = Array.from(document.querySelectorAll(".target.pad"));
 
 const numChips = Array.from(document.querySelectorAll(".num-chip"));
-const betInput = document.getElementById("betAmount");
 const placeBetBtn = document.getElementById("placeBetBtn");
 
 const roundIdSpan = document.getElementById("roundId");
@@ -39,9 +39,7 @@ const popupMsgEl = document.getElementById("popupMessage");
 const popupHomeBtn = document.getElementById("popupHomeBtn");
 const popupLobbyBtn = document.getElementById("popupLobbyBtn");
 
-if (userNameLabel) {
-  userNameLabel.textContent = USERNAME;
-}
+if (userNameLabel) userNameLabel.textContent = USERNAME;
 
 let walletBalance = 0;
 let selectedNumber = 0;
@@ -64,9 +62,8 @@ function setStatus(msg, type = "") {
 
 function updateWallet(balance) {
   walletBalance = balance;
-  if (walletBalanceSpan) {
-    walletBalanceSpan.textContent = walletBalance.toFixed(0);
-  }
+  if (walletBalanceSpan) walletBalanceSpan.textContent = walletBalance.toFixed(0);
+
   if (coinsWrapper) {
     coinsWrapper.classList.add("coin-bounce");
     setTimeout(() => coinsWrapper.classList.remove("coin-bounce"), 500);
@@ -93,30 +90,30 @@ function setSelectedNumber(n) {
   });
 }
 
+function disableBettingUI() {
+  if (placeBetBtn) placeBetBtn.disabled = true;
+  numChips.forEach((chip) => (chip.disabled = true));
+}
+
 // ✅ FIXED: Update my bets display
 function updateMyBets(bets) {
-  const myBets = (bets || []).filter(b => {
+  const myBets = (bets || []).filter((b) => {
     const betUserId = String(b.user_id || b.userId || "");
     return betUserId === String(USER_ID);
   });
 
-  if (myBets.length > 0) {
-    userHasBet = true;
-  }
+  if (myBets.length > 0) userHasBet = true;
 
-  if (userBetCountLabel) {
-    userBetCountLabel.textContent = myBets.length;
-  }
+  if (userBetCountLabel) userBetCountLabel.textContent = myBets.length;
 
   if (!myBetsRow) return;
+
   if (myBets.length === 0) {
     myBetsRow.innerHTML = '<span style="color:#6b7280;font-size:11px;">none</span>';
   } else {
-    const numbers = myBets.map(b => b.number).sort((a, b) => a - b);
-    myBetsRow.innerHTML = numbers.map(n => `<span class="my-bet-chip">${n}</span>`).join(", ");
+    const numbers = myBets.map((b) => b.number).sort((a, b) => a - b);
+    myBetsRow.innerHTML = numbers.map((n) => `<span class="my-bet-chip">${n}</span>`).join(", ");
   }
-
-  console.log("[updateMyBets] Count:", myBets.length, "Numbers:", myBets.map(b => b.number).join(","));
 }
 
 // ✅ FIXED: Update targets from bets
@@ -139,16 +136,12 @@ function updateTargetsFromBets(bets) {
       if (userSpan) userSpan.textContent = "";
     }
   });
-
-  console.log("[updateTargetsFromBets] Updated", list.length, "targets from bets");
 }
 
 function ensureTargetForWinningNumber(winningNumber) {
   if (winningNumber === null || winningNumber === undefined) return;
 
-  const existing = targets.find(
-    (t) => t.dataset.number === String(winningNumber)
-  );
+  const existing = targets.find((t) => t.dataset.number === String(winningNumber));
   if (existing) return;
 
   const target = targets[0];
@@ -162,21 +155,11 @@ function ensureTargetForWinningNumber(winningNumber) {
   if (userSpan) userSpan.textContent = "";
 }
 
-function disableBettingUI() {
-  if (placeBetBtn) placeBetBtn.disabled = true;
-  numChips.forEach((chip) => {
-    chip.disabled = true;
-  });
-}
-
 function determineUserOutcome(table) {
   const result = table.result;
-  const myBets = (table.bets || []).filter(
-    (b) => String(b.user_id) === String(USER_ID)
-  );
-  if (!myBets.length) {
-    return { outcome: "none", result };
-  }
+  const myBets = (table.bets || []).filter((b) => String(b.user_id) === String(USER_ID));
+  if (!myBets.length) return { outcome: "none", result };
+
   const won = myBets.some((b) => String(b.number) === String(result));
   return { outcome: won ? "win" : "lose", result };
 }
@@ -190,10 +173,10 @@ function showEndPopup(outcomeInfo) {
   let message = "This game has ended. Please keep playing to keep your winning chances high.";
 
   if (outcome === "win") {
-    title = "Congratulations! 🎉";
+    title = "Congratulations!";
     message = "You have won the game. Please keep playing to keep your winning chances high.";
   } else if (outcome === "lose") {
-    title = "Hard Luck! 😢";
+    title = "Hard Luck!";
     message = "You have lost the game. Please keep playing to keep your winning chances high.";
   }
 
@@ -207,13 +190,11 @@ function showSlotsFullPopup() {
   if (!popupEl) return;
 
   if (popupTitleEl) popupTitleEl.textContent = "All slots are full";
-  if (popupMsgEl) popupMsgEl.textContent = "This game is already full. You will be redirected to lobby to join another table.";
+  if (popupMsgEl) popupMsgEl.textContent =
+    "This game is already full. You will be redirected to lobby to join another table.";
 
   popupEl.style.display = "flex";
-
-  setTimeout(() => {
-    window.history.back();
-  }, 2000);
+  setTimeout(() => window.history.back(), 2000);
 }
 
 function syncUrlWithTable(roundCode) {
@@ -230,109 +211,212 @@ function syncUrlWithTable(roundCode) {
   }
 }
 
-// ================= ARROW ANIMATION (ENHANCED) =================
+// ================= PROFESSIONAL ARROW SHOT =================
+// Key improvements vs your current version:
+// - Never moves the real #arrowSprite into the target (avoids "pasted" + broken next shot).
+// - Uses a clone for flight and a second clone for the stuck arrow.
+// - Rotates to follow the curve tangent (natural).
+// - Anchors stick by arrow tip (transform-origin + translate).
+// - Cancels previous shots cleanly.
 
-function ensureArrowStyles() {
-  if (document.getElementById("arrow-anim-styles")) return;
+let _shotToken = 0;
+let _stuckArrows = [];
+
+function ensureAnimStyles() {
+  if (document.getElementById("diamond-shot-styles")) return;
   const style = document.createElement("style");
-  style.id = "arrow-anim-styles";
+  style.id = "diamond-shot-styles";
   style.textContent = `
-    @keyframes archerDraw {
-      0% { transform: scaleX(1) rotate(0deg); }
-      50% { transform: scaleX(0.85) rotate(-5deg); }
-      100% { transform: scaleX(1) rotate(0deg); }
-    }
-    @keyframes targetFlash {
+    @keyframes targetFlashRing {
       0% { opacity: 0; transform: translate(-50%, -50%) scale(0.6); }
-      50% { opacity: 1; transform: translate(-50%, -50%) scale(1); }
-      100% { opacity: 0; transform: translate(-50%, -50%) scale(1.3); }
+      35% { opacity: 1; transform: translate(-50%, -50%) scale(1.0); }
+      100% { opacity: 0; transform: translate(-50%, -50%) scale(1.35); }
     }
   `;
   document.head.appendChild(style);
 }
 
+function clearStuckArrows() {
+  _stuckArrows.forEach((el) => el.remove());
+  _stuckArrows = [];
+}
+
+function resetArrowToBow() {
+  if (!arrowImg) return;
+  arrowImg.style.opacity = "1";
+  arrowImg.style.transform = ""; // let CSS control idle state
+  arrowImg.style.left = "";
+  arrowImg.style.top = "";
+  arrowImg.style.position = "";
+  arrowImg.style.zIndex = "";
+
+  // If old code ever moved it, put it back
+  if (archerLayerEl && arrowImg.parentElement !== archerLayerEl) {
+    archerLayerEl.appendChild(arrowImg);
+  }
+}
+
+function flashTarget(target) {
+  const ring = document.createElement("div");
+  ring.style.position = "absolute";
+  ring.style.left = "50%";
+  ring.style.top = "50%";
+  ring.style.width = "92%";
+  ring.style.height = "92%";
+  ring.style.borderRadius = "50%";
+  ring.style.border = "2px solid rgba(56,189,248,0.9)";
+  ring.style.boxShadow = "0 0 18px rgba(56,189,248,0.7)";
+  ring.style.pointerEvents = "none";
+  ring.style.animation = "targetFlashRing 420ms ease-out";
+  ring.style.zIndex = "6";
+  target.appendChild(ring);
+  setTimeout(() => ring.remove(), 450);
+}
+
 function shootArrowToWinningNumber(winningNumber) {
   if (!rangeEl || !arrowImg || !archerImg) return;
 
-  const target = targets.find(t => t.dataset.number === String(winningNumber));
+  const target = targets.find((t) => t.dataset.number === String(winningNumber));
   if (!target) return;
 
+  ensureAnimStyles();
+
+  // cancel previous shots + remove prior stuck arrows (optional but cleaner)
+  const token = ++_shotToken;
+  clearStuckArrows();
+
+  resetArrowToBow();
+
   const rangeRect = rangeEl.getBoundingClientRect();
-  const arrowRect = arrowImg.getBoundingClientRect();
   const targetRect = target.getBoundingClientRect();
+  const arrowRect = arrowImg.getBoundingClientRect();
 
-  // Positions relative to RANGE (for flight)
-  const startX = (arrowRect.left + arrowRect.width * 0.2) - rangeRect.left;
-  const startY = (arrowRect.top + arrowRect.height * 0.5) - rangeRect.top;
+  // Start near the arrow tip (right side of your arrow svg)
+  const startX = (arrowRect.left + arrowRect.width * 0.88) - rangeRect.left;
+  const startY = (arrowRect.top + arrowRect.height * 0.55) - rangeRect.top;
 
-  const endX = (targetRect.left + targetRect.width * 0.55) - rangeRect.left;  // slightly right of center
-  const endY = (targetRect.top + targetRect.height * 0.50) - rangeRect.top;   // center vertically
+  // End near center of target
+  const endX = (targetRect.left + targetRect.width * 0.52) - rangeRect.left;
+  const endY = (targetRect.top + targetRect.height * 0.52) - rangeRect.top;
 
   const dx = endX - startX;
   const dy = endY - startY;
-  const dist = Math.sqrt(dx * dx + dy * dy);
+  const dist = Math.hypot(dx, dy);
 
-  const duration = 650;
-  const peak = -Math.min(150, dist * 0.4);
+  // Quadratic bezier control point (nice arc)
+  const midX = (startX + endX) / 2;
+  const lift = Math.min(170, Math.max(95, dist * 0.35));
+  const ctrlX = midX;
+  const ctrlY = Math.min(startY, endY) - lift;
+
+  // Clone arrow for flight; keep original hidden so user sees 1 arrow only
+  const flying = arrowImg.cloneNode(true);
+  flying.removeAttribute("id");
+  flying.style.position = "absolute";
+  flying.style.left = "0px";
+  flying.style.top = "0px";
+  flying.style.width = (arrowRect.width || 52) + "px";
+  flying.style.height = "auto";
+  flying.style.pointerEvents = "none";
+  flying.style.zIndex = "60";
+  flying.style.willChange = "transform,left,top,filter";
+  flying.style.filter = "drop-shadow(0 10px 14px rgba(0,0,0,0.7))";
+  rangeEl.appendChild(flying);
+
+  arrowImg.style.opacity = "0";
+
+  // Archer pose
+  archerImg.classList.add("shoot");
+  setTimeout(() => archerImg.classList.remove("shoot"), 350);
+
+  const duration = 720;
   const startTime = performance.now();
 
-  // Archer shoot animation (uses your CSS .archer.shoot)
-  archerImg.classList.add("shoot");
-  setTimeout(() => archerImg.classList.remove("shoot"), 400);
+  const bezier = (t, p0, p1, p2) => {
+    const u = 1 - t;
+    return u * u * p0 + 2 * u * t * p1 + t * t * p2;
+  };
+  const bezierDeriv = (t, p0, p1, p2) => 2 * (1 - t) * (p1 - p0) + 2 * t * (p2 - p1);
+  const easeOutCubic = (t) => 1 - Math.pow(1 - t, 3);
 
   function step(now) {
-    const tRaw = (now - startTime) / duration;
-    const t = Math.min(Math.max(tRaw, 0), 1);
+    if (token !== _shotToken) {
+      flying.remove();
+      arrowImg.style.opacity = "1";
+      return;
+    }
 
-    // ease-out-cubic
-    const ease = 1 - Math.pow(1 - t, 3);
+    const raw = (now - startTime) / duration;
+    const tr = Math.min(Math.max(raw, 0), 1);
+    const t = easeOutCubic(tr);
 
-    const x = startX + dx * ease;
-    const yLinear = startY + dy * ease;
-    const yArc = yLinear + peak * (4 * t * (1 - t));
+    const x = bezier(t, startX, ctrlX, endX);
+    const y = bezier(t, startY, ctrlY, endY);
 
-    const angle = Math.atan2(dy, dx) * (180 / Math.PI);
-    const scale = 1 - t * 0.12;
+    // Rotate to match curve tangent (professional feel)
+    const vx = bezierDeriv(t, startX, ctrlX, endX);
+    const vy = bezierDeriv(t, startY, ctrlY, endY);
+    const angle = Math.atan2(vy, vx) * (180 / Math.PI);
 
-    // Flight: fixed positioning in viewport
-    arrowImg.style.position = "fixed";
-    arrowImg.style.left = (rangeRect.left + x) + "px";
-    arrowImg.style.top = (rangeRect.top + yArc) + "px";
-    arrowImg.style.transform = `translate(-50%, -50%) rotate(${angle}deg) scale(${scale})`;
-    arrowImg.style.zIndex = "200"; // below popup
+    // slight stability: a touch of wobble early only
+    const wobble = (1 - t) * 1.7 * Math.sin(t * 10);
 
-    if (t < 1) {
+    flying.style.left = x + "px";
+    flying.style.top = y + "px";
+    flying.style.transform = `translate(-50%, -50%) rotate(${angle + wobble}deg)`;
+
+    if (tr < 1) {
       requestAnimationFrame(step);
       return;
     }
 
     // Impact
     target.classList.add("win");
+    flashTarget(target);
 
-    // ✅ STICK: move arrow INTO the target so it stays attached
-    // Convert final point to TARGET-local coordinates
+    // Remove flying arrow
+    flying.remove();
+
+    // Stick arrow inside target with tip anchoring
     const stickLeft = (rangeRect.left + endX) - targetRect.left;
-    const stickTop  = (rangeRect.top + endY) - targetRect.top;
+    const stickTop = (rangeRect.top + endY) - targetRect.top;
 
-    // Append into target (target is position:relative in your CSS)
-    target.appendChild(arrowImg);
+    const stuck = arrowImg.cloneNode(true);
+    stuck.removeAttribute("id");
+    stuck.style.position = "absolute";
+    stuck.style.left = stickLeft + "px";
+    stuck.style.top = stickTop + "px";
+    stuck.style.width = (arrowRect.width || 52) + "px";
+    stuck.style.height = "auto";
+    stuck.style.pointerEvents = "none";
 
-    // Now anchor relative to target
-    arrowImg.style.position = "absolute";
-    arrowImg.style.left = stickLeft + "px";
-    arrowImg.style.top = stickTop + "px";
-    arrowImg.style.transform = `translate(-50%, -50%) rotate(${angle}deg) scale(0.92)`;
-    arrowImg.style.zIndex = "50";      // above target image
-    arrowImg.style.transition = "transform 0.15s ease-out";
+    // IMPORTANT: keep it above target image but below pad text; your CSS originally uses z-index
+    // (arrow had z-index: 4, targets z-index: 1) [file:102]
+    stuck.style.zIndex = "3";
 
-    // Small settle/bounce so it feels like it "thuds" in
+    // Tip anchor: arrow points to the right in your sprite, so tip is near 90–95% X.
+    stuck.style.transformOrigin = "92% 50%";
+    stuck.style.filter = "drop-shadow(0 10px 14px rgba(0,0,0,0.75))";
+    stuck.style.transition = "transform 160ms ease-out";
+
+    const finalAngle = angle + (-6 + Math.random() * 12);
+    // translate(-92%, -50%) puts the TIP on the hit point, then translateX simulates penetration
+    stuck.style.transform = `translate(-92%, -50%) rotate(${finalAngle}deg) translateX(10px)`;
+
+    target.appendChild(stuck);
+    _stuckArrows.push(stuck);
+
     requestAnimationFrame(() => {
-      arrowImg.style.transform = `translate(-50%, -50%) rotate(${angle}deg) scale(1)`;
+      stuck.style.transform = `translate(-92%, -50%) rotate(${finalAngle}deg) translateX(0px)`;
     });
+
+    // Restore idle arrow at bow
+    arrowImg.style.opacity = "1";
   }
 
   requestAnimationFrame(step);
 }
+
 // ================= TIMER =================
 
 function startLocalTimer() {
@@ -368,19 +452,11 @@ async function fetchTableData() {
       if (!table) {
         gameFinished = true;
         disableBettingUI();
-        if (tablePollInterval) {
-          clearInterval(tablePollInterval);
-          tablePollInterval = null;
-        }
-        if (localTimerInterval) {
-          clearInterval(localTimerInterval);
-          localTimerInterval = null;
-        }
+        if (tablePollInterval) clearInterval(tablePollInterval);
+        if (localTimerInterval) clearInterval(localTimerInterval);
 
         setStatus("This game has finished. You'll be taken back to lobby to join a new one.", "error");
-        setTimeout(() => {
-          window.history.back();
-        }, 2000);
+        setTimeout(() => window.history.back(), 2000);
         return;
       }
     } else {
@@ -403,28 +479,20 @@ function updateGameUI(table) {
   displayRemainingSeconds = table.time_remaining || 0;
   renderTimer();
 
-  // ✅ CRITICAL: Update targets from polling (for initial load + other players' bets)
-  if (table.bets && Array.isArray(table.bets) && table.bets.length > 0) {
-    console.log("[polling] Updating targets from API bets:", table.bets.length);
+  if (table.bets && Array.isArray(table.bets)) {
     updateTargetsFromBets(table.bets);
     updateMyBets(table.bets);
-    if (playerCountSpan) {
-      playerCountSpan.textContent = table.bets.length;
-    }
+    if (playerCountSpan) playerCountSpan.textContent = table.bets.length;
   }
 
   if (placeBetBtn && !gameFinished) {
     const maxPlayers = typeof table.max_players === "number" ? table.max_players : null;
     const slotsFull = !!table.is_full || (maxPlayers !== null && table.players >= maxPlayers);
-
     placeBetBtn.disabled = !!table.is_betting_closed || !!table.is_finished || slotsFull;
   }
 
-  if (displayRemainingSeconds <= 10) {
-    timerPill && timerPill.classList.add("urgent");
-  } else {
-    timerPill && timerPill.classList.remove("urgent");
-  }
+  if (displayRemainingSeconds <= 10) timerPill && timerPill.classList.add("urgent");
+  else timerPill && timerPill.classList.remove("urgent");
 
   const maxPlayers = typeof table.max_players === "number" ? table.max_players : null;
   const isFull = table.is_full === true || (maxPlayers !== null && table.players >= maxPlayers);
@@ -432,14 +500,8 @@ function updateGameUI(table) {
   if (!gameFinished && !userHasBet && isFull) {
     gameFinished = true;
     disableBettingUI();
-    if (tablePollInterval) {
-      clearInterval(tablePollInterval);
-      tablePollInterval = null;
-    }
-    if (localTimerInterval) {
-      clearInterval(localTimerInterval);
-      localTimerInterval = null;
-    }
+    if (tablePollInterval) clearInterval(tablePollInterval);
+    if (localTimerInterval) clearInterval(localTimerInterval);
     showSlotsFullPopup();
     return;
   }
@@ -448,31 +510,26 @@ function updateGameUI(table) {
 
   if (hasResult && table.result !== lastResultShown) {
     lastResultShown = table.result;
-    setStatus(`Winning number: ${table.result}`, "ok");
 
+    setStatus(`Winning number: ${table.result}`, "ok");
     ensureTargetForWinningNumber(table.result);
     shootArrowToWinningNumber(table.result);
 
     if (!gameFinished) {
       gameFinished = true;
       disableBettingUI();
-
-      if (tablePollInterval) {
-        clearInterval(tablePollInterval);
-        tablePollInterval = null;
-      }
-      if (localTimerInterval) {
-        clearInterval(localTimerInterval);
-        localTimerInterval = null;
-      }
+      if (tablePollInterval) clearInterval(tablePollInterval);
+      if (localTimerInterval) clearInterval(localTimerInterval);
 
       const outcomeInfo = determineUserOutcome(table);
-      setTimeout(() => {
-        showEndPopup(outcomeInfo);
-      }, 1000);
+      setTimeout(() => showEndPopup(outcomeInfo), 1000);
     }
   } else if (!hasResult) {
     lastResultShown = null;
+    // If you ever decide not to finish the game and keep polling,
+    // this keeps visuals clean for a new round:
+    clearStuckArrows();
+    resetArrowToBow();
   }
 }
 
@@ -480,9 +537,7 @@ function startPolling() {
   fetchTableData();
   if (tablePollInterval) clearInterval(tablePollInterval);
   tablePollInterval = setInterval(() => {
-    if (!gameFinished) {
-      fetchTableData();
-    }
+    if (!gameFinished) fetchTableData();
   }, 2000);
 }
 
@@ -494,67 +549,49 @@ async function fetchBalance() {
   try {
     const res = await fetch(`/balance/${USER_ID}`);
     const data = await res.json();
-    if (typeof data.balance === "number") {
-      updateWallet(data.balance);
-    }
+    if (typeof data.balance === "number") updateWallet(data.balance);
   } catch (err) {
     console.error("balance fetch error", err);
   }
 }
 
 function joinGameRoom() {
-  socket.emit("join_game", {
-    game_type: GAME,
-    user_id: USER_ID,
-  });
+  socket.emit("join_game", { game_type: GAME, user_id: USER_ID });
 }
 
 socket.on("connect", () => {
-  console.log("[socket] CONNECTED");
   joinGameRoom();
   fetchBalance();
   fetchTableData();
 });
 
-socket.on("disconnect", () => {
-  console.log("[socket] DISCONNECTED");
-});
-
-socket.on("connect_error", (error) => {
-  console.error("[socket] CONNECTION ERROR:", error);
-});
+socket.on("connect_error", (error) => console.error("[socket] CONNECTION ERROR:", error));
+socket.on("disconnect", () => {});
 
 // ✅ LISTEN FOR OWN BET SUCCESS
 socket.on("bet_success", (payload) => {
-  console.log("[bet_success] Received - players:", payload.players?.length || 0);
   if (gameFinished) return;
 
   userHasBet = true;
   setStatus(payload.message || "Bet placed ✓", "ok");
-  if (typeof payload.new_balance === "number") {
-    updateWallet(payload.new_balance);
-  }
+
+  if (typeof payload.new_balance === "number") updateWallet(payload.new_balance);
 
   if (payload.players && Array.isArray(payload.players)) {
-    console.log("[bet_success] Updating UI with", payload.players.length, "players");
     updateTargetsFromBets(payload.players);
     updateMyBets(payload.players);
-    if (playerCountSpan) {
-      playerCountSpan.textContent = payload.players.length;
-    }
+    if (playerCountSpan) playerCountSpan.textContent = payload.players.length;
   }
 });
 
 // ✅ LISTEN FOR BROADCAST TABLE UPDATES
 socket.on("update_table", (payload) => {
-  console.log("[update_table] BROADCAST received - players:", payload.players?.length || 0);
   if (gameFinished) return;
 
   if (payload.players && Array.isArray(payload.players)) {
-    console.log("[update_table] Updating UI with", payload.players.length, "players");
-    playerCountSpan.textContent = payload.players.length;
     updateTargetsFromBets(payload.players);
     updateMyBets(payload.players);
+    if (playerCountSpan) playerCountSpan.textContent = payload.players.length;
   }
 
   if (payload.time_remaining != null) {
@@ -562,15 +599,12 @@ socket.on("update_table", (payload) => {
     renderTimer();
   }
 
-  if (payload.is_betting_closed) {
-    disableBettingUI();
-  }
+  if (payload.is_betting_closed) disableBettingUI();
 });
 
 // ✅ LISTEN FOR BET ERRORS
 socket.on("bet_error", (payload) => {
   if (gameFinished) return;
-  console.error("[bet_error]:", payload.message);
   setStatus(payload.message || "Bet error", "error");
 });
 
@@ -624,21 +658,10 @@ if (placeBetBtn) {
   });
 }
 
-if (popupHomeBtn) {
-  popupHomeBtn.addEventListener("click", () => {
-    window.location.href = HOME_URL;
-  });
-}
-
-if (popupLobbyBtn) {
-  popupLobbyBtn.addEventListener("click", () => {
-    window.history.back();
-  });
-}
+if (popupHomeBtn) popupHomeBtn.addEventListener("click", () => (window.location.href = HOME_URL));
+if (popupLobbyBtn) popupLobbyBtn.addEventListener("click", () => window.history.back());
 
 // ================= INIT =================
-
-console.log(`[INIT] Game=${GAME}, User=${USER_ID}, Username=${USERNAME}, Bet=${FIXED_BET_AMOUNT}`);
 
 fetchBalance();
 startPolling();
