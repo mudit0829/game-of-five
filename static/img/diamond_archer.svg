@@ -1,0 +1,74 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512">
+  <defs>
+    <linearGradient id="cloth" x1="0" x2="1">
+      <stop offset="0" stop-color="#0b1220"/>
+      <stop offset="1" stop-color="#111827"/>
+    </linearGradient>
+    <linearGradient id="accent" x1="0" x2="1">
+      <stop offset="0" stop-color="#38bdf8"/>
+      <stop offset="1" stop-color="#14b8a6"/>
+    </linearGradient>
+    <filter id="shadow" x="-30%" y="-30%" width="160%" height="160%">
+      <feDropShadow dx="0" dy="8" stdDeviation="10" flood-color="#000" flood-opacity="0.6"/>
+    </filter>
+  </defs>
+
+  <!-- Archer sprite facing RIGHT -->
+  <g filter="url(#shadow)">
+    <!-- legs -->
+    <path d="M210 430 C210 395 230 360 260 345 C290 360 310 395 310 430
+             L310 468 C310 486 296 500 278 500 L270 500
+             C252 500 238 486 238 468 L238 442
+             L222 500 L206 500 C188 500 174 486 174 468 L174 460
+             C174 446 182 436 196 432 Z"
+          fill="url(#cloth)"/>
+
+    <!-- torso -->
+    <path d="M210 210 C220 170 250 150 285 150
+             C330 150 360 182 370 232
+             C380 284 360 330 320 350
+             C290 364 252 360 228 338
+             C196 308 196 260 210 210 Z"
+          fill="url(#cloth)" stroke="#38bdf8" stroke-opacity="0.25" stroke-width="4"/>
+
+    <!-- hood -->
+    <path d="M235 180 C255 130 320 120 350 165
+             C365 188 360 230 330 250
+             C305 267 268 260 250 240
+             C232 220 228 200 235 180 Z"
+          fill="#0f172a" stroke="#0ea5e9" stroke-opacity="0.25" stroke-width="4"/>
+
+    <!-- head (minimal, no detailed face) -->
+    <circle cx="300" cy="210" r="34" fill="#111827" stroke="url(#accent)" stroke-opacity="0.35" stroke-width="4"/>
+
+    <!-- arm holding bow (forward/right) -->
+    <path d="M310 260 C350 250 380 260 404 290
+             C414 304 410 324 396 334
+             C382 344 364 340 354 326
+             C340 306 326 300 308 304 Z"
+          fill="#0b1220" stroke="#38bdf8" stroke-opacity="0.22" stroke-width="4"/>
+
+    <!-- rear arm drawing string -->
+    <path d="M260 270 C250 248 252 226 266 208
+             C278 192 298 188 312 200
+             C326 212 322 232 312 244
+             C304 254 304 266 308 278 Z"
+          fill="#0b1220" stroke="#14b8a6" stroke-opacity="0.18" stroke-width="4"/>
+
+    <!-- bow (curved, facing right) -->
+    <path d="M412 220
+             C382 250 382 312 412 342"
+          fill="none" stroke="#cbd5e1" stroke-width="10" stroke-linecap="round"/>
+
+    <!-- bow grip -->
+    <rect x="400" y="268" width="24" height="26" rx="10" fill="#111827" stroke="#38bdf8" stroke-opacity="0.35"/>
+
+    <!-- bow string -->
+    <path d="M412 220 L382 280 L412 342"
+          fill="none" stroke="#94a3b8" stroke-width="3" stroke-linecap="round" opacity="0.9"/>
+
+    <!-- accent sash -->
+    <path d="M230 300 C255 330 310 346 350 332"
+          fill="none" stroke="url(#accent)" stroke-width="10" stroke-linecap="round" opacity="0.85"/>
+  </g>
+</svg>
