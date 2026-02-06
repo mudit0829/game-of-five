@@ -507,3 +507,56 @@ body {
     width: 96px;
   }
 }
+
+/* ================= DIAMOND FIX PACK (paste at end) ================= */
+
+/* Lock the app to viewport height, but allow internal scrolling areas */
+.diamond-page{
+  height: 100vh;
+  min-height: 100vh;
+  overflow: hidden; /* keep body locked, sheet will scroll */
+}
+
+/* Allow the middle area to actually shrink in a flex column */
+.range-wrapper{
+  min-height: 0;   /* IMPORTANT: allows shrink so controls don't go off-screen */
+  margin-bottom: 8px;
+}
+
+/* Make the range height responsive instead of forcing big min-height */
+.range{
+  min-height: 0;
+  height: clamp(210px, 34vh, 320px);
+}
+
+/* Controls become a scrollable bottom sheet */
+.controls-sheet{
+  flex: 0 0 auto;
+  max-height: 48vh;                 /* controls never push below screen */
+  overflow-y: auto;                 /* scroll inside */
+  -webkit-overflow-scrolling: touch;
+  padding-bottom: calc(10px + env(safe-area-inset-bottom));
+  border-top-left-radius: 18px;
+  border-top-right-radius: 18px;
+}
+
+/* Keep the Place Bet button always visible */
+.bet-button{
+  position: sticky;
+  bottom: 6px;
+  z-index: 5;
+}
+
+/* A little tighter spacing on short screens */
+@media (max-height: 720px){
+  .numbers-title{ font-size: 12px; margin-bottom: 4px; }
+  .numbers-row{ gap: 5px; margin-bottom: 6px; }
+  .num-chip{ width: 34px; height: 34px; font-size: 13px; }
+  .bet-container{ margin: 6px 0; }
+}
+
+/* Make sure popup is always on top of arrow/archer */
+.result-popup{
+  z-index: 9999;
+}
+
