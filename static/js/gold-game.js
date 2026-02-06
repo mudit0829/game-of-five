@@ -1,5 +1,5 @@
 // ================= BASIC SETUP =================
-// ✅ CRITICAL FIX: Use window.* variables, NEVER redeclare if HTML already set them
+// Use window.* variables set by HTML
 
 const GAME = window.GAME_TYPE || "gold";
 const FIXED_BET_AMOUNT = window.FIXED_BET_AMOUNT || 50;
@@ -38,40 +38,44 @@ const popupMsgEl = document.getElementById("popupMessage");
 const popupHomeBtn = document.getElementById("popupHomeBtn");
 const popupLobbyBtn = document.getElementById("popupLobbyBtn");
 
-if (userNameLabel) {
-  userNameLabel.textContent = USERNAME;
-}
+if (userNameLabel) userNameLabel.textContent = USERNAME;
+
+// ================= STATE =================
 
 let walletBalance = 0;
 let selectedNumber = 0;
+
 let currentTable = null;
-let lastResultShown = null;
 let gameFinished = false;
+
 let tablePollInterval = null;
 let localTimerInterval = null;
 let displayRemainingSeconds = 0;
+
 let userHasBet = false;
+
 let videoPlayer = null;
-let videoVisible = false;
+let videoStartedForRound = null;
 
-// ================= UI HELPERS =================
+let shotShownForRound = null;
+let popupShownForRound = null;
 
-function setStatus(msg, type = "") {
-  if (!statusEl) return;
-  statusEl.textContent = msg || "";
-  statusEl.className = "status";
-  if (type) statusEl.classList.add(type);
+// ================= SMALL UTILITIES =================
+
+function pick(obj, ...keys) {
+  for (const k of keys) {
+    if (obj && obj[k] !== undefined && obj[k] !== null) return obj[k];
+  }
+  return undefined;
 }
 
-function updateWallet(balance) {
-  walletBalance = balance;
-  if (walletBalanceSpan) {
-    walletBalanceSpan.textContent = walletBalance.toFixed(0);
-  }
-  if (coinsWrapper) {
-    coinsWrapper.classList.add("coin-bounce");
-    setTimeout(() => coinsWrapper.classList.remove("coin-bounce"), 500);
-  }
+function toBool(v) {
+  return v === true || v === "true" || v === 1 || v === "1";
+}
+
+function safeNum(v, fallback = 0) {
+  const n = Number(v);
+  return Number.isFinite(n) ? n : fallback;
 }
 
 function formatTime(seconds) {
@@ -81,141 +85,32 @@ function formatTime(seconds) {
   return `${mins}:${secs.toString().padStart(2, "0")}`;
 }
 
-function renderTimer() {
-  if (!timerText) return;
-  timerText.textContent = formatTime(displayRemainingSeconds);
-}
+function normalizeTable(raw) {
+  if (!raw) return null;
 
-function setSelectedNumber(n) {
-  selectedNumber = n;
-  numChips.forEach((chip) => {
-    const v = parseInt(chip.dataset.number, 10);
-    chip.classList.toggle("selected", v === n);
-  });
-}
+  const t = { ...raw };
 
-// ✅ Update my bets display
-function updateMyBets(bets) {
-  const myBets = (bets || []).filter(b => {
-    const betUserId = String(b.user_id || b.userId || "");
-    return betUserId === String(USER_ID);
-  });
+  // handle both snake_case + no-underscore versions
+  t.roundCode = pick(raw, "round_code", "roundcode");
+  t.timeRemaining = safeNum(pick(raw, "time_remaining", "timeremaining"), 0);
+  t.isFinished = toBool(pick(raw, "is_finished", "isfinished"));
+  t.isBettingClosed = toBool(pick(raw, "is_betting_closed", "isbettingclosed"));
 
-  if (myBets.length > 0) {
-    userHasBet = true;
-  }
+  t.maxPlayers = pick(raw, "max_players", "maxplayers");
+  t.playersCount = safeNum(pick(raw, "players"), 0);
 
-  if (userBetCountLabel) {
-    userBetCountLabel.textContent = myBets.length;
-  }
+  const betsRaw = Array.isArray(raw.bets) ? raw.bets : (Array.isArray(raw.players) ? raw.players : []);
+  t.bets = betsRaw.map((b) => ({
+    ...b,
+    userId: pick(b, "user_id", "userid"),
+    username: pick(b, "username") || "Player",
+    number: pick(b, "number"),
+    isBot: toBool(pick(b, "is_bot", "isbot")),
+  }));
 
-  if (!myBetsRow) return;
-  if (myBets.length === 0) {
-    myBetsRow.innerHTML = '<span style="color:#6b7280;font-size:11px;">none</span>';
-  } else {
-    const numbers = myBets.map(b => b.number).sort((a, b) => a - b);
-    myBetsRow.innerHTML = numbers.map(n => `<span class="my-bet-chip">${n}</span>`).join(", ");
-  }
+  t.resultValue = pick(raw, "result");
 
-  console.log("[updateMyBets] Count:", myBets.length, "Numbers:", myBets.map(b => b.number).join(","));
-}
-
-// Update goals from bets
-function updateGoalsFromBets(bets) {
-  const list = (bets || []).slice(0, 6);
-
-  goals.forEach((goal, i) => {
-    const numSpan = goal.querySelector(".pad-number");
-    const userSpan = goal.querySelector(".pad-user");
-    goal.classList.remove("win");
-
-    if (i < list.length) {
-      const b = list[i];
-      goal.dataset.number = String(b.number);
-      if (numSpan) numSpan.textContent = b.number;
-      if (userSpan) userSpan.textContent = b.username;
-    } else {
-      goal.dataset.number = "";
-      if (numSpan) numSpan.textContent = "";
-      if (userSpan) userSpan.textContent = "";
-    }
-  });
-
-  console.log("[updateGoalsFromBets] Updated", list.length, "goals from bets");
-}
-
-// Ensure winning number is on a goal
-function ensureGoalForWinningNumber(winningNumber) {
-  if (winningNumber === null || winningNumber === undefined) return;
-
-  const existing = goals.find(
-    (g) => g.dataset.number === String(winningNumber)
-  );
-  if (existing) return;
-
-  const goal = goals[0];
-  if (!goal) return;
-
-  const numSpan = goal.querySelector(".pad-number");
-  const userSpan = goal.querySelector(".pad-user");
-
-  goal.dataset.number = String(winningNumber);
-  if (numSpan) numSpan.textContent = winningNumber;
-  if (userSpan) userSpan.textContent = "";
-}
-
-function disableBettingUI() {
-  if (placeBetBtn) placeBetBtn.disabled = true;
-  numChips.forEach((chip) => {
-    chip.disabled = true;
-  });
-}
-
-function determineUserOutcome(table) {
-  const result = table.result;
-  const myBets = (table.bets || []).filter(
-    (b) => String(b.user_id) === String(USER_ID)
-  );
-  if (!myBets.length) {
-    return { outcome: "none", result };
-  }
-  const won = myBets.some((b) => String(b.number) === String(result));
-  return { outcome: won ? "win" : "lose", result };
-}
-
-function showEndPopup(outcomeInfo) {
-  if (!popupEl) return;
-
-  const { outcome } = outcomeInfo;
-
-  let title = "Game Finished";
-  let message = "This game has ended. Please keep playing to keep your winning chances high.";
-
-  if (outcome === "win") {
-    title = "Congratulations! 🎉";
-    message = "You have won the game. Please keep playing to keep your winning chances high.";
-  } else if (outcome === "lose") {
-    title = "Hard Luck! 😢";
-    message = "You have lost the game. Please keep playing to keep your winning chances high.";
-  }
-
-  if (popupTitleEl) popupTitleEl.textContent = title;
-  if (popupMsgEl) popupMsgEl.textContent = message;
-
-  popupEl.style.display = "flex";
-}
-
-function showSlotsFullPopup() {
-  if (!popupEl) return;
-
-  if (popupTitleEl) popupTitleEl.textContent = "All slots are full";
-  if (popupMsgEl) popupMsgEl.textContent = "This game is already full. You will be redirected to lobby to join another table.";
-
-  popupEl.style.display = "flex";
-
-  setTimeout(() => {
-    window.history.back();
-  }, 2000);
+  return t;
 }
 
 function syncUrlWithTable(roundCode) {
@@ -232,45 +127,216 @@ function syncUrlWithTable(roundCode) {
   }
 }
 
-// ================= VIDEO ANIMATION =================
+// ================= UI HELPERS =================
 
-function showPlayerKickVideo() {
-  if (videoVisible) return;
+function setStatus(msg, type = "") {
+  if (!statusEl) return;
+  statusEl.textContent = msg || "";
+  statusEl.className = "status";
+  if (type) statusEl.classList.add(type);
+}
 
-  console.log("[video] Showing player kick video at", displayRemainingSeconds, 'seconds remaining');
+function updateWallet(balance) {
+  walletBalance = safeNum(balance, 0);
+  if (walletBalanceSpan) walletBalanceSpan.textContent = walletBalance.toFixed(0);
 
-  if (!playerArea) {
-    console.warn("[video] playerArea not found");
-    return;
+  if (coinsWrapper) {
+    coinsWrapper.classList.add("coin-bounce");
+    setTimeout(() => coinsWrapper.classList.remove("coin-bounce"), 500);
+  }
+}
+
+function renderTimer() {
+  if (!timerText) return;
+  timerText.textContent = formatTime(displayRemainingSeconds);
+}
+
+function setSelectedNumber(n) {
+  selectedNumber = n;
+  numChips.forEach((chip) => {
+    const v = parseInt(chip.dataset.number, 10);
+    chip.classList.toggle("selected", v === n);
+  });
+}
+
+function disableBettingUI() {
+  if (placeBetBtn) placeBetBtn.disabled = true;
+  numChips.forEach((chip) => {
+    chip.disabled = true;
+  });
+}
+
+// ✅ Update my bets display
+function updateMyBets(bets) {
+  const myBets = (bets || []).filter((b) => String(b.userId) === String(USER_ID));
+
+  userHasBet = myBets.length > 0;
+
+  if (userBetCountLabel) userBetCountLabel.textContent = myBets.length;
+
+  if (!myBetsRow) return;
+
+  if (myBets.length === 0) {
+    myBetsRow.innerHTML = '<span style="color:#6b7280;font-size:11px;">none</span>';
+  } else {
+    const numbers = myBets.map((b) => Number(b.number)).sort((a, b) => a - b);
+    myBetsRow.innerHTML = numbers.map((n) => `<span class="my-bet-chip">${n}</span>`).join("");
+  }
+}
+
+function updateGoalsFromBets(bets) {
+  const list = (bets || []).slice(0, 6);
+
+  goals.forEach((goal, i) => {
+    const numSpan = goal.querySelector(".pad-number");
+    const userSpan = goal.querySelector(".pad-user");
+    goal.classList.remove("win");
+
+    if (i < list.length) {
+      const b = list[i];
+      goal.dataset.number = String(b.number);
+      if (numSpan) numSpan.textContent = b.number;
+      if (userSpan) userSpan.textContent = b.username || "";
+    } else {
+      goal.dataset.number = "";
+      if (numSpan) numSpan.textContent = "";
+      if (userSpan) userSpan.textContent = "";
+    }
+  });
+}
+
+// Ensure winning number is on a goal (in case no one bet that number)
+function ensureGoalForWinningNumber(winningNumber) {
+  if (winningNumber === null || winningNumber === undefined) return;
+
+  const existing = goals.find((g) => g.dataset.number === String(winningNumber));
+  if (existing) return;
+
+  const goal = goals[0];
+  if (!goal) return;
+
+  const numSpan = goal.querySelector(".pad-number");
+  const userSpan = goal.querySelector(".pad-user");
+
+  goal.dataset.number = String(winningNumber);
+  if (numSpan) numSpan.textContent = winningNumber;
+  if (userSpan) userSpan.textContent = "";
+}
+
+function determineUserOutcome(table) {
+  const result = table.resultValue;
+  const myBets = (table.bets || []).filter((b) => String(b.userId) === String(USER_ID));
+  if (!myBets.length) return { outcome: "none", result };
+
+  const won = myBets.some((b) => String(b.number) === String(result));
+  return { outcome: won ? "win" : "lose", result };
+}
+
+function showEndPopup({ outcome, result }) {
+  if (!popupEl) return;
+
+  let title = "Game Finished";
+  let message = `Winning number: ${result}`;
+
+  if (outcome === "win") {
+    title = "Congratulations!";
+    message = `You have WON this game. Winning number: ${result}`;
+  } else if (outcome === "lose") {
+    title = "Hard Luck!";
+    message = `You have LOST this game. Winning number: ${result}`;
+  } else {
+    title = "Game Finished";
+    message = `Winning number: ${result}`;
   }
 
-  videoVisible = true;
+  if (popupTitleEl) popupTitleEl.textContent = title;
+  if (popupMsgEl) popupMsgEl.textContent = message;
 
-  const video = document.createElement("video");
-  video.id = "playerKickVideo";
-  video.src = "/static/video/gold_game_video_Play.mp4";
-  video.style.width = "100%";
-  video.style.height = "100%";
-  video.style.objectFit = "cover";
-  video.style.objectPosition = "center";
-  video.muted = true;
-  video.autoplay = true;
-  video.playsinline = true;
+  popupEl.style.display = "flex";
+}
 
-  playerArea.appendChild(video);
-  videoPlayer = video;
+function showSlotsFullPopup() {
+  if (!popupEl) return;
 
-  playerArea.classList.add("visible");
+  if (popupTitleEl) popupTitleEl.textContent = "All slots are full";
+  if (popupMsgEl) popupMsgEl.textContent = "This game is already full. You will be redirected to lobby to join another table.";
 
-  video.play().catch(err => console.warn("[video] Play error:", err));
+  popupEl.style.display = "flex";
 
-  const hideVideoInterval = setInterval(() => {
-    if (displayRemainingSeconds <= 2 && videoPlayer) {
-      console.log("[video] Timer hit 2s, pausing video");
+  setTimeout(() => window.history.back(), 2000);
+}
+
+// ================= VIDEO (Kick) =================
+// Requirement: start showing at 5 seconds remaining, video is ~3s so the kick ends around 2s remaining.
+
+function ensureKickVideoElement() {
+  if (!playerArea) return null;
+
+  let v = document.getElementById("playerKickVideo");
+  if (v) return v;
+
+  v = document.createElement("video");
+  v.id = "playerKickVideo";
+  v.src = "/static/video/gold_game_video_Play.mp4";
+  v.muted = true;
+  v.autoplay = false;
+  v.playsInline = true;
+  v.preload = "auto";
+
+  playerArea.appendChild(v);
+  return v;
+}
+
+function showKickVideoForTimeWindow() {
+  if (!currentTable) return;
+
+  const roundId = currentTable.roundCode || "__no_round__";
+  if (videoStartedForRound === roundId) return;
+
+  // only start in the 5..3 window (so the 3 sec clip ends at 2 sec remaining)
+  if (displayRemainingSeconds > 5 || displayRemainingSeconds <= 2) return;
+
+  videoStartedForRound = roundId;
+
+  const v = ensureKickVideoElement();
+  if (!v) return;
+
+  videoPlayer = v;
+
+  // If we started late (e.g., at 4s), jump into the clip so it still ends at 2s.
+  // Example: remaining=4 => we want to be 1s into the clip already.
+  const startFrom = Math.max(0, 5 - displayRemainingSeconds);
+  try {
+    v.currentTime = startFrom;
+  } catch (e) {
+    // ignore
+  }
+
+  // Hide the ball during video (prevents double visuals)
+  if (ballImg) ballImg.style.opacity = "0";
+
+  v.play().catch((err) => console.warn("[video] play error:", err));
+}
+
+function hideKickVideoAt2s() {
+  if (!videoPlayer) return;
+
+  if (displayRemainingSeconds <= 2) {
+    try {
       videoPlayer.pause();
-      clearInterval(hideVideoInterval);
+    } catch (e) {
+      // ignore
     }
-  }, 100);
+
+    // Remove video node to keep DOM clean
+    const node = document.getElementById("playerKickVideo");
+    if (node && node.parentNode) node.parentNode.removeChild(node);
+
+    videoPlayer = null;
+
+    // Bring ball back for the shot animation
+    if (ballImg) ballImg.style.opacity = "1";
+  }
 }
 
 // ================= BALL ANIMATION =================
@@ -280,13 +346,11 @@ function ensureTrajectoryStyles() {
   const style = document.createElement("style");
   style.id = "trajectory-styles";
   style.textContent = `
-    @keyframes drawPath {
-      to { stroke-dashoffset: 0; }
-    }
+    @keyframes drawPath { to { stroke-dashoffset: 0; } }
     @keyframes goalFlash {
-      0% { opacity: 0; transform: translate(-50%, -50%) scale(0.5);}
-      50% { opacity:1; transform: translate(-50%, -50%) scale(1);}
-      100% { opacity:0; transform: translate(-50%, -50%) scale(1.2);}
+      0% { opacity: 0; transform: translate(-50%, -50%) scale(0.5); }
+      50% { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+      100% { opacity: 0; transform: translate(-50%, -50%) scale(1.2); }
     }`;
   document.head.appendChild(style);
 }
@@ -316,21 +380,16 @@ function createTrajectoryLine(startX, startY, endX, endY, peak) {
   path.style.strokeDashoffset = "1000";
   path.style.animation = "drawPath 0.6s ease-out forwards";
   svg.appendChild(path);
-  if (pitch) pitch.appendChild(svg);
 
+  if (pitch) pitch.appendChild(svg);
   setTimeout(() => svg.parentNode && svg.parentNode.removeChild(svg), 1200);
 }
 
 function shootBallToWinningNumber(winningNumber) {
   if (!pitch || !ballImg) return;
 
-  const targetGoal = goals.find(
-    (g) => g.dataset.number === String(winningNumber)
-  );
-  if (!targetGoal) {
-    console.log("Winning number not on a goal:", winningNumber);
-    return;
-  }
+  const targetGoal = goals.find((g) => g.dataset.number === String(winningNumber));
+  if (!targetGoal) return;
 
   const pitchRect = pitch.getBoundingClientRect();
   const ballRect = ballImg.getBoundingClientRect();
@@ -340,6 +399,7 @@ function shootBallToWinningNumber(winningNumber) {
   const startY = ballRect.top + ballRect.height / 2;
   const endX = goalRect.left + goalRect.width / 2;
   const endY = goalRect.top + goalRect.height / 2;
+
   const deltaX = endX - startX;
   const deltaY = endY - startY;
   const distance = Math.sqrt(deltaX * deltaX + deltaY * deltaY);
@@ -347,10 +407,10 @@ function shootBallToWinningNumber(winningNumber) {
   const duration = 750;
   const startTime = performance.now();
 
-  const pitchStartX = ballRect.left + ballRect.width / 2 - pitchRect.left;
-  const pitchStartY = ballRect.top + ballRect.height / 2 - pitchRect.top;
-  const pitchEndX = goalRect.left + goalRect.width / 2 - pitchRect.left;
-  const pitchEndY = goalRect.top + goalRect.height / 2 - pitchRect.top;
+  const pitchStartX = startX - pitchRect.left;
+  const pitchStartY = startY - pitchRect.top;
+  const pitchEndX = endX - pitchRect.left;
+  const pitchEndY = endY - pitchRect.top;
 
   createTrajectoryLine(pitchStartX, pitchStartY, pitchEndX, pitchEndY, peak);
 
@@ -360,8 +420,8 @@ function shootBallToWinningNumber(winningNumber) {
     ballImg.style.position = "fixed";
     ballImg.style.transition = "none";
     ballImg.style.zIndex = "1000";
-    ballImg.style.left = startX + "px";
-    ballImg.style.top = startY + "px";
+    ballImg.style.left = `${startX}px`;
+    ballImg.style.top = `${startY}px`;
     ballImg.style.transform = "translate(-50%, -50%)";
 
     function step(now) {
@@ -376,8 +436,8 @@ function shootBallToWinningNumber(winningNumber) {
       const rotation = t * (distance * 1.5);
       const scale = 1 - t * 0.12;
 
-      ballImg.style.left = x + "px";
-      ballImg.style.top = yArc + "px";
+      ballImg.style.left = `${x}px`;
+      ballImg.style.top = `${yArc}px`;
       ballImg.style.transform = `translate(-50%, -50%) rotate(${rotation}deg) scale(${scale})`;
 
       if (t < 1) {
@@ -420,15 +480,19 @@ function shootBallToWinningNumber(winningNumber) {
 
 function startLocalTimer() {
   if (localTimerInterval) clearInterval(localTimerInterval);
+
   localTimerInterval = setInterval(() => {
     if (gameFinished) return;
+
     if (displayRemainingSeconds > 0) {
       displayRemainingSeconds -= 1;
       renderTimer();
 
-      if (displayRemainingSeconds === 5 && !videoVisible) {
-        showPlayerKickVideo();
-      }
+      // Start video in the 5..3 window
+      showKickVideoForTimeWindow();
+
+      // Remove/pause video at 2s
+      hideKickVideoAt2s();
     }
   }, 1000);
 }
@@ -447,36 +511,34 @@ async function fetchTableData() {
       return;
     }
 
-    let table = null;
+    let raw = null;
 
     if (tableCodeFromUrl) {
-      table = data.tables.find((t) => t.round_code === tableCodeFromUrl) || null;
+      raw =
+        data.tables.find((t) => String(pick(t, "round_code", "roundcode")) === String(tableCodeFromUrl)) ||
+        null;
 
-      if (!table) {
+      if (!raw) {
         gameFinished = true;
         disableBettingUI();
-        if (tablePollInterval) {
-          clearInterval(tablePollInterval);
-          tablePollInterval = null;
-        }
-        if (localTimerInterval) {
-          clearInterval(localTimerInterval);
-          localTimerInterval = null;
-        }
+
+        if (tablePollInterval) clearInterval(tablePollInterval);
+        tablePollInterval = null;
+
+        if (localTimerInterval) clearInterval(localTimerInterval);
+        localTimerInterval = null;
 
         setStatus("This game has finished. You'll be taken back to lobby to join a new one.", "error");
-        setTimeout(() => {
-          window.history.back();
-        }, 2000);
+        setTimeout(() => window.history.back(), 2000);
         return;
       }
     } else {
-      table = data.tables[0];
-      syncUrlWithTable(table.round_code);
+      raw = data.tables[0];
+      syncUrlWithTable(pick(raw, "round_code", "roundcode"));
     }
 
-    currentTable = table;
-    updateGameUI(table);
+    currentTable = normalizeTable(raw);
+    updateGameUI(currentTable);
   } catch (err) {
     console.error("fetchTableData error", err);
   }
@@ -485,92 +547,93 @@ async function fetchTableData() {
 function updateGameUI(table) {
   if (!table) return;
 
-  if (roundIdSpan) roundIdSpan.textContent = table.round_code || "-";
+  if (roundIdSpan) roundIdSpan.textContent = table.roundCode || "-";
 
-  displayRemainingSeconds = table.time_remaining || 0;
+  // Sync timer from server, then local timer keeps it smooth
+  displayRemainingSeconds = table.timeRemaining || 0;
   renderTimer();
 
-  // ✅ Update goals from polling
-  if (table.bets && Array.isArray(table.bets) && table.bets.length > 0) {
-    console.log("[polling] Updating goals from API bets:", table.bets.length);
-    updateGoalsFromBets(table.bets);
-    updateMyBets(table.bets);
-    if (playerCountSpan) {
-      playerCountSpan.textContent = table.bets.length;
-    }
-  }
+  // Update goals + my bets
+  updateGoalsFromBets(table.bets || []);
+  updateMyBets(table.bets || []);
+
+  if (playerCountSpan) playerCountSpan.textContent = table.playersCount || 0;
+
+  // Betting enabled/disabled
+  const maxPlayers = typeof table.maxPlayers === "number" ? table.maxPlayers : null;
+  const isFull = maxPlayers !== null && (table.playersCount >= maxPlayers);
 
   if (placeBetBtn && !gameFinished) {
-    placeBetBtn.disabled =
-      !!table.is_betting_closed ||
-      (typeof table.max_players === "number" &&
-        table.players >= table.max_players);
+    placeBetBtn.disabled = !!table.isBettingClosed || isFull;
   }
 
-  if (displayRemainingSeconds <= 10) {
-    timerPill && timerPill.classList.add("urgent");
-  } else {
-    timerPill && timerPill.classList.remove("urgent");
+  if (timerPill) {
+    if (displayRemainingSeconds <= 10) timerPill.classList.add("urgent");
+    else timerPill.classList.remove("urgent");
   }
-
-  const maxPlayers = typeof table.max_players === "number" ? table.max_players : null;
-  const isFull = table.is_full === true || (maxPlayers !== null && table.players >= maxPlayers);
 
   if (!gameFinished && !userHasBet && isFull) {
     gameFinished = true;
     disableBettingUI();
-    if (tablePollInterval) {
-      clearInterval(tablePollInterval);
-      tablePollInterval = null;
-    }
-    if (localTimerInterval) {
-      clearInterval(localTimerInterval);
-      localTimerInterval = null;
-    }
+    if (tablePollInterval) clearInterval(tablePollInterval);
+    tablePollInterval = null;
+    if (localTimerInterval) clearInterval(localTimerInterval);
+    localTimerInterval = null;
     showSlotsFullPopup();
     return;
   }
 
-  const hasResult = table.result !== null && table.result !== undefined && table.result !== "";
+  const hasResult = table.resultValue !== null && table.resultValue !== undefined && table.resultValue !== "";
 
-  if (hasResult && table.result !== lastResultShown) {
-    lastResultShown = table.result;
-    setStatus(`Winning number: ${table.result}`, "ok");
+  // ✅ Start kick video in the right window (5..3)
+  showKickVideoForTimeWindow();
 
-    ensureGoalForWinningNumber(table.result);
-    shootBallToWinningNumber(table.result);
+  // ✅ Hide video at 2 seconds remaining (kick should finish here)
+  hideKickVideoAt2s();
 
-    if (!gameFinished) {
+  // ✅ Shoot ball at <= 2 seconds remaining when result exists (works with pre-result backend)
+  if (hasResult && table.timeRemaining <= 2) {
+    const roundId = table.roundCode || "__no_round__";
+    if (shotShownForRound !== roundId) {
+      shotShownForRound = roundId;
+
+      setStatus(`Winning number: ${table.resultValue}`, "ok");
+      ensureGoalForWinningNumber(table.resultValue);
+      shootBallToWinningNumber(table.resultValue);
+    }
+  }
+
+  // ✅ Popup only when finished, after the ball animation
+  if (hasResult && table.isFinished) {
+    const roundId = table.roundCode || "__no_round__";
+    if (popupShownForRound !== roundId) {
+      popupShownForRound = roundId;
+
       gameFinished = true;
       disableBettingUI();
 
-      if (tablePollInterval) {
-        clearInterval(tablePollInterval);
-        tablePollInterval = null;
-      }
-      if (localTimerInterval) {
-        clearInterval(localTimerInterval);
-        localTimerInterval = null;
-      }
+      if (tablePollInterval) clearInterval(tablePollInterval);
+      tablePollInterval = null;
+
+      if (localTimerInterval) clearInterval(localTimerInterval);
+      localTimerInterval = null;
 
       const outcomeInfo = determineUserOutcome(table);
-      setTimeout(() => {
-        showEndPopup(outcomeInfo);
-      }, 1000);
+
+      // Wait for shot animation to be visible
+      setTimeout(() => showEndPopup(outcomeInfo), 1400);
     }
-  } else if (!hasResult) {
-    lastResultShown = null;
   }
 }
 
 function startPolling() {
   fetchTableData();
   if (tablePollInterval) clearInterval(tablePollInterval);
+
+  // faster polling helps not miss the 5s / 2s windows
   tablePollInterval = setInterval(() => {
-    if (!gameFinished) {
-      fetchTableData();
-    }
-  }, 2000);
+    if (!gameFinished) fetchTableData();
+  }, 1000);
 }
 
 // ================= SOCKET =================
@@ -581,82 +644,74 @@ async function fetchBalance() {
   try {
     const res = await fetch(`/balance/${USER_ID}`);
     const data = await res.json();
-    if (typeof data.balance === "number") {
-      updateWallet(data.balance);
-    }
+    if (typeof data.balance === "number") updateWallet(data.balance);
   } catch (err) {
     console.error("balance fetch error", err);
   }
 }
 
 function joinGameRoom() {
-  socket.emit("join_game", {
-    game_type: GAME,
-    user_id: USER_ID,
-  });
+  // support both event names
+  socket.emit("join_game", { game_type: GAME, user_id: USER_ID });
+  socket.emit("joingame", { game_type: GAME, user_id: USER_ID });
 }
 
 socket.on("connect", () => {
-  console.log("[socket] CONNECTED");
   joinGameRoom();
   fetchBalance();
   fetchTableData();
 });
 
-socket.on("disconnect", () => {
-  console.log("[socket] DISCONNECTED");
-});
-
-socket.on("connect_error", (error) => {
-  console.error("[socket] CONNECTION ERROR:", error);
-});
-
-socket.on("bet_success", (payload) => {
-  console.log("[bet_success] Received - players:", payload.players?.length || 0);
+// support both naming styles from backend
+function handleBetSuccess(payload) {
   if (gameFinished) return;
 
   userHasBet = true;
-  setStatus(payload.message || "Bet placed ✓", "ok");
-  if (typeof payload.new_balance === "number") {
-    updateWallet(payload.new_balance);
-  }
+  setStatus(payload?.message || "Bet placed ✓", "ok");
 
-  if (payload.players && Array.isArray(payload.players)) {
-    console.log("[bet_success] Updating UI with", payload.players.length, "players");
-    updateGoalsFromBets(payload.players);
-    updateMyBets(payload.players);
-    if (playerCountSpan) {
-      playerCountSpan.textContent = payload.players.length;
-    }
-  }
-});
+  const newBal = payload?.new_balance ?? payload?.newbalance;
+  if (typeof newBal === "number") updateWallet(newBal);
 
-socket.on("update_table", (payload) => {
-  console.log("[update_table] BROADCAST received - players:", payload.players?.length || 0);
+  const players = payload?.players || payload?.bets;
+  if (players && Array.isArray(players)) {
+    const t = normalizeTable({ bets: players });
+    updateGoalsFromBets(t.bets);
+    updateMyBets(t.bets);
+    if (playerCountSpan) playerCountSpan.textContent = t.bets.length;
+  }
+}
+
+function handleUpdateTable(payload) {
   if (gameFinished) return;
 
-  if (payload.players && Array.isArray(payload.players)) {
-    console.log("[update_table] Updating UI with", payload.players.length, "players");
-    playerCountSpan.textContent = payload.players.length;
-    updateGoalsFromBets(payload.players);
-    updateMyBets(payload.players);
+  const t = normalizeTable(payload);
+  if (t?.bets) {
+    updateGoalsFromBets(t.bets);
+    updateMyBets(t.bets);
+    if (playerCountSpan) playerCountSpan.textContent = t.bets.length;
   }
 
-  if (payload.time_remaining != null) {
-    displayRemainingSeconds = payload.time_remaining;
+  if (t?.timeRemaining != null) {
+    displayRemainingSeconds = t.timeRemaining;
     renderTimer();
   }
 
-  if (payload.is_betting_closed) {
-    disableBettingUI();
-  }
-});
+  if (t?.isBettingClosed) disableBettingUI();
+}
 
-socket.on("bet_error", (payload) => {
+function handleBetError(payload) {
   if (gameFinished) return;
-  console.error("[bet_error]:", payload.message);
-  setStatus(payload.message || "Bet error", "error");
-});
+  setStatus(payload?.message || "Bet error", "error");
+}
+
+socket.on("bet_success", handleBetSuccess);
+socket.on("betsuccess", handleBetSuccess);
+
+socket.on("update_table", handleUpdateTable);
+socket.on("updatetable", handleUpdateTable);
+
+socket.on("bet_error", handleBetError);
+socket.on("beterror", handleBetError);
 
 // ================= UI EVENTS =================
 
@@ -674,14 +729,13 @@ if (placeBetBtn) {
       setStatus("This game has already finished.", "error");
       return;
     }
-
     if (!currentTable) {
       setStatus("Game is not ready yet. Please wait...", "error");
       return;
     }
 
-    const maxPlayers = typeof currentTable.max_players === "number" ? currentTable.max_players : null;
-    if (maxPlayers !== null && currentTable.players >= maxPlayers) {
+    const maxPlayers = typeof currentTable.maxPlayers === "number" ? currentTable.maxPlayers : null;
+    if (maxPlayers !== null && currentTable.playersCount >= maxPlayers) {
       setStatus("All slots are full for this game.", "error");
       disableBettingUI();
       return;
@@ -691,31 +745,27 @@ if (placeBetBtn) {
       setStatus("Insufficient balance", "error");
       return;
     }
+
     if (selectedNumber === null || selectedNumber === undefined) {
       setStatus("Select a number first", "error");
       return;
     }
 
-    socket.emit("place_bet", {
+    const payload = {
       game_type: GAME,
       user_id: USER_ID,
       username: USERNAME,
       number: selectedNumber,
-    });
+      // round_code optional; backend can auto-assign an open table
+    };
+
+    socket.emit("place_bet", payload);
+    socket.emit("placebet", payload);
   });
 }
 
-if (popupHomeBtn) {
-  popupHomeBtn.addEventListener("click", () => {
-    window.location.href = HOME_URL;
-  });
-}
-
-if (popupLobbyBtn) {
-  popupLobbyBtn.addEventListener("click", () => {
-    window.history.back();
-  });
-}
+if (popupHomeBtn) popupHomeBtn.addEventListener("click", () => (window.location.href = HOME_URL));
+if (popupLobbyBtn) popupLobbyBtn.addEventListener("click", () => window.history.back());
 
 // ================= INIT =================
 
