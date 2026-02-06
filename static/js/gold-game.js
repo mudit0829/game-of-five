@@ -15,7 +15,7 @@ const HOME_URL = "/home";
 
 const pitch = document.querySelector(".pitch");
 const ballImg = document.getElementById("ballSprite");
-const playerArea = document.querySelector(".player-area"); // kept for compatibility, but we won't use it for positioning now
+const playerArea = document.querySelector(".player-area"); // kept (not used for positioning now)
 const goals = Array.from(document.querySelectorAll(".goal.pad"));
 
 const numChips = Array.from(document.querySelectorAll(".num-chip"));
@@ -62,16 +62,28 @@ let shotShownForRound = null;
 let popupShownForRound = null;
 
 // ================= KICK VIDEO TUNING =================
-// NOTE: Your CSS ball is often positioned independently in the pitch, so we anchor to the BALL rect. [file:99]
 
-const KICK_SHOW_AT_REMAINING = 4;    // show/start video at 4 seconds remaining
-const KICK_FREEZE_AT_REMAINING = 2;  // pause + keep on screen at 2 seconds remaining
-const KICK_SCALE = 0.30;             // 70% smaller => 30% size
+// Show player at 4 seconds remaining and freeze at 2 seconds remaining
+const KICK_SHOW_AT_REMAINING = 4;
+const KICK_FREEZE_AT_REMAINING = 2;
 
-// Fine tuning: move player a bit left/right/up/down relative to the ball.
-// If player is not exactly at the ball, adjust these numbers.
-const KICK_SHIFT_X = -55; // negative = move player left of ball (usually correct for kicking)
-const KICK_SHIFT_Y = 10;  // positive = move player slightly down
+// Reduce player size by 30% more than previous (0.30 -> 0.21)
+const KICK_SCALE = 0.21;
+
+// Fine tuning: move player relative to ball
+// Increase KICK_SHIFT_X (closer to 0) to move RIGHT, decrease to move LEFT.
+const KICK_SHIFT_X = -40; // moved a bit right from earlier (-45/-55)
+const KICK_SHIFT_Y = 10;
+
+let kickResizeHandlerAttached = false;
+function attachKickResizeHandlerOnce() {
+  if (kickResizeHandlerAttached) return;
+  kickResizeHandlerAttached = true;
+
+  window.addEventListener("resize", () => {
+    if (videoPlayer) positionKickVideoAtBall(videoPlayer);
+  });
+}
 
 // ================= SMALL UTILITIES =================
 
@@ -282,34 +294,34 @@ function showSlotsFullPopup() {
 
 // ================= VIDEO (Kick) =================
 
-function cleanupKickVideo({ restoreBall = true } = {}) {
+function cleanupKickVideo() {
   const node = document.getElementById("playerKickVideo");
   if (node && node.parentNode) node.parentNode.removeChild(node);
-
   videoPlayer = null;
 
-  if (restoreBall && ballImg) ballImg.style.opacity = "1";
+  // Keep ball visible always
+  if (ballImg) ballImg.style.opacity = "1";
 }
 
 function positionKickVideoAtBall(v) {
   if (!v) return;
 
-  // If ball sprite exists, anchor video to it (works even if ball is near goal). [file:99]
   if (ballImg) {
     const r = ballImg.getBoundingClientRect();
+
     const x = r.left + r.width / 2 + KICK_SHIFT_X;
     const y = r.top + r.height + KICK_SHIFT_Y;
 
     v.style.left = `${x}px`;
     v.style.top = `${y}px`;
 
-    // Place the player's feet at the ball (bottom aligned)
+    // feet aligned near ball
     v.style.transformOrigin = "bottom center";
     v.style.transform = `translate(-50%, -100%) scale(${KICK_SCALE})`;
     return;
   }
 
-  // Fallback: center of pitch
+  // fallback: center-ish of pitch
   if (pitch) {
     const pr = pitch.getBoundingClientRect();
     v.style.left = `${pr.left + pr.width / 2}px`;
@@ -331,20 +343,20 @@ function ensureKickVideoElement() {
   v.playsInline = true;
   v.preload = "auto";
 
-  // CRITICAL: fixed positioning so it NEVER sits in the betting numbers area
+  // fixed overlay to follow ball position (not tied to bottom controls)
   v.style.position = "fixed";
-  v.style.width = "360px";  // base size, then scaled down
+  v.style.width = "360px"; // base size; actual size controlled by scale()
   v.style.height = "auto";
   v.style.pointerEvents = "none";
-  v.style.zIndex = "9";     // ball in CSS is z-index 10 [file:99]
+
+  // Keep video behind the ball (ball is z-index 10 in your CSS). [file:99]
+  v.style.zIndex = "9";
+
   v.style.filter = "drop-shadow(0 12px 22px rgba(0,0,0,0.65))";
 
   document.body.appendChild(v);
 
-  // Keep it aligned on resize/orientation
-  window.addEventListener("resize", () => {
-    if (videoPlayer) positionKickVideoAtBall(videoPlayer);
-  });
+  attachKickResizeHandlerOnce();
 
   return v;
 }
@@ -366,16 +378,16 @@ function maybeStartKickVideo() {
 
   videoPlayer = v;
 
-  // Place at the ball BEFORE playing
-  positionKickVideoAtBall(v);
+  // Keep ball visible (NO flicker)
+  if (ballImg) ballImg.style.opacity = "1";
 
-  // Start from beginning at 4 seconds
+  // Place before play + one more frame after (mobile stability)
+  positionKickVideoAtBall(v);
+  requestAnimationFrame(() => positionKickVideoAtBall(v));
+
   try {
     v.currentTime = 0;
   } catch (e) {}
-
-  // Hide the ball during play (prevents double visuals)
-  if (ballImg) ballImg.style.opacity = "0";
 
   v.play().catch((err) => console.warn("[video] play error:", err));
 }
@@ -394,10 +406,11 @@ function freezeKickVideoAt2s() {
       videoPlayer.pause();
     } catch (e) {}
 
-    // Re-align at the exact ball position and keep it there
+    // lock it exactly at ball position
     positionKickVideoAtBall(videoPlayer);
+    requestAnimationFrame(() => positionKickVideoAtBall(videoPlayer));
 
-    // Show ball again while player stays frozen at ball position
+    // ball stays visible
     if (ballImg) ballImg.style.opacity = "1";
   }
 }
@@ -532,8 +545,8 @@ function shootBallToWinningNumber(winningNumber) {
           ballImg.style.transform = originalTransform || "translate(0,0)";
           ballImg.style.zIndex = "10";
 
-          // Clean kick video after shot ends
-          cleanupKickVideo({ restoreBall: true });
+          // clean frozen kick video after shot ends
+          cleanupKickVideo();
         }, 900);
       }
     }
@@ -554,10 +567,7 @@ function startLocalTimer() {
       displayRemainingSeconds -= 1;
       renderTimer();
 
-      // Start video at 4 seconds
       maybeStartKickVideo();
-
-      // Freeze at 2 seconds (do NOT remove)
       freezeKickVideoAt2s();
     }
   }, 1000);
@@ -594,7 +604,7 @@ async function fetchTableData() {
         if (localTimerInterval) clearInterval(localTimerInterval);
         localTimerInterval = null;
 
-        cleanupKickVideo({ restoreBall: true });
+        cleanupKickVideo();
 
         setStatus("This game has finished. You'll be taken back to lobby to join a new one.", "error");
         setTimeout(() => window.history.back(), 2000);
@@ -615,9 +625,11 @@ async function fetchTableData() {
 function updateGameUI(table) {
   if (!table) return;
 
-  // If a new round arrives while old video exists, clean it up.
+  // If new round arrives, clear old kick video
   if (videoPlayer && videoStartedForRound && table.roundCode && videoStartedForRound !== table.roundCode) {
-    cleanupKickVideo({ restoreBall: true });
+    cleanupKickVideo();
+    videoStartedForRound = null;
+    videoFrozenForRound = null;
   }
 
   if (roundIdSpan) roundIdSpan.textContent = table.roundCode || "-";
@@ -653,21 +665,18 @@ function updateGameUI(table) {
     if (localTimerInterval) clearInterval(localTimerInterval);
     localTimerInterval = null;
 
-    cleanupKickVideo({ restoreBall: true });
-
+    cleanupKickVideo();
     showSlotsFullPopup();
     return;
   }
 
   const hasResult = table.resultValue !== null && table.resultValue !== undefined && table.resultValue !== "";
 
-  // ✅ Start at 4 seconds
+  // kick appear at 4 sec, freeze at 2 sec
   maybeStartKickVideo();
-
-  // ✅ Freeze at 2 seconds (keep on screen)
   freezeKickVideoAt2s();
 
-  // ✅ Shoot ball at <= 2 seconds remaining when result exists
+  // shoot ball at <= 2 seconds remaining when result exists
   if (hasResult && table.timeRemaining <= 2) {
     const roundId = table.roundCode || "__no_round__";
     if (shotShownForRound !== roundId) {
@@ -679,7 +688,7 @@ function updateGameUI(table) {
     }
   }
 
-  // ✅ Popup only when finished, after the ball animation
+  // Popup only when finished, after the ball animation
   if (hasResult && table.isFinished) {
     const roundId = table.roundCode || "__no_round__";
     if (popupShownForRound !== roundId) {
@@ -697,7 +706,7 @@ function updateGameUI(table) {
       const outcomeInfo = determineUserOutcome(table);
 
       setTimeout(() => {
-        cleanupKickVideo({ restoreBall: true });
+        cleanupKickVideo();
         showEndPopup(outcomeInfo);
       }, 1400);
     }
