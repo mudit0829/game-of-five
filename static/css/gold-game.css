@@ -683,3 +683,19 @@ body {
     font-size: 13px;
   }
 }
+/* Video injected by JS */
+.player-area video#playerKickVideo{
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: center;
+  border-radius: 14px;
+  z-index: 1;
+}
+
+/* Keep ball above video */
+.player-area .ball{
+  z-index: 10;
+}
