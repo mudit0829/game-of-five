@@ -615,3 +615,42 @@ body {
 .arrow{ z-index: 3; } /* below targets so it won't cover numbers */
 .targets{ z-index: 5; } /* targets always above archer layer */
 
+/* ===== FINAL OVERRIDES (paste at END) ===== */
+
+/* Your names are clipped because .range has overflow:hidden and .pad-user was outside (-18px) */
+.pad-user{
+  bottom: 8px !important;      /* overrides -18px */
+  z-index: 40 !important;
+  font-size: 9px !important;
+  padding: 2px 7px !important;
+}
+.pad-number{ z-index: 40 !important; }
+
+/* Reserve a left gutter so archer doesn't sit under targets */
+.targets{
+  padding-left: 92px !important;  /* creates space for archer at left */
+  z-index: 10 !important;
+}
+
+/* Keep target image below, but text above everything */
+.target img{ position: relative; z-index: 1; }
+.pad-number, .pad-user{ position: absolute; z-index: 40; }
+
+/* Archer layer visible in the left gutter */
+.archer-layer{
+  z-index: 6 !important;
+  height: 74px !important;
+  bottom: 6px !important;
+  padding-left: 10px !important;
+  pointer-events: none;
+}
+.archer{ width: 78px !important; }
+
+/* Idle arrow can be above target image but below text */
+.arrow{
+  width: 42px !important;
+  left: 52px !important;
+  bottom: 22px !important;
+  z-index: 20 !important;  /* below .pad-number/.pad-user */
+  pointer-events: none;
+}
