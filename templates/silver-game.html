@@ -29,28 +29,21 @@
 <!-- POND -->
 <section class="pond">
   <!-- Frog container -->
-  <div id="frogContainer" class="frog-wrapper">
-    <!-- Idle frog (always looping) -->
-    <video
-      id="frogIdleVideo"
-      class="frog-video"
-      muted
-      playsinline
-      autoplay
-      loop
-    >
-      <source src="/static/video/frog-idle.mp4" type="video/mp4">
-    </video>
-    <!-- Jump frog (played on result) -->
-    <video
-      id="frogJumpVideo"
-      class="frog-video"
-      muted
-      playsinline
-    >
-      <source id="frogVideoSource" src="" type="video/mp4">
-    </video>
-  </div>
+ <!-- Frog container (ONLY ONE IDLE FROG) -->
+<div id="frogContainer" class="frog-wrapper" aria-hidden="true">
+  <video
+    id="frogIdleVideo"
+    class="frog-video"
+    muted
+    playsinline
+    autoplay
+    loop
+    preload="auto"
+  >
+    <source src="/static/video/frog-idle.mp4" type="video/mp4">
+  </video>
+</div>
+
   <!-- Pads -->
   <div class="pads">
     <div class="pads-row">
