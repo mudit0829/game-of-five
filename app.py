@@ -437,6 +437,7 @@ def manage_game_table(table: GameTable):
                     time.sleep(1)
                     continue
 
+                # Add bots while betting open (same as your logic)
                 if (
                     not table.is_betting_closed
                     and len(table.bets) < table.max_players
@@ -449,21 +450,45 @@ def manage_game_table(table: GameTable):
                         if table.add_bot_bet():
                             table.last_bot_added_at = now
 
+                # Close betting
                 if now >= table.betting_close_time and not table.is_betting_closed:
                     table.is_betting_closed = True
                     print(f"{table.game_type} Table {table.table_number}: Betting closed")
 
+                # ✅ PRE-SELECT RESULT at 2 seconds remaining (for UI animation)
+                # This only sets table.result early; it does NOT pay anyone early.
+                if (
+                    (not table.is_finished)
+                    and (table.result is None)
+                    and (len(table.bets) > 0)
+                    and (table.get_time_remaining() <= 2)
+                ):
+                    table.result = table.calculate_result()
+                    print(
+                        f"{table.game_type} Table {table.table_number}: Pre-selected winner at <=2s: {table.result}"
+                    )
+
+                # Finish game at end_time (00 sec)
                 if now >= table.end_time and not table.is_finished:
                     table.is_finished = True
-                    result = table.calculate_result()
+
+                    # ✅ IMPORTANT: do NOT recalculate if already pre-selected
+                    if table.result is None:
+                        table.result = table.calculate_result()
+
+                    result = table.result
                     winners = table.get_winners()
-                    print(f"{table.game_type} Table {table.table_number}: Game ended. Winner: {result}")
+                    print(
+                        f"{table.game_type} Table {table.table_number}: Game ended. Winner: {result}"
+                    )
 
                     # History update
                     for bet in table.bets:
                         if bet.get("is_bot"):
                             continue
+
                         uid = bet["user_id"]
+
                         for rec in user_game_history.get(uid, []):
                             if (
                                 not rec.get("is_resolved")
@@ -472,10 +497,12 @@ def manage_game_table(table: GameTable):
                                 and rec["number"] == bet["number"]
                             ):
                                 rec["winning_number"] = result
-                                rec["win"] = bet["number"] == result
+                                rec["win"] = (bet["number"] == result)
                                 rec["status"] = "win" if rec["win"] else "lose"
                                 rec["amount"] = (
-                                    table.config["payout"] if rec["win"] else -table.config["bet_amount"]
+                                    table.config["payout"]
+                                    if rec["win"]
+                                    else -table.config["bet_amount"]
                                 )
                                 rec["is_resolved"] = True
                                 rec["date_time"] = now.strftime("%Y-%m-%d %H:%M")
@@ -485,7 +512,7 @@ def manage_game_table(table: GameTable):
                         wallet = Wallet.query.filter_by(user_id=winner["user_id"]).first()
                         if wallet:
                             wallet.balance += winner["payout"]
-                        
+
                         win_tx = Transaction(
                             user_id=winner["user_id"],
                             kind="win",
@@ -493,13 +520,16 @@ def manage_game_table(table: GameTable):
                             balance_after=wallet.balance if wallet else 0,
                             label="Game Won",
                             game_title=table.config["name"],
-                            note=f"Hit number {table.result}"
+                            note=f"Hit number {result}",
                         )
                         db.session.add(win_tx)
 
                     db.session.commit()
 
+                    # Keep result available for UI for a short moment
                     time.sleep(3)
+
+                    # Reset for new round
                     table.bets = []
                     table.result = None
                     table.is_betting_closed = False
@@ -509,12 +539,16 @@ def manage_game_table(table: GameTable):
                     table.betting_close_time = table.end_time - timedelta(seconds=15)
                     table.round_code = table._make_round_code()
                     table.last_bot_added_at = None
-                    print(f"{table.game_type} Table {table.table_number}: New round started - {table.round_code}")
+                    print(
+                        f"{table.game_type} Table {table.table_number}: New round started - {table.round_code}"
+                    )
 
                 time.sleep(1)
+
             except Exception as e:
                 print(f"Error managing table {table.game_type} #{table.table_number}: {e}")
                 time.sleep(1)
+
 
 
 def start_all_game_tables():
