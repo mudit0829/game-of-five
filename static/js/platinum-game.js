@@ -38,9 +38,7 @@ if (paratrooper) {
   paratrooper.style.transition = "none";
 }
 
-if (userNameLabel) {
-  userNameLabel.textContent = USERNAME;
-}
+if (userNameLabel) userNameLabel.textContent = USERNAME;
 
 // ================== STATE ==================
 
@@ -55,6 +53,51 @@ let resultAnimationShownForRound = null;
 let resultModalShownForRound = null;
 let kickedForNoBet = false;
 
+// ================== SMALL UTILITIES ==================
+
+function pick(obj, ...keys) {
+  for (const k of keys) {
+    if (obj && obj[k] !== undefined && obj[k] !== null) return obj[k];
+  }
+  return undefined;
+}
+
+function toBool(v) {
+  return v === true || v === "true" || v === 1 || v === "1";
+}
+
+function safeNum(v, fallback = 0) {
+  const n = Number(v);
+  return Number.isFinite(n) ? n : fallback;
+}
+
+function normalizeTable(table) {
+  if (!table) return null;
+
+  const t = { ...table };
+
+  t.roundCode = pick(table, "round_code", "roundcode");
+  t.timeRemaining = safeNum(pick(table, "time_remaining", "timeremaining"), 0);
+  t.isFinished = toBool(pick(table, "is_finished", "isfinished"));
+  t.isBettingClosed = toBool(pick(table, "is_betting_closed", "isbettingclosed"));
+
+  t.slotsAvailable = pick(table, "slots_available", "slotsavailable");
+  t.maxPlayers = pick(table, "max_players", "maxplayers");
+  t.playersCount = safeNum(pick(table, "players"), 0);
+
+  // normalize bets
+  t.bets = Array.isArray(table.bets) ? table.bets.map((b) => ({
+    ...b,
+    userId: pick(b, "user_id", "userid"),
+    username: pick(b, "username") || "Player",
+    number: pick(b, "number"),
+  })) : [];
+
+  t.resultValue = pick(table, "result");
+
+  return t;
+}
+
 // ================== UI HELPERS ==================
 
 function setStatus(msg, type = "") {
@@ -65,10 +108,9 @@ function setStatus(msg, type = "") {
 }
 
 function updateWallet(balance) {
-  walletBalance = balance;
-  if (walletBalanceSpan) {
-    walletBalanceSpan.textContent = walletBalance.toFixed(0);
-  }
+  walletBalance = safeNum(balance, 0);
+  if (walletBalanceSpan) walletBalanceSpan.textContent = walletBalance.toFixed(0);
+
   if (coinsWrapper) {
     coinsWrapper.classList.add("coin-bounce");
     setTimeout(() => coinsWrapper.classList.remove("coin-bounce"), 500);
@@ -92,15 +134,12 @@ function disableBettingUI() {
 
 function updateMyBets(bets) {
   const myBets = (bets || []).filter(
-    (b) => String(b.user_id) === String(USER_ID)
+    (b) => String(b.userId) === String(USER_ID)
   );
 
-  if (userBetsLabel) {
-    userBetsLabel.textContent = myBets.length;
-  }
+  if (userBetsLabel) userBetsLabel.textContent = myBets.length;
 
   if (!myBetsContainer) return;
-
   myBetsContainer.innerHTML = "";
 
   if (myBets.length === 0) {
@@ -123,8 +162,9 @@ function updateMyBets(bets) {
 function updateBoatsFromBets(bets) {
   const betsByNumber = {};
   (bets || []).forEach((b) => {
-    if (!betsByNumber[b.number]) betsByNumber[b.number] = [];
-    betsByNumber[b.number].push(b);
+    const num = String(b.number);
+    if (!betsByNumber[num]) betsByNumber[num] = [];
+    betsByNumber[num].push(b);
   });
 
   const uniqueNumbers = Object.keys(betsByNumber).slice(0, 6);
@@ -137,9 +177,9 @@ function updateBoatsFromBets(bets) {
     if (i < uniqueNumbers.length) {
       const number = uniqueNumbers[i];
       const betsOnNumber = betsByNumber[number];
-      boat.dataset.number = number;
-      if (numSpan) numSpan.textContent = number;
-      if (userSpan) userSpan.textContent = betsOnNumber[0].username;
+      boat.dataset.number = String(number);
+      if (numSpan) numSpan.textContent = String(number);
+      if (userSpan) userSpan.textContent = betsOnNumber?.[0]?.username || "";
     } else {
       boat.dataset.number = "";
       if (numSpan) numSpan.textContent = "";
@@ -306,26 +346,20 @@ function showFullSlotAndGoBack(messageText) {
   document.body.appendChild(overlay);
 }
 
-// ============== PARATROOPER ANIMATION (ENHANCED) ==============
+// ============== PARATROOPER ANIMATION ==============
 
 function ensureParatrooperAnimationStyles() {
   if (document.getElementById("paratrooper-anim-styles")) return;
-  
+
   const style = document.createElement("style");
   style.id = "paratrooper-anim-styles";
   style.textContent = `
     @keyframes paratrooperLand {
-      0% {
-        transform: translate(-50%, -50%) scale(1) rotateZ(0deg);
-      }
-      85% {
-        transform: translate(-50%, -50%) scale(1.05) rotateZ(2deg);
-      }
-      100% {
-        transform: translate(-50%, -50%) scale(0.95) rotateZ(-1deg);
-      }
+      0% { transform: translate(-50%, -50%) scale(1) rotateZ(0deg); }
+      85% { transform: translate(-50%, -50%) scale(1.05) rotateZ(2deg); }
+      100% { transform: translate(-50%, -50%) scale(0.95) rotateZ(-1deg); }
     }
-    
+
     @keyframes boatBounce {
       0% { transform: translateY(0); }
       25% { transform: translateY(-8px); }
@@ -333,7 +367,7 @@ function ensureParatrooperAnimationStyles() {
       75% { transform: translateY(-4px); }
       100% { transform: translateY(0); }
     }
-    
+
     @keyframes boatGlow {
       0% { box-shadow: 0 0 0 rgba(34, 197, 94, 0); }
       50% { box-shadow: 0 0 30px 10px rgba(34, 197, 94, 0.6); }
@@ -347,8 +381,9 @@ function dropParatrooperToWinningNumber(winningNumber) {
   if (!paratrooper) return;
 
   const targetBoat = boats.find(
-    (b) => b.dataset.number === String(winningNumber)
+    (b) => String(b.dataset.number) === String(winningNumber)
   );
+
   if (!targetBoat) {
     console.log("Winning number not on any boat:", winningNumber);
     return;
@@ -358,7 +393,7 @@ function dropParatrooperToWinningNumber(winningNumber) {
 
   const boatRect = targetBoat.getBoundingClientRect();
 
-  // Landing position: center of boat
+  // Landing position: center of boat (viewport coords)
   const targetX = boatRect.left + boatRect.width / 2;
   const targetY = boatRect.top + boatRect.height / 2;
 
@@ -366,28 +401,28 @@ function dropParatrooperToWinningNumber(winningNumber) {
   const startY = -220;
   const startX = window.innerWidth / 2;
 
-  const duration = 1200; // 1.2 seconds for drop
+  const duration = 1200;
   const startTime = performance.now();
 
-  // ✅ Reset and show paratrooper
+  // Reset and show paratrooper
   paratrooper.style.transition = "none";
   paratrooper.style.opacity = "1";
   paratrooper.style.top = `${startY}px`;
   paratrooper.style.left = `${startX}px`;
   paratrooper.style.transform = "translate(-50%, -50%) scale(1)";
+  paratrooper.style.animation = "none";
 
   function step(now) {
     const elapsed = now - startTime;
     const tRaw = elapsed / duration;
     const t = Math.min(Math.max(tRaw, 0), 1);
 
-    // ✅ Smooth easing: ease-out-cubic
+    // ease-out-cubic
     const ease = 1 - Math.pow(1 - t, 3);
 
     const currentX = startX + (targetX - startX) * ease;
     const currentY = startY + (targetY - startY) * ease;
 
-    // ✅ Slight scale decrease as falls (parachute getting smaller)
     const scale = 1 - t * 0.15;
 
     paratrooper.style.top = `${currentY}px`;
@@ -397,29 +432,24 @@ function dropParatrooperToWinningNumber(winningNumber) {
     if (t < 1) {
       requestAnimationFrame(step);
     } else {
-      // ✅ LANDING: Play landing animation
       console.log("[paratrooper] Landing on boat with number:", winningNumber);
-      
+
       paratrooper.style.animation = "paratrooperLand 0.5s ease-out forwards";
       targetBoat.classList.add("win");
-      
-      // ✅ Boat bounce + glow effect
-      targetBoat.style.animation = "boatBounce 0.6s ease-in-out";
-      targetBoat.style.boxShadow = "0 0 0 rgba(34, 197, 94, 0)";
-      targetBoat.style.animation = "boatGlow 0.8s ease-out";
 
-      // ✅ Keep paratrooper on boat for 1.2 seconds, then fade out
+      // Bounce + glow (combined so one does not overwrite the other)
+      targetBoat.style.animation = "boatBounce 0.6s ease-in-out, boatGlow 0.8s ease-out";
+
+      // keep paratrooper for a moment then fade out
       setTimeout(() => {
-        paratrooper.style.animation = "none";
         paratrooper.style.transition = "opacity 0.5s ease-out, top 0.6s ease-out";
         paratrooper.style.opacity = "0";
         paratrooper.style.top = "-260px";
 
-        // Reset transition after fade
         setTimeout(() => {
           paratrooper.style.transition = "none";
           paratrooper.style.animation = "none";
-        }, 600);
+        }, 650);
       }, 1200);
     }
   }
@@ -441,12 +471,12 @@ async function fetchTableData() {
       return;
     }
 
-    let table = null;
+    let rawTable = null;
 
     if (tableCodeFromUrl) {
-      table = data.tables.find((t) => t.round_code === tableCodeFromUrl) || null;
+      rawTable = data.tables.find((t) => String(pick(t, "round_code", "roundcode")) === String(tableCodeFromUrl)) || null;
 
-      if (!table) {
+      if (!rawTable) {
         gameFinished = true;
         disableBettingUI();
         setStatus(
@@ -466,12 +496,12 @@ async function fetchTableData() {
         return;
       }
     } else {
-      table = data.tables[0];
-      syncUrlWithTable(table.round_code);
+      rawTable = data.tables[0];
+      syncUrlWithTable(pick(rawTable, "round_code", "roundcode"));
     }
 
-    currentTable = table;
-    updateGameUI(table);
+    currentTable = normalizeTable(rawTable);
+    updateGameUI(currentTable);
   } catch (err) {
     console.error("fetchTableData error", err);
   }
@@ -480,20 +510,18 @@ async function fetchTableData() {
 function updateGameUI(table) {
   if (!table) return;
 
-  if (roundCodeSpan) roundCodeSpan.textContent = table.round_code || "--";
-  if (playerCountSpan) playerCountSpan.textContent = table.players || 0;
+  if (roundCodeSpan) roundCodeSpan.textContent = table.roundCode || "--";
+  if (playerCountSpan) playerCountSpan.textContent = table.playersCount || 0;
 
-  const tr = table.time_remaining || 0;
+  const tr = table.timeRemaining || 0;
   const mins = Math.floor(tr / 60);
   const secs = tr % 60;
   if (timerText) {
-    timerText.textContent = `${mins}:${secs
-      .toString()
-      .padStart(2, "0")}`;
+    timerText.textContent = `${mins}:${secs.toString().padStart(2, "0")}`;
   }
 
   if (timerPill) {
-    if (tr <= 10 && !table.is_finished && !table.is_betting_closed) {
+    if (tr <= 10 && !table.isFinished && !table.isBettingClosed) {
       timerPill.classList.add("urgent");
     } else {
       timerPill.classList.remove("urgent");
@@ -504,20 +532,23 @@ function updateGameUI(table) {
   updateMyBets(table.bets || []);
 
   const myBets = (table.bets || []).filter(
-    (b) => String(b.user_id) === String(USER_ID)
+    (b) => String(b.userId) === String(USER_ID)
   );
   const hasUserBet = myBets.length > 0;
 
+  const slotsAvail = table.slotsAvailable;
+  const maxPlayers = safeNum(table.maxPlayers, 0);
+
   const slotsFull =
-    (typeof table.slots_available === "number" &&
-      table.slots_available <= 0) ||
-    (typeof table.max_players === "number" &&
-      table.players >= table.max_players) ||
+    (typeof slotsAvail === "number" && slotsAvail <= 0) ||
+    (maxPlayers > 0 && table.playersCount >= maxPlayers) ||
     table.is_full === true;
 
+  // NOTE: If you want users with 0 bets to still see paratrooper,
+  // comment out this "kick" block.
   if (
     !hasUserBet &&
-    (slotsFull || table.is_betting_closed || table.is_finished) &&
+    (slotsFull || table.isBettingClosed || table.isFinished) &&
     !kickedForNoBet
   ) {
     gameFinished = true;
@@ -530,27 +561,22 @@ function updateGameUI(table) {
     return;
   }
 
-  if (table.is_betting_closed || table.is_finished || slotsFull) {
+  if (table.isBettingClosed || table.isFinished || slotsFull) {
     disableBettingUI();
   } else {
-    placeBetBtn.disabled = false;
-    document.querySelectorAll(".num-chip").forEach((chip) => {
-      chip.disabled = false;
-    });
+    if (placeBetBtn) placeBetBtn.disabled = false;
+    document.querySelectorAll(".num-chip").forEach((chip) => (chip.disabled = false));
   }
 
-  if (
-    table.is_finished &&
-    table.result !== null &&
-    table.result !== undefined
-  ) {
-    const roundId = table.round_code;
+  // Trigger paratrooper when round finished + result exists
+  if (table.isFinished && table.resultValue !== null && table.resultValue !== undefined) {
+    const roundId = table.roundCode || "__no_round__";
 
     if (resultAnimationShownForRound !== roundId) {
       resultAnimationShownForRound = roundId;
-      console.log("[updateGameUI] Triggering paratrooper drop for result:", table.result);
-      dropParatrooperToWinningNumber(table.result);
-      setStatus(`Winning number: ${table.result}`, "ok");
+      console.log("[updateGameUI] Triggering paratrooper drop for result:", table.resultValue);
+      dropParatrooperToWinningNumber(table.resultValue);
+      setStatus(`Winning number: ${table.resultValue}`, "ok");
     }
 
     if (resultModalShownForRound !== roundId && hasUserBet) {
@@ -561,8 +587,8 @@ function updateGameUI(table) {
         tablePollInterval = null;
       }
 
-      const userWon = myBets.some((b) => b.number === table.result);
-      const title = userWon ? "Congratulations! 🎉" : "Hard Luck! 😢";
+      const userWon = myBets.some((b) => Number(b.number) === Number(table.resultValue));
+      const title = userWon ? "Congratulations!" : "Hard Luck!";
       const msg = userWon
         ? "You have WON this game. Keep playing to keep your winning chances high."
         : "You LOST this game. Keep playing to keep your winning chances high.";
@@ -571,12 +597,8 @@ function updateGameUI(table) {
         showResultModal({
           title,
           message: msg,
-          onHome: () => {
-            window.location.href = "/home";
-          },
-          onLobby: () => {
-            window.location.href = "/game/platinum";
-          },
+          onHome: () => (window.location.href = "/home"),
+          onLobby: () => (window.location.href = "/game/platinum"),
         });
       }, 800);
     }
@@ -591,19 +613,16 @@ async function fetchBalance() {
   try {
     const res = await fetch(`/balance/${USER_ID}`);
     const data = await res.json();
-    if (typeof data.balance === "number") {
-      updateWallet(data.balance);
-    }
+    if (typeof data.balance === "number") updateWallet(data.balance);
   } catch (err) {
     console.error("balance fetch error", err);
   }
 }
 
 function joinGameRoom() {
-  socket.emit("join_game", {
-    game_type: GAME,
-    user_id: USER_ID,
-  });
+  // Try both event names (some backends use join_game, some use joingame)
+  socket.emit("join_game", { game_type: GAME, user_id: USER_ID });
+  socket.emit("joingame", { game_type: GAME, user_id: USER_ID });
 }
 
 socket.on("connect", () => {
@@ -613,17 +632,29 @@ socket.on("connect", () => {
   fetchTableData();
 });
 
-socket.on("bet_success", (payload) => {
-  setStatus(payload.message || "Bet placed", "ok");
-  if (typeof payload.new_balance === "number") {
-    updateWallet(payload.new_balance);
-  }
-  fetchTableData();
-});
+// Listen to BOTH naming styles
+function handleBetSuccess(payload) {
+  setStatus(payload?.message || "Bet placed", "ok");
 
-socket.on("bet_error", (payload) => {
-  setStatus(payload.message || "Bet error", "error");
-});
+  const newBal = payload?.new_balance ?? payload?.newbalance;
+  if (typeof newBal === "number") updateWallet(newBal);
+
+  fetchTableData();
+}
+
+function handleBetError(payload) {
+  setStatus(payload?.message || "Bet error", "error");
+}
+
+socket.on("bet_success", handleBetSuccess);
+socket.on("betsuccess", handleBetSuccess);
+
+socket.on("bet_error", handleBetError);
+socket.on("beterror", handleBetError);
+
+// Optional: table updates from server (if you broadcast "updatetable")
+socket.on("update_table", () => fetchTableData());
+socket.on("updatetable", () => fetchTableData());
 
 // ================== UI EVENTS ==================
 
@@ -641,11 +672,12 @@ if (placeBetBtn) {
       return;
     }
 
+    const slotsAvail = currentTable.slotsAvailable;
+    const maxPlayers = safeNum(currentTable.maxPlayers, 0);
+
     const slotsFull =
-      (typeof currentTable.slots_available === "number" &&
-        currentTable.slots_available <= 0) ||
-      (typeof currentTable.max_players === "number" &&
-        currentTable.players >= currentTable.max_players) ||
+      (typeof slotsAvail === "number" && slotsAvail <= 0) ||
+      (maxPlayers > 0 && currentTable.playersCount >= maxPlayers) ||
       currentTable.is_full === true;
 
     if (slotsFull) {
@@ -665,25 +697,32 @@ if (placeBetBtn) {
     }
 
     const myBets =
-      (currentTable.bets || []).filter(
-        (b) => String(b.user_id) === String(USER_ID)
-      ) || [];
+      (currentTable.bets || []).filter((b) => String(b.userId) === String(USER_ID)) || [];
+
     const alreadyOnThisNumber = myBets.some(
       (b) => Number(b.number) === Number(selectedNumber)
     );
+
     if (alreadyOnThisNumber) {
       setStatus("You already placed a bet on this number", "error");
       return;
     }
 
-    socket.emit("place_bet", {
+    // Try both event names (some backends use place_bet, some placebet)
+    const payload = {
       game_type: GAME,
       user_id: USER_ID,
       username: USERNAME,
       number: selectedNumber,
-    });
+    };
+
+    socket.emit("place_bet", payload);
+    socket.emit("placebet", payload);
   });
 }
+
+// ===== Controls height sync for your CSS variable =====
+
 function syncControlsHeight() {
   const controls = document.querySelector(".controls");
   if (!controls) return;
@@ -693,7 +732,10 @@ function syncControlsHeight() {
 
 window.addEventListener("load", syncControlsHeight);
 window.addEventListener("resize", syncControlsHeight);
-if (window.ResizeObserver) new ResizeObserver(syncControlsHeight).observe(document.querySelector(".controls"));
+if (window.ResizeObserver) {
+  const el = document.querySelector(".controls");
+  if (el) new ResizeObserver(syncControlsHeight).observe(el);
+}
 
 // ================== INIT ==================
 
