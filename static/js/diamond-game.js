@@ -211,16 +211,11 @@ function syncUrlWithTable(roundCode) {
   }
 }
 
-// ================= PROFESSIONAL ARROW SHOT =================
-// Key improvements vs your current version:
-// - Never moves the real #arrowSprite into the target (avoids "pasted" + broken next shot).
-// - Uses a clone for flight and a second clone for the stuck arrow.
-// - Rotates to follow the curve tangent (natural).
-// - Anchors stick by arrow tip (transform-origin + translate).
-// - Cancels previous shots cleanly.
+// ================= ARROW + DOTTED PATH (PRO) =================
 
 let _shotToken = 0;
 let _stuckArrows = [];
+let _shotSvg = null;
 
 function ensureAnimStyles() {
   if (document.getElementById("diamond-shot-styles")) return;
@@ -232,6 +227,10 @@ function ensureAnimStyles() {
       35% { opacity: 1; transform: translate(-50%, -50%) scale(1.0); }
       100% { opacity: 0; transform: translate(-50%, -50%) scale(1.35); }
     }
+
+    @keyframes diamondPathIn { from { opacity: 0; } to { opacity: 1; } }
+    @keyframes diamondPathOut { to { opacity: 0; } }
+    @keyframes diamondDash { to { stroke-dashoffset: -26; } }
   `;
   document.head.appendChild(style);
 }
@@ -241,16 +240,60 @@ function clearStuckArrows() {
   _stuckArrows = [];
 }
 
+function ensureShotSvg() {
+  if (!rangeEl) return null;
+  if (_shotSvg && _shotSvg.isConnected) return _shotSvg;
+
+  const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+  svg.setAttribute("preserveAspectRatio", "none");
+  svg.style.position = "absolute";
+  svg.style.inset = "0";
+  svg.style.pointerEvents = "none";
+
+  // Keep it visible over background/targets. (Arrow clones use much higher z-index.) [file:102]
+  svg.style.zIndex = "2";
+
+  rangeEl.appendChild(svg);
+  _shotSvg = svg;
+  return svg;
+}
+
+function clearShotPath() {
+  if (_shotSvg) _shotSvg.innerHTML = "";
+}
+
+function drawShotPath(rangeRect, startX, startY, ctrlX, ctrlY, endX, endY) {
+  const svg = ensureShotSvg();
+  if (!svg) return;
+
+  svg.setAttribute("viewBox", `0 0 ${rangeRect.width} ${rangeRect.height}`);
+  svg.innerHTML = "";
+
+  const path = document.createElementNS("http://www.w3.org/2000/svg", "path");
+  path.setAttribute("d", `M ${startX} ${startY} Q ${ctrlX} ${ctrlY} ${endX} ${endY}`);
+  path.setAttribute("fill", "none");
+  path.setAttribute("stroke", "rgba(226,232,240,0.70)");
+  path.setAttribute("stroke-width", "2");
+  path.setAttribute("stroke-linecap", "round");
+  path.setAttribute("stroke-dasharray", "2 10");
+  path.style.filter = "drop-shadow(0 8px 12px rgba(0,0,0,0.55))";
+
+  // Fade in quickly, animate dash while arrow is flying, then fade out
+  path.style.animation =
+    "diamondPathIn 140ms ease-out, diamondDash 520ms linear infinite, diamondPathOut 520ms ease-in 280ms forwards";
+
+  svg.appendChild(path);
+}
+
 function resetArrowToBow() {
   if (!arrowImg) return;
   arrowImg.style.opacity = "1";
-  arrowImg.style.transform = ""; // let CSS control idle state
+  arrowImg.style.transform = "";
   arrowImg.style.left = "";
   arrowImg.style.top = "";
   arrowImg.style.position = "";
   arrowImg.style.zIndex = "";
 
-  // If old code ever moved it, put it back
   if (archerLayerEl && arrowImg.parentElement !== archerLayerEl) {
     archerLayerEl.appendChild(arrowImg);
   }
@@ -281,17 +324,18 @@ function shootArrowToWinningNumber(winningNumber) {
 
   ensureAnimStyles();
 
-  // cancel previous shots + remove prior stuck arrows (optional but cleaner)
+  // cancel previous shot
   const token = ++_shotToken;
-  clearStuckArrows();
 
+  clearStuckArrows();
+  clearShotPath();
   resetArrowToBow();
 
   const rangeRect = rangeEl.getBoundingClientRect();
   const targetRect = target.getBoundingClientRect();
   const arrowRect = arrowImg.getBoundingClientRect();
 
-  // Start near the arrow tip (right side of your arrow svg)
+  // Start near the arrow tip (right side)
   const startX = (arrowRect.left + arrowRect.width * 0.88) - rangeRect.left;
   const startY = (arrowRect.top + arrowRect.height * 0.55) - rangeRect.top;
 
@@ -303,13 +347,17 @@ function shootArrowToWinningNumber(winningNumber) {
   const dy = endY - startY;
   const dist = Math.hypot(dx, dy);
 
-  // Quadratic bezier control point (nice arc)
+  // ✅ Gentle arc (prevents that "jump up" look)
   const midX = (startX + endX) / 2;
-  const lift = Math.min(170, Math.max(95, dist * 0.35));
+  const midY = (startY + endY) / 2;
+  const lift = Math.min(80, Math.max(28, dist * 0.14));
   const ctrlX = midX;
-  const ctrlY = Math.min(startY, endY) - lift;
+  const ctrlY = midY - lift;
 
-  // Clone arrow for flight; keep original hidden so user sees 1 arrow only
+  // Dotted guide path (like gold game)
+  drawShotPath(rangeRect, startX, startY, ctrlX, ctrlY, endX, endY);
+
+  // Clone arrow for flight; keep original hidden
   const flying = arrowImg.cloneNode(true);
   flying.removeAttribute("id");
   flying.style.position = "absolute";
@@ -320,7 +368,7 @@ function shootArrowToWinningNumber(winningNumber) {
   flying.style.pointerEvents = "none";
   flying.style.zIndex = "60";
   flying.style.willChange = "transform,left,top,filter";
-  flying.style.filter = "drop-shadow(0 10px 14px rgba(0,0,0,0.7))";
+  flying.style.filter = "drop-shadow(0 10px 14px rgba(0,0,0,0.70))";
   rangeEl.appendChild(flying);
 
   arrowImg.style.opacity = "0";
@@ -339,10 +387,13 @@ function shootArrowToWinningNumber(winningNumber) {
   const bezierDeriv = (t, p0, p1, p2) => 2 * (1 - t) * (p1 - p0) + 2 * t * (p2 - p1);
   const easeOutCubic = (t) => 1 - Math.pow(1 - t, 3);
 
+  const aimAngle = Math.atan2(dy, dx) * (180 / Math.PI);
+
   function step(now) {
     if (token !== _shotToken) {
       flying.remove();
       arrowImg.style.opacity = "1";
+      clearShotPath();
       return;
     }
 
@@ -353,17 +404,21 @@ function shootArrowToWinningNumber(winningNumber) {
     const x = bezier(t, startX, ctrlX, endX);
     const y = bezier(t, startY, ctrlY, endY);
 
-    // Rotate to match curve tangent (professional feel)
+    // Tangent angle along the curve
     const vx = bezierDeriv(t, startX, ctrlX, endX);
     const vy = bezierDeriv(t, startY, ctrlY, endY);
-    const angle = Math.atan2(vy, vx) * (180 / Math.PI);
+    const tangentAngle = Math.atan2(vy, vx) * (180 / Math.PI);
 
-    // slight stability: a touch of wobble early only
-    const wobble = (1 - t) * 1.7 * Math.sin(t * 10);
+    // ✅ Smooth rotation blending: avoids instant “flip up”
+    const mix = Math.min(1, t * 1.15);
+    const angle = aimAngle + (tangentAngle - aimAngle) * mix;
+
+    // Subtle scale for depth (optional but looks premium)
+    const scale = 1 - t * 0.08;
 
     flying.style.left = x + "px";
     flying.style.top = y + "px";
-    flying.style.transform = `translate(-50%, -50%) rotate(${angle + wobble}deg)`;
+    flying.style.transform = `translate(-50%, -50%) rotate(${angle}deg) scale(${scale})`;
 
     if (tr < 1) {
       requestAnimationFrame(step);
@@ -371,10 +426,10 @@ function shootArrowToWinningNumber(winningNumber) {
     }
 
     // Impact
+    clearShotPath();
     target.classList.add("win");
     flashTarget(target);
 
-    // Remove flying arrow
     flying.remove();
 
     // Stick arrow inside target with tip anchoring
@@ -389,18 +444,12 @@ function shootArrowToWinningNumber(winningNumber) {
     stuck.style.width = (arrowRect.width || 52) + "px";
     stuck.style.height = "auto";
     stuck.style.pointerEvents = "none";
-
-    // IMPORTANT: keep it above target image but below pad text; your CSS originally uses z-index
-    // (arrow had z-index: 4, targets z-index: 1) [file:102]
     stuck.style.zIndex = "3";
-
-    // Tip anchor: arrow points to the right in your sprite, so tip is near 90–95% X.
     stuck.style.transformOrigin = "92% 50%";
     stuck.style.filter = "drop-shadow(0 10px 14px rgba(0,0,0,0.75))";
     stuck.style.transition = "transform 160ms ease-out";
 
     const finalAngle = angle + (-6 + Math.random() * 12);
-    // translate(-92%, -50%) puts the TIP on the hit point, then translateX simulates penetration
     stuck.style.transform = `translate(-92%, -50%) rotate(${finalAngle}deg) translateX(10px)`;
 
     target.appendChild(stuck);
@@ -526,9 +575,8 @@ function updateGameUI(table) {
     }
   } else if (!hasResult) {
     lastResultShown = null;
-    // If you ever decide not to finish the game and keep polling,
-    // this keeps visuals clean for a new round:
     clearStuckArrows();
+    clearShotPath();
     resetArrowToBow();
   }
 }
