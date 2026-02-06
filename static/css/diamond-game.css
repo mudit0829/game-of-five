@@ -559,4 +559,37 @@ body {
 .result-popup{
   z-index: 9999;
 }
+/* ===== FIX: targets must be above archer layer ===== */
+.targets { z-index: 5; }                 /* was 1 */
+.archer-layer { z-index: 2; pointer-events: none; }  /* keep visuals but don't block UI */
+
+/* keep text above everything inside target */
+.pad-number { z-index: 20; }
+.pad-user { z-index: 20; }
+
+/* make archer area smaller & lower so it doesn't invade target grid */
+.archer-layer{
+  height: 64px;
+  bottom: 0px;
+  padding-left: 12px;
+}
+
+.archer{
+  width: 88px; /* smaller than 110px */
+}
+
+.arrow{
+  width: 44px;     /* smaller than 52px */
+  bottom: 22px;    /* slightly lower */
+  left: 58px;      /* closer to archer */
+  z-index: 3;      /* below targets; JS will raise it while flying */
+}
+/* ===== FIX: keep usernames INSIDE target so they never get clipped ===== */
+.pad-user{
+  bottom: 6px;                 /* was -18px */
+  font-size: 9px;
+  padding: 2px 7px;
+  background: rgba(2, 6, 23, 0.75);
+  border: 1px solid rgba(148, 163, 184, 0.55);
+}
 
