@@ -1,9 +1,11 @@
 // ================= BASIC SETUP =================
 const GAME = window.GAME_TYPE || "silver";
 const FIXED_BET_AMOUNT = window.FIXED_BET_AMOUNT || 10;
+
 const urlParams = new URLSearchParams(window.location.search);
-const TABLE_CODE = urlParams.get("table") || null;
-const USER_ID = window.GAME_USER_ID || null;
+let tableCodeFromUrl = urlParams.get("table") || null;
+
+const USER_ID = window.GAME_USER_ID;
 const USERNAME = window.GAME_USERNAME || "Player";
 const HOME_URL = "/home";
 
@@ -11,64 +13,92 @@ const HOME_URL = "/home";
 const pondEl = document.querySelector(".pond");
 const frogContainer = document.getElementById("frogContainer");
 const frogIdleVideo = document.getElementById("frogIdleVideo");
-const frogJumpVideo = document.getElementById("frogJumpVideo");
-const frogVideoSource = document.getElementById("frogVideoSource");
+
 const pads = Array.from(document.querySelectorAll(".pad"));
 const numChips = Array.from(document.querySelectorAll(".num-chip"));
 const placeBetBtn = document.getElementById("placeBetBtn");
+
 const roundIdSpan = document.getElementById("roundId");
 const playerCountSpan = document.getElementById("playerCount");
 const timerText = document.getElementById("timerText");
 const walletBalanceSpan = document.getElementById("walletBalance");
 const statusEl = document.getElementById("statusMessage");
 const coinsWrapper = document.querySelector(".coins");
+
 const userNameLabel = document.getElementById("userName");
 const userBetCountLabel = document.getElementById("userBetCount");
 const myBetsRow = document.getElementById("myBetsRow");
+
 const popupEl = document.getElementById("resultPopup");
 const popupTitleEl = document.getElementById("popupTitle");
 const popupMsgEl = document.getElementById("popupMessage");
 const popupHomeBtn = document.getElementById("popupHomeBtn");
 const popupLobbyBtn = document.getElementById("popupLobbyBtn");
 
-// ================= FROG JUMP VIDEO CONFIG =================
-const FROG_VIDEOS = {
-  front: "/static/video/front-jump-frog.mp4",
-  left: "/static/video/left-jump-frog.mp4",
-  right: "/static/video/right-jump-frog.mp4",
-};
-
-// Unlock video on interaction
-let videoUnlocked = false;
-document.addEventListener("click", () => {
-  if (videoUnlocked || !frogJumpVideo) return;
-  frogJumpVideo.muted = true;
-  frogJumpVideo.play().then(() => {
-    frogJumpVideo.pause();
-    frogJumpVideo.currentTime = 0;
-    videoUnlocked = true;
-    console.log("[frog] video unlocked");
-  }).catch(() => {});
-}, { once: true });
-
 if (userNameLabel) userNameLabel.textContent = USERNAME;
 
+// ================= STATE =================
 let walletBalance = 0;
 let selectedNumber = 0;
+
 let currentTable = null;
-let lastResultShown = null;
-let lockedWinningPad = null;
 let gameFinished = false;
+
 let tablePollInterval = null;
-let localTimerInterval = null;
+
 let displayRemainingSeconds = 0;
-let jumpStarted = false;
-let storedResult = null;
-let userHasBet = false;
-let pendingOutcomeInfo = null;
-let myCurrentBets = [];
+
+// one-hop-per-round + one-popup-per-round
+let hopShownForRound = null;
+let popupShownForRound = null;
+
+// landing time to delay popup until hop finishes
+let hopLandingETA = 0;
 
 // ================= HELPERS =================
+function pick(obj, ...keys) {
+  for (const k of keys) {
+    if (obj && obj[k] !== undefined && obj[k] !== null) return obj[k];
+  }
+  return undefined;
+}
+
+function toBool(v) {
+  return v === true || v === "true" || v === 1 || v === "1";
+}
+
+function safeNum(v, fallback = 0) {
+  const n = Number(v);
+  return Number.isFinite(n) ? n : fallback;
+}
+
+function normalizeTable(raw) {
+  if (!raw) return null;
+
+  const t = { ...raw };
+
+  t.roundCode = pick(raw, "round_code", "roundcode");
+  t.timeRemaining = safeNum(pick(raw, "time_remaining", "timeremaining"), 0);
+  t.isFinished = toBool(pick(raw, "is_finished", "isfinished"));
+  t.isBettingClosed = toBool(pick(raw, "is_betting_closed", "isbettingclosed"));
+
+  t.maxPlayers = pick(raw, "max_players", "maxplayers");
+  t.playersCount = safeNum(pick(raw, "players"), 0);
+
+  t.resultValue = pick(raw, "result");
+
+  const betsRaw = Array.isArray(raw.bets) ? raw.bets : (Array.isArray(raw.players) ? raw.players : []);
+  t.bets = betsRaw.map((b) => ({
+    ...b,
+    userId: pick(b, "user_id", "userid"),
+    username: pick(b, "username") || "Player",
+    number: pick(b, "number"),
+    isBot: toBool(pick(b, "is_bot", "isbot")),
+  }));
+
+  return t;
+}
+
 function setStatus(msg, type = "") {
   if (!statusEl) return;
   statusEl.textContent = msg || "";
@@ -76,8 +106,13 @@ function setStatus(msg, type = "") {
 }
 
 function updateWallet(balance) {
-  walletBalance = balance;
+  walletBalance = safeNum(balance, 0);
   if (walletBalanceSpan) walletBalanceSpan.textContent = walletBalance.toFixed(0);
+
+  if (coinsWrapper) {
+    coinsWrapper.classList.add("coin-bounce");
+    setTimeout(() => coinsWrapper.classList.remove("coin-bounce"), 500);
+  }
 }
 
 function formatTime(seconds) {
@@ -91,471 +126,391 @@ function renderTimer() {
 
 function setSelectedNumber(n) {
   selectedNumber = n;
-  numChips.forEach(chip => {
+  numChips.forEach((chip) => {
     chip.classList.toggle("selected", parseInt(chip.dataset.number, 10) === n);
   });
 }
 
-// ✅ FIXED: Update my bets display with correct format
+function disableBettingUI() {
+  if (placeBetBtn) placeBetBtn.disabled = true;
+  numChips.forEach((c) => (c.disabled = true));
+}
+
 function updateMyBets(bets) {
-  const myBets = (bets || []).filter(b => {
-    const betUserId = String(b.user_id || b.userId || "");
-    return betUserId === String(USER_ID);
-  });
-  
-  myCurrentBets = myBets;
-  
-  if (myBets.length > 0) {
-    userHasBet = true;
-  }
-  
-  // ✅ UPDATE YELLOW #2: Show total bet count
-  if (userBetCountLabel) {
-    userBetCountLabel.textContent = myBets.length;
-  }
-  
-  // ✅ UPDATE YELLOW #1: Show "Your Bets: 1, 6" format
+  const myBets = (bets || []).filter((b) => String(b.userId) === String(USER_ID));
+
+  if (userBetCountLabel) userBetCountLabel.textContent = myBets.length;
+
   if (myBetsRow) {
     if (myBets.length === 0) {
       myBetsRow.innerHTML = '<span style="color:#6b7280;font-size:11px;">none</span>';
     } else {
-      const numbers = myBets.map(b => b.number).sort((a, b) => a - b);
-      myBetsRow.innerHTML = numbers.map(n => `<span class="my-bet-chip">${n}</span>`).join(", ");
+      const numbers = myBets.map((b) => Number(b.number)).sort((a, b) => a - b);
+      myBetsRow.innerHTML = numbers.map((n) => `<span class="my-bet-chip">${n}</span>`).join("");
     }
   }
-  
-  console.log("[updateMyBets] Count:", myBets.length, "Numbers:", myBets.map(b => b.number).join(","));
+
+  return myBets;
 }
 
 function updatePadsFromBets(bets) {
   const list = (bets || []).slice(0, 6);
+
   pads.forEach((pad, i) => {
     const numSpan = pad.querySelector(".pad-number");
     const userSpan = pad.querySelector(".pad-user");
-    
-    if (!gameFinished) {
-      pad.classList.remove("win");
-    }
-    
+    pad.classList.remove("win");
+
     if (i < list.length) {
       const bet = list[i];
       pad.dataset.number = String(bet.number);
       if (numSpan) numSpan.textContent = bet.number;
-      if (userSpan) userSpan.textContent = bet.username;
+      if (userSpan) userSpan.textContent = bet.username || "";
     } else {
       pad.dataset.number = "";
       if (numSpan) numSpan.textContent = "";
       if (userSpan) userSpan.textContent = "";
     }
   });
-  
-  console.log("[updatePadsFromBets] Updated", list.length, "pads from bets");
 }
 
 function ensurePadForWinningNumber(winningNumber) {
   if (winningNumber == null) return;
+
   const str = String(winningNumber);
-  if (pads.some(p => p.dataset.number === str)) return;
+  const exists = pads.some((p) => p.dataset.number === str);
+  if (exists) return;
+
   const pad = pads[0];
   if (!pad) return;
+
   pad.dataset.number = str;
   const numSpan = pad.querySelector(".pad-number");
   if (numSpan) numSpan.textContent = str;
 }
 
-function disableBettingUI() {
-  if (placeBetBtn) placeBetBtn.disabled = true;
-  numChips.forEach(c => c.disabled = true);
+function findPadForNumber(num) {
+  const str = String(num);
+  return pads.find(
+    (p) => p.dataset.number === str || (p.querySelector(".pad-number")?.textContent || "").trim() === str
+  );
 }
 
 function determineUserOutcome(table) {
-  const result = table.result;
-  const myBets = (table.bets || []).filter(b => String(b.user_id) === String(USER_ID));
+  const result = table.resultValue;
+  const myBets = (table.bets || []).filter((b) => String(b.userId) === String(USER_ID));
   if (!myBets.length) return { outcome: "none", result };
-  return { outcome: myBets.some(b => String(b.number) === String(result)) ? "win" : "lose", result };
+
+  const won = myBets.some((b) => String(b.number) === String(result));
+  return { outcome: won ? "win" : "lose", result };
 }
 
-// ✅ FIXED: Show result popup when game ends
 function showResultPopup(outcomeInfo) {
   if (!popupEl) return;
-  const { outcome } = outcomeInfo;
-  
+
+  const { outcome, result } = outcomeInfo;
+
   let title = "Game Finished";
-  if (outcome === "win") {
-    title = "Congratulations! 🎉";
-  } else if (outcome === "lose") {
-    title = "Hard Luck! 😢";
-  }
-  
-  console.log("[popup] Showing:", title);
-  popupTitleEl.textContent = title;
-  popupMsgEl.textContent = "Please keep playing to keep your winning chances high.";
+  if (outcome === "win") title = "Congratulations!";
+  else if (outcome === "lose") title = "Hard Luck!";
+
+  if (popupTitleEl) popupTitleEl.textContent = title;
+  if (popupMsgEl) popupMsgEl.textContent = `Winning number: ${result}`;
+
   popupEl.style.display = "flex";
-  
-  setTimeout(() => window.history.back(), 5000);
 }
 
 function showSlotsFullPopup() {
   if (!popupEl) return;
-  popupTitleEl.textContent = "All slots are full";
-  popupMsgEl.textContent = "This game is already full. Redirecting to lobby...";
+  if (popupTitleEl) popupTitleEl.textContent = "All slots are full";
+  if (popupMsgEl) popupMsgEl.textContent = "This game is already full. Redirecting to lobby...";
   popupEl.style.display = "flex";
   setTimeout(() => window.history.back(), 2000);
 }
 
-// ================= FROG LOGIC =================
-function getJumpDirectionByPadIndex(index) {
-  if (index <= 1) return "left";
-  if (index <= 3) return "front";
-  return "right";
-}
+// ================= FROG HOP (IDLE FROG MOVES) =================
+// One frog only: keep idle video playing, move frogContainer in an arc to the winning pad.
 
-function findPadForNumber(num) {
-  const str = String(num);
-  return pads.find(p => p.dataset.number === str || p.querySelector(".pad-number")?.textContent.trim() === str);
-}
+function hopFrogToPad(targetPad, durationMs = 1200) {
+  if (!frogContainer || !targetPad) return;
 
-function hopFrogToWinningNumber(winningNumber) {
-  if (jumpStarted) return;
-  jumpStarted = true;
-  console.log("[frog] Starting jump to number:", winningNumber);
+  const frogRect = frogContainer.getBoundingClientRect();
+  const padRect = targetPad.getBoundingClientRect();
 
-  const targetPad = lockedWinningPad || findPadForNumber(winningNumber);
-  if (!targetPad) {
-    console.warn("[frog] No target pad found for number:", winningNumber);
-    jumpStarted = false;
-    return;
+  const startX = frogRect.left + frogRect.width / 2;
+  const startY = frogRect.top + frogRect.height / 2;
+
+  const endX = padRect.left + padRect.width / 2;
+  const endY = padRect.top + padRect.height / 2;
+
+  // arc height based on distance
+  const dx = endX - startX;
+  const dy = endY - startY;
+  const dist = Math.sqrt(dx * dx + dy * dy);
+  const peak = -Math.min(160, Math.max(90, dist * 0.45));
+
+  const duration = Math.max(700, Math.min(1800, Number(durationMs) || 1200));
+  const startTime = performance.now();
+
+  hopLandingETA = Date.now() + duration;
+
+  // Switch to fixed positioning during hop so it can move anywhere
+  frogContainer.style.position = "fixed";
+  frogContainer.style.left = `${startX}px`;
+  frogContainer.style.top = `${startY}px`;
+  frogContainer.style.transform = "translate(-50%, -50%)";
+  frogContainer.style.margin = "0";
+  frogContainer.style.zIndex = "1200";
+
+  function step(now) {
+    const tRaw = (now - startTime) / duration;
+    const t = Math.min(Math.max(tRaw, 0), 1);
+
+    // ease out
+    const ease = 1 - Math.pow(1 - t, 3);
+
+    const x = startX + dx * ease;
+    const yLinear = startY + dy * ease;
+    const yArc = yLinear + peak * (4 * t * (1 - t));
+
+    const scale = 1 + Math.sin(Math.PI * t) * 0.08; // small hop squash/stretch
+    const rotate = (dx / (dist || 1)) * 6 * (1 - Math.abs(0.5 - t) * 2);
+
+    frogContainer.style.left = `${x}px`;
+    frogContainer.style.top = `${yArc}px`;
+    frogContainer.style.transform = `translate(-50%, -50%) scale(${scale}) rotate(${rotate}deg)`;
+
+    if (t < 1) {
+      requestAnimationFrame(step);
+    } else {
+      // landing bounce
+      frogContainer.style.transition = "transform 0.25s ease-out";
+      frogContainer.style.transform = "translate(-50%, -50%) scale(1)";
+
+      setTimeout(() => {
+        frogContainer.style.transition = "none";
+      }, 260);
+
+      targetPad.classList.add("win");
+    }
   }
 
-  const padIndex = pads.indexOf(targetPad);
-  const direction = getJumpDirectionByPadIndex(padIndex);
-  const animationClass = `jump-${direction}`;
-
-  console.log(`[frog] Jump animation → ${direction} to number ${winningNumber} (pad ${padIndex})`);
-
-  frogIdleVideo.pause();
-  frogIdleVideo.style.display = "none";
-
-  frogVideoSource.src = FROG_VIDEOS[direction] || FROG_VIDEOS.front;
-  frogJumpVideo.load();
-  frogJumpVideo.style.display = "block";
-  frogJumpVideo.currentTime = 0;
-
-  frogJumpVideo.onloadeddata = () => {
-    console.log("[frog] Video ready, playing...");
-    frogJumpVideo.play().catch(e => console.error("[frog] Play error:", e));
-    frogContainer.classList.add(animationClass, "jumping");
-  };
-
-  frogJumpVideo.onended = () => {
-    console.log("[frog] Jump animation finished");
-    frogJumpVideo.style.display = "none";
-    frogIdleVideo.style.display = "block";
-    frogIdleVideo.play();
-
-    targetPad.classList.add("win");
-    gameFinished = true;
-
-    setTimeout(() => {
-      frogContainer.classList.remove("jumping", "jump-left", "jump-front", "jump-right");
-    }, 1800);
-
-    if (pendingOutcomeInfo) {
-      console.log("[frog] Showing result popup after jump");
-      showResultPopup(pendingOutcomeInfo);
-      pendingOutcomeInfo = null;
-    }
-  };
+  requestAnimationFrame(step);
 }
 
-// ================= TIMER =================
-function startLocalTimer() {
-  if (localTimerInterval) clearInterval(localTimerInterval);
-  localTimerInterval = setInterval(() => {
-    if (gameFinished) return;
-    if (displayRemainingSeconds > 0) {
-      displayRemainingSeconds--;
-      renderTimer();
-      if (displayRemainingSeconds === 15) disableBettingUI();
-      if (displayRemainingSeconds === 10 && storedResult !== null && !jumpStarted) {
-        console.log("[timer] Trigger jump at 10s, result:", storedResult);
-        hopFrogToWinningNumber(storedResult);
-      }
-    }
-  }, 1000);
-}
-
-// ================= POLLING & UPDATE =================
+// ================= POLLING =================
 async function fetchTableData() {
-  if (gameFinished && lastResultShown !== null) return;
+  if (gameFinished) return;
+
   try {
     const res = await fetch("/api/tables/silver");
     const data = await res.json();
-    if (!data.tables?.length) {
-      console.log("[fetch] No tables available");
-      return setStatus("No active tables", "error");
-    }
-    
-    let table = TABLE_CODE 
-      ? data.tables.find(t => t.round_code === TABLE_CODE) 
-      : data.tables[0];
-    
-    if (!table) {
-      console.log("[fetch] Table not found");
+
+    if (!data.tables || !data.tables.length) {
+      setStatus("No active tables", "error");
       return;
     }
-    
-    currentTable = table;
-    console.log("[fetch] Table data:", {
-      round: table.round_code,
-      players: table.players,
-      bets: table.bets?.length || 0,
-      result: table.result,
-      time: table.time_remaining
-    });
-    
-    updateGameUIMinimal(table);
+
+    let raw = null;
+
+    if (tableCodeFromUrl) {
+      raw =
+        data.tables.find(
+          (t) => String(pick(t, "round_code", "roundcode")) === String(tableCodeFromUrl)
+        ) || null;
+
+      if (!raw) {
+        gameFinished = true;
+        disableBettingUI();
+        setStatus("This game has finished. Going back to lobby...", "error");
+
+        if (tablePollInterval) clearInterval(tablePollInterval);
+        tablePollInterval = null;
+
+        setTimeout(() => window.history.back(), 2000);
+        return;
+      }
+    } else {
+      raw = data.tables[0];
+      tableCodeFromUrl = pick(raw, "round_code", "roundcode") || null;
+    }
+
+    currentTable = normalizeTable(raw);
+    updateGameUI(currentTable);
   } catch (err) {
-    console.error("[fetch] error:", err);
+    console.error("[fetchTableData] error:", err);
   }
 }
 
-function updateGameUIMinimal(table) {
-  roundIdSpan.textContent = table.round_code || "-";
+function updateGameUI(table) {
+  if (!table) return;
 
-  if (!gameFinished) {
-    const oldSec = displayRemainingSeconds;
-    displayRemainingSeconds = table.time_remaining || 0;
-    if (oldSec !== displayRemainingSeconds) renderTimer();
-  }
+  if (roundIdSpan) roundIdSpan.textContent = table.roundCode || "-";
 
+  displayRemainingSeconds = table.timeRemaining || 0;
+  renderTimer();
+
+  // Update pads + bets
+  updatePadsFromBets(table.bets || []);
+  const myBets = updateMyBets(table.bets || []);
+
+  if (playerCountSpan) playerCountSpan.textContent = table.playersCount || 0;
+
+  // Disable betting close to end
   if (placeBetBtn && !gameFinished) {
-    placeBetBtn.disabled = displayRemainingSeconds <= 15 || 
-      (table.max_players && table.players >= table.max_players);
+    const maxPlayers = typeof table.maxPlayers === "number" ? table.maxPlayers : null;
+    const isFull = maxPlayers !== null && table.playersCount >= maxPlayers;
+    placeBetBtn.disabled = !!table.isBettingClosed || isFull || displayRemainingSeconds <= 15;
   }
 
-  const isFull = table.is_full || (table.max_players && table.players >= table.max_players);
-  if (!gameFinished && !userHasBet && isFull) {
-    console.log("[game] Slots full and user didn't bet");
+  const hasUserBet = myBets.length > 0;
+  const maxPlayers = typeof table.maxPlayers === "number" ? table.maxPlayers : null;
+  const isFull = maxPlayers !== null && table.playersCount >= maxPlayers;
+
+  if (!gameFinished && !hasUserBet && isFull) {
+    gameFinished = true;
     disableBettingUI();
-    clearInterval(tablePollInterval);
+    if (tablePollInterval) clearInterval(tablePollInterval);
     tablePollInterval = null;
     showSlotsFullPopup();
     return;
   }
 
-  // ✅ CRITICAL: Update lily pads from polling data (for initial load + other players' bets)
-  if (table.bets && Array.isArray(table.bets) && table.bets.length > 0) {
-    console.log("[polling] Updating pads from API bets:", table.bets.length);
-    updatePadsFromBets(table.bets);
-    updateMyBets(table.bets);
-    if (playerCountSpan) {
-      playerCountSpan.textContent = table.bets.length;
+  const hasResult = table.resultValue !== null && table.resultValue !== undefined && table.resultValue !== "";
+
+  // ✅ Hop at 02 seconds when result is pre-selected by backend
+  if (hasResult && table.timeRemaining <= 2) {
+    const roundId = table.roundCode || "__no_round__";
+
+    if (hopShownForRound !== roundId) {
+      hopShownForRound = roundId;
+
+      setStatus(`Winning number: ${table.resultValue}`, "ok");
+
+      ensurePadForWinningNumber(table.resultValue);
+      const targetPad = findPadForNumber(table.resultValue);
+
+      if (targetPad) {
+        hopFrogToPad(targetPad, 1200);
+      }
     }
   }
 
-  // ✅ CRITICAL: Handle game result
-  if (table.result != null && table.result !== lastResultShown) {
-    console.log(`[GAME RESULT] Result announced: ${table.result}, time remaining: ${displayRemainingSeconds}s, userHasBet: ${userHasBet}`);
-    
-    lastResultShown = table.result;
-    storedResult = table.result;
-    ensurePadForWinningNumber(table.result);
-    lockedWinningPad = findPadForNumber(table.result);
-    pendingOutcomeInfo = determineUserOutcome(table);
+  // ✅ Show popup only when finished, after hop landing
+  if (hasResult && table.isFinished) {
+    const roundId = table.roundCode || "__no_round__";
 
-    console.log("[GAME RESULT] Outcome info:", pendingOutcomeInfo);
+    if (popupShownForRound !== roundId && hasUserBet) {
+      popupShownForRound = roundId;
 
-    if (!userHasBet) {
-      console.log("[game] User didn't bet, showing slots full popup");
-      showSlotsFullPopup();
-      return;
+      gameFinished = true;
+      disableBettingUI();
+
+      if (tablePollInterval) clearInterval(tablePollInterval);
+      tablePollInterval = null;
+
+      const outcomeInfo = determineUserOutcome(table);
+      const delay = Math.max(0, (hopLandingETA || 0) - Date.now() + 250);
+
+      setTimeout(() => showResultPopup(outcomeInfo), delay);
     }
-
-    if (!jumpStarted && displayRemainingSeconds <= 12) {
-      console.log("[game] Triggering jump now");
-      hopFrogToWinningNumber(storedResult);
-    } else {
-      console.log("[game] Jump already started or time not right:", { jumpStarted, displayRemainingSeconds });
-    }
-  }
-
-  // ✅ CRITICAL: Handle new round
-  if (table.result === null && lastResultShown !== null) {
-    console.log("[NEW ROUND] Resetting for new round");
-    jumpStarted = false;
-    storedResult = null;
-    lastResultShown = null;
-    gameFinished = false;
-    userHasBet = false;
-    myCurrentBets = [];
-    pendingOutcomeInfo = null;
-    lockedWinningPad = null;
-    
-    pads.forEach(p => p.classList.remove("win"));
-    frogContainer.classList.remove("jumping", "jump-left", "jump-front", "jump-right");
-    frogJumpVideo.pause();
-    frogJumpVideo.style.display = "none";
-    frogJumpVideo.currentTime = 0;
-    frogIdleVideo.style.display = "block";
-    frogIdleVideo.play();
-    
-    if (popupEl) popupEl.style.display = "none";
-    
-    if (userBetCountLabel) userBetCountLabel.textContent = "0";
-    if (myBetsRow) myBetsRow.innerHTML = '<span style="color:#6b7280;font-size:11px;">none</span>';
-    
-    if (placeBetBtn) placeBetBtn.disabled = false;
-    numChips.forEach(c => c.disabled = false);
   }
 }
 
 function startPolling() {
-  console.log("[init] Starting polling");
   fetchTableData();
-  tablePollInterval = setInterval(fetchTableData, 1500);
+  if (tablePollInterval) clearInterval(tablePollInterval);
+  tablePollInterval = setInterval(fetchTableData, 1000);
 }
 
-// ================= SOCKET & EVENTS =================
+// ================= SOCKET (optional updates) =================
 const socket = io();
 
 async function fetchBalance() {
   try {
     const res = await fetch(`/balance/${USER_ID}`);
-    const { balance } = await res.json();
-    if (typeof balance === "number") updateWallet(balance);
+    const data = await res.json();
+    if (typeof data.balance === "number") updateWallet(data.balance);
   } catch (e) {
     console.error("[balance] fetch error:", e);
   }
 }
 
-socket.on("connect", () => {
-  console.log("[socket] CONNECTED");
+function joinGameRoom() {
   socket.emit("join_game", { game_type: GAME, user_id: USER_ID });
+  socket.emit("joingame", { game_type: GAME, user_id: USER_ID });
+}
+
+socket.on("connect", () => {
+  joinGameRoom();
   fetchBalance();
   fetchTableData();
 });
 
-socket.on("disconnect", () => {
-  console.log("[socket] DISCONNECTED");
-});
+function onBetSuccess(payload) {
+  setStatus(payload?.message || "Bet placed ✓", "ok");
+  const newBal = payload?.new_balance ?? payload?.newbalance;
+  if (typeof newBal === "number") updateWallet(newBal);
+  fetchTableData();
+}
 
-socket.on("connect_error", (error) => {
-  console.error("[socket] CONNECTION ERROR:", error);
-});
+function onBetError(payload) {
+  setStatus(payload?.message || "Bet error", "error");
+}
 
-// ✅ LISTEN FOR OWN BET SUCCESS
-socket.on("bet_success", payload => {
-  console.log("[bet_success] Received - players:", payload.players?.length || 0);
-  if (gameFinished) {
-    console.log("[bet_success] Game finished, ignoring");
-    return;
-  }
-  
-  userHasBet = true;
-  setStatus("Bet placed ✓", "ok");
-  
-  if (payload.new_balance != null) {
-    updateWallet(payload.new_balance);
-  }
-  
-  if (payload.players && Array.isArray(payload.players)) {
-    console.log("[bet_success] Updating UI with", payload.players.length, "players");
-    updatePadsFromBets(payload.players);
-    updateMyBets(payload.players);
-    
-    if (playerCountSpan) {
-      playerCountSpan.textContent = payload.players.length;
-    }
-  }
-  
-  if (payload.round_code && roundIdSpan) {
-    roundIdSpan.textContent = payload.round_code;
-  }
-});
+socket.on("bet_success", onBetSuccess);
+socket.on("betsuccess", onBetSuccess);
 
-// ✅ LISTEN FOR BROADCAST TABLE UPDATES
-socket.on("update_table", payload => {
-  console.log("[update_table] BROADCAST received - players:", payload.players?.length || 0);
-  
-  if (payload.players && Array.isArray(payload.players)) {
-    console.log("[update_table] Updating UI with", payload.players.length, "players");
-    playerCountSpan.textContent = payload.players.length;
-    updatePadsFromBets(payload.players);
-    updateMyBets(payload.players);
-  }
-  
-  if (payload.time_remaining != null) {
-    displayRemainingSeconds = payload.time_remaining;
-    renderTimer();
-  }
-  
-  if (payload.slots_available != null && placeBetBtn) {
-    const slotsEmpty = payload.slots_available > 0;
-    placeBetBtn.disabled = !slotsEmpty || displayRemainingSeconds <= 15;
-  }
-  
-  if (payload.is_betting_closed) {
-    disableBettingUI();
-  }
-  
-  if (payload.round_code && roundIdSpan) {
-    roundIdSpan.textContent = payload.round_code;
-  }
-});
+socket.on("bet_error", onBetError);
+socket.on("beterror", onBetError);
 
-// ✅ LISTEN FOR BET ERRORS
-socket.on("bet_error", payload => {
-  console.error("[bet_error]:", payload.message);
-  setStatus(payload.message || "Bet error", "error");
-});
+socket.on("update_table", () => fetchTableData());
+socket.on("updatetable", () => fetchTableData());
 
-// ================= EVENT LISTENERS =================
-
-numChips.forEach(chip => {
+// ================= UI EVENTS =================
+numChips.forEach((chip) => {
   chip.addEventListener("click", () => {
-    if (!gameFinished && !chip.disabled) {
-      setSelectedNumber(parseInt(chip.dataset.number, 10));
-    }
+    if (gameFinished) return;
+    if (chip.disabled) return;
+    setSelectedNumber(parseInt(chip.dataset.number, 10));
   });
 });
 
-placeBetBtn?.addEventListener("click", () => {
-  if (gameFinished) {
-    return setStatus("Game finished", "error");
-  }
-  if (!currentTable) {
-    return setStatus("Game not ready", "error");
-  }
-  if (walletBalance < FIXED_BET_AMOUNT) {
-    return setStatus("Insufficient balance", "error");
-  }
-  if (selectedNumber == null || selectedNumber < 0) {
-    return setStatus("Select a number", "error");
-  }
+if (placeBetBtn) {
+  placeBetBtn.addEventListener("click", () => {
+    if (gameFinished) return setStatus("Game finished", "error");
+    if (!currentTable) return setStatus("Game not ready", "error");
 
-  console.log("[place_bet] Emitting:", selectedNumber);
-  socket.emit("place_bet", {
-    game_type: GAME,
-    user_id: USER_ID,
-    username: USERNAME,
-    number: selectedNumber,
+    if (walletBalance < FIXED_BET_AMOUNT) return setStatus("Insufficient balance", "error");
+    if (selectedNumber == null) return setStatus("Select a number", "error");
+
+    socket.emit("place_bet", {
+      game_type: GAME,
+      user_id: USER_ID,
+      username: USERNAME,
+      number: selectedNumber,
+    });
+    socket.emit("placebet", {
+      game_type: GAME,
+      user_id: USER_ID,
+      username: USERNAME,
+      number: selectedNumber,
+    });
   });
-});
+}
 
-popupHomeBtn?.addEventListener("click", () => {
-  window.location.href = HOME_URL;
-});
+if (popupHomeBtn) popupHomeBtn.addEventListener("click", () => (window.location.href = HOME_URL));
+if (popupLobbyBtn) popupLobbyBtn.addEventListener("click", () => window.history.back());
 
-popupLobbyBtn?.addEventListener("click", () => {
-  window.history.back();
-});
+// ================= INIT =================
+if (frogIdleVideo) {
+  frogIdleVideo.muted = true;
+  frogIdleVideo.play().catch(() => {});
+}
 
-// ================= INITIALIZATION =================
-console.log(`[INIT] Game=${GAME}, User=${USER_ID}, Username=${USERNAME}, Bet=${FIXED_BET_AMOUNT}`);
+console.log(`[INIT] Silver Game - User=${USER_ID}, Username=${USERNAME}, Bet=${FIXED_BET_AMOUNT}`);
 
 fetchBalance();
 startPolling();
-startLocalTimer();
 setSelectedNumber(0);
 setStatus("");
