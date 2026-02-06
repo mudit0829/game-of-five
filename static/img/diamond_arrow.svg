@@ -1,0 +1,38 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="512" height="256" viewBox="0 0 512 256">
+  <defs>
+    <linearGradient id="shaft" x1="0" x2="1">
+      <stop offset="0" stop-color="#0b1220"/>
+      <stop offset="0.5" stop-color="#1f2a44"/>
+      <stop offset="1" stop-color="#0b1220"/>
+    </linearGradient>
+    <linearGradient id="steel" x1="0" x2="1">
+      <stop offset="0" stop-color="#cbd5e1"/>
+      <stop offset="0.5" stop-color="#f8fafc"/>
+      <stop offset="1" stop-color="#94a3b8"/>
+    </linearGradient>
+    <filter id="shadow" x="-30%" y="-30%" width="160%" height="160%">
+      <feDropShadow dx="0" dy="6" stdDeviation="6" flood-color="#000" flood-opacity="0.55"/>
+    </filter>
+  </defs>
+
+  <!-- Arrow pointing RIGHT -->
+  <g filter="url(#shadow)">
+    <!-- shaft -->
+    <rect x="70" y="118" width="320" height="20" rx="10" fill="url(#shaft)"/>
+    <rect x="90" y="124" width="280" height="4" rx="2" fill="#38bdf8" opacity="0.35"/>
+
+    <!-- head -->
+    <polygon points="390,102 470,128 390,154 402,128" fill="url(#steel)"/>
+    <polygon points="402,128 468,128 402,128" fill="#38bdf8" opacity="0.18"/>
+
+    <!-- collar -->
+    <rect x="360" y="112" width="34" height="32" rx="10" fill="#0f172a" stroke="#38bdf8" stroke-opacity="0.35"/>
+
+    <!-- fletching -->
+    <polygon points="70,128 30,98 34,128 30,158" fill="#14b8a6"/>
+    <polygon points="82,128 44,106 48,128 44,150" fill="#0ea5e9" opacity="0.9"/>
+
+    <!-- nock -->
+    <rect x="62" y="116" width="10" height="24" rx="4" fill="#111827"/>
+  </g>
+</svg>
