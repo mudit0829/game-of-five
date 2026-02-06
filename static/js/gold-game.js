@@ -56,9 +56,19 @@ let userHasBet = false;
 
 let videoPlayer = null;
 let videoStartedForRound = null;
+let videoFrozenForRound = null;
 
 let shotShownForRound = null;
 let popupShownForRound = null;
+
+// ================= KICK VIDEO TUNING =================
+// Your CSS places the ball inside .player-area using translateX(-20px) [file:99]
+// so we match that offset so the player stops exactly at the ball position.
+
+const KICK_SHOW_AT_REMAINING = 4;    // show/start video at 4 seconds remaining
+const KICK_FREEZE_AT_REMAINING = 2;  // pause + keep on screen at 2 seconds remaining
+const KICK_SCALE = 0.30;             // 70% smaller => 30% size
+const KICK_X_OFFSET_PX = -20;        // match ball translateX(-20px)
 
 // ================= SMALL UTILITIES =================
 
@@ -259,7 +269,8 @@ function showSlotsFullPopup() {
   if (!popupEl) return;
 
   if (popupTitleEl) popupTitleEl.textContent = "All slots are full";
-  if (popupMsgEl) popupMsgEl.textContent = "This game is already full. You will be redirected to lobby to join another table.";
+  if (popupMsgEl) popupMsgEl.textContent =
+    "This game is already full. You will be redirected to lobby to join another table.";
 
   popupEl.style.display = "flex";
 
@@ -267,7 +278,15 @@ function showSlotsFullPopup() {
 }
 
 // ================= VIDEO (Kick) =================
-// Requirement: start showing at 5 seconds remaining, video is ~3s so the kick ends around 2s remaining.
+
+function cleanupKickVideo({ restoreBall = true } = {}) {
+  const node = document.getElementById("playerKickVideo");
+  if (node && node.parentNode) node.parentNode.removeChild(node);
+
+  videoPlayer = null;
+
+  if (restoreBall && ballImg) ballImg.style.opacity = "1";
+}
 
 function ensureKickVideoElement() {
   if (!playerArea) return null;
@@ -283,58 +302,72 @@ function ensureKickVideoElement() {
   v.playsInline = true;
   v.preload = "auto";
 
+  // IMPORTANT: Make it not affect flex layout (fixes "here/there")
+  // and align it to the same anchor as the ball inside .player-area. [file:99]
+  v.style.position = "absolute";
+  v.style.left = "50%";
+  v.style.bottom = "0px";
+  v.style.width = "200px"; // base width, then scale down
+  v.style.height = "auto";
+  v.style.transformOrigin = "bottom center";
+  v.style.transform = `translateX(-50%) translateX(${KICK_X_OFFSET_PX}px) scale(${KICK_SCALE})`;
+
+  // Keep ball above the player video
+  v.style.zIndex = "1";
+  v.style.pointerEvents = "none";
+  v.style.filter = "drop-shadow(0 10px 18px rgba(0,0,0,0.65))";
+
   playerArea.appendChild(v);
   return v;
 }
 
-function showKickVideoForTimeWindow() {
+function maybeStartKickVideo() {
   if (!currentTable) return;
 
   const roundId = currentTable.roundCode || "__no_round__";
   if (videoStartedForRound === roundId) return;
 
-  // only start in the 5..3 window (so the 3 sec clip ends at 2 sec remaining)
-  if (displayRemainingSeconds > 5 || displayRemainingSeconds <= 2) return;
+  // Start exactly around 4 seconds remaining (we allow 4..3 window)
+  if (displayRemainingSeconds > KICK_SHOW_AT_REMAINING || displayRemainingSeconds <= KICK_FREEZE_AT_REMAINING) return;
 
   videoStartedForRound = roundId;
+  videoFrozenForRound = null;
 
   const v = ensureKickVideoElement();
   if (!v) return;
 
   videoPlayer = v;
 
-  // If we started late (e.g., at 4s), jump into the clip so it still ends at 2s.
-  // Example: remaining=4 => we want to be 1s into the clip already.
-  const startFrom = Math.max(0, 5 - displayRemainingSeconds);
+  // Always start from beginning at 4 seconds
   try {
-    v.currentTime = startFrom;
+    v.currentTime = 0;
   } catch (e) {
     // ignore
   }
 
-  // Hide the ball during video (prevents double visuals)
+  // Hide the ball during play (prevents double visuals)
   if (ballImg) ballImg.style.opacity = "0";
 
   v.play().catch((err) => console.warn("[video] play error:", err));
 }
 
-function hideKickVideoAt2s() {
+function freezeKickVideoAt2s() {
+  if (!currentTable) return;
   if (!videoPlayer) return;
 
-  if (displayRemainingSeconds <= 2) {
+  const roundId = currentTable.roundCode || "__no_round__";
+  if (videoFrozenForRound === roundId) return;
+
+  if (displayRemainingSeconds <= KICK_FREEZE_AT_REMAINING) {
+    videoFrozenForRound = roundId;
+
     try {
       videoPlayer.pause();
     } catch (e) {
       // ignore
     }
 
-    // Remove video node to keep DOM clean
-    const node = document.getElementById("playerKickVideo");
-    if (node && node.parentNode) node.parentNode.removeChild(node);
-
-    videoPlayer = null;
-
-    // Bring ball back for the shot animation
+    // Show ball again while player stays frozen at ball position
     if (ballImg) ballImg.style.opacity = "1";
   }
 }
@@ -468,6 +501,9 @@ function shootBallToWinningNumber(winningNumber) {
           ballImg.style.transition = "transform 0.5s ease-out";
           ballImg.style.transform = originalTransform || "translate(0,0)";
           ballImg.style.zIndex = "10";
+
+          // After shot finishes, remove the frozen kick video (clean)
+          cleanupKickVideo({ restoreBall: true });
         }, 900);
       }
     }
@@ -488,11 +524,11 @@ function startLocalTimer() {
       displayRemainingSeconds -= 1;
       renderTimer();
 
-      // Start video in the 5..3 window
-      showKickVideoForTimeWindow();
+      // Start video at 4 seconds
+      maybeStartKickVideo();
 
-      // Remove/pause video at 2s
-      hideKickVideoAt2s();
+      // Freeze at 2 seconds (do NOT remove)
+      freezeKickVideoAt2s();
     }
   }, 1000);
 }
@@ -528,6 +564,8 @@ async function fetchTableData() {
         if (localTimerInterval) clearInterval(localTimerInterval);
         localTimerInterval = null;
 
+        cleanupKickVideo({ restoreBall: true });
+
         setStatus("This game has finished. You'll be taken back to lobby to join a new one.", "error");
         setTimeout(() => window.history.back(), 2000);
         return;
@@ -546,6 +584,11 @@ async function fetchTableData() {
 
 function updateGameUI(table) {
   if (!table) return;
+
+  // If a new round arrives while old video exists, clean it up.
+  if (videoPlayer && videoStartedForRound && table.roundCode && videoStartedForRound !== table.roundCode) {
+    cleanupKickVideo({ restoreBall: true });
+  }
 
   if (roundIdSpan) roundIdSpan.textContent = table.roundCode || "-";
 
@@ -579,19 +622,22 @@ function updateGameUI(table) {
     tablePollInterval = null;
     if (localTimerInterval) clearInterval(localTimerInterval);
     localTimerInterval = null;
+
+    cleanupKickVideo({ restoreBall: true });
+
     showSlotsFullPopup();
     return;
   }
 
   const hasResult = table.resultValue !== null && table.resultValue !== undefined && table.resultValue !== "";
 
-  // ✅ Start kick video in the right window (5..3)
-  showKickVideoForTimeWindow();
+  // ✅ Start at 4 seconds
+  maybeStartKickVideo();
 
-  // ✅ Hide video at 2 seconds remaining (kick should finish here)
-  hideKickVideoAt2s();
+  // ✅ Freeze at 2 seconds (keep on screen)
+  freezeKickVideoAt2s();
 
-  // ✅ Shoot ball at <= 2 seconds remaining when result exists (works with pre-result backend)
+  // ✅ Shoot ball at <= 2 seconds remaining when result exists
   if (hasResult && table.timeRemaining <= 2) {
     const roundId = table.roundCode || "__no_round__";
     if (shotShownForRound !== roundId) {
@@ -620,8 +666,10 @@ function updateGameUI(table) {
 
       const outcomeInfo = determineUserOutcome(table);
 
-      // Wait for shot animation to be visible
-      setTimeout(() => showEndPopup(outcomeInfo), 1400);
+      setTimeout(() => {
+        cleanupKickVideo({ restoreBall: true });
+        showEndPopup(outcomeInfo);
+      }, 1400);
     }
   }
 }
@@ -630,7 +678,7 @@ function startPolling() {
   fetchTableData();
   if (tablePollInterval) clearInterval(tablePollInterval);
 
-  // faster polling helps not miss the 5s / 2s windows
+  // faster polling helps not miss the 4s / 2s windows
   tablePollInterval = setInterval(() => {
     if (!gameFinished) fetchTableData();
   }, 1000);
