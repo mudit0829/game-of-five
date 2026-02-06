@@ -176,33 +176,36 @@ body {
 
 /* ===== PLAY AREA ===== */
 :root{
-  --controls-h: 290px; /* fallback */
+  --controls-h: 250px;     /* smaller fallback than 290 */
+  --controls-gap: 12px;    /* space between boats area and controls */
+  --boats-shift: 42px;     /* pushes boats DOWN */
 }
 
-/* make play-layer stop above controls area */
 .play-layer{
   position: absolute;
   left: 0;
   right: 0;
   top: 0;
-  bottom: calc(var(--controls-h) + 12px);
+  bottom: calc(var(--controls-h) + var(--controls-gap));
   z-index: 10;
 }
 
 
-.boats-container {
+
+.boats-container{
   position: absolute;
-  top: 50%;
+  top: calc(50% + var(--boats-shift));
   left: 50%;
   transform: translate(-50%, -50%);
   width: 90%;
   max-width: 420px;
-  margin-top: -20px;
+  margin-top: 0;          /* IMPORTANT: remove -20px */
   display: flex;
   flex-direction: column;
   gap: 25px;
   z-index: 10;
 }
+
 
 .boat-row {
   display: flex;
@@ -653,10 +656,9 @@ body {
   }
 }
 
-@media (max-height: 750px) {
-  .boats-container {
-    margin-top: -30px;
-  }
+@media (max-height: 750px){
+  :root{ --boats-shift: 28px; }
+}
 
   .boat-wrapper {
     width: 90px;
@@ -673,9 +675,8 @@ body {
   }
 }
 
-@media (max-height: 680px) {
-  .boats-container {
-    margin-top: -40px;
+@media (max-height: 680px){
+  :root{ --boats-shift: 18px; }
     gap: 20px;
   }
 
