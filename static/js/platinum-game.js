@@ -53,6 +53,9 @@ let resultAnimationShownForRound = null;
 let resultModalShownForRound = null;
 let kickedForNoBet = false;
 
+// Used to delay popup until paratrooper lands
+let paratrooperLandingETA = 0;
+
 // ================== SMALL UTILITIES ==================
 
 function pick(obj, ...keys) {
@@ -86,12 +89,14 @@ function normalizeTable(table) {
   t.playersCount = safeNum(pick(table, "players"), 0);
 
   // normalize bets
-  t.bets = Array.isArray(table.bets) ? table.bets.map((b) => ({
-    ...b,
-    userId: pick(b, "user_id", "userid"),
-    username: pick(b, "username") || "Player",
-    number: pick(b, "number"),
-  })) : [];
+  t.bets = Array.isArray(table.bets)
+    ? table.bets.map((b) => ({
+        ...b,
+        userId: pick(b, "user_id", "userid"),
+        username: pick(b, "username") || "Player",
+        number: pick(b, "number"),
+      }))
+    : [];
 
   t.resultValue = pick(table, "result");
 
@@ -133,9 +138,7 @@ function disableBettingUI() {
 }
 
 function updateMyBets(bets) {
-  const myBets = (bets || []).filter(
-    (b) => String(b.userId) === String(USER_ID)
-  );
+  const myBets = (bets || []).filter((b) => String(b.userId) === String(USER_ID));
 
   if (userBetsLabel) userBetsLabel.textContent = myBets.length;
 
@@ -219,8 +222,7 @@ function showResultModal({ title, message, onHome, onLobby }) {
   const card = document.createElement("div");
   card.style.width = "90%";
   card.style.maxWidth = "360px";
-  card.style.background =
-    "radial-gradient(circle at top, #020617, #020617 60%, #000 100%)";
+  card.style.background = "radial-gradient(circle at top, #020617, #020617 60%, #000 100%)";
   card.style.borderRadius = "20px";
   card.style.padding = "18px 16px 14px";
   card.style.boxShadow = "0 20px 50px rgba(0,0,0,0.9)";
@@ -254,8 +256,7 @@ function showResultModal({ title, message, onHome, onLobby }) {
   homeBtn.style.fontWeight = "700";
   homeBtn.style.fontSize = "14px";
   homeBtn.style.cursor = "pointer";
-  homeBtn.style.background =
-    "linear-gradient(135deg, #22c55e, #16a34a, #15803d)";
+  homeBtn.style.background = "linear-gradient(135deg, #22c55e, #16a34a, #15803d)";
   homeBtn.style.color = "#020617";
   homeBtn.onclick = () => {
     document.body.removeChild(overlay);
@@ -297,8 +298,7 @@ function showFullSlotAndGoBack(messageText) {
   const card = document.createElement("div");
   card.style.width = "90%";
   card.style.maxWidth = "340px";
-  card.style.background =
-    "radial-gradient(circle at top, #020617, #020617 60%, #000 100%)";
+  card.style.background = "radial-gradient(circle at top, #020617, #020617 60%, #000 100%)";
   card.style.borderRadius = "20px";
   card.style.padding = "18px 16px 14px";
   card.style.boxShadow = "0 20px 50px rgba(0,0,0,0.9)";
@@ -331,8 +331,7 @@ function showFullSlotAndGoBack(messageText) {
   btn.style.fontWeight = "700";
   btn.style.fontSize = "14px";
   btn.style.cursor = "pointer";
-  btn.style.background =
-    "linear-gradient(135deg, #f97316, #ea580c, #b91c1c)";
+  btn.style.background = "linear-gradient(135deg, #f97316, #ea580c, #b91c1c)";
   btn.style.color = "#020617";
   btn.onclick = () => {
     document.body.removeChild(overlay);
@@ -359,7 +358,6 @@ function ensureParatrooperAnimationStyles() {
       85% { transform: translate(-50%, -50%) scale(1.05) rotateZ(2deg); }
       100% { transform: translate(-50%, -50%) scale(0.95) rotateZ(-1deg); }
     }
-
     @keyframes boatBounce {
       0% { transform: translateY(0); }
       25% { transform: translateY(-8px); }
@@ -367,7 +365,6 @@ function ensureParatrooperAnimationStyles() {
       75% { transform: translateY(-4px); }
       100% { transform: translateY(0); }
     }
-
     @keyframes boatGlow {
       0% { box-shadow: 0 0 0 rgba(34, 197, 94, 0); }
       50% { box-shadow: 0 0 30px 10px rgba(34, 197, 94, 0.6); }
@@ -377,13 +374,10 @@ function ensureParatrooperAnimationStyles() {
   document.head.appendChild(style);
 }
 
-function dropParatrooperToWinningNumber(winningNumber) {
+function dropParatrooperToWinningNumber(winningNumber, durationMs = 2000) {
   if (!paratrooper) return;
 
-  const targetBoat = boats.find(
-    (b) => String(b.dataset.number) === String(winningNumber)
-  );
-
+  const targetBoat = boats.find((b) => String(b.dataset.number) === String(winningNumber));
   if (!targetBoat) {
     console.log("Winning number not on any boat:", winningNumber);
     return;
@@ -393,18 +387,18 @@ function dropParatrooperToWinningNumber(winningNumber) {
 
   const boatRect = targetBoat.getBoundingClientRect();
 
-  // Landing position: center of boat (viewport coords)
   const targetX = boatRect.left + boatRect.width / 2;
   const targetY = boatRect.top + boatRect.height / 2;
 
-  // Starting position: top center of screen
   const startY = -220;
   const startX = window.innerWidth / 2;
 
-  const duration = 1200;
+  const duration = Math.max(900, Math.min(2600, Number(durationMs) || 2000));
   const startTime = performance.now();
 
-  // Reset and show paratrooper
+  // Used by popup delay logic
+  paratrooperLandingETA = Date.now() + duration;
+
   paratrooper.style.transition = "none";
   paratrooper.style.opacity = "1";
   paratrooper.style.top = `${startY}px`;
@@ -417,7 +411,6 @@ function dropParatrooperToWinningNumber(winningNumber) {
     const tRaw = elapsed / duration;
     const t = Math.min(Math.max(tRaw, 0), 1);
 
-    // ease-out-cubic
     const ease = 1 - Math.pow(1 - t, 3);
 
     const currentX = startX + (targetX - startX) * ease;
@@ -432,15 +425,11 @@ function dropParatrooperToWinningNumber(winningNumber) {
     if (t < 1) {
       requestAnimationFrame(step);
     } else {
-      console.log("[paratrooper] Landing on boat with number:", winningNumber);
-
       paratrooper.style.animation = "paratrooperLand 0.5s ease-out forwards";
       targetBoat.classList.add("win");
-
-      // Bounce + glow (combined so one does not overwrite the other)
       targetBoat.style.animation = "boatBounce 0.6s ease-in-out, boatGlow 0.8s ease-out";
 
-      // keep paratrooper for a moment then fade out
+      // Keep paratrooper visible briefly AFTER landing
       setTimeout(() => {
         paratrooper.style.transition = "opacity 0.5s ease-out, top 0.6s ease-out";
         paratrooper.style.opacity = "0";
@@ -450,7 +439,7 @@ function dropParatrooperToWinningNumber(winningNumber) {
           paratrooper.style.transition = "none";
           paratrooper.style.animation = "none";
         }, 650);
-      }, 1200);
+      }, 900);
     }
   }
 
@@ -474,7 +463,10 @@ async function fetchTableData() {
     let rawTable = null;
 
     if (tableCodeFromUrl) {
-      rawTable = data.tables.find((t) => String(pick(t, "round_code", "roundcode")) === String(tableCodeFromUrl)) || null;
+      rawTable =
+        data.tables.find(
+          (t) => String(pick(t, "round_code", "roundcode")) === String(tableCodeFromUrl)
+        ) || null;
 
       if (!rawTable) {
         gameFinished = true;
@@ -516,24 +508,18 @@ function updateGameUI(table) {
   const tr = table.timeRemaining || 0;
   const mins = Math.floor(tr / 60);
   const secs = tr % 60;
-  if (timerText) {
-    timerText.textContent = `${mins}:${secs.toString().padStart(2, "0")}`;
-  }
+
+  if (timerText) timerText.textContent = `${mins}:${secs.toString().padStart(2, "0")}`;
 
   if (timerPill) {
-    if (tr <= 10 && !table.isFinished && !table.isBettingClosed) {
-      timerPill.classList.add("urgent");
-    } else {
-      timerPill.classList.remove("urgent");
-    }
+    if (tr <= 10 && !table.isFinished && !table.isBettingClosed) timerPill.classList.add("urgent");
+    else timerPill.classList.remove("urgent");
   }
 
   updateBoatsFromBets(table.bets || []);
   updateMyBets(table.bets || []);
 
-  const myBets = (table.bets || []).filter(
-    (b) => String(b.userId) === String(USER_ID)
-  );
+  const myBets = (table.bets || []).filter((b) => String(b.userId) === String(USER_ID));
   const hasUserBet = myBets.length > 0;
 
   const slotsAvail = table.slotsAvailable;
@@ -544,13 +530,7 @@ function updateGameUI(table) {
     (maxPlayers > 0 && table.playersCount >= maxPlayers) ||
     table.is_full === true;
 
-  // NOTE: If you want users with 0 bets to still see paratrooper,
-  // comment out this "kick" block.
-  if (
-    !hasUserBet &&
-    (slotsFull || table.isBettingClosed || table.isFinished) &&
-    !kickedForNoBet
-  ) {
+  if (!hasUserBet && (slotsFull || table.isBettingClosed || table.isFinished) && !kickedForNoBet) {
     gameFinished = true;
     disableBettingUI();
     if (tablePollInterval) {
@@ -568,20 +548,28 @@ function updateGameUI(table) {
     document.querySelectorAll(".num-chip").forEach((chip) => (chip.disabled = false));
   }
 
-  // Trigger paratrooper when round finished + result exists
-  if (table.isFinished && table.resultValue !== null && table.resultValue !== undefined) {
+  // ✅ Start paratrooper at 02 sec remaining (backend now sends result early)
+  if (table.resultValue !== null && table.resultValue !== undefined && table.timeRemaining <= 2) {
     const roundId = table.roundCode || "__no_round__";
-
     if (resultAnimationShownForRound !== roundId) {
       resultAnimationShownForRound = roundId;
-      console.log("[updateGameUI] Triggering paratrooper drop for result:", table.resultValue);
-      dropParatrooperToWinningNumber(table.resultValue);
+
+      // Aim landing close to 00: duration based on remaining time
+      const dur = Math.max(1200, Math.min(2200, (table.timeRemaining + 0.2) * 1000));
+
       setStatus(`Winning number: ${table.resultValue}`, "ok");
+      dropParatrooperToWinningNumber(table.resultValue, dur);
     }
+  }
+
+  // ✅ Show popup AFTER game finished, and AFTER paratrooper landing
+  if (table.isFinished && table.resultValue !== null && table.resultValue !== undefined) {
+    const roundId = table.roundCode || "__no_round__";
 
     if (resultModalShownForRound !== roundId && hasUserBet) {
       resultModalShownForRound = roundId;
       gameFinished = true;
+
       if (tablePollInterval) {
         clearInterval(tablePollInterval);
         tablePollInterval = null;
@@ -590,8 +578,10 @@ function updateGameUI(table) {
       const userWon = myBets.some((b) => Number(b.number) === Number(table.resultValue));
       const title = userWon ? "Congratulations!" : "Hard Luck!";
       const msg = userWon
-        ? "You have WON this game. Keep playing to keep your winning chances high."
-        : "You LOST this game. Keep playing to keep your winning chances high.";
+        ? `You have WON this game. Winning number: ${table.resultValue}`
+        : `You LOST this game. Winning number: ${table.resultValue}`;
+
+      const delay = Math.max(0, (paratrooperLandingETA || 0) - Date.now() + 250);
 
       setTimeout(() => {
         showResultModal({
@@ -600,7 +590,7 @@ function updateGameUI(table) {
           onHome: () => (window.location.href = "/home"),
           onLobby: () => (window.location.href = "/game/platinum"),
         });
-      }, 800);
+      }, delay);
     }
   }
 }
@@ -620,25 +610,20 @@ async function fetchBalance() {
 }
 
 function joinGameRoom() {
-  // Try both event names (some backends use join_game, some use joingame)
   socket.emit("join_game", { game_type: GAME, user_id: USER_ID });
   socket.emit("joingame", { game_type: GAME, user_id: USER_ID });
 }
 
 socket.on("connect", () => {
-  console.log("[socket] Connected to game room");
   joinGameRoom();
   fetchBalance();
   fetchTableData();
 });
 
-// Listen to BOTH naming styles
 function handleBetSuccess(payload) {
   setStatus(payload?.message || "Bet placed", "ok");
-
   const newBal = payload?.new_balance ?? payload?.newbalance;
   if (typeof newBal === "number") updateWallet(newBal);
-
   fetchTableData();
 }
 
@@ -652,7 +637,6 @@ socket.on("betsuccess", handleBetSuccess);
 socket.on("bet_error", handleBetError);
 socket.on("beterror", handleBetError);
 
-// Optional: table updates from server (if you broadcast "updatetable")
 socket.on("update_table", () => fetchTableData());
 socket.on("updatetable", () => fetchTableData());
 
@@ -696,19 +680,14 @@ if (placeBetBtn) {
       return;
     }
 
-    const myBets =
-      (currentTable.bets || []).filter((b) => String(b.userId) === String(USER_ID)) || [];
-
-    const alreadyOnThisNumber = myBets.some(
-      (b) => Number(b.number) === Number(selectedNumber)
-    );
+    const myBets = (currentTable.bets || []).filter((b) => String(b.userId) === String(USER_ID)) || [];
+    const alreadyOnThisNumber = myBets.some((b) => Number(b.number) === Number(selectedNumber));
 
     if (alreadyOnThisNumber) {
       setStatus("You already placed a bet on this number", "error");
       return;
     }
 
-    // Try both event names (some backends use place_bet, some placebet)
     const payload = {
       game_type: GAME,
       user_id: USER_ID,
@@ -732,6 +711,7 @@ function syncControlsHeight() {
 
 window.addEventListener("load", syncControlsHeight);
 window.addEventListener("resize", syncControlsHeight);
+
 if (window.ResizeObserver) {
   const el = document.querySelector(".controls");
   if (el) new ResizeObserver(syncControlsHeight).observe(el);
