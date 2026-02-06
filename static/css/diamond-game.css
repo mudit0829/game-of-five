@@ -592,4 +592,26 @@ body {
   background: rgba(2, 6, 23, 0.75);
   border: 1px solid rgba(148, 163, 184, 0.55);
 }
+/* ===== FIX: usernames must NOT go outside target (otherwise clipped by .range overflow) ===== */
+.pad-user{
+  bottom: 8px !important;        /* was -18px */
+  font-size: 9px !important;
+  padding: 2px 7px !important;
+  z-index: 30 !important;
+  background: rgba(2, 6, 23, 0.75) !important;
+  border: 1px solid rgba(148, 163, 184, 0.55) !important;
+}
+.pad-number{ z-index: 30 !important; }
+
+/* Reserve a safe bottom area for the archer so it doesn't overlap targets */
+.range{ padding-bottom: 76px; }           /* keep overflow hidden, but create space inside */
+.targets-bottom{ margin-bottom: 10px !important; }  /* was 56px */
+.archer-layer{
+  height: 70px;
+  bottom: 6px;
+  z-index: 2;
+  pointer-events: none;
+}
+.arrow{ z-index: 3; } /* below targets so it won't cover numbers */
+.targets{ z-index: 5; } /* targets always above archer layer */
 
