@@ -56,6 +56,23 @@ let kickedForNoBet = false;
 // Used to delay popup until paratrooper lands
 let paratrooperLandingETA = 0;
 
+// ---------- NEW: Stable boat slot order per round (prevents "0" jumping to boat #1) ----------
+let boatOrderRoundCode = null;
+let boatBetKeyOrder = []; // array of betKeys in the order they first appeared
+let boatBetKeyToBet = new Map(); // betKey -> bet object
+
+function getBetKey(b) {
+  // Per your UI: a user cannot bet the same number twice; userId+number is stable and unique enough.
+  // If your backend allows duplicates per user+number, change this to include something else (timestamp/id).
+  return `${String(b?.userId)}|${String(b?.number)}`;
+}
+
+function resetBoatOrderForRound(roundCode) {
+  boatOrderRoundCode = roundCode || "__no_round__";
+  boatBetKeyOrder = [];
+  boatBetKeyToBet = new Map();
+}
+
 // ================== SMALL UTILITIES ==================
 
 function pick(obj, ...keys) {
@@ -101,6 +118,13 @@ function normalizeTable(table) {
   t.resultValue = pick(table, "result");
 
   return t;
+}
+
+function hashToIndex(str, mod) {
+  const s = String(str ?? "");
+  let h = 0;
+  for (let i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) >>> 0;
+  return mod > 0 ? (h % mod) : 0;
 }
 
 // ================== UI HELPERS ==================
@@ -162,33 +186,79 @@ function updateMyBets(bets) {
   });
 }
 
-function updateBoatsFromBets(bets) {
-  const betsByNumber = {};
+// ---------- UPDATED: boats show bets in "first available boat" order (not number-based) ----------
+function updateBoatsFromBets(bets, roundCode = "") {
+  const rc = roundCode || "__no_round__";
+  if (boatOrderRoundCode !== rc) resetBoatOrderForRound(rc);
+
+  // Map the latest bets we have now
+  const currentMap = new Map();
   (bets || []).forEach((b) => {
-    const num = String(b.number);
-    if (!betsByNumber[num]) betsByNumber[num] = [];
-    betsByNumber[num].push(b);
+    const key = getBetKey(b);
+    currentMap.set(key, b);
+
+    // First time seeing this bet in this round -> append to display order
+    if (!boatBetKeyToBet.has(key) && !boatBetKeyOrder.includes(key)) {
+      boatBetKeyOrder.push(key);
+    }
   });
 
-  const uniqueNumbers = Object.keys(betsByNumber).slice(0, 6);
+  // Remove keys that are no longer present
+  boatBetKeyOrder = boatBetKeyOrder.filter((k) => currentMap.has(k));
+
+  // Refresh stored bet objects
+  boatBetKeyToBet = currentMap;
+
+  // Fill boats with first 6 bets in this stable order
+  const keysToShow = boatBetKeyOrder.slice(0, 6);
 
   boats.forEach((boat, i) => {
     const numSpan = boat.querySelector(".boat-number");
     const userSpan = boat.querySelector(".boat-user");
     boat.classList.remove("win");
 
-    if (i < uniqueNumbers.length) {
-      const number = uniqueNumbers[i];
-      const betsOnNumber = betsByNumber[number];
-      boat.dataset.number = String(number);
-      if (numSpan) numSpan.textContent = String(number);
-      if (userSpan) userSpan.textContent = betsOnNumber?.[0]?.username || "";
+    // Clear any temporary animations
+    boat.style.animation = "";
+
+    if (i < keysToShow.length) {
+      const bet = boatBetKeyToBet.get(keysToShow[i]);
+      const number = bet?.number;
+
+      boat.dataset.number = String(number ?? "");
+      if (numSpan) numSpan.textContent = String(number ?? "");
+      if (userSpan) userSpan.textContent = bet?.username || "";
     } else {
       boat.dataset.number = "";
       if (numSpan) numSpan.textContent = "";
       if (userSpan) userSpan.textContent = "";
     }
   });
+}
+
+// Ensure winning number is on a boat (so paratrooper always has a target)
+function ensureBoatForWinningNumber(winningNumber, roundCode = "") {
+  if (winningNumber === null || winningNumber === undefined) return;
+  if (!boats || boats.length === 0) return;
+
+  const existing = boats.find((b) => String(b.dataset.number) === String(winningNumber));
+  if (existing) return;
+
+  // Prefer an empty boat first
+  let boat = boats.find((b) => !b.dataset.number || b.dataset.number === "");
+  if (!boat) {
+    // Otherwise choose a stable rotating slot (not always boat[0])
+    const idx = hashToIndex(`${roundCode}|${winningNumber}`, boats.length);
+    boat = boats[idx] || boats[0];
+  }
+
+  if (!boat) return;
+
+  const numSpan = boat.querySelector(".boat-number");
+  const userSpan = boat.querySelector(".boat-user");
+
+  boat.dataset.number = String(winningNumber);
+  if (numSpan) numSpan.textContent = String(winningNumber);
+  if (userSpan) userSpan.textContent = "";
 }
 
 // ============== URL SYNC WITH TABLE CODE ==============
@@ -464,17 +534,12 @@ async function fetchTableData() {
 
     if (tableCodeFromUrl) {
       rawTable =
-        data.tables.find(
-          (t) => String(pick(t, "round_code", "roundcode")) === String(tableCodeFromUrl)
-        ) || null;
+        data.tables.find((t) => String(pick(t, "round_code", "roundcode")) === String(tableCodeFromUrl)) || null;
 
       if (!rawTable) {
         gameFinished = true;
         disableBettingUI();
-        setStatus(
-          "This game has finished. You'll be taken back to lobby for a new one.",
-          "error"
-        );
+        setStatus("This game has finished. You'll be taken back to lobby for a new one.", "error");
 
         if (tablePollInterval) {
           clearInterval(tablePollInterval);
@@ -502,6 +567,11 @@ async function fetchTableData() {
 function updateGameUI(table) {
   if (!table) return;
 
+  // If round changed, reset stable boat order
+  if (boatOrderRoundCode !== (table.roundCode || "__no_round__")) {
+    resetBoatOrderForRound(table.roundCode);
+  }
+
   if (roundCodeSpan) roundCodeSpan.textContent = table.roundCode || "--";
   if (playerCountSpan) playerCountSpan.textContent = table.playersCount || 0;
 
@@ -516,7 +586,9 @@ function updateGameUI(table) {
     else timerPill.classList.remove("urgent");
   }
 
-  updateBoatsFromBets(table.bets || []);
+  // UPDATED: stable, slot-based ordering (not number-based)
+  updateBoatsFromBets(table.bets || [], table.roundCode || "");
+
   updateMyBets(table.bets || []);
 
   const myBets = (table.bets || []).filter((b) => String(b.userId) === String(USER_ID));
@@ -553,6 +625,9 @@ function updateGameUI(table) {
     const roundId = table.roundCode || "__no_round__";
     if (resultAnimationShownForRound !== roundId) {
       resultAnimationShownForRound = roundId;
+
+      // Ensure winning number exists on some boat so paratrooper always has a target
+      ensureBoatForWinningNumber(table.resultValue, table.roundCode || "");
 
       // Aim landing close to 00: duration based on remaining time
       const dur = Math.max(1200, Math.min(2200, (table.timeRemaining + 0.2) * 1000));
@@ -670,6 +745,7 @@ if (placeBetBtn) {
       return;
     }
 
+    // NOTE: FIXED_BET_AMOUNT should be defined globally by your HTML (same as other games).
     if (walletBalance < FIXED_BET_AMOUNT) {
       setStatus("Insufficient balance", "error");
       return;
