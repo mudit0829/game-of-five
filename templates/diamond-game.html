@@ -97,17 +97,7 @@
 
       <div class="my-bets-title">Your bets in this game</div>
       <div id="myBetsRow" class="my-bets-row"></div>
-
-      <div class="bet-container">
-        <input
-          id="betAmount"
-          type="number"
-          min="{{ game.bet_amount }}"
-          step="{{ game.bet_amount }}"
-          placeholder="Your Bet"
-        >
-      </div>
-
+       
       <button id="placeBetBtn" class="bet-button">
         Place Bet (₹{{ game.bet_amount }})
       </button>
