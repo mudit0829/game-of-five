@@ -70,20 +70,10 @@ const KICK_FREEZE_AT_REMAINING = 2;
 // Reduce player size by 30% more than previous (0.30 -> 0.21)
 const KICK_SCALE = 0.21;
 
-// Fine tuning: move player relative to ball (ball is perfect; adjust player only here)
-const KICK_SHIFT_X = -40; // increase toward 0 => moves player RIGHT
-const KICK_SHIFT_Y = 10;  // increase => moves player DOWN
-
-// Anchor point inside the video that should sit on the BALL CENTER (percent of video size).
-const KICK_ANCHOR_X_PCT = 52;
-const KICK_ANCHOR_Y_PCT = 94;
-
-// Kick video source
-const KICK_VIDEO_SRC = "/static/video/gold_game_video_Play.mp4";
-
-// Robust z-index: keep video visible above pitch/UI, then lift ball above video during kick.
-const KICK_VIDEO_ZINDEX = 9999;
-const KICK_BALL_LIFT_ZINDEX = 10000;
+// Fine tuning: move player relative to ball
+// Increase KICK_SHIFT_X (closer to 0) to move RIGHT, decrease to move LEFT.
+const KICK_SHIFT_X = -40; // moved a bit right from earlier (-45/-55)
+const KICK_SHIFT_Y = 10;
 
 let kickResizeHandlerAttached = false;
 function attachKickResizeHandlerOnce() {
@@ -91,61 +81,8 @@ function attachKickResizeHandlerOnce() {
   kickResizeHandlerAttached = true;
 
   window.addEventListener("resize", () => {
-    if (videoPlayer) {
-      positionKickVideoAtBall(videoPlayer);
-      requestAnimationFrame(() => positionKickVideoAtBall(videoPlayer));
-    }
+    if (videoPlayer) positionKickVideoAtBall(videoPlayer);
   });
-}
-
-// requestAnimationFrame alignment loop (prevents mobile frame-jump)
-let kickAlignRafId = null;
-let kickAlignActive = false;
-
-function startKickAlignLoop() {
-  if (kickAlignActive) return;
-  kickAlignActive = true;
-
-  const loop = () => {
-    if (!kickAlignActive) return;
-
-    if (videoPlayer) {
-      const ok = positionKickVideoAtBall(videoPlayer);
-
-      // Reveal only when we successfully positioned against a valid ball rect
-      if (ok) revealKickVideo(videoPlayer);
-    }
-
-    kickAlignRafId = requestAnimationFrame(loop);
-  };
-
-  kickAlignRafId = requestAnimationFrame(loop);
-}
-
-function stopKickAlignLoop() {
-  kickAlignActive = false;
-  if (kickAlignRafId) cancelAnimationFrame(kickAlignRafId);
-  kickAlignRafId = null;
-}
-
-// Keep ball above kick video (without touching CSS file)
-function liftBallAboveKickVideo() {
-  if (!ballImg) return;
-  if (!ballImg.dataset.kickPrevZ) {
-    const computed = window.getComputedStyle(ballImg).zIndex;
-    ballImg.dataset.kickPrevZ = computed ?? "";
-  }
-  ballImg.style.zIndex = String(KICK_BALL_LIFT_ZINDEX);
-}
-
-function restoreBallZIndex() {
-  if (!ballImg) return;
-  if (ballImg.dataset.kickPrevZ != null) {
-    const prev = ballImg.dataset.kickPrevZ;
-    delete ballImg.dataset.kickPrevZ;
-    if (!prev || prev === "auto") ballImg.style.zIndex = "";
-    else ballImg.style.zIndex = prev;
-  }
 }
 
 // ================= SMALL UTILITIES =================
@@ -173,6 +110,7 @@ function formatTime(seconds) {
   return `${mins}:${secs.toString().padStart(2, "0")}`;
 }
 
+// NEW: stable index picker so we don't always pick goals[0]
 function hashToIndex(str, mod) {
   const s = String(str ?? "");
   let h = 0;
@@ -300,7 +238,7 @@ function updateGoalsFromBets(bets) {
   });
 }
 
-// Ensure winning number is on a goal (in case no one bet that number)
+// ✅ FIXED: Ensure winning number is on a goal WITHOUT always forcing goals[0]
 function ensureGoalForWinningNumber(winningNumber, roundCode = "") {
   if (winningNumber === null || winningNumber === undefined) return;
   if (!goals || goals.length === 0) return;
@@ -308,10 +246,10 @@ function ensureGoalForWinningNumber(winningNumber, roundCode = "") {
   const existing = goals.find((g) => g.dataset.number === String(winningNumber));
   if (existing) return;
 
-  // Prefer an empty slot first
+  // Prefer an empty slot first (doesn't overwrite any shown bet)
   let goal = goals.find((g) => !g.dataset.number || g.dataset.number === "");
 
-  // If no empty slot, choose a stable rotating slot (not always goals[0])
+  // If no empty slot, choose a stable rotating slot (prevents always same goal)
   if (!goal) {
     const idx = hashToIndex(`${roundCode}|${winningNumber}`, goals.length);
     goal = goals[idx] || goals[0];
@@ -373,77 +311,41 @@ function showSlotsFullPopup() {
 
 // ================= VIDEO (Kick) =================
 
-function hideKickVideo(v) {
-  if (!v) return;
-  v.style.display = "none";
-  v.style.opacity = "0";
-  // Put it far offscreen so even if something forces display:block, it won't appear at 0,0.
-  v.style.left = "-10000px";
-  v.style.top = "-10000px";
-}
-
-function revealKickVideo(v) {
-  if (!v) return;
-  if (v.style.display !== "block") v.style.display = "block";
-  if (v.style.opacity !== "1") v.style.opacity = "1";
-}
-
 function cleanupKickVideo() {
-  stopKickAlignLoop();
-
   const node = document.getElementById("playerKickVideo");
   if (node && node.parentNode) node.parentNode.removeChild(node);
   videoPlayer = null;
 
+  // Keep ball visible always
   if (ballImg) ballImg.style.opacity = "1";
-  restoreBallZIndex();
 }
 
-// Returns true only when it successfully positioned using a valid rect.
 function positionKickVideoAtBall(v) {
-  if (!v) return false;
+  if (!v) return;
 
   if (ballImg) {
-    // If ball isn't rendered yet, don't position (prevents 0,0 / NaN issues)
-    if (typeof ballImg.getClientRects === "function" && ballImg.getClientRects().length === 0) return false;
-
     const r = ballImg.getBoundingClientRect();
-    if (!r || r.width <= 0 || r.height <= 0) return false;
 
-    const ballCenterX = r.left + r.width / 2;
-    const ballCenterY = r.top + r.height / 2;
-
-    const x = ballCenterX + KICK_SHIFT_X;
-    const y = ballCenterY + KICK_SHIFT_Y;
-
-    if (!Number.isFinite(x) || !Number.isFinite(y)) return false;
+    const x = r.left + r.width / 2 + KICK_SHIFT_X;
+    const y = r.top + r.height + KICK_SHIFT_Y;
 
     v.style.left = `${x}px`;
     v.style.top = `${y}px`;
 
-    v.style.transformOrigin = "top left";
-    v.style.transform = `translate(-${KICK_ANCHOR_X_PCT}%, -${KICK_ANCHOR_Y_PCT}%) scale(${KICK_SCALE})`;
-
-    return true;
+    // feet aligned near ball
+    v.style.transformOrigin = "bottom center";
+    v.style.transform = `translate(-50%, -100%) scale(${KICK_SCALE})`;
+    return;
   }
 
+  // fallback: center-ish of pitch
   if (pitch) {
     const pr = pitch.getBoundingClientRect();
-    if (!pr || pr.width <= 0 || pr.height <= 0) return false;
-
-    const x = pr.left + pr.width / 2 + KICK_SHIFT_X;
-    const y = pr.top + pr.height * 0.85 + KICK_SHIFT_Y;
-
-    if (!Number.isFinite(x) || !Number.isFinite(y)) return false;
-
-    v.style.left = `${x}px`;
-    v.style.top = `${y}px`;
-    v.style.transformOrigin = "top left";
-    v.style.transform = `translate(-${KICK_ANCHOR_X_PCT}%, -${KICK_ANCHOR_Y_PCT}%) scale(${KICK_SCALE})`;
-    return true;
+    v.style.left = `${pr.left + pr.width / 2}px`;
+    v.style.top = `${pr.top + pr.height * 0.85}px`;
+    v.style.transformOrigin = "bottom center";
+    v.style.transform = `translate(-50%, -100%) scale(${KICK_SCALE})`;
   }
-
-  return false;
 }
 
 function ensureKickVideoElement() {
@@ -452,29 +354,24 @@ function ensureKickVideoElement() {
 
   v = document.createElement("video");
   v.id = "playerKickVideo";
-  v.src = KICK_VIDEO_SRC;
+  v.src = "/static/video/gold_game_video_Play.mp4";
   v.muted = true;
   v.autoplay = false;
   v.playsInline = true;
   v.preload = "auto";
 
+  // fixed overlay to follow ball position (not tied to bottom controls)
   v.style.position = "fixed";
-  v.style.width = "360px";
+  v.style.width = "360px"; // base size; actual size controlled by scale()
   v.style.height = "auto";
   v.style.pointerEvents = "none";
-  v.style.zIndex = String(KICK_VIDEO_ZINDEX);
+
+  // Keep video behind the ball (ball is z-index 10 in your CSS).
+  v.style.zIndex = "9";
+
   v.style.filter = "drop-shadow(0 12px 22px rgba(0,0,0,0.65))";
-  v.style.willChange = "transform,left,top,opacity";
 
   document.body.appendChild(v);
-
-  // Start fully hidden and offscreen (so it never flashes in top-left)
-  hideKickVideo(v);
-
-  v.addEventListener("loadedmetadata", () => {
-    // Try to position once metadata is available
-    if (positionKickVideoAtBall(v)) revealKickVideo(v);
-  });
 
   attachKickResizeHandlerOnce();
 
@@ -487,9 +384,8 @@ function maybeStartKickVideo() {
   const roundId = currentTable.roundCode || "__no_round__";
   if (videoStartedForRound === roundId) return;
 
-  // Start whenever <= 4 and > 0 (covers timer jumps 4 -> 2)
-  if (displayRemainingSeconds > KICK_SHOW_AT_REMAINING) return;
-  if (displayRemainingSeconds <= 0) return;
+  // Start around 4 seconds remaining (allow 4..3 window)
+  if (displayRemainingSeconds > KICK_SHOW_AT_REMAINING || displayRemainingSeconds <= KICK_FREEZE_AT_REMAINING) return;
 
   videoStartedForRound = roundId;
   videoFrozenForRound = null;
@@ -499,17 +395,12 @@ function maybeStartKickVideo() {
 
   videoPlayer = v;
 
+  // Keep ball visible (NO flicker)
   if (ballImg) ballImg.style.opacity = "1";
-  liftBallAboveKickVideo();
 
-  // Keep hidden until we have a valid ball rect and have positioned correctly
-  hideKickVideo(v);
-
-  // Start align loop; it will reveal only after successful positioning
-  startKickAlignLoop();
-
-  // If we can position now, reveal immediately (no waiting)
-  if (positionKickVideoAtBall(v)) revealKickVideo(v);
+  // Place before play + one more frame after (mobile stability)
+  positionKickVideoAtBall(v);
+  requestAnimationFrame(() => positionKickVideoAtBall(v));
 
   try {
     v.currentTime = 0;
@@ -525,23 +416,19 @@ function freezeKickVideoAt2s() {
   const roundId = currentTable.roundCode || "__no_round__";
   if (videoFrozenForRound === roundId) return;
 
-  if (displayRemainingSeconds <= KICK_FREEZE_AT_REMAINING && displayRemainingSeconds > 0) {
+  if (displayRemainingSeconds <= KICK_FREEZE_AT_REMAINING) {
     videoFrozenForRound = roundId;
-
-    // Lock one last time right at freeze
-    if (positionKickVideoAtBall(videoPlayer)) revealKickVideo(videoPlayer);
-    requestAnimationFrame(() => {
-      if (positionKickVideoAtBall(videoPlayer)) revealKickVideo(videoPlayer);
-    });
 
     try {
       videoPlayer.pause();
     } catch (e) {}
 
-    stopKickAlignLoop();
+    // lock it exactly at ball position
+    positionKickVideoAtBall(videoPlayer);
+    requestAnimationFrame(() => positionKickVideoAtBall(videoPlayer));
 
+    // ball stays visible
     if (ballImg) ballImg.style.opacity = "1";
-    liftBallAboveKickVideo();
   }
 }
 
@@ -625,7 +512,7 @@ function shootBallToWinningNumber(winningNumber) {
 
     ballImg.style.position = "fixed";
     ballImg.style.transition = "none";
-    ballImg.style.zIndex = String(KICK_BALL_LIFT_ZINDEX);
+    ballImg.style.zIndex = "1000";
     ballImg.style.left = `${startX}px`;
     ballImg.style.top = `${startY}px`;
     ballImg.style.transform = "translate(-50%, -50%)";
@@ -813,7 +700,10 @@ function updateGameUI(table) {
       shotShownForRound = roundId;
 
       setStatus(`Winning number: ${table.resultValue}`, "ok");
+
+      // ✅ FIX: don't always force goals[0]
       ensureGoalForWinningNumber(table.resultValue, table.roundCode);
+
       shootBallToWinningNumber(table.resultValue);
     }
   }
