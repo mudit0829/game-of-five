@@ -246,11 +246,16 @@ function ensureShotSvg() {
 
   const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
   svg.setAttribute("preserveAspectRatio", "none");
+
+  // ✅ IMPORTANT: force inline SVG to fill the range reliably
+  svg.setAttribute("width", "100%");
+  svg.setAttribute("height", "100%");
+  svg.style.width = "100%";
+  svg.style.height = "100%";
+
   svg.style.position = "absolute";
   svg.style.inset = "0";
   svg.style.pointerEvents = "none";
-
-  // Keep it visible over background/targets. (Arrow clones use much higher z-index.) [file:102]
   svg.style.zIndex = "2";
 
   rangeEl.appendChild(svg);
@@ -262,11 +267,11 @@ function clearShotPath() {
   if (_shotSvg) _shotSvg.innerHTML = "";
 }
 
-function drawShotPath(rangeRect, startX, startY, ctrlX, ctrlY, endX, endY) {
+function drawShotPath(rangeW, rangeH, startX, startY, ctrlX, ctrlY, endX, endY) {
   const svg = ensureShotSvg();
   if (!svg) return;
 
-  svg.setAttribute("viewBox", `0 0 ${rangeRect.width} ${rangeRect.height}`);
+  svg.setAttribute("viewBox", `0 0 ${rangeW} ${rangeH}`);
   svg.innerHTML = "";
 
   const path = document.createElementNS("http://www.w3.org/2000/svg", "path");
@@ -335,27 +340,55 @@ function shootArrowToWinningNumber(winningNumber) {
   const targetRect = target.getBoundingClientRect();
   const arrowRect = arrowImg.getBoundingClientRect();
 
-  // Start near the arrow tip (right side)
-  const startX = (arrowRect.left + arrowRect.width * 0.88) - rangeRect.left;
-  const startY = (arrowRect.top + arrowRect.height * 0.55) - rangeRect.top;
+  // ✅ Use range layout size for consistent coordinates (works even if range is CSS-scaled)
+  const rangeW = Math.max(1, rangeEl.clientWidth || Math.round(rangeRect.width));
+  const rangeH = Math.max(1, rangeEl.clientHeight || Math.round(rangeRect.height));
 
-  // End near center of target
-  const endX = (targetRect.left + targetRect.width * 0.52) - rangeRect.left;
-  const endY = (targetRect.top + targetRect.height * 0.52) - rangeRect.top;
+  const scaleX = rangeRect.width / rangeW || 1;
+  const scaleY = rangeRect.height / rangeH || 1;
+
+  const toLocal = (clientX, clientY) => ({
+    x: (clientX - rangeRect.left) / scaleX,
+    y: (clientY - rangeRect.top) / scaleY,
+  });
+
+  const toClient = (localX, localY) => ({
+    x: rangeRect.left + localX * scaleX,
+    y: rangeRect.top + localY * scaleY,
+  });
+
+  // Tip anchor in the arrow image (tune if your sprite has extra transparent padding)
+  const arrowW = arrowRect.width || 52;
+  const arrowH = arrowRect.height || Math.max(14, Math.round(arrowW * 0.28));
+  const tipAx = arrowW * 0.88;
+  const tipAy = arrowH * 0.55;
+
+  // Start at arrow tip (converted to range local coords)
+  const startLocal = toLocal(arrowRect.left + tipAx, arrowRect.top + tipAy);
+  const startX = startLocal.x;
+  const startY = startLocal.y;
+
+  // End where the tip should hit (target center)
+  const endLocal = toLocal(
+    targetRect.left + targetRect.width * 0.52,
+    targetRect.top + targetRect.height * 0.52
+  );
+  const endX = endLocal.x;
+  const endY = endLocal.y;
 
   const dx = endX - startX;
   const dy = endY - startY;
   const dist = Math.hypot(dx, dy);
 
-  // ✅ Gentle arc (prevents that "jump up" look)
+  // Gentle arc
   const midX = (startX + endX) / 2;
   const midY = (startY + endY) / 2;
   const lift = Math.min(80, Math.max(28, dist * 0.14));
   const ctrlX = midX;
   const ctrlY = midY - lift;
 
-  // Dotted guide path (like gold game)
-  drawShotPath(rangeRect, startX, startY, ctrlX, ctrlY, endX, endY);
+  // Dotted guide path
+  drawShotPath(rangeW, rangeH, startX, startY, ctrlX, ctrlY, endX, endY);
 
   // Clone arrow for flight; keep original hidden
   const flying = arrowImg.cloneNode(true);
@@ -363,14 +396,17 @@ function shootArrowToWinningNumber(winningNumber) {
   flying.style.position = "absolute";
   flying.style.left = "0px";
   flying.style.top = "0px";
-  flying.style.width = (arrowRect.width || 52) + "px";
+  flying.style.width = arrowW + "px";
   flying.style.height = "auto";
   flying.style.pointerEvents = "none";
   flying.style.zIndex = "60";
-  flying.style.willChange = "transform,left,top,filter";
+  flying.style.willChange = "transform";
   flying.style.filter = "drop-shadow(0 10px 14px rgba(0,0,0,0.70))";
-  rangeEl.appendChild(flying);
 
+  // ✅ Rotate/scale around the TIP, so the tip stays on the curve
+  flying.style.transformOrigin = `${tipAx}px ${tipAy}px`;
+
+  rangeEl.appendChild(flying);
   arrowImg.style.opacity = "0";
 
   // Archer pose
@@ -409,16 +445,15 @@ function shootArrowToWinningNumber(winningNumber) {
     const vy = bezierDeriv(t, startY, ctrlY, endY);
     const tangentAngle = Math.atan2(vy, vx) * (180 / Math.PI);
 
-    // ✅ Smooth rotation blending: avoids instant “flip up”
+    // Smooth rotation blending
     const mix = Math.min(1, t * 1.15);
     const angle = aimAngle + (tangentAngle - aimAngle) * mix;
 
-    // Subtle scale for depth (optional but looks premium)
     const scale = 1 - t * 0.08;
 
-    flying.style.left = x + "px";
-    flying.style.top = y + "px";
-    flying.style.transform = `translate(-50%, -50%) rotate(${angle}deg) scale(${scale})`;
+    // ✅ Place top-left so that the TIP is at (x,y)
+    flying.style.transform =
+      `translate(${x - tipAx}px, ${y - tipAy}px) rotate(${angle}deg) scale(${scale})`;
 
     if (tr < 1) {
       requestAnimationFrame(step);
@@ -432,31 +467,32 @@ function shootArrowToWinningNumber(winningNumber) {
 
     flying.remove();
 
-    // Stick arrow inside target with tip anchoring
-    const stickLeft = (rangeRect.left + endX) - targetRect.left;
-    const stickTop = (rangeRect.top + endY) - targetRect.top;
+    // Stick arrow inside target with TIP anchoring
+    const hitClient = toClient(endX, endY);
+    const stickTipX = hitClient.x - targetRect.left;
+    const stickTipY = hitClient.y - targetRect.top;
 
     const stuck = arrowImg.cloneNode(true);
     stuck.removeAttribute("id");
     stuck.style.position = "absolute";
-    stuck.style.left = stickLeft + "px";
-    stuck.style.top = stickTop + "px";
-    stuck.style.width = (arrowRect.width || 52) + "px";
+    stuck.style.left = (stickTipX - tipAx) + "px";
+    stuck.style.top = (stickTipY - tipAy) + "px";
+    stuck.style.width = arrowW + "px";
     stuck.style.height = "auto";
     stuck.style.pointerEvents = "none";
     stuck.style.zIndex = "3";
-    stuck.style.transformOrigin = "92% 50%";
+    stuck.style.transformOrigin = `${tipAx}px ${tipAy}px`;
     stuck.style.filter = "drop-shadow(0 10px 14px rgba(0,0,0,0.75))";
     stuck.style.transition = "transform 160ms ease-out";
 
     const finalAngle = angle + (-6 + Math.random() * 12);
-    stuck.style.transform = `translate(-92%, -50%) rotate(${finalAngle}deg) translateX(10px)`;
+    stuck.style.transform = `rotate(${finalAngle}deg) translateX(10px)`;
 
     target.appendChild(stuck);
     _stuckArrows.push(stuck);
 
     requestAnimationFrame(() => {
-      stuck.style.transform = `translate(-92%, -50%) rotate(${finalAngle}deg) translateX(0px)`;
+      stuck.style.transform = `rotate(${finalAngle}deg) translateX(0px)`;
     });
 
     // Restore idle arrow at bow
