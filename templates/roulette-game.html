@@ -1,251 +1,109 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
 <head>
-<meta charset="UTF-8">
-<title>Professional Roulette Wheel</title>
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<style>
-  * { margin:0; padding:0; box-sizing:border-box; }
-
-  body {
-    height:100vh;
-    background:#0b001a;
-    display:flex;
-    align-items:center;
-    justify-content:center;
-    font-family:Arial,Helvetica,sans-serif;
-  }
-
-  .wrapper {
-    position:relative;
-    width:440px;
-    height:440px;
-  }
-
-  /* Golden Arrow Pointer (like screenshot) */
-  .arrow {
-    position:absolute;
-    top:-30px;
-    left:50%;
-    transform:translateX(-50%);
-    width:40px;
-    height:60px;
-    background:linear-gradient(to bottom, #ffd700, #b8860b);
-    clip-path: polygon(50% 100%, 0 0, 100% 0);
-    box-shadow:0 8px 20px rgba(0,0,0,0.6), 0 0 20px #ffd70066;
-    z-index:20;
-  }
-
-  .arrow::before {
-    content:"";
-    position:absolute;
-    inset:4px;
-    background:#000;
-    clip-path: polygon(50% 100%, 0 0, 100% 0);
-  }
-
-  /* Wheel Container */
-  .wheel {
-    width:100%;
-    height:100%;
-    border-radius:50%;
-    position:relative;
-    overflow:hidden;
-    box-shadow:0 20px 60px rgba(0,0,0,0.8);
-  }
-
-  /* Rotating Group (pockets + numbers + lights) */
-  .rotating {
-    position:absolute;
-    inset:0;
-    border-radius:50%;
-    transition:transform 5.5s cubic-bezier(0.2, 0.85, 0.25, 1);
-  }
-
-  /* Outer Gold Rim with Lights */
-  .rim {
-    position:absolute;
-    inset:-12px;
-    border-radius:50%;
-    border:12px solid #ffd700;
-    box-shadow:0 0 40px #ffd700aa, inset 0 0 40px #b8860b;
-  }
-
-  .light {
-    position:absolute;
-    width:12px;
-    height:12px;
-    background:#fff;
-    border-radius:50%;
-    top:0;
-    left:50%;
-    transform:translateX(-50%);
-    box-shadow:0 0 12px #ffff00;
-  }
-
-  /* Inner Bowl (brown like screenshot) */
-  .bowl {
-    position:absolute;
-    inset:40px;
-    border-radius:50%;
-    background:#4a2a16;
-    box-shadow:inset 0 0 60px #000;
-  }
-
-  /* Center Gold Ball */
-  .center-ball {
-    position:absolute;
-    width:90px;
-    height:90px;
-    border-radius:50%;
-    background:radial-gradient(circle at 30% 30%, #fff, #ffd700, #b8860b);
-    top:50%;
-    left:50%;
-    transform:translate(-50%,-50%);
-    box-shadow:0 0 30px #ffd700aa, inset 0 -10px 20px #000;
-    z-index:5;
-  }
-
-  /* Pockets */
-  .pocket {
-    position:absolute;
-    width:100%;
-    height:100%;
-    clip-path: polygon(48% 0%, 52% 0%, 52% 100%, 48% 100%);
-    transform-origin: center;
-  }
-
-  .red { background:#c62828; }
-  .black { background:#111111; }
-  .green { background:#2e7d32; }
-
-  /* Numbers - upright, no overlap */
-  .number {
-    position:absolute;
-    width:40px;
-    height:40px;
-    left:50%;
-    top:50%;
-    transform:translate(-50%,-50%);
-    display:flex;
-    align-items:center;
-    justify-content:center;
-    font-size:18px;
-    font-weight:900;
-    color:white;
-    text-shadow:0 2px 4px black;
-  }
-
-  .number.win {
-    color:#ffd700;
-    font-size:24px;
-    text-shadow:0 0 15px #ffd700;
-    transform:translate(-50%,-50%) scale(1.4);
-  }
-</style>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Roulette (Hourly)</title>
+  <link rel="stylesheet" href="roulettegame.css" />
 </head>
+
 <body>
+  <div class="app">
+    <header class="topbar">
+      <div class="brand">
+        <div class="brand-title">Roulette</div>
+        <div class="brand-sub" id="roundInfo">Round: -</div>
+      </div>
 
-<div class="wrapper">
-  <div class="arrow"></div>
+      <div class="stats">
+        <div class="pill">
+          <div class="pill-label">Time left</div>
+          <div class="pill-value" id="timerText">60:00</div>
+        </div>
+        <div class="pill">
+          <div class="pill-label">Wallet</div>
+          <div class="pill-value">₹<span id="walletBalance">0</span></div>
+        </div>
+        <div class="pill">
+          <div class="pill-label">My numbers</div>
+          <div class="pill-value"><span id="myUniqueCount">0</span>/20</div>
+        </div>
+      </div>
+    </header>
 
-  <div class="wheel">
-    <div class="rim"></div>
+    <div class="status" id="statusMessage"></div>
 
-    <div class="rotating" id="rotating">
-      <!-- Lights -->
-      <div class="light" style="transform:rotate(0deg) translateY(-210px);"></div>
-      <div class="light" style="transform:rotate(9.73deg) translateY(-210px);"></div>
-      <div class="light" style="transform:rotate(19.46deg) translateY(-210px);"></div>
-      <div class="light" style="transform:rotate(29.19deg) translateY(-210px);"></div>
-      <div class="light" style="transform:rotate(38.92deg) translateY(-210px);"></div>
-      <div class="light" style="transform:rotate(48.65deg) translateY(-210px);"></div>
-      <div class="light" style="transform:rotate(58.38deg) translateY(-210px);"></div>
-      <div class="light" style="transform:rotate(68.11deg) translateY(-210px);"></div>
-      <div class="light" style="transform:rotate(77.84deg) translateY(-210px);"></div>
-      <div class="light" style="transform:rotate(87.57deg) translateY(-210px);"></div>
-      <div class="light" style="transform:rotate(97.3deg) translateY(-210px);"></div>
-      <div class="light" style="transform:rotate(107.03deg) translateY(-210px);"></div>
-      <div class="light" style="transform:rotate(116.76deg) translateY(-210px);"></div>
-      <div class="light" style="transform:rotate(126.49deg) translateY(-210px);"></div>
-      <div class="light" style="transform:rotate(136.22deg) translateY(-210px);"></div>
-      <div class="light" style="transform:rotate(145.95deg) translateY(-210px);"></div>
-      <div class="light" style="transform:rotate(155.68deg) translateY(-210px);"></div>
-      <div class="light" style="transform:rotate(165.41deg) translateY(-210px);"></div>
-      <div class="light" style="transform:rotate(175.14deg) translateY(-210px);"></div>
-      <div class="light" style="transform:rotate(184.86deg) translateY(-210px);"></div>
-      <div class="light" style="transform:rotate(194.59deg) translateY(-210px);"></div>
-      <div class="light" style="transform:rotate(204.32deg) translateY(-210px);"></div>
-      <div class="light" style="transform:rotate(214.05deg) translateY(-210px);"></div>
-      <div class="light" style="transform:rotate(223.78deg) translateY(-210px);"></div>
-      <div class="light" style="transform:rotate(233.51deg) translateY(-210px);"></div>
-      <div class="light" style="transform:rotate(243.24deg) translateY(-210px);"></div>
-      <div class="light" style="transform:rotate(252.97deg) translateY(-210px);"></div>
-      <div class="light" style="transform:rotate(262.7deg) translateY(-210px);"></div>
-      <div class="light" style="transform:rotate(272.43deg) translateY(-210px);"></div>
-      <div class="light" style="transform:rotate(282.16deg) translateY(-210px);"></div>
-      <div class="light" style="transform:rotate(291.89deg) translateY(-210px);"></div>
-      <div class="light" style="transform:rotate(301.62deg) translateY(-210px);"></div>
-      <div class="light" style="transform:rotate(311.35deg) translateY(-210px);"></div>
-      <div class="light" style="transform:rotate(321.08deg) translateY(-210px);"></div>
-      <div class="light" style="transform:rotate(330.81deg) translateY(-210px);"></div>
-      <div class="light" style="transform:rotate(340.54deg) translateY(-210px);"></div>
-      <div class="light" style="transform:rotate(350.27deg) translateY(-210px);"></div>
+    <main class="layout">
+      <!-- Wheel -->
+      <section class="wheel-card">
+        <div class="wheel-wrap">
+          <div class="pointer"></div>
+          <canvas id="wheelCanvas" width="520" height="520"></canvas>
+        </div>
 
-      <!-- Pockets -->
-      <div id="pockets"></div>
+        <div class="wheel-meta">
+          <div class="meta-box">
+            <div class="meta-label">Last result</div>
+            <div class="meta-value" id="lastResult">-</div>
+          </div>
+          <div class="meta-box">
+            <div class="meta-label">Bet unit</div>
+            <div class="meta-value">₹<span id="betUnit">200</span></div>
+          </div>
+          <div class="meta-box">
+            <div class="meta-label">Payout</div>
+            <div class="meta-value">10× (₹200 → ₹2000)</div>
+          </div>
+        </div>
 
-      <!-- Numbers -->
-      <div id="numbers"></div>
-    </div>
+        <div class="wheel-actions">
+          <button id="clearBtn" class="btn ghost">Clear</button>
+          <button id="placeBetBtn" class="btn primary">Place bets</button>
+        </div>
+      </section>
 
-    <div class="bowl"></div>
-    <div class="center-ball"></div>
+      <!-- Betting table -->
+      <section class="table-card">
+        <div class="table-head">
+          <div class="table-title">Pick numbers (1–36)</div>
+          <div class="table-sub">Tap a number to add/remove. You can bet on max 20 unique numbers.</div>
+        </div>
+
+        <div class="grid" id="numberGrid"></div>
+
+        <div class="table-footer">
+          <div class="help">
+            <div><span class="dot red"></span> Red</div>
+            <div><span class="dot black"></span> Black</div>
+          </div>
+          <div class="help">
+            <div>Total bet: ₹<span id="totalBet">0</span></div>
+            <div>Round status: <span id="roundStatus">OPEN</span></div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Betslip -->
+      <section class="slip-card">
+        <div class="slip-head">
+          <div class="slip-title">My bet slip</div>
+          <div class="slip-sub" id="slipHint">No bets yet.</div>
+        </div>
+
+        <div class="slip-list" id="betsList"></div>
+
+        <div class="slip-total">
+          <div class="slip-total-label">Payable now</div>
+          <div class="slip-total-value">₹<span id="payableNow">0</span></div>
+        </div>
+
+        <div class="small-note">
+          Demo front-end: result + settlement happens in browser. For real game, keep result and wallet updates on server.
+        </div>
+      </section>
+    </main>
   </div>
-</div>
 
-<script>
-  const nums = [0,32,15,19,4,21,2,25,17,34,6,27,13,36,11,30,8,23,10,5,24,16,33,1,20,14,31,9,22,18,29,7,28,12,35,3,26];
-  const reds = [1,3,5,7,9,12,14,16,18,19,21,23,25,27,30,32,34,36];
-  const step = 360 / nums.length;
-  const pockets = document.getElementById('pockets');
-  const numbers = document.getElementById('numbers');
-
-  nums.forEach((n, i) => {
-    // Pocket
-    const p = document.createElement('div');
-    p.className = 'pocket ' + (n === 0 ? 'green' : reds.includes(n) ? 'red' : 'black');
-    p.style.transform = `rotate(${i * step}deg)`;
-    pockets.appendChild(p);
-
-    // Number
-    const numDiv = document.createElement('div');
-    numDiv.className = 'number';
-    numDiv.textContent = n;
-    numDiv.style.transform = `rotate(${i * step}deg) translateY(-170px) rotate(${-i * step}deg)`;
-    numDiv.dataset.index = i;
-    numbers.appendChild(numDiv);
-  });
-
-  // Spin to winning number (arrow points to top)
-  function spinTo(winningNumber) {
-    const i = nums.indexOf(winningNumber);
-    const stopDeg = i * step; // top is 0deg
-    const spins = 8 + Math.random() * 4; // 8-12 full spins
-    const finalDeg = spins * 360 + stopDeg;
-
-    document.querySelectorAll('.number').forEach(el => el.classList.remove('win'));
-
-    const rotating = document.querySelector('.rotating');
-    rotating.style.transform = `rotate(${finalDeg}deg)`;
-
-    setTimeout(() => {
-      document.querySelectorAll('.number')[i].classList.add('win');
-    }, 5500);
-  }
-
-  // Demo
-  setTimeout(() => spinTo(26), 1000);
-</script>
+  <script src="roulettegame.js"></script>
 </body>
 </html>
