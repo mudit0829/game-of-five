@@ -36,10 +36,7 @@
              C365 188 360 230 330 250
              C305 267 268 260 250 240
              C232 220 228 200 235 180 Z"
-          fill="#0f172a" stroke="#0ea5e9" stroke-opacity="0.25" stroke-width="4"/>
-
-    <!-- head (minimal, no detailed face) -->
-    <circle cx="300" cy="210" r="34" fill="#111827" stroke="url(#accent)" stroke-opacity="0.35" stroke-width="4"/>
+          fill="#0f172a" stroke="#0ea5e9" stroke-opacity="0.30" stroke-width="4"/>
 
     <!-- arm holding bow (forward/right) -->
     <path d="M310 260 C350 250 380 260 404 290
@@ -70,5 +67,15 @@
     <!-- accent sash -->
     <path d="M230 300 C255 330 310 346 350 332"
           fill="none" stroke="url(#accent)" stroke-width="10" stroke-linecap="round" opacity="0.85"/>
+
+    <!-- ✅ HEAD (put near end so it stays on top) -->
+    <!-- If you want darker skin, change fill only; keep stroke bright for visibility -->
+    <circle cx="300" cy="210" r="34"
+            fill="#f1c27d" stroke="#38bdf8" stroke-opacity="0.70" stroke-width="5"/>
+
+    <!-- simple face (optional, helps head “read” clearly) -->
+    <circle cx="312" cy="206" r="4" fill="#0b1220" opacity="0.65"/>
+    <path d="M292 222 C300 230 312 230 320 222"
+          fill="none" stroke="#0b1220" stroke-width="4" stroke-linecap="round" opacity="0.35"/>
   </g>
 </svg>
