@@ -211,7 +211,7 @@ function syncUrlWithTable(roundCode) {
   }
 }
 
-// ================= ARROW + DOTTED PATH (PRO) =================
+// ================= ARROW + DOTTED PATH (SYNCED) =================
 
 let _shotToken = 0;
 let _stuckArrows = [];
@@ -247,7 +247,6 @@ function ensureShotSvg() {
   const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
   svg.setAttribute("preserveAspectRatio", "none");
 
-  // ✅ IMPORTANT: force inline SVG to fill the range reliably
   svg.setAttribute("width", "100%");
   svg.setAttribute("height", "100%");
   svg.style.width = "100%";
@@ -267,7 +266,6 @@ function clearShotPath() {
   if (_shotSvg) _shotSvg.innerHTML = "";
 }
 
-// ✅ UPDATED: takes flightMs so dotted path stays in sync with arrow speed
 function drawShotPath(rangeW, rangeH, startX, startY, ctrlX, ctrlY, endX, endY, flightMs) {
   const svg = ensureShotSvg();
   if (!svg) return;
@@ -288,7 +286,6 @@ function drawShotPath(rangeW, rangeH, startX, startY, ctrlX, ctrlY, endX, endY, 
   const fadeOut = Math.max(320, Math.round(flightMs * 0.40));
   const fadeOutDelay = Math.max(0, flightMs - fadeOut);
 
-  // Fade in quickly, animate dash while arrow is flying, then fade out near impact
   path.style.animation =
     `diamondPathIn ${fadeIn}ms ease-out, ` +
     `diamondDash ${flightMs}ms linear infinite, ` +
@@ -336,7 +333,6 @@ function shootArrowToWinningNumber(winningNumber) {
 
   ensureAnimStyles();
 
-  // cancel previous shot
   const token = ++_shotToken;
 
   clearStuckArrows();
@@ -347,7 +343,7 @@ function shootArrowToWinningNumber(winningNumber) {
   const targetRect = target.getBoundingClientRect();
   const arrowRect = arrowImg.getBoundingClientRect();
 
-  // ✅ Use range layout size for consistent coordinates (works even if range is CSS-scaled)
+  // Use range layout size for consistent coordinates
   const rangeW = Math.max(1, rangeEl.clientWidth || Math.round(rangeRect.width));
   const rangeH = Math.max(1, rangeEl.clientHeight || Math.round(rangeRect.height));
 
@@ -364,29 +360,26 @@ function shootArrowToWinningNumber(winningNumber) {
     y: rangeRect.top + localY * scaleY,
   });
 
-  // ✅ IMPORTANT: use LAYOUT size for arrow (prevents sideways drift on scaled UI)
-  // offsetWidth/offsetHeight are layout sizes; getBoundingClientRect is rendered size.
-  const arrowW = arrowImg.offsetWidth || Math.max(1, (arrowRect.width || 52) / scaleX);
-  const arrowH =
-    arrowImg.offsetHeight ||
-    Math.max(14, Math.round(((arrowRect.height || 0) / scaleY) || (arrowW * 0.28)));
+  // ✅ IMPORTANT: Use CENTER anchor for both dotted path and arrow.
+  // This removes drift caused by sprite tip offsets/scales.
+  const arrowW = arrowImg.offsetWidth || 52;
+  const arrowH = arrowImg.offsetHeight || Math.max(14, Math.round(arrowW * 0.28));
 
-  // Tip anchor (in LOCAL px)
-  const tipAx = arrowW * 0.88;
-  const tipAy = arrowH * 0.55;
+  const ax = arrowW * 0.5;
+  const ay = arrowH * 0.5;
 
-  // Start at arrow tip: compute tip in CLIENT px, then convert to local
-  const tipClientX = arrowRect.left + tipAx * scaleX;
-  const tipClientY = arrowRect.top + tipAy * scaleY;
-
-  const startLocal = toLocal(tipClientX, tipClientY);
+  // Start at arrow center
+  const startLocal = toLocal(
+    arrowRect.left + arrowRect.width * 0.5,
+    arrowRect.top + arrowRect.height * 0.5
+  );
   const startX = startLocal.x;
   const startY = startLocal.y;
 
-  // End where the tip should hit (target center)
+  // End at target center
   const endLocal = toLocal(
-    targetRect.left + targetRect.width * 0.52,
-    targetRect.top + targetRect.height * 0.52
+    targetRect.left + targetRect.width * 0.5,
+    targetRect.top + targetRect.height * 0.5
   );
   const endX = endLocal.x;
   const endY = endLocal.y;
@@ -395,39 +388,36 @@ function shootArrowToWinningNumber(winningNumber) {
   const dy = endY - startY;
   const dist = Math.hypot(dx, dy);
 
-  // Gentle arc
+  // Arc
   const midX = (startX + endX) / 2;
   const midY = (startY + endY) / 2;
   const lift = Math.min(90, Math.max(32, dist * 0.16));
   const ctrlX = midX;
   const ctrlY = midY - lift;
 
-  // ✅ 50% slower arrow (previously 720ms)
+  // ✅ Slower by 50%
   const duration = 1080;
 
-  // Dotted guide path synced with the same duration
+  // Draw dotted path with same duration
   drawShotPath(rangeW, rangeH, startX, startY, ctrlX, ctrlY, endX, endY, duration);
 
-  // Clone arrow for flight; keep original hidden
+  // Flying arrow clone
   const flying = arrowImg.cloneNode(true);
   flying.removeAttribute("id");
   flying.style.position = "absolute";
   flying.style.left = "0px";
   flying.style.top = "0px";
   flying.style.width = arrowW + "px";
-  flying.style.height = "auto";
+  flying.style.height = arrowH + "px";
   flying.style.pointerEvents = "none";
   flying.style.zIndex = "60";
   flying.style.willChange = "transform";
   flying.style.filter = "drop-shadow(0 10px 14px rgba(0,0,0,0.70))";
-
-  // Rotate/scale around the TIP, so the tip stays on the curve
-  flying.style.transformOrigin = `${tipAx}px ${tipAy}px`;
+  flying.style.transformOrigin = `${ax}px ${ay}px`;
 
   rangeEl.appendChild(flying);
   arrowImg.style.opacity = "0";
 
-  // Archer pose
   archerImg.classList.add("shoot");
   setTimeout(() => archerImg.classList.remove("shoot"), 350);
 
@@ -457,34 +447,30 @@ function shootArrowToWinningNumber(winningNumber) {
     const x = bezier(t, startX, ctrlX, endX);
     const y = bezier(t, startY, ctrlY, endY);
 
-    // Tangent angle along the curve
     const vx = bezierDeriv(t, startX, ctrlX, endX);
     const vy = bezierDeriv(t, startY, ctrlY, endY);
     const tangentAngle = Math.atan2(vy, vx) * (180 / Math.PI);
 
-    // Smooth rotation blending
     const mix = Math.min(1, t * 1.15);
     const angle = aimAngle + (tangentAngle - aimAngle) * mix;
 
     const scale = 1 - t * 0.08;
 
-    // Place so that TIP is at (x,y)
     flying.style.transform =
-      `translate(${x - tipAx}px, ${y - tipAy}px) rotate(${angle}deg) scale(${scale})`;
+      `translate(${x - ax}px, ${y - ay}px) rotate(${angle}deg) scale(${scale})`;
 
     if (tr < 1) {
       requestAnimationFrame(step);
       return;
     }
 
-    // Impact
     clearShotPath();
     target.classList.add("win");
     flashTarget(target);
 
     flying.remove();
 
-    // Stick arrow inside target with TIP anchoring (handle scaled targets too)
+    // Stick arrow into target using CENTER anchor (scaled-safe)
     const hitClient = toClient(endX, endY);
 
     const targetW = Math.max(1, target.clientWidth || Math.round(targetRect.width));
@@ -498,13 +484,13 @@ function shootArrowToWinningNumber(winningNumber) {
     const stuck = arrowImg.cloneNode(true);
     stuck.removeAttribute("id");
     stuck.style.position = "absolute";
-    stuck.style.left = (stickLocalX - tipAx) + "px";
-    stuck.style.top = (stickLocalY - tipAy) + "px";
+    stuck.style.left = (stickLocalX - ax) + "px";
+    stuck.style.top = (stickLocalY - ay) + "px";
     stuck.style.width = arrowW + "px";
-    stuck.style.height = "auto";
+    stuck.style.height = arrowH + "px";
     stuck.style.pointerEvents = "none";
     stuck.style.zIndex = "3";
-    stuck.style.transformOrigin = `${tipAx}px ${tipAy}px`;
+    stuck.style.transformOrigin = `${ax}px ${ay}px`;
     stuck.style.filter = "drop-shadow(0 10px 14px rgba(0,0,0,0.75))";
     stuck.style.transition = "transform 160ms ease-out";
 
@@ -518,7 +504,6 @@ function shootArrowToWinningNumber(winningNumber) {
       stuck.style.transform = `rotate(${finalAngle}deg) translateX(0px)`;
     });
 
-    // Restore idle arrow at bow
     arrowImg.style.opacity = "1";
   }
 
