@@ -71,8 +71,7 @@ const KICK_FREEZE_AT_REMAINING = 2;
 const KICK_SCALE = 0.21;
 
 // Fine tuning: move player relative to ball
-// Increase KICK_SHIFT_X (closer to 0) to move RIGHT, decrease to move LEFT.
-const KICK_SHIFT_X = -40; // moved a bit right from earlier (-45/-55)
+const KICK_SHIFT_X = -40;
 const KICK_SHIFT_Y = 10;
 
 let kickResizeHandlerAttached = false;
@@ -110,7 +109,6 @@ function formatTime(seconds) {
   return `${mins}:${secs.toString().padStart(2, "0")}`;
 }
 
-// NEW: stable index picker so we don't always pick goals[0]
 function hashToIndex(str, mod) {
   const s = String(str ?? "");
   let h = 0;
@@ -123,7 +121,6 @@ function normalizeTable(raw) {
 
   const t = { ...raw };
 
-  // handle both snake_case + no-underscore versions
   t.roundCode = pick(raw, "round_code", "roundcode");
   t.timeRemaining = safeNum(pick(raw, "time_remaining", "timeremaining"), 0);
   t.isFinished = toBool(pick(raw, "is_finished", "isfinished"));
@@ -194,19 +191,14 @@ function setSelectedNumber(n) {
 
 function disableBettingUI() {
   if (placeBetBtn) placeBetBtn.disabled = true;
-  numChips.forEach((chip) => {
-    chip.disabled = true;
-  });
+  numChips.forEach((chip) => { chip.disabled = true; });
 }
 
-// ✅ Update my bets display
 function updateMyBets(bets) {
   const myBets = (bets || []).filter((b) => String(b.userId) === String(USER_ID));
-
   userHasBet = myBets.length > 0;
 
   if (userBetCountLabel) userBetCountLabel.textContent = myBets.length;
-
   if (!myBetsRow) return;
 
   if (myBets.length === 0) {
@@ -238,7 +230,6 @@ function updateGoalsFromBets(bets) {
   });
 }
 
-// ✅ FIXED: Ensure winning number is on a goal WITHOUT always forcing goals[0]
 function ensureGoalForWinningNumber(winningNumber, roundCode = "") {
   if (winningNumber === null || winningNumber === undefined) return;
   if (!goals || goals.length === 0) return;
@@ -246,15 +237,11 @@ function ensureGoalForWinningNumber(winningNumber, roundCode = "") {
   const existing = goals.find((g) => g.dataset.number === String(winningNumber));
   if (existing) return;
 
-  // Prefer an empty slot first (doesn't overwrite any shown bet)
   let goal = goals.find((g) => !g.dataset.number || g.dataset.number === "");
-
-  // If no empty slot, choose a stable rotating slot (prevents always same goal)
   if (!goal) {
     const idx = hashToIndex(`${roundCode}|${winningNumber}`, goals.length);
     goal = goals[idx] || goals[0];
   }
-
   if (!goal) return;
 
   const numSpan = goal.querySelector(".pad-number");
@@ -286,9 +273,6 @@ function showEndPopup({ outcome, result }) {
   } else if (outcome === "lose") {
     title = "Hard Luck!";
     message = `You have LOST this game. Winning number: ${result}`;
-  } else {
-    title = "Game Finished";
-    message = `Winning number: ${result}`;
   }
 
   if (popupTitleEl) popupTitleEl.textContent = title;
@@ -305,7 +289,6 @@ function showSlotsFullPopup() {
     "This game is already full. You will be redirected to lobby to join another table.";
 
   popupEl.style.display = "flex";
-
   setTimeout(() => window.history.back(), 2000);
 }
 
@@ -316,7 +299,6 @@ function cleanupKickVideo() {
   if (node && node.parentNode) node.parentNode.removeChild(node);
   videoPlayer = null;
 
-  // Keep ball visible always
   if (ballImg) ballImg.style.opacity = "1";
 }
 
@@ -325,20 +307,17 @@ function positionKickVideoAtBall(v) {
 
   if (ballImg) {
     const r = ballImg.getBoundingClientRect();
-
     const x = r.left + r.width / 2 + KICK_SHIFT_X;
     const y = r.top + r.height + KICK_SHIFT_Y;
 
     v.style.left = `${x}px`;
     v.style.top = `${y}px`;
 
-    // feet aligned near ball
     v.style.transformOrigin = "bottom center";
     v.style.transform = `translate(-50%, -100%) scale(${KICK_SCALE})`;
     return;
   }
 
-  // fallback: center-ish of pitch
   if (pitch) {
     const pr = pitch.getBoundingClientRect();
     v.style.left = `${pr.left + pr.width / 2}px`;
@@ -360,19 +339,14 @@ function ensureKickVideoElement() {
   v.playsInline = true;
   v.preload = "auto";
 
-  // fixed overlay to follow ball position (not tied to bottom controls)
   v.style.position = "fixed";
-  v.style.width = "360px"; // base size; actual size controlled by scale()
+  v.style.width = "360px";
   v.style.height = "auto";
   v.style.pointerEvents = "none";
-
-  // Keep video behind the ball (ball is z-index 10 in your CSS).
   v.style.zIndex = "9";
-
   v.style.filter = "drop-shadow(0 12px 22px rgba(0,0,0,0.65))";
 
   document.body.appendChild(v);
-
   attachKickResizeHandlerOnce();
 
   return v;
@@ -384,7 +358,6 @@ function maybeStartKickVideo() {
   const roundId = currentTable.roundCode || "__no_round__";
   if (videoStartedForRound === roundId) return;
 
-  // Start around 4 seconds remaining (allow 4..3 window)
   if (displayRemainingSeconds > KICK_SHOW_AT_REMAINING || displayRemainingSeconds <= KICK_FREEZE_AT_REMAINING) return;
 
   videoStartedForRound = roundId;
@@ -395,16 +368,12 @@ function maybeStartKickVideo() {
 
   videoPlayer = v;
 
-  // Keep ball visible (NO flicker)
   if (ballImg) ballImg.style.opacity = "1";
 
-  // Place before play + one more frame after (mobile stability)
   positionKickVideoAtBall(v);
   requestAnimationFrame(() => positionKickVideoAtBall(v));
 
-  try {
-    v.currentTime = 0;
-  } catch (e) {}
+  try { v.currentTime = 0; } catch (e) {}
 
   v.play().catch((err) => console.warn("[video] play error:", err));
 }
@@ -419,63 +388,100 @@ function freezeKickVideoAt2s() {
   if (displayRemainingSeconds <= KICK_FREEZE_AT_REMAINING) {
     videoFrozenForRound = roundId;
 
-    try {
-      videoPlayer.pause();
-    } catch (e) {}
+    try { videoPlayer.pause(); } catch (e) {}
 
-    // lock it exactly at ball position
     positionKickVideoAtBall(videoPlayer);
     requestAnimationFrame(() => positionKickVideoAtBall(videoPlayer));
 
-    // ball stays visible
     if (ballImg) ballImg.style.opacity = "1";
   }
 }
 
-// ================= BALL ANIMATION =================
+// ================= BALL + DOTTED PATH (LOCKED) =================
+
+// Slower by 50%
+const BALL_SHOT_DURATION_MS = 1125;    // was 750
+const BALL_SHOT_START_DELAY_MS = 420; // was 280
+const BALL_RESET_DELAY_MS = 1350;     // was 900
+
+let _shotSvg = null;
+let _shotToken = 0;
 
 function ensureTrajectoryStyles() {
   if (document.getElementById("trajectory-styles")) return;
   const style = document.createElement("style");
   style.id = "trajectory-styles";
   style.textContent = `
-    @keyframes drawPath { to { stroke-dashoffset: 0; } }
+    @keyframes goldPathIn { from { opacity: 0; } to { opacity: 1; } }
+    @keyframes goldPathOut { to { opacity: 0; } }
+    @keyframes goldDash { to { stroke-dashoffset: -28; } }
     @keyframes goalFlash {
       0% { opacity: 0; transform: translate(-50%, -50%) scale(0.5); }
       50% { opacity: 1; transform: translate(-50%, -50%) scale(1); }
       100% { opacity: 0; transform: translate(-50%, -50%) scale(1.2); }
-    }`;
+    }
+  `;
   document.head.appendChild(style);
 }
 
-function createTrajectoryLine(startX, startY, endX, endY, peak) {
-  ensureTrajectoryStyles();
+function ensureShotSvg() {
+  if (!pitch) return null;
+
+  // ensure pitch is positioning context
+  try {
+    const pos = getComputedStyle(pitch).position;
+    if (pos === "static") pitch.style.position = "relative";
+  } catch {}
+
+  if (_shotSvg && _shotSvg.isConnected) return _shotSvg;
+
   const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
-  svg.setAttribute("class", "trajectory-line");
+  svg.setAttribute("preserveAspectRatio", "none");
+  svg.setAttribute("width", "100%");
+  svg.setAttribute("height", "100%");
   svg.style.position = "absolute";
-  svg.style.top = "0";
-  svg.style.left = "0";
-  svg.style.width = "100%";
-  svg.style.height = "100%";
+  svg.style.inset = "0";
   svg.style.pointerEvents = "none";
   svg.style.zIndex = "5";
 
+  pitch.appendChild(svg);
+  _shotSvg = svg;
+  return svg;
+}
+
+function clearShotPath() {
+  if (_shotSvg) _shotSvg.innerHTML = "";
+}
+
+function drawDottedPath(pitchW, pitchH, startX, startY, ctrlX, ctrlY, endX, endY, flightMs) {
+  ensureTrajectoryStyles();
+  const svg = ensureShotSvg();
+  if (!svg) return null;
+
+  svg.setAttribute("viewBox", `0 0 ${pitchW} ${pitchH}`);
+  svg.innerHTML = "";
+
   const path = document.createElementNS("http://www.w3.org/2000/svg", "path");
-  const midX = (startX + endX) / 2;
-  const midY = (startY + endY) / 2 + peak;
-  const pathData = `M ${startX} ${startY} Q ${midX} ${midY} ${endX} ${endY}`;
-  path.setAttribute("d", pathData);
+  path.setAttribute("d", `M ${startX} ${startY} Q ${ctrlX} ${ctrlY} ${endX} ${endY}`);
+  path.setAttribute("fill", "none");
   path.setAttribute("stroke", "#fbbf24");
   path.setAttribute("stroke-width", "3");
+  path.setAttribute("stroke-linecap", "round");
   path.setAttribute("stroke-dasharray", "8 6");
-  path.setAttribute("fill", "none");
-  path.setAttribute("opacity", "0.9");
-  path.style.strokeDashoffset = "1000";
-  path.style.animation = "drawPath 0.6s ease-out forwards";
-  svg.appendChild(path);
+  path.setAttribute("opacity", "0.95");
+  path.style.filter = "drop-shadow(0 8px 12px rgba(0,0,0,0.55))";
 
-  if (pitch) pitch.appendChild(svg);
-  setTimeout(() => svg.parentNode && svg.parentNode.removeChild(svg), 1200);
+  const fadeIn = 180;
+  const fadeOut = Math.max(450, Math.round(flightMs * 0.45));
+  const fadeOutDelay = Math.max(0, flightMs - fadeOut);
+
+  path.style.animation =
+    `goldPathIn ${fadeIn}ms ease-out, ` +
+    `goldDash ${flightMs}ms linear infinite, ` +
+    `goldPathOut ${fadeOut}ms ease-in ${fadeOutDelay}ms forwards`;
+
+  svg.appendChild(path);
+  return path;
 }
 
 function shootBallToWinningNumber(winningNumber) {
@@ -484,92 +490,136 @@ function shootBallToWinningNumber(winningNumber) {
   const targetGoal = goals.find((g) => g.dataset.number === String(winningNumber));
   if (!targetGoal) return;
 
+  const token = ++_shotToken;
+
+  clearShotPath();
+
   const pitchRect = pitch.getBoundingClientRect();
   const ballRect = ballImg.getBoundingClientRect();
   const goalRect = targetGoal.getBoundingClientRect();
 
-  const startX = ballRect.left + ballRect.width / 2;
-  const startY = ballRect.top + ballRect.height / 2;
-  const endX = goalRect.left + goalRect.width / 2;
-  const endY = goalRect.top + goalRect.height / 2;
+  // local coords in pitch
+  const pitchW = Math.max(1, pitch.clientWidth || Math.round(pitchRect.width));
+  const pitchH = Math.max(1, pitch.clientHeight || Math.round(pitchRect.height));
+  const scaleX = (pitchRect.width / pitchW) || 1;
+  const scaleY = (pitchRect.height / pitchH) || 1;
 
-  const deltaX = endX - startX;
-  const deltaY = endY - startY;
-  const distance = Math.sqrt(deltaX * deltaX + deltaY * deltaY);
-  const peak = -Math.min(100, distance * 0.3);
-  const duration = 750;
-  const startTime = performance.now();
+  const toLocal = (clientX, clientY) => ({
+    x: (clientX - pitchRect.left) / scaleX,
+    y: (clientY - pitchRect.top) / scaleY,
+  });
 
-  const pitchStartX = startX - pitchRect.left;
-  const pitchStartY = startY - pitchRect.top;
-  const pitchEndX = endX - pitchRect.left;
-  const pitchEndY = endY - pitchRect.top;
+  const startLocal = toLocal(ballRect.left + ballRect.width / 2, ballRect.top + ballRect.height / 2);
+  const endLocal = toLocal(goalRect.left + goalRect.width / 2, goalRect.top + goalRect.height / 2);
 
-  createTrajectoryLine(pitchStartX, pitchStartY, pitchEndX, pitchEndY, peak);
+  const startX = startLocal.x;
+  const startY = startLocal.y;
+  const endX = endLocal.x;
+  const endY = endLocal.y;
+
+  const dx = endX - startX;
+  const dy = endY - startY;
+  const dist = Math.hypot(dx, dy);
+
+  // arc (peak up)
+  const midX = (startX + endX) / 2;
+  const midY = (startY + endY) / 2;
+  const lift = Math.min(130, Math.max(60, dist * 0.28));
+  const ctrlX = midX;
+  const ctrlY = midY - lift;
+
+  // Draw the dotted path and reuse that SAME path for the ball
+  const pathEl = drawDottedPath(pitchW, pitchH, startX, startY, ctrlX, ctrlY, endX, endY, BALL_SHOT_DURATION_MS);
+  if (!pathEl) return;
 
   setTimeout(() => {
-    const originalTransform = ballImg.style.transform;
+    if (token !== _shotToken) return;
 
-    ballImg.style.position = "fixed";
-    ballImg.style.transition = "none";
-    ballImg.style.zIndex = "1000";
-    ballImg.style.left = `${startX}px`;
-    ballImg.style.top = `${startY}px`;
-    ballImg.style.transform = "translate(-50%, -50%)";
+    const ballW = ballImg.offsetWidth || Math.max(1, ballRect.width / scaleX);
+    const ballH = ballImg.offsetHeight || Math.max(1, ballRect.height / scaleY);
+    const ax = ballW * 0.5;
+    const ay = ballH * 0.5;
+
+    // Clone ball so layout doesn't jump
+    const flying = ballImg.cloneNode(true);
+    flying.removeAttribute("id");
+    flying.removeAttribute("class"); // prevent CSS offsets on clone
+    flying.style.position = "absolute";
+    flying.style.left = "0px";
+    flying.style.top = "0px";
+    flying.style.width = ballW + "px";
+    flying.style.height = "auto";
+    flying.style.pointerEvents = "none";
+    flying.style.zIndex = "1000";
+    flying.style.willChange = "transform";
+    flying.style.transformOrigin = `${ax}px ${ay}px`;
+    flying.style.filter = "drop-shadow(0 12px 18px rgba(0,0,0,0.65))";
+
+    pitch.appendChild(flying);
+    ballImg.style.opacity = "0";
+
+    const totalLen = pathEl.getTotalLength();
+    const startTime = performance.now();
+    const easeOutCubic = (t) => 1 - Math.pow(1 - t, 3);
 
     function step(now) {
-      const elapsed = now - startTime;
-      const tRaw = elapsed / duration;
-      const t = Math.min(Math.max(tRaw, 0), 1);
-
-      const ease = 1 - Math.pow(1 - t, 3);
-      const x = startX + deltaX * ease;
-      const yLinear = startY + deltaY * ease;
-      const yArc = yLinear + peak * (4 * t * (1 - t));
-      const rotation = t * (distance * 1.5);
-      const scale = 1 - t * 0.12;
-
-      ballImg.style.left = `${x}px`;
-      ballImg.style.top = `${yArc}px`;
-      ballImg.style.transform = `translate(-50%, -50%) rotate(${rotation}deg) scale(${scale})`;
-
-      if (t < 1) {
-        requestAnimationFrame(step);
-      } else {
-        targetGoal.classList.add("win");
-
-        const flash = document.createElement("div");
-        flash.style.position = "absolute";
-        flash.style.top = "50%";
-        flash.style.left = "50%";
-        flash.style.transform = "translate(-50%, -50%)";
-        flash.style.width = "150%";
-        flash.style.height = "150%";
-        flash.style.background = "radial-gradient(circle, rgba(34,197,94,0.6) 0%, transparent 70%)";
-        flash.style.borderRadius = "50%";
-        flash.style.pointerEvents = "none";
-        flash.style.animation = "goalFlash 0.6s ease-out";
-        flash.style.zIndex = "100";
-        targetGoal.appendChild(flash);
-
-        setTimeout(() => flash.remove(), 600);
-
-        setTimeout(() => {
-          ballImg.style.position = "";
-          ballImg.style.left = "";
-          ballImg.style.top = "";
-          ballImg.style.transition = "transform 0.5s ease-out";
-          ballImg.style.transform = originalTransform || "translate(0,0)";
-          ballImg.style.zIndex = "10";
-
-          // clean frozen kick video after shot ends
-          cleanupKickVideo();
-        }, 900);
+      if (token !== _shotToken) {
+        flying.remove();
+        ballImg.style.opacity = "1";
+        clearShotPath();
+        return;
       }
+
+      const tr = Math.min(Math.max((now - startTime) / BALL_SHOT_DURATION_MS, 0), 1);
+      const t = easeOutCubic(tr);
+
+      const L = t * totalLen;
+      const p = pathEl.getPointAtLength(L);
+
+      // tangent for rotation
+      const eps = 1.0;
+      const p2 = pathEl.getPointAtLength(Math.min(totalLen, L + eps));
+      const angle = Math.atan2(p2.y - p.y, p2.x - p.x) * (180 / Math.PI);
+
+      const rotation = t * (dist * 1.1);
+      const scale = 1 - t * 0.10;
+
+      flying.style.transform =
+        `translate(${p.x - ax}px, ${p.y - ay}px) rotate(${angle + rotation}deg) scale(${scale})`;
+
+      if (tr < 1) {
+        requestAnimationFrame(step);
+        return;
+      }
+
+      // impact
+      clearShotPath();
+      targetGoal.classList.add("win");
+
+      const flash = document.createElement("div");
+      flash.style.position = "absolute";
+      flash.style.top = "50%";
+      flash.style.left = "50%";
+      flash.style.transform = "translate(-50%, -50%)";
+      flash.style.width = "150%";
+      flash.style.height = "150%";
+      flash.style.background = "radial-gradient(circle, rgba(34,197,94,0.6) 0%, transparent 70%)";
+      flash.style.borderRadius = "50%";
+      flash.style.pointerEvents = "none";
+      flash.style.animation = "goalFlash 0.9s ease-out"; // slower
+      flash.style.zIndex = "100";
+      targetGoal.appendChild(flash);
+      setTimeout(() => flash.remove(), 900);
+
+      setTimeout(() => {
+        flying.remove();
+        ballImg.style.opacity = "1";
+        cleanupKickVideo();
+      }, BALL_RESET_DELAY_MS);
     }
 
     requestAnimationFrame(step);
-  }, 280);
+  }, BALL_SHOT_START_DELAY_MS);
 }
 
 // ================= TIMER =================
@@ -642,7 +692,6 @@ async function fetchTableData() {
 function updateGameUI(table) {
   if (!table) return;
 
-  // If new round arrives, clear old kick video
   if (videoPlayer && videoStartedForRound && table.roundCode && videoStartedForRound !== table.roundCode) {
     cleanupKickVideo();
     videoStartedForRound = null;
@@ -651,17 +700,14 @@ function updateGameUI(table) {
 
   if (roundIdSpan) roundIdSpan.textContent = table.roundCode || "-";
 
-  // Sync timer from server, then local timer keeps it smooth
   displayRemainingSeconds = table.timeRemaining || 0;
   renderTimer();
 
-  // Update goals + my bets
   updateGoalsFromBets(table.bets || []);
   updateMyBets(table.bets || []);
 
   if (playerCountSpan) playerCountSpan.textContent = table.playersCount || 0;
 
-  // Betting enabled/disabled
   const maxPlayers = typeof table.maxPlayers === "number" ? table.maxPlayers : null;
   const isFull = maxPlayers !== null && (table.playersCount >= maxPlayers);
 
@@ -689,26 +735,20 @@ function updateGameUI(table) {
 
   const hasResult = table.resultValue !== null && table.resultValue !== undefined && table.resultValue !== "";
 
-  // kick appear at 4 sec, freeze at 2 sec
   maybeStartKickVideo();
   freezeKickVideoAt2s();
 
-  // shoot ball at <= 2 seconds remaining when result exists
   if (hasResult && table.timeRemaining <= 2) {
     const roundId = table.roundCode || "__no_round__";
     if (shotShownForRound !== roundId) {
       shotShownForRound = roundId;
 
       setStatus(`Winning number: ${table.resultValue}`, "ok");
-
-      // ✅ FIX: don't always force goals[0]
       ensureGoalForWinningNumber(table.resultValue, table.roundCode);
-
       shootBallToWinningNumber(table.resultValue);
     }
   }
 
-  // Popup only when finished, after the ball animation
   if (hasResult && table.isFinished) {
     const roundId = table.roundCode || "__no_round__";
     if (popupShownForRound !== roundId) {
@@ -728,7 +768,7 @@ function updateGameUI(table) {
       setTimeout(() => {
         cleanupKickVideo();
         showEndPopup(outcomeInfo);
-      }, 1400);
+      }, 2100); // slower (was 1400)
     }
   }
 }
@@ -737,7 +777,6 @@ function startPolling() {
   fetchTableData();
   if (tablePollInterval) clearInterval(tablePollInterval);
 
-  // faster polling helps not miss the 4s / 2s windows
   tablePollInterval = setInterval(() => {
     if (!gameFinished) fetchTableData();
   }, 1000);
@@ -758,7 +797,6 @@ async function fetchBalance() {
 }
 
 function joinGameRoom() {
-  // support both event names
   socket.emit("join_game", { game_type: GAME, user_id: USER_ID });
   socket.emit("joingame", { game_type: GAME, user_id: USER_ID });
 }
@@ -769,7 +807,6 @@ socket.on("connect", () => {
   fetchTableData();
 });
 
-// support both naming styles from backend
 function handleBetSuccess(payload) {
   if (gameFinished) return;
 
