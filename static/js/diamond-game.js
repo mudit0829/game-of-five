@@ -1,5 +1,4 @@
 // ================= BASIC SETUP =================
-// ✅ CRITICAL: Use window.* variables
 
 const GAME = window.GAME_TYPE || "diamond";
 const FIXED_BET_AMOUNT = window.FIXED_BET_AMOUNT || 100;
@@ -95,7 +94,6 @@ function disableBettingUI() {
   numChips.forEach((chip) => (chip.disabled = true));
 }
 
-// ✅ FIXED: Update my bets display
 function updateMyBets(bets) {
   const myBets = (bets || []).filter((b) => {
     const betUserId = String(b.user_id || b.userId || "");
@@ -116,7 +114,6 @@ function updateMyBets(bets) {
   }
 }
 
-// ✅ FIXED: Update targets from bets
 function updateTargetsFromBets(bets) {
   const list = (bets || []).slice(0, 6);
 
@@ -211,7 +208,7 @@ function syncUrlWithTable(roundCode) {
   }
 }
 
-// ================= ARROW + DOTTED PATH (SYNCED) =================
+// ================= ARROW + DOTTED PATH (LOCKED SYNC) =================
 
 let _shotToken = 0;
 let _stuckArrows = [];
@@ -227,7 +224,6 @@ function ensureAnimStyles() {
       35% { opacity: 1; transform: translate(-50%, -50%) scale(1.0); }
       100% { opacity: 0; transform: translate(-50%, -50%) scale(1.35); }
     }
-
     @keyframes diamondPathIn { from { opacity: 0; } to { opacity: 1; } }
     @keyframes diamondPathOut { to { opacity: 0; } }
     @keyframes diamondDash { to { stroke-dashoffset: -26; } }
@@ -266,9 +262,10 @@ function clearShotPath() {
   if (_shotSvg) _shotSvg.innerHTML = "";
 }
 
+// returns the created SVG path element
 function drawShotPath(rangeW, rangeH, startX, startY, ctrlX, ctrlY, endX, endY, flightMs) {
   const svg = ensureShotSvg();
-  if (!svg) return;
+  if (!svg) return null;
 
   svg.setAttribute("viewBox", `0 0 ${rangeW} ${rangeH}`);
   svg.innerHTML = "";
@@ -292,6 +289,7 @@ function drawShotPath(rangeW, rangeH, startX, startY, ctrlX, ctrlY, endX, endY, 
     `diamondPathOut ${fadeOut}ms ease-in ${fadeOutDelay}ms forwards`;
 
   svg.appendChild(path);
+  return path;
 }
 
 function resetArrowToBow() {
@@ -343,7 +341,6 @@ function shootArrowToWinningNumber(winningNumber) {
   const targetRect = target.getBoundingClientRect();
   const arrowRect = arrowImg.getBoundingClientRect();
 
-  // Use range layout size for consistent coordinates
   const rangeW = Math.max(1, rangeEl.clientWidth || Math.round(rangeRect.width));
   const rangeH = Math.max(1, rangeEl.clientHeight || Math.round(rangeRect.height));
 
@@ -360,15 +357,13 @@ function shootArrowToWinningNumber(winningNumber) {
     y: rangeRect.top + localY * scaleY,
   });
 
-  // ✅ IMPORTANT: Use CENTER anchor for both dotted path and arrow.
-  // This removes drift caused by sprite tip offsets/scales.
+  // Use arrow CENTER as anchor (most stable)
   const arrowW = arrowImg.offsetWidth || 52;
   const arrowH = arrowImg.offsetHeight || Math.max(14, Math.round(arrowW * 0.28));
-
   const ax = arrowW * 0.5;
   const ay = arrowH * 0.5;
 
-  // Start at arrow center
+  // Start at arrow center (client -> local)
   const startLocal = toLocal(
     arrowRect.left + arrowRect.width * 0.5,
     arrowRect.top + arrowRect.height * 0.5
@@ -376,7 +371,7 @@ function shootArrowToWinningNumber(winningNumber) {
   const startX = startLocal.x;
   const startY = startLocal.y;
 
-  // End at target center
+  // End at target center (client -> local)
   const endLocal = toLocal(
     targetRect.left + targetRect.width * 0.5,
     targetRect.top + targetRect.height * 0.5
@@ -388,34 +383,34 @@ function shootArrowToWinningNumber(winningNumber) {
   const dy = endY - startY;
   const dist = Math.hypot(dx, dy);
 
-  // Arc
   const midX = (startX + endX) / 2;
   const midY = (startY + endY) / 2;
   const lift = Math.min(90, Math.max(32, dist * 0.16));
   const ctrlX = midX;
   const ctrlY = midY - lift;
 
-  // ✅ Slower by 50%
+  // 50% slower
   const duration = 1080;
 
-  // Draw dotted path with same duration
-  drawShotPath(rangeW, rangeH, startX, startY, ctrlX, ctrlY, endX, endY, duration);
+  // Draw path and get the element
+  const pathEl = drawShotPath(rangeW, rangeH, startX, startY, ctrlX, ctrlY, endX, endY, duration);
+  if (!pathEl) return;
 
-  // Flying arrow clone
+  // Clone arrow for flight
   const flying = arrowImg.cloneNode(true);
   flying.removeAttribute("id");
   flying.style.position = "absolute";
   flying.style.left = "0px";
   flying.style.top = "0px";
   flying.style.width = arrowW + "px";
-  flying.style.height = arrowH + "px";
+  flying.style.height = "auto";
   flying.style.pointerEvents = "none";
   flying.style.zIndex = "60";
   flying.style.willChange = "transform";
   flying.style.filter = "drop-shadow(0 10px 14px rgba(0,0,0,0.70))";
   flying.style.transformOrigin = `${ax}px ${ay}px`;
-
   rangeEl.appendChild(flying);
+
   arrowImg.style.opacity = "0";
 
   archerImg.classList.add("shoot");
@@ -423,14 +418,8 @@ function shootArrowToWinningNumber(winningNumber) {
 
   const startTime = performance.now();
 
-  const bezier = (t, p0, p1, p2) => {
-    const u = 1 - t;
-    return u * u * p0 + 2 * u * t * p1 + t * t * p2;
-  };
-  const bezierDeriv = (t, p0, p1, p2) => 2 * (1 - t) * (p1 - p0) + 2 * t * (p2 - p1);
-  const easeOutCubic = (t) => 1 - Math.pow(1 - t, 3);
-
-  const aimAngle = Math.atan2(dy, dx) * (180 / Math.PI);
+  // Use the SAME SVG path for arrow trajectory (perfect sync)
+  const totalLen = pathEl.getTotalLength();
 
   function step(now) {
     if (token !== _shotToken) {
@@ -440,37 +429,34 @@ function shootArrowToWinningNumber(winningNumber) {
       return;
     }
 
-    const raw = (now - startTime) / duration;
-    const tr = Math.min(Math.max(raw, 0), 1);
-    const t = easeOutCubic(tr);
+    const tr = Math.min(Math.max((now - startTime) / duration, 0), 1);
+    const t = 1 - Math.pow(1 - tr, 3); // easeOutCubic
 
-    const x = bezier(t, startX, ctrlX, endX);
-    const y = bezier(t, startY, ctrlY, endY);
+    const L = t * totalLen;
+    const p = pathEl.getPointAtLength(L);
 
-    const vx = bezierDeriv(t, startX, ctrlX, endX);
-    const vy = bezierDeriv(t, startY, ctrlY, endY);
-    const tangentAngle = Math.atan2(vy, vx) * (180 / Math.PI);
-
-    const mix = Math.min(1, t * 1.15);
-    const angle = aimAngle + (tangentAngle - aimAngle) * mix;
+    // tangent: sample a tiny step forward
+    const eps = 0.75;
+    const p2 = pathEl.getPointAtLength(Math.min(totalLen, L + eps));
+    const angle = Math.atan2(p2.y - p.y, p2.x - p.x) * (180 / Math.PI);
 
     const scale = 1 - t * 0.08;
 
     flying.style.transform =
-      `translate(${x - ax}px, ${y - ay}px) rotate(${angle}deg) scale(${scale})`;
+      `translate(${p.x - ax}px, ${p.y - ay}px) rotate(${angle}deg) scale(${scale})`;
 
     if (tr < 1) {
       requestAnimationFrame(step);
       return;
     }
 
+    // Impact
     clearShotPath();
     target.classList.add("win");
     flashTarget(target);
-
     flying.remove();
 
-    // Stick arrow into target using CENTER anchor (scaled-safe)
+    // Stick arrow into target (center anchor)
     const hitClient = toClient(endX, endY);
 
     const targetW = Math.max(1, target.clientWidth || Math.round(targetRect.width));
@@ -487,7 +473,7 @@ function shootArrowToWinningNumber(winningNumber) {
     stuck.style.left = (stickLocalX - ax) + "px";
     stuck.style.top = (stickLocalY - ay) + "px";
     stuck.style.width = arrowW + "px";
-    stuck.style.height = arrowH + "px";
+    stuck.style.height = "auto";
     stuck.style.pointerEvents = "none";
     stuck.style.zIndex = "3";
     stuck.style.transformOrigin = `${ax}px ${ay}px`;
@@ -496,7 +482,6 @@ function shootArrowToWinningNumber(winningNumber) {
 
     const finalAngle = angle + (-6 + Math.random() * 12);
     stuck.style.transform = `rotate(${finalAngle}deg) translateX(10px)`;
-
     target.appendChild(stuck);
     _stuckArrows.push(stuck);
 
@@ -660,7 +645,6 @@ socket.on("connect", () => {
 socket.on("connect_error", (error) => console.error("[socket] CONNECTION ERROR:", error));
 socket.on("disconnect", () => {});
 
-// ✅ LISTEN FOR OWN BET SUCCESS
 socket.on("bet_success", (payload) => {
   if (gameFinished) return;
 
@@ -676,7 +660,6 @@ socket.on("bet_success", (payload) => {
   }
 });
 
-// ✅ LISTEN FOR BROADCAST TABLE UPDATES
 socket.on("update_table", (payload) => {
   if (gameFinished) return;
 
@@ -694,7 +677,6 @@ socket.on("update_table", (payload) => {
   if (payload.is_betting_closed) disableBettingUI();
 });
 
-// ✅ LISTEN FOR BET ERRORS
 socket.on("bet_error", (payload) => {
   if (gameFinished) return;
   setStatus(payload.message || "Bet error", "error");
