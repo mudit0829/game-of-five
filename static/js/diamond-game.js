@@ -208,7 +208,15 @@ function syncUrlWithTable(roundCode) {
   }
 }
 
-// ================= ARROW + DOTTED PATH (LOCKED SYNC) =================
+// ================= ARROW + DOTTED PATH (FIXED ONCE) =================
+
+// ✅ Adjust ONLY these 2 values if arrow still looks offset
+// Tip position inside your arrow sprite (0..1). Increase TIP_X_RATIO if arrow looks behind the path.
+const TIP_X_RATIO = 0.90; // try 0.88, 0.92, 0.95
+const TIP_Y_RATIO = 0.52; // try 0.50, 0.55
+
+const SHOT_DURATION_MS = 1080; // 50% slower than old 720ms
+const DEBUG_SHOW_ANCHOR_DOT = false; // set true only for testing
 
 let _shotToken = 0;
 let _stuckArrows = [];
@@ -238,16 +246,21 @@ function clearStuckArrows() {
 
 function ensureShotSvg() {
   if (!rangeEl) return null;
+
+  // Make sure range is a positioning context
+  try {
+    const pos = getComputedStyle(rangeEl).position;
+    if (pos === "static") rangeEl.style.position = "relative";
+  } catch {}
+
   if (_shotSvg && _shotSvg.isConnected) return _shotSvg;
 
   const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
   svg.setAttribute("preserveAspectRatio", "none");
-
   svg.setAttribute("width", "100%");
   svg.setAttribute("height", "100%");
   svg.style.width = "100%";
   svg.style.height = "100%";
-
   svg.style.position = "absolute";
   svg.style.inset = "0";
   svg.style.pointerEvents = "none";
@@ -262,10 +275,9 @@ function clearShotPath() {
   if (_shotSvg) _shotSvg.innerHTML = "";
 }
 
-// returns the created SVG path element
 function drawShotPath(rangeW, rangeH, startX, startY, ctrlX, ctrlY, endX, endY, flightMs) {
   const svg = ensureShotSvg();
-  if (!svg) return null;
+  if (!svg) return { pathEl: null, dotEl: null };
 
   svg.setAttribute("viewBox", `0 0 ${rangeW} ${rangeH}`);
   svg.innerHTML = "";
@@ -289,7 +301,18 @@ function drawShotPath(rangeW, rangeH, startX, startY, ctrlX, ctrlY, endX, endY, 
     `diamondPathOut ${fadeOut}ms ease-in ${fadeOutDelay}ms forwards`;
 
   svg.appendChild(path);
-  return path;
+
+  let dot = null;
+  if (DEBUG_SHOW_ANCHOR_DOT) {
+    dot = document.createElementNS("http://www.w3.org/2000/svg", "circle");
+    dot.setAttribute("r", "4");
+    dot.setAttribute("fill", "rgba(34,197,94,0.95)");
+    dot.setAttribute("stroke", "rgba(15,23,42,0.8)");
+    dot.setAttribute("stroke-width", "2");
+    svg.appendChild(dot);
+  }
+
+  return { pathEl: path, dotEl: dot };
 }
 
 function resetArrowToBow() {
@@ -337,13 +360,14 @@ function shootArrowToWinningNumber(winningNumber) {
   clearShotPath();
   resetArrowToBow();
 
+  // Client rectangles (screen coords)
   const rangeRect = rangeEl.getBoundingClientRect();
   const targetRect = target.getBoundingClientRect();
-  const arrowRect = arrowImg.getBoundingClientRect();
+  const arrowRect = arrowImg.getBoundingClientRect(); // includes transforms; that's OK for getting start in client coords [web:100]
 
+  // Local coordinate system = range layout size
   const rangeW = Math.max(1, rangeEl.clientWidth || Math.round(rangeRect.width));
   const rangeH = Math.max(1, rangeEl.clientHeight || Math.round(rangeRect.height));
-
   const scaleX = (rangeRect.width / rangeW) || 1;
   const scaleY = (rangeRect.height / rangeH) || 1;
 
@@ -357,21 +381,22 @@ function shootArrowToWinningNumber(winningNumber) {
     y: rangeRect.top + localY * scaleY,
   });
 
-  // Use arrow CENTER as anchor (most stable)
-  const arrowW = arrowImg.offsetWidth || 52;
-  const arrowH = arrowImg.offsetHeight || Math.max(14, Math.round(arrowW * 0.28));
-  const ax = arrowW * 0.5;
-  const ay = arrowH * 0.5;
+  // Arrow local size (layout px)
+  const arrowW = arrowImg.offsetWidth || Math.max(1, arrowRect.width / scaleX);
+  const arrowH = arrowImg.offsetHeight || Math.max(14, arrowRect.height / scaleY);
 
-  // Start at arrow center (client -> local)
-  const startLocal = toLocal(
-    arrowRect.left + arrowRect.width * 0.5,
-    arrowRect.top + arrowRect.height * 0.5
-  );
+  // ✅ Anchor point = arrow tip (or the point you want to follow the path)
+  const ax = arrowW * TIP_X_RATIO;
+  const ay = arrowH * TIP_Y_RATIO;
+
+  // Start point = arrow tip in client coords, then convert to local
+  const startClientX = arrowRect.left + arrowRect.width * TIP_X_RATIO;
+  const startClientY = arrowRect.top + arrowRect.height * TIP_Y_RATIO;
+  const startLocal = toLocal(startClientX, startClientY);
   const startX = startLocal.x;
   const startY = startLocal.y;
 
-  // End at target center (client -> local)
+  // End point = target center (client -> local)
   const endLocal = toLocal(
     targetRect.left + targetRect.width * 0.5,
     targetRect.top + targetRect.height * 0.5
@@ -383,17 +408,15 @@ function shootArrowToWinningNumber(winningNumber) {
   const dy = endY - startY;
   const dist = Math.hypot(dx, dy);
 
+  // Arc control point
   const midX = (startX + endX) / 2;
   const midY = (startY + endY) / 2;
   const lift = Math.min(90, Math.max(32, dist * 0.16));
   const ctrlX = midX;
   const ctrlY = midY - lift;
 
-  // 50% slower
-  const duration = 1080;
-
-  // Draw path and get the element
-  const pathEl = drawShotPath(rangeW, rangeH, startX, startY, ctrlX, ctrlY, endX, endY, duration);
+  // Draw dotted path (and use SAME path element for arrow movement) [web:120]
+  const { pathEl, dotEl } = drawShotPath(rangeW, rangeH, startX, startY, ctrlX, ctrlY, endX, endY, SHOT_DURATION_MS);
   if (!pathEl) return;
 
   // Clone arrow for flight
@@ -409,17 +432,19 @@ function shootArrowToWinningNumber(winningNumber) {
   flying.style.willChange = "transform";
   flying.style.filter = "drop-shadow(0 10px 14px rgba(0,0,0,0.70))";
   flying.style.transformOrigin = `${ax}px ${ay}px`;
-  rangeEl.appendChild(flying);
 
+  rangeEl.appendChild(flying);
   arrowImg.style.opacity = "0";
 
   archerImg.classList.add("shoot");
   setTimeout(() => archerImg.classList.remove("shoot"), 350);
 
   const startTime = performance.now();
-
-  // Use the SAME SVG path for arrow trajectory (perfect sync)
   const totalLen = pathEl.getTotalLength();
+
+  function easeOutCubic(t) {
+    return 1 - Math.pow(1 - t, 3);
+  }
 
   function step(now) {
     if (token !== _shotToken) {
@@ -429,21 +454,27 @@ function shootArrowToWinningNumber(winningNumber) {
       return;
     }
 
-    const tr = Math.min(Math.max((now - startTime) / duration, 0), 1);
-    const t = 1 - Math.pow(1 - tr, 3); // easeOutCubic
+    const tr = Math.min(Math.max((now - startTime) / SHOT_DURATION_MS, 0), 1);
+    const t = easeOutCubic(tr);
 
     const L = t * totalLen;
-    const p = pathEl.getPointAtLength(L);
+    const p = pathEl.getPointAtLength(L); // point on path [web:120]
 
-    // tangent: sample a tiny step forward
-    const eps = 0.75;
+    // tangent angle (small step ahead)
+    const eps = 0.9;
     const p2 = pathEl.getPointAtLength(Math.min(totalLen, L + eps));
     const angle = Math.atan2(p2.y - p.y, p2.x - p.x) * (180 / Math.PI);
 
     const scale = 1 - t * 0.08;
 
+    // ✅ Place so that ANCHOR (ax,ay) is exactly on the path point (p.x,p.y)
     flying.style.transform =
       `translate(${p.x - ax}px, ${p.y - ay}px) rotate(${angle}deg) scale(${scale})`;
+
+    if (dotEl) {
+      dotEl.setAttribute("cx", String(p.x));
+      dotEl.setAttribute("cy", String(p.y));
+    }
 
     if (tr < 1) {
       requestAnimationFrame(step);
@@ -456,7 +487,7 @@ function shootArrowToWinningNumber(winningNumber) {
     flashTarget(target);
     flying.remove();
 
-    // Stick arrow into target (center anchor)
+    // Stick arrow into target using the same anchor conversion (scaled-safe)
     const hitClient = toClient(endX, endY);
 
     const targetW = Math.max(1, target.clientWidth || Math.round(targetRect.width));
@@ -482,6 +513,7 @@ function shootArrowToWinningNumber(winningNumber) {
 
     const finalAngle = angle + (-6 + Math.random() * 12);
     stuck.style.transform = `rotate(${finalAngle}deg) translateX(10px)`;
+
     target.appendChild(stuck);
     _stuckArrows.push(stuck);
 
