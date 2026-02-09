@@ -648,9 +648,9 @@ body {
 
 /* Idle arrow can be above target image but below text */
 .arrow{
-  width: 42px !important;
-  left: 52px !important;
-  bottom: 22px !important;
-  z-index: 20 !important;  /* below .pad-number/.pad-user */
+  width: 42px;
+  left: 52px;
+  bottom: 22px;
+  z-index: 20;  /* below .pad-number/.pad-user */
   pointer-events: none;
 }
