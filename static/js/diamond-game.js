@@ -267,7 +267,8 @@ function clearShotPath() {
   if (_shotSvg) _shotSvg.innerHTML = "";
 }
 
-function drawShotPath(rangeW, rangeH, startX, startY, ctrlX, ctrlY, endX, endY) {
+// ✅ UPDATED: takes flightMs so dotted path stays in sync with arrow speed
+function drawShotPath(rangeW, rangeH, startX, startY, ctrlX, ctrlY, endX, endY, flightMs) {
   const svg = ensureShotSvg();
   if (!svg) return;
 
@@ -283,9 +284,15 @@ function drawShotPath(rangeW, rangeH, startX, startY, ctrlX, ctrlY, endX, endY) 
   path.setAttribute("stroke-dasharray", "2 10");
   path.style.filter = "drop-shadow(0 8px 12px rgba(0,0,0,0.55))";
 
-  // Fade in quickly, animate dash while arrow is flying, then fade out
+  const fadeIn = 160;
+  const fadeOut = Math.max(280, Math.round(flightMs * 0.38));
+  const fadeOutDelay = Math.max(0, flightMs - fadeOut);
+
+  // Fade in quickly, animate dash while arrow is flying, then fade out near impact
   path.style.animation =
-    "diamondPathIn 140ms ease-out, diamondDash 520ms linear infinite, diamondPathOut 520ms ease-in 280ms forwards";
+    `diamondPathIn ${fadeIn}ms ease-out, ` +
+    `diamondDash ${flightMs}ms linear infinite, ` +
+    `diamondPathOut ${fadeOut}ms ease-in ${fadeOutDelay}ms forwards`;
 
   svg.appendChild(path);
 }
@@ -387,8 +394,11 @@ function shootArrowToWinningNumber(winningNumber) {
   const ctrlX = midX;
   const ctrlY = midY - lift;
 
-  // Dotted guide path
-  drawShotPath(rangeW, rangeH, startX, startY, ctrlX, ctrlY, endX, endY);
+  // ✅ 50% slower arrow (720ms -> 1080ms)
+  const duration = 1080;
+
+  // Dotted guide path synced with the same duration
+  drawShotPath(rangeW, rangeH, startX, startY, ctrlX, ctrlY, endX, endY, duration);
 
   // Clone arrow for flight; keep original hidden
   const flying = arrowImg.cloneNode(true);
@@ -413,7 +423,6 @@ function shootArrowToWinningNumber(winningNumber) {
   archerImg.classList.add("shoot");
   setTimeout(() => archerImg.classList.remove("shoot"), 350);
 
-  const duration = 720;
   const startTime = performance.now();
 
   const bezier = (t, p0, p1, p2) => {
