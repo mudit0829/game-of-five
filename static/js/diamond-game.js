@@ -285,7 +285,7 @@ function drawShotPath(rangeW, rangeH, startX, startY, ctrlX, ctrlY, endX, endY, 
   path.style.filter = "drop-shadow(0 8px 12px rgba(0,0,0,0.55))";
 
   const fadeIn = 160;
-  const fadeOut = Math.max(280, Math.round(flightMs * 0.38));
+  const fadeOut = Math.max(320, Math.round(flightMs * 0.40));
   const fadeOutDelay = Math.max(0, flightMs - fadeOut);
 
   // Fade in quickly, animate dash while arrow is flying, then fade out near impact
@@ -351,8 +351,8 @@ function shootArrowToWinningNumber(winningNumber) {
   const rangeW = Math.max(1, rangeEl.clientWidth || Math.round(rangeRect.width));
   const rangeH = Math.max(1, rangeEl.clientHeight || Math.round(rangeRect.height));
 
-  const scaleX = rangeRect.width / rangeW || 1;
-  const scaleY = rangeRect.height / rangeH || 1;
+  const scaleX = (rangeRect.width / rangeW) || 1;
+  const scaleY = (rangeRect.height / rangeH) || 1;
 
   const toLocal = (clientX, clientY) => ({
     x: (clientX - rangeRect.left) / scaleX,
@@ -364,14 +364,22 @@ function shootArrowToWinningNumber(winningNumber) {
     y: rangeRect.top + localY * scaleY,
   });
 
-  // Tip anchor in the arrow image (tune if your sprite has extra transparent padding)
-  const arrowW = arrowRect.width || 52;
-  const arrowH = arrowRect.height || Math.max(14, Math.round(arrowW * 0.28));
+  // ✅ IMPORTANT: use LAYOUT size for arrow (prevents sideways drift on scaled UI)
+  // offsetWidth/offsetHeight are layout sizes; getBoundingClientRect is rendered size.
+  const arrowW = arrowImg.offsetWidth || Math.max(1, (arrowRect.width || 52) / scaleX);
+  const arrowH =
+    arrowImg.offsetHeight ||
+    Math.max(14, Math.round(((arrowRect.height || 0) / scaleY) || (arrowW * 0.28)));
+
+  // Tip anchor (in LOCAL px)
   const tipAx = arrowW * 0.88;
   const tipAy = arrowH * 0.55;
 
-  // Start at arrow tip (converted to range local coords)
-  const startLocal = toLocal(arrowRect.left + tipAx, arrowRect.top + tipAy);
+  // Start at arrow tip: compute tip in CLIENT px, then convert to local
+  const tipClientX = arrowRect.left + tipAx * scaleX;
+  const tipClientY = arrowRect.top + tipAy * scaleY;
+
+  const startLocal = toLocal(tipClientX, tipClientY);
   const startX = startLocal.x;
   const startY = startLocal.y;
 
@@ -390,11 +398,11 @@ function shootArrowToWinningNumber(winningNumber) {
   // Gentle arc
   const midX = (startX + endX) / 2;
   const midY = (startY + endY) / 2;
-  const lift = Math.min(80, Math.max(28, dist * 0.14));
+  const lift = Math.min(90, Math.max(32, dist * 0.16));
   const ctrlX = midX;
   const ctrlY = midY - lift;
 
-  // ✅ 50% slower arrow (720ms -> 1080ms)
+  // ✅ 50% slower arrow (previously 720ms)
   const duration = 1080;
 
   // Dotted guide path synced with the same duration
@@ -413,7 +421,7 @@ function shootArrowToWinningNumber(winningNumber) {
   flying.style.willChange = "transform";
   flying.style.filter = "drop-shadow(0 10px 14px rgba(0,0,0,0.70))";
 
-  // ✅ Rotate/scale around the TIP, so the tip stays on the curve
+  // Rotate/scale around the TIP, so the tip stays on the curve
   flying.style.transformOrigin = `${tipAx}px ${tipAy}px`;
 
   rangeEl.appendChild(flying);
@@ -460,7 +468,7 @@ function shootArrowToWinningNumber(winningNumber) {
 
     const scale = 1 - t * 0.08;
 
-    // ✅ Place top-left so that the TIP is at (x,y)
+    // Place so that TIP is at (x,y)
     flying.style.transform =
       `translate(${x - tipAx}px, ${y - tipAy}px) rotate(${angle}deg) scale(${scale})`;
 
@@ -476,16 +484,22 @@ function shootArrowToWinningNumber(winningNumber) {
 
     flying.remove();
 
-    // Stick arrow inside target with TIP anchoring
+    // Stick arrow inside target with TIP anchoring (handle scaled targets too)
     const hitClient = toClient(endX, endY);
-    const stickTipX = hitClient.x - targetRect.left;
-    const stickTipY = hitClient.y - targetRect.top;
+
+    const targetW = Math.max(1, target.clientWidth || Math.round(targetRect.width));
+    const targetH = Math.max(1, target.clientHeight || Math.round(targetRect.height));
+    const tScaleX = (targetRect.width / targetW) || 1;
+    const tScaleY = (targetRect.height / targetH) || 1;
+
+    const stickLocalX = (hitClient.x - targetRect.left) / tScaleX;
+    const stickLocalY = (hitClient.y - targetRect.top) / tScaleY;
 
     const stuck = arrowImg.cloneNode(true);
     stuck.removeAttribute("id");
     stuck.style.position = "absolute";
-    stuck.style.left = (stickTipX - tipAx) + "px";
-    stuck.style.top = (stickTipY - tipAy) + "px";
+    stuck.style.left = (stickLocalX - tipAx) + "px";
+    stuck.style.top = (stickLocalY - tipAy) + "px";
     stuck.style.width = arrowW + "px";
     stuck.style.height = "auto";
     stuck.style.pointerEvents = "none";
