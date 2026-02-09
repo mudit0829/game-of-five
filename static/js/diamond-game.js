@@ -114,7 +114,25 @@ function updateMyBets(bets) {
   }
 }
 
+// ================= SHOT CONFIG =================
+
+// Adjust ONLY if you want tip-perfect hit.
+// If your arrow PNG has a lot of transparent space, these ratios change the anchor.
+const TIP_X_RATIO = 0.90;
+const TIP_Y_RATIO = 0.52;
+
+// 50% slower than old 720ms
+const SHOT_DURATION_MS = 1080;
+
+// Freeze target rendering while shot runs (prevents path/arrow mismatch after reflow)
+let _shotInProgress = false;
+
+// ================= TARGETS =================
+
 function updateTargetsFromBets(bets) {
+  // ✅ Do not move/replace pads while arrow is flying
+  if (_shotInProgress) return;
+
   const list = (bets || []).slice(0, 6);
 
   targets.forEach((target, i) => {
@@ -208,15 +226,7 @@ function syncUrlWithTable(roundCode) {
   }
 }
 
-// ================= ARROW + DOTTED PATH (FIXED ONCE) =================
-
-// ✅ Adjust ONLY these 2 values if arrow still looks offset
-// Tip position inside your arrow sprite (0..1). Increase TIP_X_RATIO if arrow looks behind the path.
-const TIP_X_RATIO = 0.90; // try 0.88, 0.92, 0.95
-const TIP_Y_RATIO = 0.52; // try 0.50, 0.55
-
-const SHOT_DURATION_MS = 1080; // 50% slower than old 720ms
-const DEBUG_SHOW_ANCHOR_DOT = false; // set true only for testing
+// ================= ARROW + DOTTED PATH (LOCKED) =================
 
 let _shotToken = 0;
 let _stuckArrows = [];
@@ -247,7 +257,7 @@ function clearStuckArrows() {
 function ensureShotSvg() {
   if (!rangeEl) return null;
 
-  // Make sure range is a positioning context
+  // make sure .range is positioning context
   try {
     const pos = getComputedStyle(rangeEl).position;
     if (pos === "static") rangeEl.style.position = "relative";
@@ -275,9 +285,26 @@ function clearShotPath() {
   if (_shotSvg) _shotSvg.innerHTML = "";
 }
 
+function flashTarget(target) {
+  const ring = document.createElement("div");
+  ring.style.position = "absolute";
+  ring.style.left = "50%";
+  ring.style.top = "50%";
+  ring.style.width = "92%";
+  ring.style.height = "92%";
+  ring.style.borderRadius = "50%";
+  ring.style.border = "2px solid rgba(56,189,248,0.9)";
+  ring.style.boxShadow = "0 0 18px rgba(56,189,248,0.7)";
+  ring.style.pointerEvents = "none";
+  ring.style.animation = "targetFlashRing 420ms ease-out";
+  ring.style.zIndex = "6";
+  target.appendChild(ring);
+  setTimeout(() => ring.remove(), 450);
+}
+
 function drawShotPath(rangeW, rangeH, startX, startY, ctrlX, ctrlY, endX, endY, flightMs) {
   const svg = ensureShotSvg();
-  if (!svg) return { pathEl: null, dotEl: null };
+  if (!svg) return null;
 
   svg.setAttribute("viewBox", `0 0 ${rangeW} ${rangeH}`);
   svg.innerHTML = "";
@@ -301,18 +328,7 @@ function drawShotPath(rangeW, rangeH, startX, startY, ctrlX, ctrlY, endX, endY, 
     `diamondPathOut ${fadeOut}ms ease-in ${fadeOutDelay}ms forwards`;
 
   svg.appendChild(path);
-
-  let dot = null;
-  if (DEBUG_SHOW_ANCHOR_DOT) {
-    dot = document.createElementNS("http://www.w3.org/2000/svg", "circle");
-    dot.setAttribute("r", "4");
-    dot.setAttribute("fill", "rgba(34,197,94,0.95)");
-    dot.setAttribute("stroke", "rgba(15,23,42,0.8)");
-    dot.setAttribute("stroke-width", "2");
-    svg.appendChild(dot);
-  }
-
-  return { pathEl: path, dotEl: dot };
+  return path;
 }
 
 function resetArrowToBow() {
@@ -329,23 +345,6 @@ function resetArrowToBow() {
   }
 }
 
-function flashTarget(target) {
-  const ring = document.createElement("div");
-  ring.style.position = "absolute";
-  ring.style.left = "50%";
-  ring.style.top = "50%";
-  ring.style.width = "92%";
-  ring.style.height = "92%";
-  ring.style.borderRadius = "50%";
-  ring.style.border = "2px solid rgba(56,189,248,0.9)";
-  ring.style.boxShadow = "0 0 18px rgba(56,189,248,0.7)";
-  ring.style.pointerEvents = "none";
-  ring.style.animation = "targetFlashRing 420ms ease-out";
-  ring.style.zIndex = "6";
-  target.appendChild(ring);
-  setTimeout(() => ring.remove(), 450);
-}
-
 function shootArrowToWinningNumber(winningNumber) {
   if (!rangeEl || !arrowImg || !archerImg) return;
 
@@ -356,18 +355,19 @@ function shootArrowToWinningNumber(winningNumber) {
 
   const token = ++_shotToken;
 
+  _shotInProgress = true;
+
   clearStuckArrows();
   clearShotPath();
   resetArrowToBow();
 
-  // Client rectangles (screen coords)
   const rangeRect = rangeEl.getBoundingClientRect();
   const targetRect = target.getBoundingClientRect();
-  const arrowRect = arrowImg.getBoundingClientRect(); // includes transforms; that's OK for getting start in client coords [web:100]
+  const arrowRect = arrowImg.getBoundingClientRect();
 
-  // Local coordinate system = range layout size
   const rangeW = Math.max(1, rangeEl.clientWidth || Math.round(rangeRect.width));
   const rangeH = Math.max(1, rangeEl.clientHeight || Math.round(rangeRect.height));
+
   const scaleX = (rangeRect.width / rangeW) || 1;
   const scaleY = (rangeRect.height / rangeH) || 1;
 
@@ -376,27 +376,23 @@ function shootArrowToWinningNumber(winningNumber) {
     y: (clientY - rangeRect.top) / scaleY,
   });
 
-  const toClient = (localX, localY) => ({
-    x: rangeRect.left + localX * scaleX,
-    y: rangeRect.top + localY * scaleY,
-  });
-
-  // Arrow local size (layout px)
+  // Arrow layout size (stable)
   const arrowW = arrowImg.offsetWidth || Math.max(1, arrowRect.width / scaleX);
   const arrowH = arrowImg.offsetHeight || Math.max(14, arrowRect.height / scaleY);
 
-  // ✅ Anchor point = arrow tip (or the point you want to follow the path)
+  // Anchor inside arrow (tip)
   const ax = arrowW * TIP_X_RATIO;
   const ay = arrowH * TIP_Y_RATIO;
 
-  // Start point = arrow tip in client coords, then convert to local
-  const startClientX = arrowRect.left + arrowRect.width * TIP_X_RATIO;
-  const startClientY = arrowRect.top + arrowRect.height * TIP_Y_RATIO;
-  const startLocal = toLocal(startClientX, startClientY);
+  // Start (tip) from current arrow location
+  const startLocal = toLocal(
+    arrowRect.left + arrowRect.width * TIP_X_RATIO,
+    arrowRect.top + arrowRect.height * TIP_Y_RATIO
+  );
   const startX = startLocal.x;
   const startY = startLocal.y;
 
-  // End point = target center (client -> local)
+  // End at target center
   const endLocal = toLocal(
     targetRect.left + targetRect.width * 0.5,
     targetRect.top + targetRect.height * 0.5
@@ -408,18 +404,19 @@ function shootArrowToWinningNumber(winningNumber) {
   const dy = endY - startY;
   const dist = Math.hypot(dx, dy);
 
-  // Arc control point
   const midX = (startX + endX) / 2;
   const midY = (startY + endY) / 2;
   const lift = Math.min(90, Math.max(32, dist * 0.16));
   const ctrlX = midX;
   const ctrlY = midY - lift;
 
-  // Draw dotted path (and use SAME path element for arrow movement) [web:120]
-  const { pathEl, dotEl } = drawShotPath(rangeW, rangeH, startX, startY, ctrlX, ctrlY, endX, endY, SHOT_DURATION_MS);
-  if (!pathEl) return;
+  const pathEl = drawShotPath(rangeW, rangeH, startX, startY, ctrlX, ctrlY, endX, endY, SHOT_DURATION_MS);
+  if (!pathEl) {
+    _shotInProgress = false;
+    return;
+  }
 
-  // Clone arrow for flight
+  // Flying arrow clone
   const flying = arrowImg.cloneNode(true);
   flying.removeAttribute("id");
   flying.style.position = "absolute";
@@ -439,18 +436,17 @@ function shootArrowToWinningNumber(winningNumber) {
   archerImg.classList.add("shoot");
   setTimeout(() => archerImg.classList.remove("shoot"), 350);
 
-  const startTime = performance.now();
   const totalLen = pathEl.getTotalLength();
+  const startTime = performance.now();
 
-  function easeOutCubic(t) {
-    return 1 - Math.pow(1 - t, 3);
-  }
+  const easeOutCubic = (t) => 1 - Math.pow(1 - t, 3);
 
   function step(now) {
     if (token !== _shotToken) {
       flying.remove();
       arrowImg.style.opacity = "1";
       clearShotPath();
+      _shotInProgress = false;
       return;
     }
 
@@ -458,70 +454,56 @@ function shootArrowToWinningNumber(winningNumber) {
     const t = easeOutCubic(tr);
 
     const L = t * totalLen;
-    const p = pathEl.getPointAtLength(L); // point on path [web:120]
+    const p = pathEl.getPointAtLength(L); // same path, so always synced
 
-    // tangent angle (small step ahead)
     const eps = 0.9;
     const p2 = pathEl.getPointAtLength(Math.min(totalLen, L + eps));
     const angle = Math.atan2(p2.y - p.y, p2.x - p.x) * (180 / Math.PI);
 
     const scale = 1 - t * 0.08;
 
-    // ✅ Place so that ANCHOR (ax,ay) is exactly on the path point (p.x,p.y)
     flying.style.transform =
       `translate(${p.x - ax}px, ${p.y - ay}px) rotate(${angle}deg) scale(${scale})`;
-
-    if (dotEl) {
-      dotEl.setAttribute("cx", String(p.x));
-      dotEl.setAttribute("cy", String(p.y));
-    }
 
     if (tr < 1) {
       requestAnimationFrame(step);
       return;
     }
 
-    // Impact
+    // Finish
+    flying.remove();
     clearShotPath();
+
+    // highlight correct target
     target.classList.add("win");
     flashTarget(target);
-    flying.remove();
 
-    // Stick arrow into target using the same anchor conversion (scaled-safe)
-    const hitClient = toClient(endX, endY);
-
-    const targetW = Math.max(1, target.clientWidth || Math.round(targetRect.width));
-    const targetH = Math.max(1, target.clientHeight || Math.round(targetRect.height));
-    const tScaleX = (targetRect.width / targetW) || 1;
-    const tScaleY = (targetRect.height / targetH) || 1;
-
-    const stickLocalX = (hitClient.x - targetRect.left) / tScaleX;
-    const stickLocalY = (hitClient.y - targetRect.top) / tScaleY;
-
+    // ✅ Stick arrow at EXACT endpoint in range (not inside target)
     const stuck = arrowImg.cloneNode(true);
     stuck.removeAttribute("id");
     stuck.style.position = "absolute";
-    stuck.style.left = (stickLocalX - ax) + "px";
-    stuck.style.top = (stickLocalY - ay) + "px";
+    stuck.style.left = "0px";
+    stuck.style.top = "0px";
     stuck.style.width = arrowW + "px";
     stuck.style.height = "auto";
     stuck.style.pointerEvents = "none";
-    stuck.style.zIndex = "3";
+    stuck.style.zIndex = "55";
     stuck.style.transformOrigin = `${ax}px ${ay}px`;
     stuck.style.filter = "drop-shadow(0 10px 14px rgba(0,0,0,0.75))";
     stuck.style.transition = "transform 160ms ease-out";
 
     const finalAngle = angle + (-6 + Math.random() * 12);
-    stuck.style.transform = `rotate(${finalAngle}deg) translateX(10px)`;
+    stuck.style.transform = `translate(${endX - ax}px, ${endY - ay}px) rotate(${finalAngle}deg) translateX(10px)`;
 
-    target.appendChild(stuck);
+    rangeEl.appendChild(stuck);
     _stuckArrows.push(stuck);
 
     requestAnimationFrame(() => {
-      stuck.style.transform = `rotate(${finalAngle}deg) translateX(0px)`;
+      stuck.style.transform = `translate(${endX - ax}px, ${endY - ay}px) rotate(${finalAngle}deg) translateX(0px)`;
     });
 
     arrowImg.style.opacity = "1";
+    _shotInProgress = false;
   }
 
   requestAnimationFrame(step);
@@ -548,6 +530,9 @@ async function fetchTableData() {
   try {
     const res = await fetch("/api/tables/diamond");
     const data = await res.json();
+
+    // If a request returns after game is finished, ignore it
+    if (gameFinished) return;
 
     if (!data.tables || !data.tables.length) {
       setStatus("No active tables", "error");
@@ -589,7 +574,8 @@ function updateGameUI(table) {
   displayRemainingSeconds = table.time_remaining || 0;
   renderTimer();
 
-  if (table.bets && Array.isArray(table.bets)) {
+  // ✅ Freeze target updates while shot is running
+  if (!_shotInProgress && table.bets && Array.isArray(table.bets)) {
     updateTargetsFromBets(table.bets);
     updateMyBets(table.bets);
     if (playerCountSpan) playerCountSpan.textContent = table.bets.length;
@@ -622,8 +608,11 @@ function updateGameUI(table) {
     lastResultShown = table.result;
 
     setStatus(`Winning number: ${table.result}`, "ok");
-    ensureTargetForWinningNumber(table.result);
-    shootArrowToWinningNumber(table.result);
+
+    if (!_shotInProgress) {
+      ensureTargetForWinningNumber(table.result);
+      shootArrowToWinningNumber(table.result);
+    }
 
     if (!gameFinished) {
       gameFinished = true;
@@ -685,7 +674,7 @@ socket.on("bet_success", (payload) => {
 
   if (typeof payload.new_balance === "number") updateWallet(payload.new_balance);
 
-  if (payload.players && Array.isArray(payload.players)) {
+  if (!_shotInProgress && payload.players && Array.isArray(payload.players)) {
     updateTargetsFromBets(payload.players);
     updateMyBets(payload.players);
     if (playerCountSpan) playerCountSpan.textContent = payload.players.length;
@@ -695,7 +684,7 @@ socket.on("bet_success", (payload) => {
 socket.on("update_table", (payload) => {
   if (gameFinished) return;
 
-  if (payload.players && Array.isArray(payload.players)) {
+  if (!_shotInProgress && payload.players && Array.isArray(payload.players)) {
     updateTargetsFromBets(payload.players);
     updateMyBets(payload.players);
     if (playerCountSpan) playerCountSpan.textContent = payload.players.length;
