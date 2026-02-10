@@ -71,8 +71,9 @@ const KICK_FREEZE_AT_REMAINING = 2;
 const KICK_SCALE = 0.21;
 
 // Fine tuning: move player relative to ball
-const KICK_SHIFT_X = -40;
-const KICK_SHIFT_Y = 10;
+// Less negative X = move player RIGHT (closer to ball)
+const KICK_SHIFT_X = -18; // ✅ was -40
+const KICK_SHIFT_Y = 4;   // ✅ was 10
 
 let kickResizeHandlerAttached = false;
 function attachKickResizeHandlerOnce() {
@@ -307,6 +308,7 @@ function positionKickVideoAtBall(v) {
 
   if (ballImg) {
     const r = ballImg.getBoundingClientRect();
+
     const x = r.left + r.width / 2 + KICK_SHIFT_X;
     const y = r.top + r.height + KICK_SHIFT_Y;
 
@@ -343,10 +345,14 @@ function ensureKickVideoElement() {
   v.style.width = "360px";
   v.style.height = "auto";
   v.style.pointerEvents = "none";
+
+  // Keep video behind the ball
   v.style.zIndex = "9";
+
   v.style.filter = "drop-shadow(0 12px 22px rgba(0,0,0,0.65))";
 
   document.body.appendChild(v);
+
   attachKickResizeHandlerOnce();
 
   return v;
@@ -427,7 +433,6 @@ function ensureTrajectoryStyles() {
 function ensureShotSvg() {
   if (!pitch) return null;
 
-  // ensure pitch is positioning context
   try {
     const pos = getComputedStyle(pitch).position;
     if (pos === "static") pitch.style.position = "relative";
@@ -498,7 +503,6 @@ function shootBallToWinningNumber(winningNumber) {
   const ballRect = ballImg.getBoundingClientRect();
   const goalRect = targetGoal.getBoundingClientRect();
 
-  // local coords in pitch
   const pitchW = Math.max(1, pitch.clientWidth || Math.round(pitchRect.width));
   const pitchH = Math.max(1, pitch.clientHeight || Math.round(pitchRect.height));
   const scaleX = (pitchRect.width / pitchW) || 1;
@@ -521,15 +525,19 @@ function shootBallToWinningNumber(winningNumber) {
   const dy = endY - startY;
   const dist = Math.hypot(dx, dy);
 
-  // arc (peak up)
   const midX = (startX + endX) / 2;
   const midY = (startY + endY) / 2;
   const lift = Math.min(130, Math.max(60, dist * 0.28));
   const ctrlX = midX;
   const ctrlY = midY - lift;
 
-  // Draw the dotted path and reuse that SAME path for the ball
-  const pathEl = drawDottedPath(pitchW, pitchH, startX, startY, ctrlX, ctrlY, endX, endY, BALL_SHOT_DURATION_MS);
+  const pathEl = drawDottedPath(
+    pitchW, pitchH,
+    startX, startY,
+    ctrlX, ctrlY,
+    endX, endY,
+    BALL_SHOT_DURATION_MS
+  );
   if (!pathEl) return;
 
   setTimeout(() => {
@@ -540,10 +548,9 @@ function shootBallToWinningNumber(winningNumber) {
     const ax = ballW * 0.5;
     const ay = ballH * 0.5;
 
-    // Clone ball so layout doesn't jump
     const flying = ballImg.cloneNode(true);
     flying.removeAttribute("id");
-    flying.removeAttribute("class"); // prevent CSS offsets on clone
+    flying.removeAttribute("class");
     flying.style.position = "absolute";
     flying.style.left = "0px";
     flying.style.top = "0px";
@@ -576,7 +583,6 @@ function shootBallToWinningNumber(winningNumber) {
       const L = t * totalLen;
       const p = pathEl.getPointAtLength(L);
 
-      // tangent for rotation
       const eps = 1.0;
       const p2 = pathEl.getPointAtLength(Math.min(totalLen, L + eps));
       const angle = Math.atan2(p2.y - p.y, p2.x - p.x) * (180 / Math.PI);
@@ -592,7 +598,6 @@ function shootBallToWinningNumber(winningNumber) {
         return;
       }
 
-      // impact
       clearShotPath();
       targetGoal.classList.add("win");
 
@@ -606,7 +611,7 @@ function shootBallToWinningNumber(winningNumber) {
       flash.style.background = "radial-gradient(circle, rgba(34,197,94,0.6) 0%, transparent 70%)";
       flash.style.borderRadius = "50%";
       flash.style.pointerEvents = "none";
-      flash.style.animation = "goalFlash 0.9s ease-out"; // slower
+      flash.style.animation = "goalFlash 0.9s ease-out";
       flash.style.zIndex = "100";
       targetGoal.appendChild(flash);
       setTimeout(() => flash.remove(), 900);
@@ -768,7 +773,7 @@ function updateGameUI(table) {
       setTimeout(() => {
         cleanupKickVideo();
         showEndPopup(outcomeInfo);
-      }, 2100); // slower (was 1400)
+      }, 2100);
     }
   }
 }
