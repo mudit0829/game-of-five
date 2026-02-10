@@ -505,7 +505,7 @@ body {
 }
 /* ── New Frog Jump Keyframe Animation ──────────────────────────────────────── */
 .frog-wrapper.jumping {
-  animation: jump-arc 5s ease-out forwards; /* Common arc for all directions - adjust duration to match video */
+ animation: jump-arc   900ms cubic-bezier(.2,.9,.2,1) forwards; /* Common arc for all directions - adjust duration to match video */
 }
 
 @keyframes jump-arc {
@@ -516,7 +516,7 @@ body {
 
 /* Direction-specific ending positions */
 .frog-wrapper.jump-left {
-  animation: jump-left 5s ease-out forwards;
+  animation: jump-left  900ms cubic-bezier(.2,.9,.2,1) forwards;
 }
 
 @keyframes jump-left {
@@ -526,7 +526,7 @@ body {
 }
 
 .frog-wrapper.jump-front {
-  animation: jump-front 5s ease-out forwards;
+  animation: jump-front 900ms cubic-bezier(.2,.9,.2,1) forwards;
 }
 
 @keyframes jump-front {
@@ -536,7 +536,7 @@ body {
 }
 
 .frog-wrapper.jump-right {
-  animation: jump-right 5s ease-out forwards;
+  animation: jump-right 900ms cubic-bezier(.2,.9,.2,1) forwards;
 }
 
 @keyframes jump-right {
