@@ -522,7 +522,7 @@ body {
 @keyframes jump-left {
   0% { transform: translate(-50%, -50%) scale(1); }
   30% { transform: translate(calc(-50% - 80px), calc(-50% - 100px)) scale(1.1); } /* Peak - adjust for arc */
-  100% { transform: translate(calc(-50% - 190px), -50%) scale(1); } /* Landing - adjust -160px for distance */
+  100% { transform: translate(calc(-50% - 160px), -50%) scale(1); } /* Landing - adjust -160px for distance */
 }
 
 .frog-wrapper.jump-front {
@@ -542,5 +542,5 @@ body {
 @keyframes jump-right {
   0% { transform: translate(-50%, -50%) scale(1); }
   30% { transform: translate(calc(-50% + 80px), calc(-50% - 100px)) scale(1.1); } /* Peak */
-  100% { transform: translate(calc(-50% + 130px), -50%) scale(1); } /* Landing - adjust +160px */
+  100% { transform: translate(calc(-50% + 160px), -50%) scale(1); } /* Landing - adjust +160px */
 }
