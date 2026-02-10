@@ -1,118 +1,133 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="UTF-8" />
-<title>{{ game.title }} – {{ game.name }}</title>
- <!-- ✅ Step 1: Better mobile viewport handling (notch safe) -->
-  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" /> <!-- [web:222] -->
+  <meta charset="UTF-8" />
+  <title>{{ game.title }} – {{ game.name }}</title>
 
-  <!-- Your existing game CSS -->
+  <!-- Step 1: notch-safe viewport -->
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+
+  <!-- Game CSS first -->
   <link rel="stylesheet" href="{{ url_for('static', filename='css/silver-game.css') }}" />
 
-  <!-- ✅ Step 3: Common uniform patch CSS (must be AFTER the game CSS) -->
+  <!-- Step 3: Uniform patch AFTER game CSS -->
   <link rel="stylesheet" href="{{ url_for('static', filename='css/game-uniform.css') }}" />
 </head>
 
-</head>
 <body>
-<div class="game-root">
-<header class="top-bar">
-  <div class="top-left">
-    <div class="game-label">GAME <span id="roundId">–</span></div>
-    <div class="players"><span id="playerCount">0</span> PLAYERS</div>
-    <div class="user-stats">
-      You: <span id="userName"></span> · Bets: <span id="userBetCount">0</span>
-    </div>
-  </div>
-  <div class="top-center">
-    <div class="timer-pill"><span id="timerText">--</span></div>
-  </div>
-  <div class="top-right">
-    <div class="coins">
-      <img src="{{ url_for('static', filename='img/coin.png') }}">
-      <span id="walletBalance">0</span>
-    </div>
-  </div>
-</header>
-<!-- POND -->
-<section class="pond">
-  <!-- Frog container -->
- <!-- Frog container (ONLY ONE IDLE FROG) -->
-<div id="frogContainer" class="frog-wrapper" aria-hidden="true">
-  <video
-    id="frogIdleVideo"
-    class="frog-video"
-    muted
-    playsinline
-    autoplay
-    loop
-    preload="auto"
-  >
-    <source src="/static/video/frog-idle.mp4" type="video/mp4">
-  </video>
-</div>
+  <div class="game-root">
+    <header class="top-bar">
+      <div class="top-left">
+        <div class="game-label">GAME <span id="roundId">–</span></div>
+        <div class="players"><span id="playerCount">0</span> PLAYERS</div>
+        <div class="user-stats">
+          You: <span id="userName"></span> · Bets: <span id="userBetCount">0</span>
+        </div>
+      </div>
 
-  <!-- Pads -->
-  <div class="pads">
-    <div class="pads-row">
-      {% for i in range(1,4) %}
-      <div class="pad" data-pad="{{ i }}">
-        <img src="{{ url_for('static', filename='img/lilypad.png') }}">
-        <span class="pad-number"></span>
-        <span class="pad-user"></span>
+      <div class="top-center">
+        <div class="timer-pill"><span id="timerText">--</span></div>
       </div>
-      {% endfor %}
-    </div>
-    <div class="pads-row">
-      {% for i in range(4,7) %}
-      <div class="pad" data-pad="{{ i }}">
-        <img src="{{ url_for('static', filename='img/lilypad.png') }}">
-        <span class="pad-number"></span>
-        <span class="pad-user"></span>
+
+      <div class="top-right">
+        <div class="coins">
+          <img src="{{ url_for('static', filename='img/coin.png') }}" alt="Coins">
+          <span id="walletBalance">0</span>
+        </div>
       </div>
-      {% endfor %}
+    </header>
+
+    <!-- POND -->
+    <section class="pond">
+      <!-- Frog container (ONLY ONE IDLE FROG) -->
+      <div id="frogContainer" class="frog-wrapper" aria-hidden="true">
+        <video
+          id="frogIdleVideo"
+          class="frog-video"
+          muted
+          playsinline
+          autoplay
+          loop
+          preload="auto"
+        >
+          <source src="/static/video/frog-idle.mp4" type="video/mp4">
+        </video>
+      </div>
+
+      <!-- Pads -->
+      <div class="pads">
+        <div class="pads-row">
+          {% for i in range(1,4) %}
+          <div class="pad" data-pad="{{ i }}">
+            <img src="{{ url_for('static', filename='img/lilypad.png') }}" alt="Pad">
+            <span class="pad-number"></span>
+            <span class="pad-user"></span>
+          </div>
+          {% endfor %}
+        </div>
+
+        <div class="pads-row">
+          {% for i in range(4,7) %}
+          <div class="pad" data-pad="{{ i }}">
+            <img src="{{ url_for('static', filename='img/lilypad.png') }}" alt="Pad">
+            <span class="pad-number"></span>
+            <span class="pad-user"></span>
+          </div>
+          {% endfor %}
+        </div>
+      </div>
+    </section>
+
+    <!-- CONTROLS -->
+    <section class="controls">
+      <div class="numbers-title">SELECT YOUR NUMBER (0–9)</div>
+
+      <div class="numbers-row">
+        {% for n in range(5) %}
+        <button class="num-chip" data-number="{{ n }}">{{ n }}</button>
+        {% endfor %}
+      </div>
+
+      <div class="numbers-row">
+        {% for n in range(5,10) %}
+        <button class="num-chip" data-number="{{ n }}">{{ n }}</button>
+        {% endfor %}
+      </div>
+
+      <div id="myBetsRow" class="my-bets-row"></div>
+
+      <button id="placeBetBtn" class="bet-button">
+        PLACE BET (₹{{ game.bet_amount }})
+      </button>
+
+      <div id="statusMessage" class="status"></div>
+    </section>
+  </div>
+
+  <!-- RESULT POPUP -->
+  <div id="resultPopup" class="result-popup" style="display:none">
+    <div class="popup-card">
+      <h2 id="popupTitle"></h2>
+      <p id="popupMessage"></p>
+      <div class="popup-actions">
+        <button id="popupHomeBtn">Home Page</button>
+        <button id="popupLobbyBtn">Silver Game Lobby</button>
+      </div>
     </div>
   </div>
-</section>
-<section class="controls">
-  <div class="numbers-title">SELECT YOUR NUMBER (0–9)</div>
-  <div class="numbers-row">
-    {% for n in range(5) %}
-    <button class="num-chip" data-number="{{ n }}">{{ n }}</button>
-    {% endfor %}
-  </div>
-  <div class="numbers-row">
-    {% for n in range(5,10) %}
-    <button class="num-chip" data-number="{{ n }}">{{ n }}</button>
-    {% endfor %}
-  </div>
-  <div id="myBetsRow" class="my-bets-row"></div>
-  <button id="placeBetBtn" class="bet-button">
-    PLACE BET (₹{{ game.bet_amount }})
-  </button>
-  <div id="statusMessage" class="status"></div>
-</section>
-</div>
-<div id="resultPopup" class="result-popup" style="display:none">
-  <div class="popup-card">
-    <h2 id="popupTitle"></h2>
-    <p id="popupMessage"></p>
-    <div class="popup-actions">
-      <button id="popupHomeBtn">Home Page</button>
-      <button id="popupLobbyBtn">Silver Game Lobby</button>
-    </div>
-  </div>
-</div>
-<!-- Load Socket.IO first -->
-<script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
-<!-- Pass variables to JS SAFELY -->
-<script>
-  window.GAME_TYPE = "{{ game_type or 'silver' }}";
-  window.FIXED_BET_AMOUNT = {{ game.bet_amount or 10 }};
-  window.GAME_USER_ID = {{ session['user_id'] or 0 }};
-  window.GAME_USERNAME = "{{ session['username'] or 'Player' }}";
-</script>
-<!-- Load game JS LAST -->
-<script src="{{ url_for('static', filename='js/silver-game.js') }}"></script>
+
+  <!-- Load Socket.IO first -->
+  <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
+
+  <!-- Pass variables to JS -->
+  <script>
+    window.GAME_TYPE = "{{ game_type or 'silver' }}";
+    window.FIXED_BET_AMOUNT = {{ game.bet_amount or 10 }};
+    window.GAME_USER_ID = {{ session['user_id'] or 0 }};
+    window.GAME_USERNAME = "{{ session['username'] or 'Player' }}";
+  </script>
+
+  <!-- Load game JS last -->
+  <script src="{{ url_for('static', filename='js/silver-game.js') }}"></script>
 </body>
 </html>
