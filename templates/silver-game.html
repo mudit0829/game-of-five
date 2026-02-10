@@ -3,8 +3,16 @@
 <head>
 <meta charset="UTF-8" />
 <title>{{ game.title }} – {{ game.name }}</title>
-<meta name="viewport" content="width=device-width, initial-scale=1" />
-<link rel="stylesheet" href="{{ url_for('static', filename='css/silver-game.css') }}" />
+ <!-- ✅ Step 1: Better mobile viewport handling (notch safe) -->
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" /> <!-- [web:222] -->
+
+  <!-- Your existing game CSS -->
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/silver-game.css') }}" />
+
+  <!-- ✅ Step 3: Common uniform patch CSS (must be AFTER the game CSS) -->
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/game-uniform.css') }}" />
+</head>
+
 </head>
 <body>
 <div class="game-root">
