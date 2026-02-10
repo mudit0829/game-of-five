@@ -58,5 +58,5 @@ html { outline: 6px solid red !important; }
 
 /* SILVER: move frog up a bit (big screens were looking too low) */
 .game-root .frog-wrapper{
-  top: 50% !important;   /* was 56% in silver-game.css */
+  top: 40% !important;   /* was 56% in silver-game.css */
 }
