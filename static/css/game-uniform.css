@@ -1,5 +1,5 @@
 /* ===== Uniform mobile patch (all games) ===== */
-
+html { outline: 6px solid red !important; }
 /* More stable full height than 100vh on mobile browsers */
 .game-root,
 .diamond-page,
