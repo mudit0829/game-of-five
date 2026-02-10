@@ -32,6 +32,25 @@
   max-height: 48svh;
 }
 
+/* ===== SILVER: stabilize pond + frog spacing across phones ===== */
+
+/* Pond height should not swing wildly with different screen heights */
+.game-root .pond{
+  height: clamp(240px, 33svh, 320px);
+  margin-bottom: clamp(12px, 2.5svh, 22px);
+}
+
+/* Pads spacing becomes consistent */
+.game-root .pads{
+  margin-top: clamp(34px, 6svh, 60px);
+}
+
+/* Controls shouldn't push layout differently on different phones */
+.game-root .controls{
+  margin-top: clamp(16px, 6svh, 80px);
+}
+
+
 /* PLATINUM: make controls height responsive instead of fixed 250px */
 :root{
   --controls-h: clamp(210px, 32svh, 290px);
