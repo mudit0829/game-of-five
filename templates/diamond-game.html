@@ -3,10 +3,17 @@
 <head>
   <meta charset="UTF-8" />
   <title>{{ game.title }} – {{ game.name }}</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
 
+  <!-- ✅ Step 1: Better mobile viewport handling (notch safe) -->
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" /> <!-- [web:222] -->
+
+  <!-- Your existing game CSS -->
   <link rel="stylesheet" href="{{ url_for('static', filename='css/diamond-game.css') }}" />
+
+  <!-- ✅ Step 3: Common uniform patch CSS (must be AFTER the game CSS) -->
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/game-uniform.css') }}" />
 </head>
+
 <body>
   <div class="diamond-page">
     <!-- TOP BAR -->
@@ -60,22 +67,20 @@
         </div>
 
         <!-- Archer & arrow -->
-       <!-- Archer & arrow -->
-<div class="archer-layer">
-  <img
-    id="archerSprite"
-    class="archer"
-    src="{{ url_for('static', filename='img/diamond_archer.svg') }}"
-    alt="Archer"
-  >
-  <img
-    id="arrowSprite"
-    class="arrow"
-    src="{{ url_for('static', filename='img/diamond_arrow.svg') }}"
-    alt="Arrow"
-  >
-</div>
-
+        <div class="archer-layer">
+          <img
+            id="archerSprite"
+            class="archer"
+            src="{{ url_for('static', filename='img/diamond_archer.svg') }}"
+            alt="Archer"
+          >
+          <img
+            id="arrowSprite"
+            class="arrow"
+            src="{{ url_for('static', filename='img/diamond_arrow.svg') }}"
+            alt="Arrow"
+          >
+        </div>
       </section>
     </main>
 
@@ -99,7 +104,7 @@
 
       <div class="my-bets-title">Your bets in this game</div>
       <div id="myBetsRow" class="my-bets-row"></div>
-       
+
       <button id="placeBetBtn" class="bet-button">
         Place Bet (₹{{ game.bet_amount }})
       </button>
@@ -124,7 +129,7 @@
 
   <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
   <script>
-    // ✅ FIXED: Use window.* variables (NOT const) so diamond-game.js can read them
+    // ✅ Use window.* variables so diamond-game.js can read them
     window.GAME_TYPE = "{{ game_type }}";
     window.FIXED_BET_AMOUNT = {{ game.bet_amount }};
     window.GAME_USER_ID = "{{ session.get('user_id') }}";
