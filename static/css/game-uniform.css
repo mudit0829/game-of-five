@@ -1,0 +1,38 @@
+/* ===== Uniform mobile patch (all games) ===== */
+
+/* More stable full height than 100vh on mobile browsers */
+.game-root,
+.diamond-page,
+.platinum-page{
+  height: 100vh;
+  height: 100svh;      /* supported browsers use this */
+  min-height: 100vh;
+  min-height: 100svh;
+}
+
+/* Make the “play area” height consistent with clamp() */
+.pitch{               /* GOLD field */
+  height: clamp(230px, 40svh, 340px);
+}
+
+.pond{                /* SILVER field */
+  height: clamp(200px, 32svh, 300px);
+  margin-bottom: clamp(14px, 3svh, 30px);
+}
+
+/* DIAMOND: override the fix-pack vh values with svh */
+.diamond-page{
+  height: 100vh;
+  height: 100svh;
+}
+.range{
+  height: clamp(210px, 34svh, 320px);
+}
+.controls-sheet{
+  max-height: 48svh;
+}
+
+/* PLATINUM: make controls height responsive instead of fixed 250px */
+:root{
+  --controls-h: clamp(210px, 32svh, 290px);
+}
