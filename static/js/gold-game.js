@@ -11,13 +11,12 @@ const USER_ID = window.GAME_USER_ID;
 const USERNAME = window.GAME_USERNAME || "Player";
 const HOME_URL = "/home";
 
-// ✅ NEW: max bets allowed per user per round
 const MAX_BETS_PER_ROUND = 3;
 
 // ================= DOM REFERENCES =================
 const pitch = document.querySelector(".pitch");
 const ballImg = document.getElementById("ballSprite");
-const playerArea = document.querySelector(".player-area"); // kept (not used for positioning now)
+const playerArea = document.querySelector(".player-area");
 const goals = Array.from(document.querySelectorAll(".goal.pad"));
 
 const numChips = Array.from(document.querySelectorAll(".num-chip"));
@@ -63,16 +62,12 @@ let shotShownForRound = null;
 let popupShownForRound = null;
 
 // ================= KICK VIDEO TUNING =================
-// Show player at 4 seconds remaining and freeze at 2 seconds remaining
 const KICK_SHOW_AT_REMAINING = 4;
 const KICK_FREEZE_AT_REMAINING = 2;
 
-// Reduce player size by 30% more than previous (0.30 -> 0.21)
 const KICK_SCALE = 0.21;
-
-// Fine tuning: move player relative to ball
-const KICK_SHIFT_X = -18; // was -40
-const KICK_SHIFT_Y = 4;   // was 10
+const KICK_SHIFT_X = -18;
+const KICK_SHIFT_Y = 4;
 
 let kickResizeHandlerAttached = false;
 function attachKickResizeHandlerOnce() {
@@ -191,14 +186,28 @@ function setNumberChipsDisabled(disabled) {
   numChips.forEach((chip) => { chip.disabled = !!disabled; });
 }
 
-// updated: optionally disable numbers too
-function disableBettingUI(disableNumbers = true) {
-  if (placeBetBtn) placeBetBtn.disabled = true;
-  if (disableNumbers) setNumberChipsDisabled(true);
-}
+// Central function: makes buttons inactive based on current table + user bets
+function applyBettingLocks(table) {
+  const myCount = (table?.bets || []).filter((b) => String(b.userId) === String(USER_ID)).length;
+  const maxPlayers = typeof table?.maxPlayers === "number" ? table.maxPlayers : null;
+  const isFull = maxPlayers !== null && (safeNum(table?.playersCount, 0) >= maxPlayers);
+  const bettingClosed = !!table?.isBettingClosed;
 
-function countMyBetsFromTable(table) {
-  return (table?.bets || []).filter((b) => String(b.userId) === String(USER_ID)).length;
+  const limitReached = myCount >= MAX_BETS_PER_ROUND;
+
+  // Lock if any condition is true
+  const lockAll = gameFinished || isFull || bettingClosed || limitReached;
+
+  setNumberChipsDisabled(lockAll);
+  if (placeBetBtn) placeBetBtn.disabled = lockAll;
+
+  if (!gameFinished) {
+    if (isFull) setStatus("All slots are full for this game.", "error");
+    else if (limitReached) setStatus(`Bet limit reached (${MAX_BETS_PER_ROUND}/${MAX_BETS_PER_ROUND}).`, "ok");
+    else if (bettingClosed) setStatus("Betting closed.", "error");
+  }
+
+  return { myCount, isFull, bettingClosed, limitReached };
 }
 
 function updateMyBets(bets) {
@@ -407,7 +416,6 @@ function freezeKickVideoAt2s() {
 }
 
 // ================= BALL + DOTTED PATH (LOCKED) =================
-// Slower by 50%
 const BALL_SHOT_DURATION_MS = 1125;
 const BALL_SHOT_START_DELAY_MS = 420;
 const BALL_RESET_DELAY_MS = 1350;
@@ -668,7 +676,7 @@ async function fetchTableData() {
 
       if (!raw) {
         gameFinished = true;
-        disableBettingUI(true);
+        applyBettingLocks(currentTable);
 
         if (tablePollInterval) clearInterval(tablePollInterval);
         tablePollInterval = null;
@@ -710,36 +718,22 @@ function updateGameUI(table) {
 
   updateGoalsFromBets(table.bets || []);
   const myBets = updateMyBets(table.bets || []);
-  const myBetCount = myBets.length;
 
   if (playerCountSpan) playerCountSpan.textContent = table.playersCount || 0;
 
-  const maxPlayers = typeof table.maxPlayers === "number" ? table.maxPlayers : null;
-  const isFull = maxPlayers !== null && (table.playersCount >= maxPlayers);
-
-  // ✅ Lock number buttons when full OR betting closed OR bet limit reached OR game finished
-  const limitReached = myBetCount >= MAX_BETS_PER_ROUND;
-  const lockNumbers = gameFinished || isFull || !!table.isBettingClosed || limitReached;
-  setNumberChipsDisabled(lockNumbers);
-
-  // ✅ Place bet button rules
-  if (placeBetBtn && !gameFinished) {
-    placeBetBtn.disabled = !!table.isBettingClosed || isFull || limitReached;
-  }
-
-  if (limitReached && !gameFinished) {
-    setStatus(`Bet limit reached (${MAX_BETS_PER_ROUND}/${MAX_BETS_PER_ROUND}).`, "ok");
-  }
+  // ✅ Always apply locks (3/3 OR full OR closed OR finished)
+  const locks = applyBettingLocks(table);
 
   if (timerPill) {
     if (displayRemainingSeconds <= 10) timerPill.classList.add("urgent");
     else timerPill.classList.remove("urgent");
   }
 
-  // Existing behavior: if you haven't bet and table becomes full, show popup and go back
-  if (!gameFinished && !userHasBet && isFull) {
+  // If you haven't bet and table becomes full, show popup and go back
+  if (!gameFinished && !userHasBet && locks.isFull) {
     gameFinished = true;
-    disableBettingUI(true);
+    applyBettingLocks(table);
+
     if (tablePollInterval) clearInterval(tablePollInterval);
     tablePollInterval = null;
     if (localTimerInterval) clearInterval(localTimerInterval);
@@ -772,7 +766,7 @@ function updateGameUI(table) {
       popupShownForRound = roundId;
 
       gameFinished = true;
-      disableBettingUI(true);
+      applyBettingLocks(table);
 
       if (tablePollInterval) clearInterval(tablePollInterval);
       tablePollInterval = null;
@@ -834,25 +828,29 @@ function handleBetSuccess(payload) {
 
   const players = payload?.players || payload?.bets;
   if (players && Array.isArray(players)) {
-    // keep UI updated instantly
-    const t = normalizeTable({ bets: players });
+    // Update bets list quickly
+    const t = normalizeTable({ bets: players, players: players.length });
     updateGoalsFromBets(t.bets);
-    const myBets = updateMyBets(t.bets);
-
+    updateMyBets(t.bets);
     if (playerCountSpan) playerCountSpan.textContent = t.bets.length;
 
-    // ✅ lock when bet limit reached (even before next polling update)
-    if (myBets.length >= MAX_BETS_PER_ROUND) {
-      setNumberChipsDisabled(true);
-      if (placeBetBtn) placeBetBtn.disabled = true;
-    }
+    // Apply lock immediately (3/3)
+    applyBettingLocks({ ...currentTable, bets: t.bets, playersCount: t.bets.length });
   }
+
+  // Refresh full state from API
+  fetchTableData();
 }
 
 function handleUpdateTable(payload) {
   if (gameFinished) return;
 
   const t = normalizeTable(payload);
+  if (!t) return;
+
+  // Merge into currentTable to keep playersCount/maxPlayers/isBettingClosed consistent
+  currentTable = { ...(currentTable || {}), ...t };
+
   if (t?.bets) {
     updateGoalsFromBets(t.bets);
     updateMyBets(t.bets);
@@ -864,8 +862,7 @@ function handleUpdateTable(payload) {
     renderTimer();
   }
 
-  // If betting is closed, lock UI
-  if (t?.isBettingClosed) disableBettingUI(true);
+  applyBettingLocks(currentTable);
 }
 
 function handleBetError(payload) {
@@ -894,40 +891,17 @@ numChips.forEach((chip) => {
 
 if (placeBetBtn) {
   placeBetBtn.addEventListener("click", () => {
-    if (gameFinished) {
-      setStatus("This game has already finished.", "error");
-      return;
-    }
-    if (!currentTable) {
-      setStatus("Game is not ready yet. Please wait...", "error");
-      return;
-    }
+    if (gameFinished) return setStatus("This game has already finished.", "error");
+    if (!currentTable) return setStatus("Game is not ready yet. Please wait...", "error");
 
-    // ✅ 3 bets max per user per round
-    const myCountNow = countMyBetsFromTable(currentTable);
-    if (myCountNow >= MAX_BETS_PER_ROUND) {
-      setStatus(`You can place only ${MAX_BETS_PER_ROUND} bets in this game.`, "error");
-      setNumberChipsDisabled(true);
-      placeBetBtn.disabled = true;
-      return;
-    }
+    // Always re-check locks before placing bet
+    const locks = applyBettingLocks(currentTable);
+    if (locks.isFull) return;        // already set message
+    if (locks.limitReached) return;  // already set message
+    if (locks.bettingClosed) return; // already set message
 
-    const maxPlayers = typeof currentTable.maxPlayers === "number" ? currentTable.maxPlayers : null;
-    if (maxPlayers !== null && currentTable.playersCount >= maxPlayers) {
-      setStatus("All slots are full for this game.", "error");
-      disableBettingUI(true);
-      return;
-    }
-
-    if (walletBalance < FIXED_BET_AMOUNT) {
-      setStatus("Insufficient balance", "error");
-      return;
-    }
-
-    if (selectedNumber === null || selectedNumber === undefined) {
-      setStatus("Select a number first", "error");
-      return;
-    }
+    if (walletBalance < FIXED_BET_AMOUNT) return setStatus("Insufficient balance", "error");
+    if (selectedNumber === null || selectedNumber === undefined) return setStatus("Select a number first", "error");
 
     const payload = {
       game_type: GAME,
