@@ -9,6 +9,9 @@ const USER_ID = window.GAME_USER_ID;
 const USERNAME = window.GAME_USERNAME || "Player";
 const HOME_URL = "/home";
 
+// ✅ NEW: max bets allowed per user per round
+const MAX_BETS_PER_ROUND = 3;
+
 // Must match your CSS animation duration for .frog-wrapper.jump-to
 const HOP_DURATION_MS = 850;
 
@@ -142,9 +145,20 @@ function setSelectedNumber(n) {
   });
 }
 
-function disableBettingUI() {
+// ✅ helper: disable/enable number chips
+function setNumberChipsDisabled(disabled) {
+  numChips.forEach((c) => (c.disabled = !!disabled));
+}
+
+// ✅ updated: optionally disable numbers too
+function disableBettingUI(disableNumbers = true) {
   if (placeBetBtn) placeBetBtn.disabled = true;
-  numChips.forEach((c) => (c.disabled = true));
+  if (disableNumbers) setNumberChipsDisabled(true);
+}
+
+function countMyBetsFromTable(table) {
+  const list = (table?.bets || []).filter((b) => String(b.userId) === String(USER_ID));
+  return list.length;
 }
 
 function updateMyBets(bets) {
@@ -185,8 +199,7 @@ function updatePadsFromBets(bets) {
   });
 }
 
-// Safer than your old version: ONLY place the winning number on an EMPTY pad.
-// If no pad is empty, we do not overwrite players’ pads.
+// ONLY place the winning number on an EMPTY pad if needed (no overwrite).
 function ensurePadForWinningNumber(winningNumber) {
   if (winningNumber == null) return;
 
@@ -250,7 +263,6 @@ function clearOldJumpClasses() {
 function jumpFrogToPad(targetPad) {
   if (!frogContainer || !targetPad) return;
 
-  // Prevent double triggers while already hopping
   if (isHoppingNow) return;
   isHoppingNow = true;
 
@@ -263,29 +275,24 @@ function jumpFrogToPad(targetPad) {
   const padCX = padRect.left + padRect.width / 2;
   const padCY = padRect.top + padRect.height / 2;
 
-  // Make it look like frog is sitting on the pad (slightly lower than center)
   const dx = padCX - frogCX;
   const dy = (padCY - frogCY) + LANDING_Y_OFFSET_PX;
 
-  // Feed CSS variables used by your jump animation
   frogContainer.style.setProperty("--dx", `${dx}px`);
   frogContainer.style.setProperty("--dy", `${dy}px`);
   frogContainer.style.setProperty("--jumpH", `${JUMP_ARC_HEIGHT_PX}px`);
 
   clearOldJumpClasses();
 
-  // Restart animation reliably
   void frogContainer.offsetWidth;
   frogContainer.classList.add("jump-to");
 
   hopLandingETA = Date.now() + HOP_DURATION_MS;
 
-  // Highlight winning pad near landing moment
   setTimeout(() => {
     targetPad.classList.add("win");
   }, Math.max(0, HOP_DURATION_MS - 80));
 
-  // Release lock after hop ends
   setTimeout(() => {
     isHoppingNow = false;
   }, HOP_DURATION_MS + 50);
@@ -293,13 +300,9 @@ function jumpFrogToPad(targetPad) {
 
 function jumpFrogToWinningNumber(winNum) {
   if (winNum === null || winNum === undefined || winNum === "") return;
-
-  // If winning number isn’t currently visible, only put it on an EMPTY pad
   ensurePadForWinningNumber(winNum);
-
   const targetPad = findPadForNumber(winNum);
   if (!targetPad) return;
-
   jumpFrogToPad(targetPad);
 }
 
@@ -326,7 +329,7 @@ async function fetchTableData() {
 
       if (!raw) {
         gameFinished = true;
-        disableBettingUI();
+        disableBettingUI(true);
         setStatus("This game has finished. Going back to lobby...", "error");
 
         if (tablePollInterval) clearInterval(tablePollInterval);
@@ -355,26 +358,40 @@ function updateGameUI(table) {
   displayRemainingSeconds = table.timeRemaining || 0;
   renderTimer();
 
-  // Update pads + bets
   updatePadsFromBets(table.bets || []);
   const myBets = updateMyBets(table.bets || []);
 
   if (playerCountSpan) playerCountSpan.textContent = table.playersCount || 0;
 
-  // Disable betting close to end
-  if (placeBetBtn && !gameFinished) {
-    const maxPlayers = typeof table.maxPlayers === "number" ? table.maxPlayers : null;
-    const isFull = maxPlayers !== null && table.playersCount >= maxPlayers;
-    placeBetBtn.disabled = !!table.isBettingClosed || isFull || displayRemainingSeconds <= 15;
-  }
-
-  const hasUserBet = myBets.length > 0;
   const maxPlayers = typeof table.maxPlayers === "number" ? table.maxPlayers : null;
   const isFull = maxPlayers !== null && table.playersCount >= maxPlayers;
 
+  // ✅ Disable all number buttons if table is full (your requirement)
+  if (isFull) {
+    setNumberChipsDisabled(true);
+  } else if (!gameFinished && myBets.length < MAX_BETS_PER_ROUND) {
+    // enable again when not full and user hasn't hit limit
+    setNumberChipsDisabled(false);
+  }
+
+  // ✅ If user already placed 3 bets, lock number selection + button
+  if (myBets.length >= MAX_BETS_PER_ROUND) {
+    setNumberChipsDisabled(true);
+    if (placeBetBtn) placeBetBtn.disabled = true;
+    if (!gameFinished) setStatus(`Bet limit reached (${MAX_BETS_PER_ROUND}/${MAX_BETS_PER_ROUND}).`, "ok");
+  }
+
+  // Disable betting close to end (existing behavior) + full + bet-limit
+  if (placeBetBtn && !gameFinished) {
+    const lockBecauseLimit = myBets.length >= MAX_BETS_PER_ROUND;
+    placeBetBtn.disabled = !!table.isBettingClosed || isFull || lockBecauseLimit || displayRemainingSeconds <= 15;
+  }
+
+  const hasUserBet = myBets.length > 0;
+
   if (!gameFinished && !hasUserBet && isFull) {
     gameFinished = true;
-    disableBettingUI();
+    disableBettingUI(true);
     if (tablePollInterval) clearInterval(tablePollInterval);
     tablePollInterval = null;
     showSlotsFullPopup();
@@ -383,21 +400,18 @@ function updateGameUI(table) {
 
   const hasResult = table.resultValue !== null && table.resultValue !== undefined && table.resultValue !== "";
 
-  // ✅ Jump at <= 2 seconds when result is known
+  // Jump at <= 2 seconds when result is known
   if (hasResult && table.timeRemaining <= 2) {
     const roundId = table.roundCode || "__no_round__";
 
     if (hopShownForRound !== roundId) {
       hopShownForRound = roundId;
-
       setStatus(`Winning number: ${table.resultValue}`, "ok");
-
-      // One direct jump (no front-then-right)
       jumpFrogToWinningNumber(table.resultValue);
     }
   }
 
-  // ✅ Show popup only when finished, after hop landing
+  // Show popup only when finished, after hop landing
   if (hasResult && table.isFinished) {
     const roundId = table.roundCode || "__no_round__";
 
@@ -405,7 +419,7 @@ function updateGameUI(table) {
       popupShownForRound = roundId;
 
       gameFinished = true;
-      disableBettingUI();
+      disableBettingUI(true);
 
       if (tablePollInterval) clearInterval(tablePollInterval);
       tablePollInterval = null;
@@ -424,7 +438,7 @@ function startPolling() {
   tablePollInterval = setInterval(fetchTableData, 1000);
 }
 
-// ================= SOCKET (optional updates) =================
+// ================= SOCKET =================
 const socket = io();
 
 async function fetchBalance() {
@@ -481,6 +495,25 @@ if (placeBetBtn) {
   placeBetBtn.addEventListener("click", () => {
     if (gameFinished) return setStatus("Game finished", "error");
     if (!currentTable) return setStatus("Game not ready", "error");
+
+    // ✅ Hard client-side limit: 3 bets only
+    const myCountNow = countMyBetsFromTable(currentTable);
+    if (myCountNow >= MAX_BETS_PER_ROUND) {
+      setStatus(`You can place only ${MAX_BETS_PER_ROUND} bets in this game.`, "error");
+      setNumberChipsDisabled(true);
+      placeBetBtn.disabled = true;
+      return;
+    }
+
+    // ✅ If table full, block action (and lock UI)
+    const maxPlayers = typeof currentTable.maxPlayers === "number" ? currentTable.maxPlayers : null;
+    const isFull = maxPlayers !== null && currentTable.playersCount >= maxPlayers;
+    if (isFull) {
+      setStatus("Slots are full. You cannot place a bet now.", "error");
+      setNumberChipsDisabled(true);
+      placeBetBtn.disabled = true;
+      return;
+    }
 
     if (walletBalance < FIXED_BET_AMOUNT) return setStatus("Insufficient balance", "error");
     if (selectedNumber == null) return setStatus("Select a number", "error");
