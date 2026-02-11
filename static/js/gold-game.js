@@ -183,18 +183,27 @@ function setSelectedNumber(n) {
   });
 }
 
-// ✅ SAME AS SILVER
+// ✅ Silver-style + fallback lock flag
 function setNumberChipsDisabled(disabled) {
-  numChips.forEach((c) => (c.disabled = !!disabled));
+  const d = !!disabled;
+  numChips.forEach((c) => {
+    // Works if it's a <button>
+    try { c.disabled = d; } catch (e) {}
+
+    // Fallback for div/span chips: hard lock flag read by click handler
+    c.dataset.locked = d ? "1" : "0";
+
+    // Optional: keep UI consistent if CSS doesn't style disabled
+    c.classList.toggle("locked", d);
+    if (d) c.classList.remove("selected");
+  });
 }
 
-// ✅ SAME AS SILVER (optional numbers)
 function disableBettingUI(disableNumbers = true) {
   if (placeBetBtn) placeBetBtn.disabled = true;
   if (disableNumbers) setNumberChipsDisabled(true);
 }
 
-// ✅ SAME AS SILVER
 function countMyBetsFromTable(table) {
   const list = (table?.bets || []).filter((b) => String(b.userId) === String(USER_ID));
   return list.length;
@@ -355,7 +364,6 @@ function ensureKickVideoElement() {
   v.style.filter = "drop-shadow(0 12px 22px rgba(0,0,0,0.65))";
 
   document.body.appendChild(v);
-
   attachKickResizeHandlerOnce();
 
   return v;
@@ -383,7 +391,6 @@ function maybeStartKickVideo() {
   requestAnimationFrame(() => positionKickVideoAtBall(v));
 
   try { v.currentTime = 0; } catch (e) {}
-
   v.play().catch((err) => console.warn("[video] play error:", err));
 }
 
@@ -399,14 +406,20 @@ function freezeKickVideoAt2s() {
 
     try { videoPlayer.pause(); } catch (e) {}
 
-    positionKickVideoAtBall(videoPlayer);
-    requestAnimationFrame(() => positionKickVideoAtBall(videoPlayer));
+    positionKickVideoAt2sHack(videoPlayer);
+    requestAnimationFrame(() => positionKickVideoAt2sHack(videoPlayer));
 
     if (ballImg) ballImg.style.opacity = "1";
   }
 }
 
+// keep same positioning call name safety
+function positionKickVideoAt2sHack(v) {
+  positionKickVideoAtBall(v);
+}
+
 // ================= BALL + DOTTED PATH (LOCKED) =================
+// Slower by 50%
 const BALL_SHOT_DURATION_MS = 1125;
 const BALL_SHOT_START_DELAY_MS = 420;
 const BALL_RESET_DELAY_MS = 1350;
@@ -545,7 +558,9 @@ function shootBallToWinningNumber(winningNumber) {
     if (token !== _shotToken) return;
 
     const ballW = ballImg.offsetWidth || Math.max(1, ballRect.width / scaleX);
+    const ballH = ballImg.offsetHeight || Math.max(1, ballRect.height / scaleY);
     const ax = ballW * 0.5;
+    const ay = ballH * 0.5;
 
     const flying = ballImg.cloneNode(true);
     flying.removeAttribute("id");
@@ -558,7 +573,7 @@ function shootBallToWinningNumber(winningNumber) {
     flying.style.pointerEvents = "none";
     flying.style.zIndex = "1000";
     flying.style.willChange = "transform";
-    flying.style.transformOrigin = `${ax}px ${ax}px`;
+    flying.style.transformOrigin = `${ax}px ${ay}px`;
     flying.style.filter = "drop-shadow(0 12px 18px rgba(0,0,0,0.65))";
 
     pitch.appendChild(flying);
@@ -590,7 +605,7 @@ function shootBallToWinningNumber(winningNumber) {
       const scale = 1 - t * 0.10;
 
       flying.style.transform =
-        `translate(${p.x - ax}px, ${p.y - ax}px) rotate(${angle + rotation}deg) scale(${scale})`;
+        `translate(${p.x - ax}px, ${p.y - ay}px) rotate(${angle + rotation}deg) scale(${scale})`;
 
       if (tr < 1) {
         requestAnimationFrame(step);
@@ -698,21 +713,19 @@ function updateGameUI(table) {
   const maxPlayers = typeof table.maxPlayers === "number" ? table.maxPlayers : null;
   const isFull = maxPlayers !== null && (table.playersCount >= maxPlayers);
 
-  // ✅ SAME AS SILVER: full => disable ALL number buttons
+  // ✅ EXACT SILVER LOGIC
   if (isFull) {
     setNumberChipsDisabled(true);
   } else if (!gameFinished && myBets.length < MAX_BETS_PER_ROUND) {
     setNumberChipsDisabled(false);
   }
 
-  // ✅ SAME AS SILVER: 3/3 => disable ALL numbers + bet button
   if (myBets.length >= MAX_BETS_PER_ROUND) {
     setNumberChipsDisabled(true);
     if (placeBetBtn) placeBetBtn.disabled = true;
     if (!gameFinished) setStatus(`Bet limit reached (${MAX_BETS_PER_ROUND}/${MAX_BETS_PER_ROUND}).`, "ok");
   }
 
-  // Keep existing gold behavior: disable bet button when betting closed or full (plus limit)
   if (placeBetBtn && !gameFinished) {
     const lockBecauseLimit = myBets.length >= MAX_BETS_PER_ROUND;
     placeBetBtn.disabled = !!table.isBettingClosed || isFull || lockBecauseLimit;
@@ -761,7 +774,7 @@ function updateGameUI(table) {
       disableBettingUI(true);
 
       if (tablePollInterval) clearInterval(tablePollInterval);
-      tablePollInterval = null;
+        tablePollInterval = null;
 
       if (localTimerInterval) clearInterval(localTimerInterval);
       localTimerInterval = null;
@@ -813,7 +826,6 @@ function handleBetSuccess(payload) {
   if (gameFinished) return;
 
   setStatus(payload?.message || "Bet placed ✓", "ok");
-
   const newBal = payload?.new_balance ?? payload?.newbalance;
   if (typeof newBal === "number") updateWallet(newBal);
 
@@ -822,7 +834,6 @@ function handleBetSuccess(payload) {
 
 function handleUpdateTable(payload) {
   if (gameFinished) return;
-  // easiest + consistent with silver: just refresh from API
   fetchTableData();
 }
 
@@ -844,7 +855,10 @@ socket.on("beterror", handleBetError);
 numChips.forEach((chip) => {
   chip.addEventListener("click", () => {
     if (gameFinished) return;
-    if (chip.disabled) return;
+
+    // ✅ HARD GUARD (works even if chip is div/span and "disabled" doesn't block)
+    if (chip.disabled || chip.dataset.locked === "1") return;
+
     setSelectedNumber(parseInt(chip.dataset.number, 10));
   });
 });
@@ -863,7 +877,7 @@ if (placeBetBtn) {
       return;
     }
 
-    // ✅ SAME AS SILVER: if full => lock UI and block
+    // ✅ SAME AS SILVER: full => lock UI and block
     const maxPlayers = typeof currentTable.maxPlayers === "number" ? currentTable.maxPlayers : null;
     const isFull = maxPlayers !== null && currentTable.playersCount >= maxPlayers;
     if (isFull) {
