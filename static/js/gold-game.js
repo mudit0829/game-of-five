@@ -11,7 +11,7 @@ const USER_ID = window.GAME_USER_ID;
 const USERNAME = window.GAME_USERNAME || "Player";
 const HOME_URL = "/home";
 
-// ✅ same as silver: max 3 bets per user per round
+// ✅ SAME AS SILVER
 const MAX_BETS_PER_ROUND = 3;
 
 // ================= DOM REFERENCES =================
@@ -183,19 +183,21 @@ function setSelectedNumber(n) {
   });
 }
 
-// ✅ same style as silver
+// ✅ SAME AS SILVER
 function setNumberChipsDisabled(disabled) {
-  numChips.forEach((chip) => { chip.disabled = !!disabled; });
+  numChips.forEach((c) => (c.disabled = !!disabled));
 }
 
-// ✅ same style as silver (optional numbers)
+// ✅ SAME AS SILVER (optional numbers)
 function disableBettingUI(disableNumbers = true) {
   if (placeBetBtn) placeBetBtn.disabled = true;
   if (disableNumbers) setNumberChipsDisabled(true);
 }
 
+// ✅ SAME AS SILVER
 function countMyBetsFromTable(table) {
-  return (table?.bets || []).filter((b) => String(b.userId) === String(USER_ID)).length;
+  const list = (table?.bets || []).filter((b) => String(b.userId) === String(USER_ID));
+  return list.length;
 }
 
 function updateMyBets(bets) {
@@ -353,6 +355,7 @@ function ensureKickVideoElement() {
   v.style.filter = "drop-shadow(0 12px 22px rgba(0,0,0,0.65))";
 
   document.body.appendChild(v);
+
   attachKickResizeHandlerOnce();
 
   return v;
@@ -380,6 +383,7 @@ function maybeStartKickVideo() {
   requestAnimationFrame(() => positionKickVideoAtBall(v));
 
   try { v.currentTime = 0; } catch (e) {}
+
   v.play().catch((err) => console.warn("[video] play error:", err));
 }
 
@@ -493,6 +497,7 @@ function shootBallToWinningNumber(winningNumber) {
   if (!targetGoal) return;
 
   const token = ++_shotToken;
+
   clearShotPath();
 
   const pitchRect = pitch.getBoundingClientRect();
@@ -540,9 +545,7 @@ function shootBallToWinningNumber(winningNumber) {
     if (token !== _shotToken) return;
 
     const ballW = ballImg.offsetWidth || Math.max(1, ballRect.width / scaleX);
-    const ballH = ballImg.offsetHeight || Math.max(1, ballRect.height / scaleY);
     const ax = ballW * 0.5;
-    const ay = ballH * 0.5;
 
     const flying = ballImg.cloneNode(true);
     flying.removeAttribute("id");
@@ -555,7 +558,7 @@ function shootBallToWinningNumber(winningNumber) {
     flying.style.pointerEvents = "none";
     flying.style.zIndex = "1000";
     flying.style.willChange = "transform";
-    flying.style.transformOrigin = `${ax}px ${ay}px`;
+    flying.style.transformOrigin = `${ax}px ${ax}px`;
     flying.style.filter = "drop-shadow(0 12px 18px rgba(0,0,0,0.65))";
 
     pitch.appendChild(flying);
@@ -587,7 +590,7 @@ function shootBallToWinningNumber(winningNumber) {
       const scale = 1 - t * 0.10;
 
       flying.style.transform =
-        `translate(${p.x - ax}px, ${p.y - ay}px) rotate(${angle + rotation}deg) scale(${scale})`;
+        `translate(${p.x - ax}px, ${p.y - ax}px) rotate(${angle + rotation}deg) scale(${scale})`;
 
       if (tr < 1) {
         requestAnimationFrame(step);
@@ -596,21 +599,6 @@ function shootBallToWinningNumber(winningNumber) {
 
       clearShotPath();
       targetGoal.classList.add("win");
-
-      const flash = document.createElement("div");
-      flash.style.position = "absolute";
-      flash.style.top = "50%";
-      flash.style.left = "50%";
-      flash.style.transform = "translate(-50%, -50%)";
-      flash.style.width = "150%";
-      flash.style.height = "150%";
-      flash.style.background = "radial-gradient(circle, rgba(34,197,94,0.6) 0%, transparent 70%)";
-      flash.style.borderRadius = "50%";
-      flash.style.pointerEvents = "none";
-      flash.style.animation = "goalFlash 0.9s ease-out";
-      flash.style.zIndex = "100";
-      targetGoal.appendChild(flash);
-      setTimeout(() => flash.remove(), 900);
 
       setTimeout(() => {
         flying.remove();
@@ -710,22 +698,21 @@ function updateGameUI(table) {
   const maxPlayers = typeof table.maxPlayers === "number" ? table.maxPlayers : null;
   const isFull = maxPlayers !== null && (table.playersCount >= maxPlayers);
 
-  // ✅ SILVER-LIKE: if full -> disable ALL number chips
+  // ✅ SAME AS SILVER: full => disable ALL number buttons
   if (isFull) {
     setNumberChipsDisabled(true);
   } else if (!gameFinished && myBets.length < MAX_BETS_PER_ROUND) {
-    // enable again when not full and under limit
     setNumberChipsDisabled(false);
   }
 
-  // ✅ SILVER-LIKE: if user reached 3 bets -> disable ALL number chips + bet button
+  // ✅ SAME AS SILVER: 3/3 => disable ALL numbers + bet button
   if (myBets.length >= MAX_BETS_PER_ROUND) {
     setNumberChipsDisabled(true);
     if (placeBetBtn) placeBetBtn.disabled = true;
     if (!gameFinished) setStatus(`Bet limit reached (${MAX_BETS_PER_ROUND}/${MAX_BETS_PER_ROUND}).`, "ok");
   }
 
-  // Bet button rule: closed OR full OR limit OR last seconds (gold previously didn't have 15s lock; keep simple)
+  // Keep existing gold behavior: disable bet button when betting closed or full (plus limit)
   if (placeBetBtn && !gameFinished) {
     const lockBecauseLimit = myBets.length >= MAX_BETS_PER_ROUND;
     placeBetBtn.disabled = !!table.isBettingClosed || isFull || lockBecauseLimit;
@@ -736,7 +723,6 @@ function updateGameUI(table) {
     else timerPill.classList.remove("urgent");
   }
 
-  // Existing behavior: if you haven't bet and table becomes full, show popup and go back
   if (!gameFinished && !userHasBet && isFull) {
     gameFinished = true;
     disableBettingUI(true);
@@ -831,43 +817,13 @@ function handleBetSuccess(payload) {
   const newBal = payload?.new_balance ?? payload?.newbalance;
   if (typeof newBal === "number") updateWallet(newBal);
 
-  // Refresh UI state (bets count etc)
   fetchTableData();
 }
 
 function handleUpdateTable(payload) {
   if (gameFinished) return;
-
-  const t = normalizeTable(payload);
-  if (!t) return;
-
-  // update currentTable and UI
-  currentTable = { ...(currentTable || {}), ...t };
-
-  if (t?.bets) {
-    updateGoalsFromBets(t.bets);
-    const myBets = updateMyBets(t.bets);
-    if (playerCountSpan) playerCountSpan.textContent = t.bets.length;
-
-    // ✅ immediate lock if limit reached
-    if (myBets.length >= MAX_BETS_PER_ROUND) {
-      setNumberChipsDisabled(true);
-      if (placeBetBtn) placeBetBtn.disabled = true;
-    }
-  }
-
-  if (t?.timeRemaining != null) {
-    displayRemainingSeconds = t.timeRemaining;
-    renderTimer();
-  }
-
-  // ✅ immediate lock if full or betting closed
-  const maxPlayers = typeof currentTable.maxPlayers === "number" ? currentTable.maxPlayers : null;
-  const isFull = maxPlayers !== null && (currentTable.playersCount >= maxPlayers);
-  if (currentTable.isBettingClosed || isFull) {
-    setNumberChipsDisabled(true);
-    if (placeBetBtn) placeBetBtn.disabled = true;
-  }
+  // easiest + consistent with silver: just refresh from API
+  fetchTableData();
 }
 
 function handleBetError(payload) {
@@ -889,8 +845,7 @@ numChips.forEach((chip) => {
   chip.addEventListener("click", () => {
     if (gameFinished) return;
     if (chip.disabled) return;
-    const n = parseInt(chip.dataset.number, 10);
-    setSelectedNumber(n);
+    setSelectedNumber(parseInt(chip.dataset.number, 10));
   });
 });
 
@@ -899,7 +854,7 @@ if (placeBetBtn) {
     if (gameFinished) return setStatus("This game has already finished.", "error");
     if (!currentTable) return setStatus("Game is not ready yet. Please wait...", "error");
 
-    // ✅ SILVER-LIKE: block if already 3 bets
+    // ✅ SAME AS SILVER: 3 bets max
     const myCountNow = countMyBetsFromTable(currentTable);
     if (myCountNow >= MAX_BETS_PER_ROUND) {
       setStatus(`You can place only ${MAX_BETS_PER_ROUND} bets in this game.`, "error");
@@ -908,11 +863,11 @@ if (placeBetBtn) {
       return;
     }
 
-    // ✅ SILVER-LIKE: block if full, and lock numbers
+    // ✅ SAME AS SILVER: if full => lock UI and block
     const maxPlayers = typeof currentTable.maxPlayers === "number" ? currentTable.maxPlayers : null;
     const isFull = maxPlayers !== null && currentTable.playersCount >= maxPlayers;
     if (isFull) {
-      setStatus("All slots are full for this game.", "error");
+      setStatus("Slots are full. You cannot place a bet now.", "error");
       setNumberChipsDisabled(true);
       placeBetBtn.disabled = true;
       return;
