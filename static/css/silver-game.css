@@ -544,3 +544,28 @@ body {
   30% { transform: translate(calc(-50% + 80px), calc(-50% - 100px)) scale(1.1); } /* Peak */
   100% { transform: translate(calc(-50% + 160px), -50%) scale(1); } /* Landing - adjust +160px */
 }
+/* ===== Precise jump (one animation, any direction) ===== */
+.frog-wrapper{
+  --dx: 0px;
+  --dy: 0px;
+  --jumpH: 90px; /* arc height */
+}
+
+/* One class only */
+.frog-wrapper.jump-to{
+  animation: frogJumpTo 850ms cubic-bezier(.2,.9,.2,1) forwards;
+}
+
+@keyframes frogJumpTo{
+  0%{
+    transform: translate(-50%, -50%) translate(0px, 0px) scale(1);
+  }
+  45%{
+    transform: translate(-50%, -50%)
+      translate(calc(var(--dx) * .5), calc(var(--dy) * .5 - var(--jumpH)))
+      scale(1.08);
+  }
+  100%{
+    transform: translate(-50%, -50%) translate(var(--dx), var(--dy)) scale(1);
+  }
+}
