@@ -10,6 +10,9 @@ const USER_ID = window.GAME_USER_ID;
 const USERNAME = window.GAME_USERNAME || "Player";
 const HOME_URL = "/home";
 
+// ✅ SAME AS GOLD/SILVER
+const MAX_BETS_PER_ROUND = 3;
+
 // ================= DOM REFERENCES =================
 
 const rangeEl = document.querySelector(".range");
@@ -40,6 +43,8 @@ const popupLobbyBtn = document.getElementById("popupLobbyBtn");
 
 if (userNameLabel) userNameLabel.textContent = USERNAME;
 
+// ================= STATE =================
+
 let walletBalance = 0;
 let selectedNumber = 0;
 let currentTable = null;
@@ -60,7 +65,7 @@ function setStatus(msg, type = "") {
 }
 
 function updateWallet(balance) {
-  walletBalance = balance;
+  walletBalance = typeof balance === "number" ? balance : Number(balance || 0);
   if (walletBalanceSpan) walletBalanceSpan.textContent = walletBalance.toFixed(0);
 
   if (coinsWrapper) {
@@ -89,9 +94,30 @@ function setSelectedNumber(n) {
   });
 }
 
-function disableBettingUI() {
+// ✅ SAME AS GOLD (works for button + fallback for div/span)
+function setNumberChipsDisabled(disabled) {
+  const d = !!disabled;
+  numChips.forEach((c) => {
+    try { c.disabled = d; } catch (e) {}
+    c.dataset.locked = d ? "1" : "0";
+    c.classList.toggle("locked", d);
+    if (d) c.classList.remove("selected");
+  });
+}
+
+// ✅ SAME AS GOLD
+function disableBettingUI(disableNumbers = true) {
   if (placeBetBtn) placeBetBtn.disabled = true;
-  numChips.forEach((chip) => (chip.disabled = true));
+  if (disableNumbers) setNumberChipsDisabled(true);
+}
+
+// ✅ SAME AS GOLD
+function countMyBetsFromTable(table) {
+  const list = (table?.bets || []).filter((b) => {
+    const betUserId = String(b.user_id || b.userId || "");
+    return betUserId === String(USER_ID);
+  });
+  return list.length;
 }
 
 function updateMyBets(bets) {
@@ -100,37 +126,33 @@ function updateMyBets(bets) {
     return betUserId === String(USER_ID);
   });
 
-  if (myBets.length > 0) userHasBet = true;
+  userHasBet = myBets.length > 0;
 
   if (userBetCountLabel) userBetCountLabel.textContent = myBets.length;
 
-  if (!myBetsRow) return;
-
-  if (myBets.length === 0) {
-    myBetsRow.innerHTML = '<span style="color:#6b7280;font-size:11px;">none</span>';
-  } else {
-    const numbers = myBets.map((b) => b.number).sort((a, b) => a - b);
-    myBetsRow.innerHTML = numbers.map((n) => `<span class="my-bet-chip">${n}</span>`).join(", ");
+  if (myBetsRow) {
+    if (myBets.length === 0) {
+      myBetsRow.innerHTML = '<span style="color:#6b7280;font-size:11px;">none</span>';
+    } else {
+      const numbers = myBets.map((b) => Number(b.number)).sort((a, b) => a - b);
+      myBetsRow.innerHTML = numbers.map((n) => `<span class="my-bet-chip">${n}</span>`).join(", ");
+    }
   }
+
+  return myBets;
 }
 
 // ================= SHOT CONFIG =================
 
-// Adjust ONLY if you want tip-perfect hit.
-// If your arrow PNG has a lot of transparent space, these ratios change the anchor.
 const TIP_X_RATIO = 0.90;
 const TIP_Y_RATIO = 0.52;
-
-// 50% slower than old 720ms
 const SHOT_DURATION_MS = 1080;
 
-// Freeze target rendering while shot runs (prevents path/arrow mismatch after reflow)
 let _shotInProgress = false;
 
 // ================= TARGETS =================
 
 function updateTargetsFromBets(bets) {
-  // ✅ Do not move/replace pads while arrow is flying
   if (_shotInProgress) return;
 
   const list = (bets || []).slice(0, 6);
@@ -257,7 +279,6 @@ function clearStuckArrows() {
 function ensureShotSvg() {
   if (!rangeEl) return null;
 
-  // make sure .range is positioning context
   try {
     const pos = getComputedStyle(rangeEl).position;
     if (pos === "static") rangeEl.style.position = "relative";
@@ -376,15 +397,12 @@ function shootArrowToWinningNumber(winningNumber) {
     y: (clientY - rangeRect.top) / scaleY,
   });
 
-  // Arrow layout size (stable)
   const arrowW = arrowImg.offsetWidth || Math.max(1, arrowRect.width / scaleX);
   const arrowH = arrowImg.offsetHeight || Math.max(14, arrowRect.height / scaleY);
 
-  // Anchor inside arrow (tip)
   const ax = arrowW * TIP_X_RATIO;
   const ay = arrowH * TIP_Y_RATIO;
 
-  // Start (tip) from current arrow location
   const startLocal = toLocal(
     arrowRect.left + arrowRect.width * TIP_X_RATIO,
     arrowRect.top + arrowRect.height * TIP_Y_RATIO
@@ -392,7 +410,6 @@ function shootArrowToWinningNumber(winningNumber) {
   const startX = startLocal.x;
   const startY = startLocal.y;
 
-  // End at target center
   const endLocal = toLocal(
     targetRect.left + targetRect.width * 0.5,
     targetRect.top + targetRect.height * 0.5
@@ -416,7 +433,6 @@ function shootArrowToWinningNumber(winningNumber) {
     return;
   }
 
-  // Flying arrow clone
   const flying = arrowImg.cloneNode(true);
   flying.removeAttribute("id");
   flying.style.position = "absolute";
@@ -433,12 +449,13 @@ function shootArrowToWinningNumber(winningNumber) {
   rangeEl.appendChild(flying);
   arrowImg.style.opacity = "0";
 
-  archerImg.classList.add("shoot");
-  setTimeout(() => archerImg.classList.remove("shoot"), 350);
+  if (archerImg) {
+    archerImg.classList.add("shoot");
+    setTimeout(() => archerImg.classList.remove("shoot"), 350);
+  }
 
   const totalLen = pathEl.getTotalLength();
   const startTime = performance.now();
-
   const easeOutCubic = (t) => 1 - Math.pow(1 - t, 3);
 
   function step(now) {
@@ -454,7 +471,7 @@ function shootArrowToWinningNumber(winningNumber) {
     const t = easeOutCubic(tr);
 
     const L = t * totalLen;
-    const p = pathEl.getPointAtLength(L); // same path, so always synced
+    const p = pathEl.getPointAtLength(L);
 
     const eps = 0.9;
     const p2 = pathEl.getPointAtLength(Math.min(totalLen, L + eps));
@@ -470,15 +487,12 @@ function shootArrowToWinningNumber(winningNumber) {
       return;
     }
 
-    // Finish
     flying.remove();
     clearShotPath();
 
-    // highlight correct target
     target.classList.add("win");
     flashTarget(target);
 
-    // ✅ Stick arrow at EXACT endpoint in range (not inside target)
     const stuck = arrowImg.cloneNode(true);
     stuck.removeAttribute("id");
     stuck.style.position = "absolute";
@@ -531,7 +545,6 @@ async function fetchTableData() {
     const res = await fetch("/api/tables/diamond");
     const data = await res.json();
 
-    // If a request returns after game is finished, ignore it
     if (gameFinished) return;
 
     if (!data.tables || !data.tables.length) {
@@ -546,7 +559,7 @@ async function fetchTableData() {
 
       if (!table) {
         gameFinished = true;
-        disableBettingUI();
+        disableBettingUI(true);
         if (tablePollInterval) clearInterval(tablePollInterval);
         if (localTimerInterval) clearInterval(localTimerInterval);
 
@@ -574,33 +587,51 @@ function updateGameUI(table) {
   displayRemainingSeconds = table.time_remaining || 0;
   renderTimer();
 
-  // ✅ Freeze target updates while shot is running
   if (!_shotInProgress && table.bets && Array.isArray(table.bets)) {
     updateTargetsFromBets(table.bets);
-    updateMyBets(table.bets);
+    const myBets = updateMyBets(table.bets);
     if (playerCountSpan) playerCountSpan.textContent = table.bets.length;
-  }
 
-  if (placeBetBtn && !gameFinished) {
     const maxPlayers = typeof table.max_players === "number" ? table.max_players : null;
-    const slotsFull = !!table.is_full || (maxPlayers !== null && table.players >= maxPlayers);
-    placeBetBtn.disabled = !!table.is_betting_closed || !!table.is_finished || slotsFull;
+    const isFull = table.is_full === true || (maxPlayers !== null && table.players >= maxPlayers);
+
+    // ✅ SAME AS GOLD: full => disable ALL number buttons
+    if (isFull) {
+      setNumberChipsDisabled(true);
+    } else if (!gameFinished && myBets.length < MAX_BETS_PER_ROUND) {
+      setNumberChipsDisabled(false);
+    }
+
+    // ✅ SAME AS GOLD: 3/3 => disable ALL numbers + bet button
+    if (myBets.length >= MAX_BETS_PER_ROUND) {
+      setNumberChipsDisabled(true);
+      if (placeBetBtn) placeBetBtn.disabled = true;
+      if (!gameFinished) setStatus(`Bet limit reached (${MAX_BETS_PER_ROUND}/${MAX_BETS_PER_ROUND}).`, "ok");
+    }
+
+    if (placeBetBtn && !gameFinished) {
+      const lockBecauseLimit = myBets.length >= MAX_BETS_PER_ROUND;
+      placeBetBtn.disabled = !!table.is_betting_closed || !!table.is_finished || isFull || lockBecauseLimit;
+    }
+
+    if (!gameFinished && !userHasBet && isFull) {
+      gameFinished = true;
+      disableBettingUI(true);
+      if (tablePollInterval) clearInterval(tablePollInterval);
+      if (localTimerInterval) clearInterval(localTimerInterval);
+      showSlotsFullPopup();
+      return;
+    }
+  } else {
+    // still update bet button state even if shot in progress
+    const maxPlayers = typeof table.max_players === "number" ? table.max_players : null;
+    const isFull = table.is_full === true || (maxPlayers !== null && table.players >= maxPlayers);
+    if (placeBetBtn && !gameFinished) placeBetBtn.disabled = !!table.is_betting_closed || !!table.is_finished || isFull;
+    if (isFull) setNumberChipsDisabled(true);
   }
 
   if (displayRemainingSeconds <= 10) timerPill && timerPill.classList.add("urgent");
   else timerPill && timerPill.classList.remove("urgent");
-
-  const maxPlayers = typeof table.max_players === "number" ? table.max_players : null;
-  const isFull = table.is_full === true || (maxPlayers !== null && table.players >= maxPlayers);
-
-  if (!gameFinished && !userHasBet && isFull) {
-    gameFinished = true;
-    disableBettingUI();
-    if (tablePollInterval) clearInterval(tablePollInterval);
-    if (localTimerInterval) clearInterval(localTimerInterval);
-    showSlotsFullPopup();
-    return;
-  }
 
   const hasResult = table.result !== null && table.result !== undefined && table.result !== "";
 
@@ -616,7 +647,7 @@ function updateGameUI(table) {
 
     if (!gameFinished) {
       gameFinished = true;
-      disableBettingUI();
+      disableBettingUI(true);
       if (tablePollInterval) clearInterval(tablePollInterval);
       if (localTimerInterval) clearInterval(localTimerInterval);
 
@@ -666,41 +697,22 @@ socket.on("connect", () => {
 socket.on("connect_error", (error) => console.error("[socket] CONNECTION ERROR:", error));
 socket.on("disconnect", () => {});
 
+// ✅ bet_success: refresh from API (simplest + consistent)
 socket.on("bet_success", (payload) => {
   if (gameFinished) return;
-
-  userHasBet = true;
-  setStatus(payload.message || "Bet placed ✓", "ok");
-
-  if (typeof payload.new_balance === "number") updateWallet(payload.new_balance);
-
-  if (!_shotInProgress && payload.players && Array.isArray(payload.players)) {
-    updateTargetsFromBets(payload.players);
-    updateMyBets(payload.players);
-    if (playerCountSpan) playerCountSpan.textContent = payload.players.length;
-  }
+  setStatus(payload?.message || "Bet placed ✓", "ok");
+  if (typeof payload?.new_balance === "number") updateWallet(payload.new_balance);
+  fetchTableData();
 });
 
-socket.on("update_table", (payload) => {
+socket.on("update_table", () => {
   if (gameFinished) return;
-
-  if (!_shotInProgress && payload.players && Array.isArray(payload.players)) {
-    updateTargetsFromBets(payload.players);
-    updateMyBets(payload.players);
-    if (playerCountSpan) playerCountSpan.textContent = payload.players.length;
-  }
-
-  if (payload.time_remaining != null) {
-    displayRemainingSeconds = payload.time_remaining;
-    renderTimer();
-  }
-
-  if (payload.is_betting_closed) disableBettingUI();
+  fetchTableData();
 });
 
 socket.on("bet_error", (payload) => {
   if (gameFinished) return;
-  setStatus(payload.message || "Bet error", "error");
+  setStatus(payload?.message || "Bet error", "error");
 });
 
 // ================= UI EVENTS =================
@@ -708,6 +720,7 @@ socket.on("bet_error", (payload) => {
 numChips.forEach((chip) => {
   chip.addEventListener("click", () => {
     if (gameFinished) return;
+    if (chip.disabled || chip.dataset.locked === "1") return; // ✅ hard guard
     const n = parseInt(chip.dataset.number, 10);
     setSelectedNumber(n);
   });
@@ -725,12 +738,21 @@ if (placeBetBtn) {
       return;
     }
 
+    // ✅ 3-bet limit (same as gold)
+    const myCountNow = countMyBetsFromTable(currentTable);
+    if (myCountNow >= MAX_BETS_PER_ROUND) {
+      setStatus(`You can place only ${MAX_BETS_PER_ROUND} bets in this game.`, "error");
+      setNumberChipsDisabled(true);
+      placeBetBtn.disabled = true;
+      return;
+    }
+
     const maxPlayers = typeof currentTable.max_players === "number" ? currentTable.max_players : null;
     const slotsFull = currentTable.is_full === true || (maxPlayers !== null && currentTable.players >= maxPlayers);
 
     if (slotsFull) {
       setStatus("All slots are full for this game.", "error");
-      disableBettingUI();
+      disableBettingUI(true);
       return;
     }
 
