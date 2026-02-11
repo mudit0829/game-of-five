@@ -699,3 +699,33 @@ body {
 .player-area .ball{
   z-index: 10;
 }
+
+/* ===== DISABLED / LOCKED NUMBER BUTTONS (silver-like) ===== */
+.num-chip:disabled,
+.num-chip.locked {
+  opacity: 0.35;
+  cursor: not-allowed;
+  transform: none !important;
+  box-shadow: none !important;
+  border-color: rgba(148, 163, 184, 0.18) !important;
+  background: radial-gradient(circle at 30% 30%, #0b1220, #050914) !important;
+  color: rgba(226, 232, 240, 0.55) !important;
+  filter: grayscale(0.7);
+}
+
+/* stop hover lift/glow when disabled */
+.num-chip:disabled:hover,
+.num-chip.locked:hover {
+  transform: none !important;
+  box-shadow: none !important;
+}
+
+/* also fade the PLACE BET button when disabled */
+.bet-button:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+  transform: none !important;
+  box-shadow: none !important;
+  filter: grayscale(0.3);
+}
+
