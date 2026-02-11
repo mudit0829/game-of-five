@@ -9,6 +9,15 @@ const USER_ID = window.GAME_USER_ID;
 const USERNAME = window.GAME_USERNAME || "Player";
 const HOME_URL = "/home";
 
+// Must match your CSS animation duration for .frog-wrapper.jump-to
+const HOP_DURATION_MS = 850;
+
+// Small tuning so frog looks like sitting ON the pad (positive = a bit lower)
+const LANDING_Y_OFFSET_PX = 10;
+
+// Arc height (px) — this sets CSS var used by your new jump animation
+const JUMP_ARC_HEIGHT_PX = 95;
+
 // ================= DOM REFERENCES =================
 const pondEl = document.querySelector(".pond");
 const frogContainer = document.getElementById("frogContainer");
@@ -45,7 +54,6 @@ let currentTable = null;
 let gameFinished = false;
 
 let tablePollInterval = null;
-
 let displayRemainingSeconds = 0;
 
 // one-hop-per-round + one-popup-per-round
@@ -54,6 +62,9 @@ let popupShownForRound = null;
 
 // landing time to delay popup until hop finishes
 let hopLandingETA = 0;
+
+// used to avoid accidental double-trigger
+let isHoppingNow = false;
 
 // ================= HELPERS =================
 function pick(obj, ...keys) {
@@ -174,6 +185,8 @@ function updatePadsFromBets(bets) {
   });
 }
 
+// Safer than your old version: ONLY place the winning number on an EMPTY pad.
+// If no pad is empty, we do not overwrite players’ pads.
 function ensurePadForWinningNumber(winningNumber) {
   if (winningNumber == null) return;
 
@@ -181,11 +194,11 @@ function ensurePadForWinningNumber(winningNumber) {
   const exists = pads.some((p) => p.dataset.number === str);
   if (exists) return;
 
-  const pad = pads[0];
-  if (!pad) return;
+  const emptyPad = pads.find((p) => !p.dataset.number);
+  if (!emptyPad) return;
 
-  pad.dataset.number = str;
-  const numSpan = pad.querySelector(".pad-number");
+  emptyPad.dataset.number = str;
+  const numSpan = emptyPad.querySelector(".pad-number");
   if (numSpan) numSpan.textContent = str;
 }
 
@@ -228,74 +241,66 @@ function showSlotsFullPopup() {
   setTimeout(() => window.history.back(), 2000);
 }
 
-// ================= FROG HOP (IDLE FROG MOVES) =================
-// One frog only: keep idle video playing, move frogContainer in an arc to the winning pad.
+// ================= PRECISE FROG JUMP (uses your new CSS .jump-to) =================
+function clearOldJumpClasses() {
+  if (!frogContainer) return;
+  frogContainer.classList.remove("jumping", "jump-left", "jump-front", "jump-right", "jump-to");
+}
 
-function hopFrogToPad(targetPad, durationMs = 1200) {
+function jumpFrogToPad(targetPad) {
   if (!frogContainer || !targetPad) return;
+
+  // Prevent double triggers while already hopping
+  if (isHoppingNow) return;
+  isHoppingNow = true;
 
   const frogRect = frogContainer.getBoundingClientRect();
   const padRect = targetPad.getBoundingClientRect();
 
-  const startX = frogRect.left + frogRect.width / 2;
-  const startY = frogRect.top + frogRect.height / 2;
+  const frogCX = frogRect.left + frogRect.width / 2;
+  const frogCY = frogRect.top + frogRect.height / 2;
 
-  const endX = padRect.left + padRect.width / 2;
-  const endY = padRect.top + padRect.height / 2;
+  const padCX = padRect.left + padRect.width / 2;
+  const padCY = padRect.top + padRect.height / 2;
 
-  // arc height based on distance
-  const dx = endX - startX;
-  const dy = endY - startY;
-  const dist = Math.sqrt(dx * dx + dy * dy);
-  const peak = -Math.min(160, Math.max(90, dist * 0.45));
+  // Make it look like frog is sitting on the pad (slightly lower than center)
+  const dx = padCX - frogCX;
+  const dy = (padCY - frogCY) + LANDING_Y_OFFSET_PX;
 
-  const duration = Math.max(700, Math.min(1800, Number(durationMs) || 1200));
-  const startTime = performance.now();
+  // Feed CSS variables used by your jump animation
+  frogContainer.style.setProperty("--dx", `${dx}px`);
+  frogContainer.style.setProperty("--dy", `${dy}px`);
+  frogContainer.style.setProperty("--jumpH", `${JUMP_ARC_HEIGHT_PX}px`);
 
-  hopLandingETA = Date.now() + duration;
+  clearOldJumpClasses();
 
-  // Switch to fixed positioning during hop so it can move anywhere
-  frogContainer.style.position = "fixed";
-  frogContainer.style.left = `${startX}px`;
-  frogContainer.style.top = `${startY}px`;
-  frogContainer.style.transform = "translate(-50%, -50%)";
-  frogContainer.style.margin = "0";
-  frogContainer.style.zIndex = "1200";
+  // Restart animation reliably
+  void frogContainer.offsetWidth;
+  frogContainer.classList.add("jump-to");
 
-  function step(now) {
-    const tRaw = (now - startTime) / duration;
-    const t = Math.min(Math.max(tRaw, 0), 1);
+  hopLandingETA = Date.now() + HOP_DURATION_MS;
 
-    // ease out
-    const ease = 1 - Math.pow(1 - t, 3);
+  // Highlight winning pad near landing moment
+  setTimeout(() => {
+    targetPad.classList.add("win");
+  }, Math.max(0, HOP_DURATION_MS - 80));
 
-    const x = startX + dx * ease;
-    const yLinear = startY + dy * ease;
-    const yArc = yLinear + peak * (4 * t * (1 - t));
+  // Release lock after hop ends
+  setTimeout(() => {
+    isHoppingNow = false;
+  }, HOP_DURATION_MS + 50);
+}
 
-    const scale = 1 + Math.sin(Math.PI * t) * 0.08; // small hop squash/stretch
-    const rotate = (dx / (dist || 1)) * 6 * (1 - Math.abs(0.5 - t) * 2);
+function jumpFrogToWinningNumber(winNum) {
+  if (winNum === null || winNum === undefined || winNum === "") return;
 
-    frogContainer.style.left = `${x}px`;
-    frogContainer.style.top = `${yArc}px`;
-    frogContainer.style.transform = `translate(-50%, -50%) scale(${scale}) rotate(${rotate}deg)`;
+  // If winning number isn’t currently visible, only put it on an EMPTY pad
+  ensurePadForWinningNumber(winNum);
 
-    if (t < 1) {
-      requestAnimationFrame(step);
-    } else {
-      // landing bounce
-      frogContainer.style.transition = "transform 0.25s ease-out";
-      frogContainer.style.transform = "translate(-50%, -50%) scale(1)";
+  const targetPad = findPadForNumber(winNum);
+  if (!targetPad) return;
 
-      setTimeout(() => {
-        frogContainer.style.transition = "none";
-      }, 260);
-
-      targetPad.classList.add("win");
-    }
-  }
-
-  requestAnimationFrame(step);
+  jumpFrogToPad(targetPad);
 }
 
 // ================= POLLING =================
@@ -378,7 +383,7 @@ function updateGameUI(table) {
 
   const hasResult = table.resultValue !== null && table.resultValue !== undefined && table.resultValue !== "";
 
-  // ✅ Hop at 02 seconds when result is pre-selected by backend
+  // ✅ Jump at <= 2 seconds when result is known
   if (hasResult && table.timeRemaining <= 2) {
     const roundId = table.roundCode || "__no_round__";
 
@@ -387,12 +392,8 @@ function updateGameUI(table) {
 
       setStatus(`Winning number: ${table.resultValue}`, "ok");
 
-      ensurePadForWinningNumber(table.resultValue);
-      const targetPad = findPadForNumber(table.resultValue);
-
-      if (targetPad) {
-        hopFrogToPad(targetPad, 1200);
-      }
+      // One direct jump (no front-then-right)
+      jumpFrogToWinningNumber(table.resultValue);
     }
   }
 
