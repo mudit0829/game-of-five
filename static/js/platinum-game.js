@@ -10,6 +10,9 @@ let tableCodeFromUrl = urlParams.get("table") || null;
 const USER_ID = GAME_USER_ID;
 const USERNAME = GAME_USERNAME || "Player";
 
+// ✅ SAME AS GOLD/SILVER
+const MAX_BETS_PER_ROUND = 3;
+
 // ================== DOM REFERENCES ==================
 
 const roundCodeSpan = document.getElementById("roundCode");
@@ -56,14 +59,12 @@ let kickedForNoBet = false;
 // Used to delay popup until paratrooper lands
 let paratrooperLandingETA = 0;
 
-// ---------- NEW: Stable boat slot order per round (prevents "0" jumping to boat #1) ----------
+// ---------- Stable boat slot order per round ----------
 let boatOrderRoundCode = null;
-let boatBetKeyOrder = []; // array of betKeys in the order they first appeared
-let boatBetKeyToBet = new Map(); // betKey -> bet object
+let boatBetKeyOrder = [];
+let boatBetKeyToBet = new Map();
 
 function getBetKey(b) {
-  // Per your UI: a user cannot bet the same number twice; userId+number is stable and unique enough.
-  // If your backend allows duplicates per user+number, change this to include something else (timestamp/id).
   return `${String(b?.userId)}|${String(b?.number)}`;
 }
 
@@ -105,7 +106,6 @@ function normalizeTable(table) {
   t.maxPlayers = pick(table, "max_players", "maxplayers");
   t.playersCount = safeNum(pick(table, "players"), 0);
 
-  // normalize bets
   t.bets = Array.isArray(table.bets)
     ? table.bets.map((b) => ({
         ...b,
@@ -116,6 +116,7 @@ function normalizeTable(table) {
     : [];
 
   t.resultValue = pick(table, "result");
+  t.isFull = toBool(pick(table, "is_full", "isfull"));
 
   return t;
 }
@@ -154,11 +155,25 @@ function setSelectedNumber(n) {
   });
 }
 
-function disableBettingUI() {
-  if (placeBetBtn) placeBetBtn.disabled = true;
+// ✅ same “locked fallback” approach as gold
+function setNumberChipsDisabled(disabled) {
+  const d = !!disabled;
   document.querySelectorAll(".num-chip").forEach((chip) => {
-    chip.disabled = true;
+    try { chip.disabled = d; } catch (e) {}
+    chip.dataset.locked = d ? "1" : "0";
+    chip.classList.toggle("locked", d);
+    if (d) chip.classList.remove("selected");
   });
+}
+
+function disableBettingUI(disableNumbers = true) {
+  if (placeBetBtn) placeBetBtn.disabled = true;
+  if (disableNumbers) setNumberChipsDisabled(true);
+}
+
+function countMyBetsFromTable(table) {
+  const list = (table?.bets || []).filter((b) => String(b.userId) === String(USER_ID));
+  return list.length;
 }
 
 function updateMyBets(bets) {
@@ -166,7 +181,7 @@ function updateMyBets(bets) {
 
   if (userBetsLabel) userBetsLabel.textContent = myBets.length;
 
-  if (!myBetsContainer) return;
+  if (!myBetsContainer) return myBets;
   myBetsContainer.innerHTML = "";
 
   if (myBets.length === 0) {
@@ -175,7 +190,7 @@ function updateMyBets(bets) {
     span.style.fontSize = "11px";
     span.textContent = "none";
     myBetsContainer.appendChild(span);
-    return;
+    return myBets;
   }
 
   myBets.forEach((b) => {
@@ -184,40 +199,34 @@ function updateMyBets(bets) {
     chip.textContent = b.number;
     myBetsContainer.appendChild(chip);
   });
+
+  return myBets;
 }
 
-// ---------- UPDATED: boats show bets in "first available boat" order (not number-based) ----------
+// ---------- UPDATED: boats show bets in "first available boat" order ----------
 function updateBoatsFromBets(bets, roundCode = "") {
   const rc = roundCode || "__no_round__";
   if (boatOrderRoundCode !== rc) resetBoatOrderForRound(rc);
 
-  // Map the latest bets we have now
   const currentMap = new Map();
   (bets || []).forEach((b) => {
     const key = getBetKey(b);
     currentMap.set(key, b);
 
-    // First time seeing this bet in this round -> append to display order
     if (!boatBetKeyToBet.has(key) && !boatBetKeyOrder.includes(key)) {
       boatBetKeyOrder.push(key);
     }
   });
 
-  // Remove keys that are no longer present
   boatBetKeyOrder = boatBetKeyOrder.filter((k) => currentMap.has(k));
-
-  // Refresh stored bet objects
   boatBetKeyToBet = currentMap;
 
-  // Fill boats with first 6 bets in this stable order
   const keysToShow = boatBetKeyOrder.slice(0, 6);
 
   boats.forEach((boat, i) => {
     const numSpan = boat.querySelector(".boat-number");
     const userSpan = boat.querySelector(".boat-user");
     boat.classList.remove("win");
-
-    // Clear any temporary animations
     boat.style.animation = "";
 
     if (i < keysToShow.length) {
@@ -235,7 +244,6 @@ function updateBoatsFromBets(bets, roundCode = "") {
   });
 }
 
-// Ensure winning number is on a boat (so paratrooper always has a target)
 function ensureBoatForWinningNumber(winningNumber, roundCode = "") {
   if (winningNumber === null || winningNumber === undefined) return;
   if (!boats || boats.length === 0) return;
@@ -243,10 +251,8 @@ function ensureBoatForWinningNumber(winningNumber, roundCode = "") {
   const existing = boats.find((b) => String(b.dataset.number) === String(winningNumber));
   if (existing) return;
 
-  // Prefer an empty boat first
   let boat = boats.find((b) => !b.dataset.number || b.dataset.number === "");
   if (!boat) {
-    // Otherwise choose a stable rotating slot (not always boat[0])
     const idx = hashToIndex(`${roundCode}|${winningNumber}`, boats.length);
     boat = boats[idx] || boats[0];
   }
@@ -272,7 +278,7 @@ function syncUrlWithTable(roundCode) {
 }
 
 // ============== POPUP MODALS ==============
-
+// (unchanged)
 function createOverlay() {
   const overlay = document.createElement("div");
   overlay.style.position = "fixed";
@@ -416,7 +422,7 @@ function showFullSlotAndGoBack(messageText) {
 }
 
 // ============== PARATROOPER ANIMATION ==============
-
+// (unchanged)
 function ensureParatrooperAnimationStyles() {
   if (document.getElementById("paratrooper-anim-styles")) return;
 
@@ -466,7 +472,6 @@ function dropParatrooperToWinningNumber(winningNumber, durationMs = 2000) {
   const duration = Math.max(900, Math.min(2600, Number(durationMs) || 2000));
   const startTime = performance.now();
 
-  // Used by popup delay logic
   paratrooperLandingETA = Date.now() + duration;
 
   paratrooper.style.transition = "none";
@@ -499,7 +504,6 @@ function dropParatrooperToWinningNumber(winningNumber, durationMs = 2000) {
       targetBoat.classList.add("win");
       targetBoat.style.animation = "boatBounce 0.6s ease-in-out, boatGlow 0.8s ease-out";
 
-      // Keep paratrooper visible briefly AFTER landing
       setTimeout(() => {
         paratrooper.style.transition = "opacity 0.5s ease-out, top 0.6s ease-out";
         paratrooper.style.opacity = "0";
@@ -538,7 +542,7 @@ async function fetchTableData() {
 
       if (!rawTable) {
         gameFinished = true;
-        disableBettingUI();
+        disableBettingUI(true);
         setStatus("This game has finished. You'll be taken back to lobby for a new one.", "error");
 
         if (tablePollInterval) {
@@ -567,7 +571,6 @@ async function fetchTableData() {
 function updateGameUI(table) {
   if (!table) return;
 
-  // If round changed, reset stable boat order
   if (boatOrderRoundCode !== (table.roundCode || "__no_round__")) {
     resetBoatOrderForRound(table.roundCode);
   }
@@ -578,7 +581,6 @@ function updateGameUI(table) {
   const tr = table.timeRemaining || 0;
   const mins = Math.floor(tr / 60);
   const secs = tr % 60;
-
   if (timerText) timerText.textContent = `${mins}:${secs.toString().padStart(2, "0")}`;
 
   if (timerPill) {
@@ -586,12 +588,8 @@ function updateGameUI(table) {
     else timerPill.classList.remove("urgent");
   }
 
-  // UPDATED: stable, slot-based ordering (not number-based)
   updateBoatsFromBets(table.bets || [], table.roundCode || "");
-
-  updateMyBets(table.bets || []);
-
-  const myBets = (table.bets || []).filter((b) => String(b.userId) === String(USER_ID));
+  const myBets = updateMyBets(table.bets || []);
   const hasUserBet = myBets.length > 0;
 
   const slotsAvail = table.slotsAvailable;
@@ -600,11 +598,26 @@ function updateGameUI(table) {
   const slotsFull =
     (typeof slotsAvail === "number" && slotsAvail <= 0) ||
     (maxPlayers > 0 && table.playersCount >= maxPlayers) ||
-    table.is_full === true;
+    table.isFull === true;
 
+  // ✅ SAME AS GOLD: full => disable ALL number buttons
+  if (slotsFull) {
+    setNumberChipsDisabled(true);
+  } else if (!gameFinished && myBets.length < MAX_BETS_PER_ROUND) {
+    setNumberChipsDisabled(false);
+  }
+
+  // ✅ SAME AS GOLD: 3/3 => disable ALL numbers + bet button
+  if (myBets.length >= MAX_BETS_PER_ROUND) {
+    setNumberChipsDisabled(true);
+    if (placeBetBtn) placeBetBtn.disabled = true;
+    if (!gameFinished) setStatus(`Bet limit reached (${MAX_BETS_PER_ROUND}/${MAX_BETS_PER_ROUND}).`, "ok");
+  }
+
+  // Kick user if no bet and table is not joinable
   if (!hasUserBet && (slotsFull || table.isBettingClosed || table.isFinished) && !kickedForNoBet) {
     gameFinished = true;
-    disableBettingUI();
+    disableBettingUI(true);
     if (tablePollInterval) {
       clearInterval(tablePollInterval);
       tablePollInterval = null;
@@ -613,23 +626,26 @@ function updateGameUI(table) {
     return;
   }
 
-  if (table.isBettingClosed || table.isFinished || slotsFull) {
-    disableBettingUI();
-  } else {
-    if (placeBetBtn) placeBetBtn.disabled = false;
-    document.querySelectorAll(".num-chip").forEach((chip) => (chip.disabled = false));
+  // Button state
+  if (placeBetBtn && !gameFinished) {
+    const lockBecauseLimit = myBets.length >= MAX_BETS_PER_ROUND;
+    placeBetBtn.disabled = !!table.isBettingClosed || !!table.isFinished || slotsFull || lockBecauseLimit;
   }
 
-  // ✅ Start paratrooper at 02 sec remaining (backend now sends result early)
+  if (table.isBettingClosed || table.isFinished || slotsFull || myBets.length >= MAX_BETS_PER_ROUND) {
+    disableBettingUI(true);
+  } else {
+    if (placeBetBtn) placeBetBtn.disabled = false;
+    setNumberChipsDisabled(false);
+  }
+
   if (table.resultValue !== null && table.resultValue !== undefined && table.timeRemaining <= 2) {
     const roundId = table.roundCode || "__no_round__";
     if (resultAnimationShownForRound !== roundId) {
       resultAnimationShownForRound = roundId;
 
-      // Ensure winning number exists on some boat so paratrooper always has a target
       ensureBoatForWinningNumber(table.resultValue, table.roundCode || "");
 
-      // Aim landing close to 00: duration based on remaining time
       const dur = Math.max(1200, Math.min(2200, (table.timeRemaining + 0.2) * 1000));
 
       setStatus(`Winning number: ${table.resultValue}`, "ok");
@@ -637,7 +653,6 @@ function updateGameUI(table) {
     }
   }
 
-  // ✅ Show popup AFTER game finished, and AFTER paratrooper landing
   if (table.isFinished && table.resultValue !== null && table.resultValue !== undefined) {
     const roundId = table.roundCode || "__no_round__";
 
@@ -719,6 +734,8 @@ socket.on("updatetable", () => fetchTableData());
 
 document.querySelectorAll(".num-chip").forEach((chip) => {
   chip.addEventListener("click", () => {
+    if (gameFinished) return;
+    if (chip.disabled || chip.dataset.locked === "1") return; // ✅ hard guard
     const n = parseInt(chip.dataset.number, 10);
     setSelectedNumber(n);
   });
@@ -726,8 +743,15 @@ document.querySelectorAll(".num-chip").forEach((chip) => {
 
 if (placeBetBtn) {
   placeBetBtn.addEventListener("click", () => {
-    if (!currentTable) {
-      setStatus("Game not ready yet", "error");
+    if (gameFinished) return setStatus("Game finished", "error");
+    if (!currentTable) return setStatus("Game not ready yet", "error");
+
+    // ✅ 3-bet limit
+    const myCountNow = countMyBetsFromTable(currentTable);
+    if (myCountNow >= MAX_BETS_PER_ROUND) {
+      setStatus(`You can place only ${MAX_BETS_PER_ROUND} bets in this game.`, "error");
+      setNumberChipsDisabled(true);
+      placeBetBtn.disabled = true;
       return;
     }
 
@@ -737,47 +761,28 @@ if (placeBetBtn) {
     const slotsFull =
       (typeof slotsAvail === "number" && slotsAvail <= 0) ||
       (maxPlayers > 0 && currentTable.playersCount >= maxPlayers) ||
-      currentTable.is_full === true;
+      currentTable.isFull === true;
 
     if (slotsFull) {
       setStatus("All slots are full for this game.", "error");
-      disableBettingUI();
+      disableBettingUI(true);
       return;
     }
 
-    // NOTE: FIXED_BET_AMOUNT should be defined globally by your HTML (same as other games).
-    if (walletBalance < FIXED_BET_AMOUNT) {
-      setStatus("Insufficient balance", "error");
-      return;
-    }
-
-    if (selectedNumber === null || selectedNumber === undefined) {
-      setStatus("Select a number first", "error");
-      return;
-    }
+    if (walletBalance < FIXED_BET_AMOUNT) return setStatus("Insufficient balance", "error");
+    if (selectedNumber === null || selectedNumber === undefined) return setStatus("Select a number first", "error");
 
     const myBets = (currentTable.bets || []).filter((b) => String(b.userId) === String(USER_ID)) || [];
     const alreadyOnThisNumber = myBets.some((b) => Number(b.number) === Number(selectedNumber));
+    if (alreadyOnThisNumber) return setStatus("You already placed a bet on this number", "error");
 
-    if (alreadyOnThisNumber) {
-      setStatus("You already placed a bet on this number", "error");
-      return;
-    }
-
-    const payload = {
-      game_type: GAME,
-      user_id: USER_ID,
-      username: USERNAME,
-      number: selectedNumber,
-    };
-
+    const payload = { game_type: GAME, user_id: USER_ID, username: USERNAME, number: selectedNumber };
     socket.emit("place_bet", payload);
     socket.emit("placebet", payload);
   });
 }
 
 // ===== Controls height sync for your CSS variable =====
-
 function syncControlsHeight() {
   const controls = document.querySelector(".controls");
   if (!controls) return;
