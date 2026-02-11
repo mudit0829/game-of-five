@@ -11,8 +11,10 @@ const USER_ID = window.GAME_USER_ID;
 const USERNAME = window.GAME_USERNAME || "Player";
 const HOME_URL = "/home";
 
-// ================= DOM REFERENCES =================
+// ✅ NEW: max bets allowed per user per round
+const MAX_BETS_PER_ROUND = 3;
 
+// ================= DOM REFERENCES =================
 const pitch = document.querySelector(".pitch");
 const ballImg = document.getElementById("ballSprite");
 const playerArea = document.querySelector(".player-area"); // kept (not used for positioning now)
@@ -41,7 +43,6 @@ const popupLobbyBtn = document.getElementById("popupLobbyBtn");
 if (userNameLabel) userNameLabel.textContent = USERNAME;
 
 // ================= STATE =================
-
 let walletBalance = 0;
 let selectedNumber = 0;
 
@@ -62,7 +63,6 @@ let shotShownForRound = null;
 let popupShownForRound = null;
 
 // ================= KICK VIDEO TUNING =================
-
 // Show player at 4 seconds remaining and freeze at 2 seconds remaining
 const KICK_SHOW_AT_REMAINING = 4;
 const KICK_FREEZE_AT_REMAINING = 2;
@@ -71,9 +71,8 @@ const KICK_FREEZE_AT_REMAINING = 2;
 const KICK_SCALE = 0.21;
 
 // Fine tuning: move player relative to ball
-// Less negative X = move player RIGHT (closer to ball)
-const KICK_SHIFT_X = -18; // ✅ was -40
-const KICK_SHIFT_Y = 4;   // ✅ was 10
+const KICK_SHIFT_X = -18; // was -40
+const KICK_SHIFT_Y = 4;   // was 10
 
 let kickResizeHandlerAttached = false;
 function attachKickResizeHandlerOnce() {
@@ -86,7 +85,6 @@ function attachKickResizeHandlerOnce() {
 }
 
 // ================= SMALL UTILITIES =================
-
 function pick(obj, ...keys) {
   for (const k of keys) {
     if (obj && obj[k] !== undefined && obj[k] !== null) return obj[k];
@@ -159,7 +157,6 @@ function syncUrlWithTable(roundCode) {
 }
 
 // ================= UI HELPERS =================
-
 function setStatus(msg, type = "") {
   if (!statusEl) return;
   statusEl.textContent = msg || "";
@@ -190,9 +187,18 @@ function setSelectedNumber(n) {
   });
 }
 
-function disableBettingUI() {
+function setNumberChipsDisabled(disabled) {
+  numChips.forEach((chip) => { chip.disabled = !!disabled; });
+}
+
+// updated: optionally disable numbers too
+function disableBettingUI(disableNumbers = true) {
   if (placeBetBtn) placeBetBtn.disabled = true;
-  numChips.forEach((chip) => { chip.disabled = true; });
+  if (disableNumbers) setNumberChipsDisabled(true);
+}
+
+function countMyBetsFromTable(table) {
+  return (table?.bets || []).filter((b) => String(b.userId) === String(USER_ID)).length;
 }
 
 function updateMyBets(bets) {
@@ -200,7 +206,7 @@ function updateMyBets(bets) {
   userHasBet = myBets.length > 0;
 
   if (userBetCountLabel) userBetCountLabel.textContent = myBets.length;
-  if (!myBetsRow) return;
+  if (!myBetsRow) return myBets;
 
   if (myBets.length === 0) {
     myBetsRow.innerHTML = '<span style="color:#6b7280;font-size:11px;">none</span>';
@@ -208,6 +214,8 @@ function updateMyBets(bets) {
     const numbers = myBets.map((b) => Number(b.number)).sort((a, b) => a - b);
     myBetsRow.innerHTML = numbers.map((n) => `<span class="my-bet-chip">${n}</span>`).join("");
   }
+
+  return myBets;
 }
 
 function updateGoalsFromBets(bets) {
@@ -294,7 +302,6 @@ function showSlotsFullPopup() {
 }
 
 // ================= VIDEO (Kick) =================
-
 function cleanupKickVideo() {
   const node = document.getElementById("playerKickVideo");
   if (node && node.parentNode) node.parentNode.removeChild(node);
@@ -345,14 +352,10 @@ function ensureKickVideoElement() {
   v.style.width = "360px";
   v.style.height = "auto";
   v.style.pointerEvents = "none";
-
-  // Keep video behind the ball
   v.style.zIndex = "9";
-
   v.style.filter = "drop-shadow(0 12px 22px rgba(0,0,0,0.65))";
 
   document.body.appendChild(v);
-
   attachKickResizeHandlerOnce();
 
   return v;
@@ -404,11 +407,10 @@ function freezeKickVideoAt2s() {
 }
 
 // ================= BALL + DOTTED PATH (LOCKED) =================
-
 // Slower by 50%
-const BALL_SHOT_DURATION_MS = 1125;    // was 750
-const BALL_SHOT_START_DELAY_MS = 420; // was 280
-const BALL_RESET_DELAY_MS = 1350;     // was 900
+const BALL_SHOT_DURATION_MS = 1125;
+const BALL_SHOT_START_DELAY_MS = 420;
+const BALL_RESET_DELAY_MS = 1350;
 
 let _shotSvg = null;
 let _shotToken = 0;
@@ -628,7 +630,6 @@ function shootBallToWinningNumber(winningNumber) {
 }
 
 // ================= TIMER =================
-
 function startLocalTimer() {
   if (localTimerInterval) clearInterval(localTimerInterval);
 
@@ -646,7 +647,6 @@ function startLocalTimer() {
 }
 
 // ================= POLLING =================
-
 async function fetchTableData() {
   if (gameFinished) return;
 
@@ -668,7 +668,7 @@ async function fetchTableData() {
 
       if (!raw) {
         gameFinished = true;
-        disableBettingUI();
+        disableBettingUI(true);
 
         if (tablePollInterval) clearInterval(tablePollInterval);
         tablePollInterval = null;
@@ -709,15 +709,26 @@ function updateGameUI(table) {
   renderTimer();
 
   updateGoalsFromBets(table.bets || []);
-  updateMyBets(table.bets || []);
+  const myBets = updateMyBets(table.bets || []);
+  const myBetCount = myBets.length;
 
   if (playerCountSpan) playerCountSpan.textContent = table.playersCount || 0;
 
   const maxPlayers = typeof table.maxPlayers === "number" ? table.maxPlayers : null;
   const isFull = maxPlayers !== null && (table.playersCount >= maxPlayers);
 
+  // ✅ Lock number buttons when full OR betting closed OR bet limit reached OR game finished
+  const limitReached = myBetCount >= MAX_BETS_PER_ROUND;
+  const lockNumbers = gameFinished || isFull || !!table.isBettingClosed || limitReached;
+  setNumberChipsDisabled(lockNumbers);
+
+  // ✅ Place bet button rules
   if (placeBetBtn && !gameFinished) {
-    placeBetBtn.disabled = !!table.isBettingClosed || isFull;
+    placeBetBtn.disabled = !!table.isBettingClosed || isFull || limitReached;
+  }
+
+  if (limitReached && !gameFinished) {
+    setStatus(`Bet limit reached (${MAX_BETS_PER_ROUND}/${MAX_BETS_PER_ROUND}).`, "ok");
   }
 
   if (timerPill) {
@@ -725,9 +736,10 @@ function updateGameUI(table) {
     else timerPill.classList.remove("urgent");
   }
 
+  // Existing behavior: if you haven't bet and table becomes full, show popup and go back
   if (!gameFinished && !userHasBet && isFull) {
     gameFinished = true;
-    disableBettingUI();
+    disableBettingUI(true);
     if (tablePollInterval) clearInterval(tablePollInterval);
     tablePollInterval = null;
     if (localTimerInterval) clearInterval(localTimerInterval);
@@ -760,7 +772,7 @@ function updateGameUI(table) {
       popupShownForRound = roundId;
 
       gameFinished = true;
-      disableBettingUI();
+      disableBettingUI(true);
 
       if (tablePollInterval) clearInterval(tablePollInterval);
       tablePollInterval = null;
@@ -788,7 +800,6 @@ function startPolling() {
 }
 
 // ================= SOCKET =================
-
 const socket = io();
 
 async function fetchBalance() {
@@ -823,10 +834,18 @@ function handleBetSuccess(payload) {
 
   const players = payload?.players || payload?.bets;
   if (players && Array.isArray(players)) {
+    // keep UI updated instantly
     const t = normalizeTable({ bets: players });
     updateGoalsFromBets(t.bets);
-    updateMyBets(t.bets);
+    const myBets = updateMyBets(t.bets);
+
     if (playerCountSpan) playerCountSpan.textContent = t.bets.length;
+
+    // ✅ lock when bet limit reached (even before next polling update)
+    if (myBets.length >= MAX_BETS_PER_ROUND) {
+      setNumberChipsDisabled(true);
+      if (placeBetBtn) placeBetBtn.disabled = true;
+    }
   }
 }
 
@@ -845,7 +864,8 @@ function handleUpdateTable(payload) {
     renderTimer();
   }
 
-  if (t?.isBettingClosed) disableBettingUI();
+  // If betting is closed, lock UI
+  if (t?.isBettingClosed) disableBettingUI(true);
 }
 
 function handleBetError(payload) {
@@ -863,10 +883,10 @@ socket.on("bet_error", handleBetError);
 socket.on("beterror", handleBetError);
 
 // ================= UI EVENTS =================
-
 numChips.forEach((chip) => {
   chip.addEventListener("click", () => {
     if (gameFinished) return;
+    if (chip.disabled) return;
     const n = parseInt(chip.dataset.number, 10);
     setSelectedNumber(n);
   });
@@ -883,10 +903,19 @@ if (placeBetBtn) {
       return;
     }
 
+    // ✅ 3 bets max per user per round
+    const myCountNow = countMyBetsFromTable(currentTable);
+    if (myCountNow >= MAX_BETS_PER_ROUND) {
+      setStatus(`You can place only ${MAX_BETS_PER_ROUND} bets in this game.`, "error");
+      setNumberChipsDisabled(true);
+      placeBetBtn.disabled = true;
+      return;
+    }
+
     const maxPlayers = typeof currentTable.maxPlayers === "number" ? currentTable.maxPlayers : null;
     if (maxPlayers !== null && currentTable.playersCount >= maxPlayers) {
       setStatus("All slots are full for this game.", "error");
-      disableBettingUI();
+      disableBettingUI(true);
       return;
     }
 
@@ -916,7 +945,6 @@ if (popupHomeBtn) popupHomeBtn.addEventListener("click", () => (window.location.
 if (popupLobbyBtn) popupLobbyBtn.addEventListener("click", () => window.history.back());
 
 // ================= INIT =================
-
 console.log(`[INIT] Game=${GAME}, User=${USER_ID}, Username=${USERNAME}, Bet=${FIXED_BET_AMOUNT}`);
 
 fetchBalance();
