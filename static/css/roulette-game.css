@@ -1,155 +1,376 @@
+/* BASIC LAYOUT */
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
 body {
-    background: #332C20;
-    font: 100% Arial, Helvetica, sans-serif;
-    min-width: 1200px;
+  margin: 0;
+  font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI",
+    sans-serif;
+  background: radial-gradient(circle at top, #020617 0, #020617 45%, #000 100%);
+  color: #e5e7eb;
 }
 
-.valid
-{
-    border: 1px solid lightgray;
-}
-.error
-{
-    border: 1px solid red;
+.app {
+  max-width: 1100px;
+  margin: 0 auto;
+  padding: 12px 10px 20px;
 }
 
-#panelWheel {
-    float: left;
+/* TOP BAR */
+
+.top-bar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 12px;
 }
 
-img {
-    width: 100%;
-    height: auto;
+.game-title {
+  display: flex;
+  flex-direction: column;
 }
 
-label, input, .radio-group,.dropbtn, .dropdown-content {
-    transition: all 0.5s;
+.game-name {
+  font-size: 20px;
+  font-weight: 800;
 }
 
-#panelDisplay {
-    float: left;
-    text-align: center;
-    font-weight: 300;
-    font-size: 20px;
-    width: 300px;
-    position: relative;
-    top: 300px;
-    left: -300px;
+.game-sub {
+  font-size: 12px;
+  color: #9ca3af;
 }
 
-#currentCash {
-    color: #74bb3a;
+.game-info {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
 }
 
-#moneybag {
-    height: auto;
-    width: 70px;
-    margin: 0 auto;
+.info-box {
+  min-width: 80px;
+  padding: 4px 8px;
+  border-radius: 10px;
+  background: rgba(15, 23, 42, 0.85);
+  border: 1px solid rgba(148, 163, 184, 0.4);
+  text-align: center;
 }
 
-#panelOptions {
-    float: left;
-    background: #D6B588;
-    width: 250px;
-    height: auto;
-    text-align: center;
-    font-weight: 300;
-    position: relative;
-    top: 100px;
-    border: ridge black 3px;
+.info-box span {
+  display: block;
+  font-size: 10px;
+  color: #9ca3af;
 }
 
-input[type=text] {
-    background: #D6B588;
-    color: white;
-    width: 60%;
-    height: 25px;
-    font-size: 20px;
+.info-box strong {
+  font-size: 14px;
 }
 
-input[type=radio] {
-    visibility: hidden;
-    display: none;
+/* MAIN LAYOUT */
+
+.layout {
+  display: flex;
+  gap: 14px;
+  flex-wrap: wrap;
 }
 
-input[type=radio]:checked + label{
-    color: #74bb3a;
+.wheel-panel {
+  flex: 0 0 320px;
+  max-width: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
 }
 
-.radio-group label + input[type=radio] + label {
-    border-left: solid 3px #2b2b2b;
+.bet-panel {
+  flex: 1 1 0;
+  min-width: 260px;
 }
 
-.radio-group {
-    border: solid 3px #2b2b2b;
-    display: inline-block;
-    border-radius: 10px;
-    overflow: hidden;
+/* WHEEL */
+
+.wheel-wrapper {
+  display: flex;
+  justify-content: center;
+  margin-top: 8px;
+  margin-bottom: 10px;
 }
 
-.radio-group label {
-    color: #3c3f41;
-    cursor: pointer;
-    font-weight: bold;
-    padding: 10px 20px;
+.wheel-border {
+  position: relative;
+  width: 260px;
+  height: 260px;
+  border-radius: 50%;
+  background: radial-gradient(circle at top, #111827, #020617);
+  box-shadow: 0 18px 40px rgba(0, 0, 0, 0.9);
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
-/* Dropdown Button */
-.dropbtn {
-    background-color: #74bb3a;
-    color: white;
-    padding: 16px;
-    font-size: 16px;
-    border: none;
-    cursor: pointer;
+.wheel-img {
+  width: 230px;
+  height: 230px;
+  border-radius: 50%;
+  box-shadow: inset 0 0 8px rgba(15, 23, 42, 0.7);
+  transition: transform 0.2s ease-out;
 }
 
-/* The container <div> - needed to position the dropdown content */
-.dropdown {
-    position: relative;
-    display: inline-block;
+/* pointer at top */
+.wheel-pointer {
+  position: absolute;
+  top: 3px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 0;
+  height: 0;
+  border-left: 10px solid transparent;
+  border-right: 10px solid transparent;
+  border-bottom: 18px solid #facc15;
+  filter: drop-shadow(0 4px 10px rgba(0, 0, 0, 0.8));
 }
 
-/* Dropdown Content (Hidden by Default) */
-.dropdown-content {
-    display: none;
-    position: absolute;
-    background-color: #f9f9f9;
-    /*min-width: 160px;*/
-    box-shadow: 0 8px 16px 0 rgba(0,0,0,0.2);
-    z-index: 1;
-    width: 100%;
+/* SPIN BUTTON */
+
+.spin-button {
+  margin-top: 10px;
+  padding: 10px 24px;
+  border-radius: 999px;
+  border: none;
+  background: linear-gradient(135deg, #22c55e, #10b981, #14b8a6);
+  color: #020617;
+  font-weight: 800;
+  letter-spacing: 0.5px;
+  cursor: pointer;
+  box-shadow: 0 10px 24px rgba(34, 197, 94, 0.5);
+  transition: transform 0.15s ease, box-shadow 0.15s ease, opacity 0.15s ease;
 }
 
-.dropdown-content label {
-    color: #74bb3a;
-    display: inline-block;
-    cursor: pointer;
-    font-weight: bold;
-    padding: 5px 0;
-    width: 100%;
+.spin-button:hover:not(:disabled) {
+  transform: translateY(-2px);
+  box-shadow: 0 14px 30px rgba(34, 197, 94, 0.6);
 }
 
-/* Change color of dropdown links on hover */
-.dropdown-content label:hover {
-    background-color: #f1f1f1
+.spin-button:active:not(:disabled) {
+  transform: translateY(0) scale(0.97);
+  box-shadow: 0 6px 16px rgba(34, 197, 94, 0.4);
 }
 
-/* Show the dropdown menu on hover */
-.dropdown:hover .dropdown-content {
-    display: block;
+.spin-button:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+  box-shadow: none;
 }
 
-/* Change the background color of the dropdown button when the dropdown content is shown */
-.dropbtn:hover{
-    background-color: #5a9125;
+/* LAST RESULT */
+
+.last-result {
+  margin-top: 8px;
+  font-size: 13px;
+  color: #e5e7eb;
 }
 
-.dropdown-content input[type=radio]:checked + label{
-    color: #c2c2c2;
-    background: #2b2b2b;
+/* NUMBERS CARD */
+
+.numbers-card {
+  background: rgba(15, 23, 42, 0.85);
+  border-radius: 16px;
+  padding: 10px;
+  border: 1px solid rgba(148, 163, 184, 0.45);
+  margin-bottom: 12px;
 }
 
-figure {
-cursor: pointer;
+.numbers-header {
+  text-align: center;
+  margin-bottom: 8px;
+}
+
+.numbers-title {
+  font-size: 13px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.7px;
+}
+
+.numbers-sub {
+  font-size: 11px;
+  color: #9ca3af;
+}
+
+/* NUMBER GRID */
+
+.numbers-grid {
+  display: grid;
+  grid-template-columns: repeat(9, minmax(0, 1fr));
+  gap: 6px;
+  justify-items: center;
+}
+
+.num-chip {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  border: 1px solid rgba(148, 163, 184, 0.4);
+  background: radial-gradient(circle at 30% 30%, #1e293b, #020617);
+  color: #e5e7eb;
+  font-size: 13px;
+  font-weight: 700;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  box-shadow: 0 3px 10px rgba(0, 0, 0, 0.8);
+  transition: all 0.15s ease;
+}
+
+.num-chip:hover:not(:disabled):not(.locked) {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 14px rgba(0, 0, 0, 0.9);
+}
+
+.num-chip:active:not(:disabled):not(.locked) {
+  transform: translateY(0) scale(0.95);
+}
+
+.num-chip.selected {
+  background: radial-gradient(circle at 30% 30%, #22c55e, #15803d);
+  color: #020617;
+  border-color: #22c55e;
+  box-shadow: 0 3px 14px rgba(34, 197, 94, 0.7);
+}
+
+/* INACTIVE / LOCKED NUMBER CHIPS (like other games) */
+.num-chip:disabled,
+.num-chip.locked {
+  opacity: 0.35;
+  cursor: not-allowed;
+  transform: none !important;
+  box-shadow: none !important;
+  filter: grayscale(0.6);
+}
+
+.num-chip:disabled:hover,
+.num-chip.locked:hover {
+  transform: none !important;
+  box-shadow: none !important;
+}
+
+/* MY BETS */
+
+.my-bets-card {
+  background: rgba(15, 23, 42, 0.85);
+  border-radius: 16px;
+  padding: 8px 10px;
+  border: 1px solid rgba(148, 163, 184, 0.45);
+  margin-bottom: 10px;
+}
+
+.my-bets-header {
+  display: flex;
+  justify-content: space-between;
+  font-size: 11px;
+  color: #9ca3af;
+  margin-bottom: 6px;
+}
+
+.my-bets-header .small {
+  font-size: 10px;
+}
+
+.my-bets-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+}
+
+.my-bet-chip {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 22px;
+  padding: 2px 6px;
+  font-size: 11px;
+  border-radius: 999px;
+  background: rgba(59, 130, 246, 0.3);
+  color: #bfdbfe;
+  border: 1px solid #3b82f6;
+  box-shadow: 0 2px 6px rgba(59, 130, 246, 0.5);
+}
+
+.none-label {
+  font-size: 11px;
+  color: #6b7280;
+}
+
+/* MAIN BET BUTTON */
+
+.bet-main-button {
+  display: block;
+  width: 100%;
+  padding: 11px 16px;
+  margin-bottom: 6px;
+  border-radius: 999px;
+  border: none;
+  background: linear-gradient(135deg, #22c55e, #16a34a, #22c55e);
+  font-size: 15px;
+  font-weight: 800;
+  color: #020617;
+  cursor: pointer;
+  box-shadow: 0 10px 24px rgba(34, 197, 94, 0.6);
+  transition: all 0.15s ease;
+}
+
+.bet-main-button:hover:not(:disabled) {
+  transform: translateY(-2px);
+  box-shadow: 0 14px 32px rgba(34, 197, 94, 0.7);
+}
+
+.bet-main-button:active:not(:disabled) {
+  transform: translateY(0) scale(0.97);
+  box-shadow: 0 6px 18px rgba(34, 197, 94, 0.45);
+}
+
+/* disabled state */
+.bet-main-button:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+  box-shadow: none;
+}
+
+/* STATUS MESSAGE */
+
+.status {
+  min-height: 18px;
+  font-size: 12px;
+  text-align: center;
+  padding-top: 2px;
+}
+
+.status.ok {
+  color: #86efac;
+}
+
+.status.error {
+  color: #fca5a5;
+}
+
+/* RESPONSIVE */
+
+@media (max-width: 768px) {
+  .layout {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .wheel-panel {
+    margin-bottom: 12px;
+  }
+
+  .numbers-grid {
+    grid-template-columns: repeat(6, minmax(0, 1fr));
+  }
 }
