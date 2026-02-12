@@ -282,8 +282,8 @@ class GameTable:
             user_id_norm = user_id
 
         user_bets = [b for b in self.bets if b["user_id"] == user_id_norm]
-        if len(user_bets) >= 4:
-            return False, "Maximum 4 bets per user"
+        if len(user_bets) >= 3:
+            return False, "Maximum 3 bets per user"
 
         if len(self.bets) >= self.max_players:
             return False, "All slots are full"
