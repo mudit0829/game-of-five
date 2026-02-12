@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <title>Roulette Wheel Game</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <link rel="stylesheet" href="roulette-game.css" />
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/roulette-game.css') }}" />
 </head>
 <body>
   <div class="app">
@@ -44,7 +44,7 @@
             <img
               id="rouletteWheel"
               class="wheel-img"
-              src="static/img/wheel1.png"
+              src="{{ url_for('static', filename='img/wheel1.png') }}"
               alt="Roulette Wheel"
             />
           </div>
@@ -89,6 +89,6 @@
     </main>
   </div>
 
-  <script src="roulette-game.js"></script>
+  <script src="{{ url_for('static', filename='js/roulette-game.js') }}"></script>
 </body>
 </html>
