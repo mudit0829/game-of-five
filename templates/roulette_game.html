@@ -4,7 +4,7 @@
 <head>
     <title>Casino Bet Simulator</title>
     <script src="https://code.jquery.com/jquery-1.10.2.js"></script>
-    <link rel="stylesheet" href="static/css/roulettegame.css">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/roulettegame.css') }}">
 </head>
 
 <body>
@@ -70,7 +70,7 @@
 </div>
 
 
-<script src="static/js/roulettegame.js"></script>
+<script src="{{ url_for('static', filename='js/roulettegame.js') }}"></script>
 <noscript>Please enable JavaScript</noscript>
 </body>
 </html>
