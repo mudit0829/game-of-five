@@ -1,76 +1,94 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="en">
-
 <head>
-    <title>Casino Bet Simulator</title>
-    <script src="https://code.jquery.com/jquery-1.10.2.js"></script>
-    <link rel="stylesheet" href="{{ url_for('static', filename='css/roulette-game.css') }}">
+  <meta charset="UTF-8" />
+  <title>Roulette Wheel Game</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <link rel="stylesheet" href="roulette-game.css" />
 </head>
-
 <body>
-<figure id='panelWheel'>
-    <img title='click me to spin!' alt="spin wheel" src='{{ url_for('static', filename='img/wheel1.png') }}'/>
-</figure>
+  <div class="app">
+    <header class="top-bar">
+      <div class="game-title">
+        <div class="game-name">Roulette Wheel</div>
+        <div class="game-sub">60 min round · 36 players max</div>
+      </div>
+      <div class="game-info">
+        <div class="info-box">
+          <span>Wallet</span>
+          <strong id="walletBalance">10000</strong>
+        </div>
+        <div class="info-box">
+          <span>Your bets</span>
+          <strong><span id="userBetCount">0</span>/20</strong>
+        </div>
+        <div class="info-box">
+          <span>Players</span>
+          <strong id="playerCount">1</strong>
+        </div>
+        <div class="info-box">
+          <span>Time left</span>
+          <strong id="timerText">60:00</strong>
+        </div>
+      </div>
+    </header>
 
-<div id='panelOptions'>
-    <form id='formOptions'>
-
-        <div class='dropdown'>
-            <button class='dropbtn'>on win</button>
-            <div class='dropdown-content'>
-                <input type='radio' id='option-1win' name='onWinButton' value='0'>
-                <label for='option-1win'>stop</label>
-                <input type='radio' id='option-2win' name='onWinButton' value='0.5'>
-                <label for='option-2win'>50%</label>
-                <input type='radio' id='option-3win' name='onWinButton' value='1' checked>
-                <label for='option-3win'>100%</label>
-                <input type='radio' id='option-4win' name='onWinButton' value='2'>
-                <label for='option-4win'>200%</label>
-            </div>
+    <main class="layout">
+      <!-- WHEEL SIDE -->
+      <section class="wheel-panel">
+        <div class="wheel-wrapper">
+          <div class="wheel-border">
+            <!-- pointer -->
+            <div class="wheel-pointer"></div>
+            <!-- wheel image -->
+            <img
+              id="rouletteWheel"
+              class="wheel-img"
+              src="static/img/wheel1.png"
+              alt="Roulette Wheel"
+            />
+          </div>
         </div>
 
-        <div class='dropdown'>
-            <button class='dropbtn'>on loss</button>
-            <div class='dropdown-content'>
-                <input type='radio' id='option-1loss' name='onLoseButton' value='0'>
-                <label for='option-1loss'>stop</label>
-                <input type='radio' id='option-2loss' name='onLoseButton' value='0.5'>
-                <label for='option-2loss'>50%</label>
-                <input type='radio' id='option-3loss' name='onLoseButton' value='1' checked>
-                <label for='option-3loss'>100%</label>
-                <input type='radio' id='option-4loss' name='onLoseButton' value='2'>
-                <label for='option-4loss'>200%</label>
-            </div>
+        <button id="spinBtn" class="spin-button">
+          SPIN WHEEL
+        </button>
+
+        <div id="lastResult" class="last-result">Result: --</div>
+      </section>
+
+      <!-- BETTING SIDE -->
+      <section class="bet-panel">
+        <div class="numbers-card">
+          <div class="numbers-header">
+            <div class="numbers-title">Select your numbers (0–35)</div>
+            <div class="numbers-sub">Fixed bet: 200 coins per number</div>
+          </div>
+
+          <div id="numbersGrid" class="numbers-grid">
+            <!-- JS will generate 0–35 buttons -->
+          </div>
         </div>
 
-        <input type='button' id='resetButton' class='dropbtn' value='reset'/>
-
-        <div class='radio-group'>
-            <input type='radio' id='option-one' name='loopSelector' value='1' checked>
-            <label for='option-one'>1x</label>
-            <input type='radio' id='option-two' name='loopSelector' value='10'>
-            <label for='option-two'>10x</label>
-            <input type='radio' id='option-three' name='loopSelector' value='50'>
-            <label for='option-three'>50x</label>
+        <div class="my-bets-card">
+          <div class="my-bets-header">
+            <span>Your bets in this round</span>
+            <span class="small">(max 20 numbers, one bet per number)</span>
+          </div>
+          <div id="myBetsRow" class="my-bets-row">
+            <span class="none-label">none</span>
+          </div>
         </div>
 
-        <input class='fine' id='betAmount' name='betAmount' type='text' value='0' placeholder='Bet Amount:'>
+        <button id="placeBetBtn" class="bet-main-button">
+          PLACE BET (200 COINS)
+        </button>
 
-    </form>
-</div>
+        <div id="statusMessage" class="status"></div>
+      </section>
+    </main>
+  </div>
 
-
-<div id='panelDisplay'>
-    <div id='currentCash'>$<span id='cash'>0</span></div>
-    <figure id='moneybag'>
-        <img title='click me to add cash' alt='click to reset' src='Resources/moneybag.png'/>
-    </figure>
-
-    <div id='spinCount'>Spin: <span id='spin'>0</span> Win: <span id='win'>0</span> Lose: <span id='lose'>0</span></div>
-</div>
-
-
-<script src="{{ url_for('static', filename='js/roulette-game.js') }}"></script>
-<noscript>Please enable JavaScript</noscript>
+  <script src="roulette-game.js"></script>
 </body>
 </html>
