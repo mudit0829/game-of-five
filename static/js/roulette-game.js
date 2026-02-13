@@ -1,14 +1,30 @@
 // ================== CONFIG ==================
+
+// European roulette wheel order (single zero)
+// Clockwise, starting from 0 at the top (under pointer)
+const EURO_WHEEL_ORDER = [
+  0, 32, 15, 19, 4, 21, 2, 25, 17, 34, 6, 27, 13, 36,
+  11, 30, 8, 23, 10, 5, 24, 16, 33, 1, 20, 14, 31, 9,
+  22, 18, 29, 7, 28, 12, 35, 3, 26
+]; // 37 slots [web:353]
+
+const TOTAL_SLOTS = EURO_WHEEL_ORDER.length; // 37
+const DEGREES_PER_SLOT = 360 / TOTAL_SLOTS;
+const BASE_OFFSET_DEG = 0; // tweak if pointer is slightly off center
+
 const FIXED_BET_AMOUNT = 200;
 const MAX_BETS_PER_USER = 20;
-const MAX_PLAYERS = 36; // not enforced here yet (server will do)
+const MAX_PLAYERS = 37; // to be enforced by backend later
 
-// Simulated state (replace later with real server data)
+// Simulated state (front-end demo, no server yet)
 let walletBalance = 10000;
-let userBets = [];        // array of numbers (0–35)
+let userBets = [];         // array of chosen numbers (0–36)
 let selectedNumber = null;
 let isSpinning = false;
 let currentRoundSeconds = 60 * 60; // 60 minutes in seconds
+
+// keep wheel spinning forward
+let lastRotation = 0;
 
 // DOM
 const walletBalanceSpan = document.getElementById("walletBalance");
@@ -98,20 +114,18 @@ function refreshBetControlsState() {
     setStatus(`Bet limit reached (${MAX_BETS_PER_USER}/${MAX_BETS_PER_USER}).`, "ok");
   }
 
-  // Disable PLACE BET if limit or no wallet or spinning
   if (placeBetBtn) {
     placeBetBtn.disabled =
       atLimit || walletBalance < FIXED_BET_AMOUNT || isSpinning;
   }
 
-  // Disable numbers if limit reached
   setNumberChipsDisabled(atLimit || isSpinning);
 }
 
 // ================== INIT NUMBER GRID ==================
 function createNumberGrid() {
   if (!numbersGrid) return;
-  for (let n = 0; n <= 35; n++) {
+  for (let n = 0; n <= 36; n++) {
     const btn = document.createElement("button");
     btn.type = "button";
     btn.className = "num-chip";
@@ -121,7 +135,6 @@ function createNumberGrid() {
     btn.addEventListener("click", () => {
       if (isSpinning) return;
       if (btn.disabled || btn.dataset.locked === "1") return;
-
       setSelectedNumber(n);
       setStatus("", "");
     });
@@ -130,7 +143,7 @@ function createNumberGrid() {
   }
 }
 
-// ================== BET LOGIC (FRONTEND DEMO) ==================
+// ================== BET LOGIC (DEMO) ==================
 function handlePlaceBet() {
   if (isSpinning) {
     setStatus("Wheel is spinning, please wait...", "error");
@@ -158,11 +171,13 @@ function handlePlaceBet() {
   }
 
   if (userBets.length >= MAX_BETS_PER_USER) {
-    setStatus(`You can place only ${MAX_BETS_PER_USER} bets in this round.`, "error");
+    setStatus(
+      `You can place only ${MAX_BETS_PER_USER} bets in this round.`,
+      "error"
+    );
     return;
   }
 
-  // Deduct and add bet (front-end demo only)
   walletBalance -= FIXED_BET_AMOUNT;
   userBets.push(selectedNumber);
 
@@ -173,29 +188,25 @@ function handlePlaceBet() {
   setStatus(`Bet placed on ${selectedNumber}.`, "ok");
 }
 
-// ================== WHEEL SPIN LOGIC ==================
-
-let lastRotation = 0; // to keep wheel spinning forward
-
+// ================== WHEEL SPIN (EURO ORDER) ==================
 function spinWheelToNumber(targetNumber) {
   if (!wheelImg) return;
 
-  const totalSlots = 36;
-  const degreesPerSlot = 360 / totalSlots; // 10°
-  const baseOffset = 0; // adjust if pointer is not at 0° in your image
+  const slotIndex = EURO_WHEEL_ORDER.indexOf(targetNumber);
+  if (slotIndex === -1) {
+    console.warn("Number not found on wheel order:", targetNumber);
+    return;
+  }
 
-  const slotIndex = targetNumber; // 0–35
-  const targetAngle = baseOffset + slotIndex * degreesPerSlot;
+  const targetAngle = BASE_OFFSET_DEG + slotIndex * DEGREES_PER_SLOT;
 
-  // Add extra spins (for nice animation)
-  const extraSpins = 4; // full 360° rotations
+  const extraSpins = 4;
   const targetRotation = extraSpins * 360 + targetAngle;
 
-  // Make sure wheel keeps spinning forward
   const finalRotation = lastRotation + targetRotation;
-  lastRotation = finalRotation % 360000; // avoid huge numbers
+  lastRotation = finalRotation % 360000;
 
-  const durationMs = 4000; // 4 seconds
+  const durationMs = 4000;
 
   wheelImg.style.transition = `transform ${durationMs}ms cubic-bezier(0.15, 0.8, 0.25, 1)`;
   wheelImg.style.transform = `rotate(${finalRotation}deg)`;
@@ -203,6 +214,7 @@ function spinWheelToNumber(targetNumber) {
 
 function handleSpin() {
   if (isSpinning) return;
+
   if (currentRoundSeconds <= 0) {
     setStatus("This round is over. Waiting for next round.", "error");
     return;
@@ -213,8 +225,9 @@ function handleSpin() {
     return;
   }
 
-  // In real app: you will receive targetNumber from backend.
-  const targetNumber = Math.floor(Math.random() * 36); // 0–35
+  // In real app, targetNumber comes from backend.
+  const targetIndex = Math.floor(Math.random() * TOTAL_SLOTS);
+  const targetNumber = EURO_WHEEL_ORDER[targetIndex];
 
   isSpinning = true;
   setStatus("Spinning...", "ok");
@@ -223,17 +236,15 @@ function handleSpin() {
 
   spinWheelToNumber(targetNumber);
 
-  // After animation duration, resolve result
   setTimeout(() => {
     isSpinning = false;
     if (spinBtn) spinBtn.disabled = false;
 
     if (lastResultEl) lastResultEl.textContent = `Result: ${targetNumber}`;
 
-    // Check win
     const totalBetAmount = userBets.length * FIXED_BET_AMOUNT;
     if (userBets.includes(targetNumber)) {
-      const winAmount = totalBetAmount * 20; // 20x total bet
+      const winAmount = totalBetAmount * 20;
       walletBalance += winAmount;
       updateWalletUI();
       setStatus(
@@ -244,7 +255,6 @@ function handleSpin() {
       setStatus(`You lost this spin. Result was ${targetNumber}.`, "error");
     }
 
-    // For demo: keep your bets for the full 60‑min round.
     refreshBetControlsState();
   }, 4100);
 }
