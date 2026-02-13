@@ -8,8 +8,7 @@
 
 body {
   margin: 0;
-  font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI",
-    sans-serif;
+  font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
   background: radial-gradient(circle at top, #020617 0, #020617 45%, #000 100%);
   color: #e5e7eb;
 }
@@ -20,7 +19,7 @@ body {
   padding: 12px 10px 20px;
 }
 
-/* TOP BAR */
+/* TOP BAR (legacy layout - if you still use it somewhere, keep) */
 
 .top-bar {
   display: flex;
@@ -216,7 +215,7 @@ body {
   border-radius: 50%;
   border: 1px solid rgba(148, 163, 184, 0.4);
   background: radial-gradient(circle at 30% 30%, #1e293b, #020617);
-  color: #e5e7eb;
+  color: #e5e7eb; /* keep digits visible */
   font-size: 13px;
   font-weight: 700;
   display: inline-flex;
@@ -227,12 +226,12 @@ body {
   transition: all 0.15s ease;
 }
 
-.num-chip:hover:not(:disabled):not(.locked) {
+.num-chip:hover:not(:disabled):not(.locked):not(.bet-locked) {
   transform: translateY(-2px);
   box-shadow: 0 6px 14px rgba(0, 0, 0, 0.9);
 }
 
-.num-chip:active:not(:disabled):not(.locked) {
+.num-chip:active:not(:disabled):not(.locked):not(.bet-locked) {
   transform: translateY(0) scale(0.95);
 }
 
@@ -243,20 +242,35 @@ body {
   box-shadow: 0 3px 14px rgba(34, 197, 94, 0.7);
 }
 
-/* INACTIVE / LOCKED NUMBER CHIPS */
-.num-chip:disabled,
+/* GLOBAL LOCKED (if you use .locked anywhere) — keep readable, don't hide digits */
 .num-chip.locked {
-  opacity: 0.35;
+  opacity: 0.85;
   cursor: not-allowed;
   transform: none !important;
   box-shadow: none !important;
-  filter: grayscale(0.6);
+  filter: none;
 }
 
-.num-chip:disabled:hover,
-.num-chip.locked:hover {
+/* DISABLED (general) — keep readable */
+.num-chip:disabled {
+  opacity: 0.85;           /* was 0.35 (too low on dark bg) */
+  cursor: not-allowed;
   transform: none !important;
   box-shadow: none !important;
+  filter: none;            /* grayscale can kill readability */
+}
+
+/* BET-LOCKED (server/other players) — RED + ALWAYS READABLE */
+.num-chip.bet-locked,
+.num-chip.bet-locked:disabled {
+  background: rgba(220, 60, 60, 0.22);
+  border-color: rgba(255, 120, 120, 0.85);
+  color: #ffffff;
+  opacity: 1 !important;
+  filter: none !important;
+  box-shadow:
+    0 0 0 2px rgba(210, 60, 60, 0.35),
+    0 10px 20px rgba(0, 0, 0, 0.40);
 }
 
 /* MY BETS */
@@ -334,7 +348,6 @@ body {
   box-shadow: 0 6px 18px rgba(34, 197, 94, 0.45);
 }
 
-/* disabled state */
 .bet-main-button:disabled {
   opacity: 0.55;
   cursor: not-allowed;
@@ -350,13 +363,8 @@ body {
   padding-top: 2px;
 }
 
-.status.ok {
-  color: #86efac;
-}
-
-.status.error {
-  color: #fca5a5;
-}
+.status.ok { color: #86efac; }
+.status.error { color: #fca5a5; }
 
 /* RESPONSIVE */
 
@@ -375,115 +383,7 @@ body {
   }
 }
 
-/* ===== Roulette header (3-column HUD) ===== */
-
-.top-bar--roulette{
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) auto auto; /* prevents left overflow */
-  align-items: center;
-  gap: 12px;
-
-  padding: 12px;
-  border-radius: 18px;
-
-  background: rgba(10, 22, 20, 0.55);
-  border: 1px solid rgba(255,255,255,0.10);
-  backdrop-filter: blur(10px);
-  box-shadow: 0 16px 40px rgba(0,0,0,0.38), inset 0 1px 0 rgba(255,255,255,0.06);
-}
-
-/* Using minmax(0, 1fr) helps avoid grid column overflow when text is long. [web:41] */
-.hud-left{ min-width: 0; }
-.hud-center{ justify-self: center; }
-.hud-right{ justify-self: end; }
-
-.hud-card{
-  min-width: 0;
-  padding: 10px 12px;
-  border-radius: 16px;
-  background: rgba(0,0,0,0.28);
-  border: 1px solid rgba(255,255,255,0.10);
-  box-shadow: inset 0 1px 0 rgba(255,255,255,0.06);
-}
-
-.hud-title{
-  font-weight: 900;
-  letter-spacing: 0.6px;
-  font-size: 13px;
-  color: rgba(120, 205, 255, 0.95);
-  text-transform: uppercase;
-  line-height: 1.1;
-}
-
-.hud-gameid{
-  margin-top: 4px;
-  font-weight: 950;
-  font-size: 16px;
-  letter-spacing: 0.2px;
-  color: #eaf2ff;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.hud-meta{
-  margin-top: 6px;
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
-  align-items: center;
-
-  font-size: 12.5px;
-  color: rgba(234, 242, 255, 0.78);
-}
-
-.hud-meta .dot{ opacity: 0.55; }
-
-/* Center timer pill */
-.timer-pill{
-  min-width: 108px;
-  padding: 10px 18px;
-  border-radius: 999px;
-  font-weight: 950;
-  font-variant-numeric: tabular-nums;
-  letter-spacing: 0.4px;
-
-  background: linear-gradient(180deg, rgba(186,110,255,0.95), rgba(118,93,255,0.90));
-  color: #08111f;
-  border: 1px solid rgba(255,255,255,0.18);
-  box-shadow: 0 16px 30px rgba(0,0,0,0.35), inset 0 1px 0 rgba(255,255,255,0.28);
-}
-
-.coins-pill{
-  display: inline-flex;
-  align-items: center;
-  gap: 10px;
-
-  padding: 10px 14px;
-  border-radius: 999px;
-  font-weight: 950;
-  font-variant-numeric: tabular-nums;
-
-  background: rgba(0,0,0,0.30);
-  border: 1px solid rgba(255, 209, 102, 0.30);
-  box-shadow: 0 16px 30px rgba(0,0,0,0.32), inset 0 1px 0 rgba(255,255,255,0.06);
-}
-
-.coin-ico{
-  width: 18px;
-  height: 18px;
-  border-radius: 50%;
-  background: radial-gradient(circle at 30% 30%, #fff3c4 0%, #ffd46e 35%, #ffb100 80%, #d88900 100%);
-  box-shadow: inset 0 1px 0 rgba(255,255,255,0.35), 0 8px 16px rgba(0,0,0,0.35);
-}
-
-/* Mobile tighten */
-@media (max-width: 420px){
-  .top-bar--roulette{ padding: 10px; gap: 10px; }
-  .timer-pill{ min-width: 96px; padding: 9px 14px; }
-  .coins-pill{ padding: 9px 12px; gap: 8px; }
-}
-/* ===== Smaller HUD like your other game ===== */
+/* ===== Roulette header (3-column HUD) — keep ONLY one version ===== */
 
 .top-bar--roulette{
   display: grid;
@@ -500,34 +400,50 @@ body {
   box-shadow: 0 16px 40px rgba(0,0,0,0.38), inset 0 1px 0 rgba(255,255,255,0.06);
 }
 
+.hud-left{ min-width: 0; }
+.hud-center{ justify-self: center; }
+.hud-right{ justify-self: end; }
+
 .hud-card{
+  min-width: 0;
   padding: clamp(8px, 2.2vw, 10px) clamp(10px, 2.6vw, 12px);
   border-radius: 16px;
   background: rgba(0,0,0,0.24);
   border: 1px solid rgba(255,255,255,0.10);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.06);
 }
 
 .hud-title{
   font-size: clamp(11px, 2.8vw, 13px);
   font-weight: 900;
   letter-spacing: 0.6px;
+  color: rgba(120, 205, 255, 0.95);
+  text-transform: uppercase;
+  line-height: 1.1;
 }
 
 .hud-gameid{
+  margin-top: 4px;
   font-size: clamp(13px, 3.6vw, 16px);
   font-weight: 950;
+  letter-spacing: 0.2px;
+  color: #eaf2ff;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
 
-/* meta smaller (this is what makes it look “compact”) */
 .hud-meta{
   margin-top: 5px;
-  font-size: clamp(11px, 2.9vw, 12.5px);
+  display: flex;
+  flex-wrap: wrap;
   gap: 6px;
+  align-items: center;
+  font-size: clamp(11px, 2.9vw, 12.5px);
   color: rgba(234, 242, 255, 0.78);
 }
+
+.hud-meta .dot{ opacity: 0.55; }
 
 .timer-pill{
   min-width: clamp(86px, 22vw, 110px);
@@ -536,47 +452,40 @@ body {
   font-size: clamp(13px, 3.6vw, 16px);
   font-weight: 950;
   font-variant-numeric: tabular-nums;
+  letter-spacing: 0.4px;
+
+  background: linear-gradient(180deg, rgba(186,110,255,0.95), rgba(118,93,255,0.90));
+  color: #08111f;
+  border: 1px solid rgba(255,255,255,0.18);
+  box-shadow: 0 16px 30px rgba(0,0,0,0.35), inset 0 1px 0 rgba(255,255,255,0.28);
 }
 
 .coins-pill{
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+
   padding: clamp(8px, 2.3vw, 10px) clamp(10px, 2.7vw, 14px);
   border-radius: 999px;
   font-size: clamp(13px, 3.4vw, 16px);
   font-weight: 950;
+  font-variant-numeric: tabular-nums;
+
+  background: rgba(0,0,0,0.30);
+  border: 1px solid rgba(255, 209, 102, 0.30);
+  box-shadow: 0 16px 30px rgba(0,0,0,0.32), inset 0 1px 0 rgba(255,255,255,0.06);
 }
 
 .coin-ico{
   width: clamp(14px, 3.8vw, 18px);
   height: clamp(14px, 3.8vw, 18px);
+  border-radius: 50%;
+  background: radial-gradient(circle at 30% 30%, #fff3c4 0%, #ffd46e 35%, #ffb100 80%, #d88900 100%);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.35), 0 8px 16px rgba(0,0,0,0.35);
 }
 
-/* When this number already has a bet, show red */
-.num-chip.bet-locked {
-  background: rgba(210, 60, 60, 0.20);
-  border-color: rgba(255, 120, 120, 0.85);
-  box-shadow:
-    0 0 0 2px rgba(210, 60, 60, 0.35),
-    0 10px 20px rgba(0, 0, 0, 0.40);
-  color: #ffe9e9;
-}
-
-/* Optional: keep selected hover subtle when locked */
-.num-chip.bet-locked:hover {
-  transform: translateY(-1px);
-  background: rgba(210, 60, 60, 0.26);
-}
-.num-chip { color: #eaf2ff; }  /* ensure numbers are visible */
-
-.num-chip.bet-locked{
-  background: rgba(220, 60, 60, 0.22);
-  border-color: rgba(255, 120, 120, 0.85);
-  color: #fff;
-  opacity: 1 !important;        /* important: don’t fade locked chips */
-  filter: none !important;
-}
-
-/* keep disabled still readable */
-.num-chip:disabled{
-  opacity: 1;                   /* do not fade */
-  cursor: not-allowed;
+@media (max-width: 420px){
+  .top-bar--roulette{ padding: 10px; gap: 10px; }
+  .timer-pill{ min-width: 96px; padding: 9px 14px; }
+  .coins-pill{ padding: 9px 12px; gap: 8px; }
 }
