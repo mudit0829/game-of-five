@@ -82,8 +82,29 @@ function updateUserBetsUI() {
   });
 }
 
+/* --- NEW: chip helpers for "already bet" visual --- */
+function getChipEl(n) {
+  return document.querySelector(`.num-chip[data-number="${n}"]`);
+}
+
+function setChipLocked(n, locked) {
+  const el = getChipEl(n);
+  if (!el) return;
+  el.classList.toggle("bet-locked", !!locked);
+}
+
+function syncLockedChipsFromBets() {
+  // Clear all locks
+  document.querySelectorAll(".num-chip.bet-locked").forEach((el) => {
+    el.classList.remove("bet-locked");
+  });
+  // Apply locks from userBets
+  userBets.forEach((n) => setChipLocked(n, true));
+}
+
 function setSelectedNumber(n) {
   selectedNumber = n;
+
   document.querySelectorAll(".num-chip").forEach((chip) => {
     const v = parseInt(chip.dataset.number, 10);
     chip.classList.toggle("selected", v === n);
@@ -119,12 +140,23 @@ function createNumberGrid() {
 
     btn.addEventListener("click", () => {
       if (isSpinning) return;
+
+      // NEW: If already bet, keep it red and show message (no re-select needed)
+      if (userBets.includes(n)) {
+        setStatus("Bet already placed on this number.", "error");
+        setSelectedNumber(null);
+        return;
+      }
+
       setSelectedNumber(n);
       setStatus("");
     });
 
     numbersGrid.appendChild(btn);
   }
+
+  // NEW: if bets already exist, reflect them on grid
+  syncLockedChipsFromBets();
 }
 
 // ------------------ Wheel DOM wrapper + hidden labels ------------------
@@ -196,10 +228,6 @@ function setupWheelWrapperAndLabels() {
   labels.id = "wheelLabels";
   wrap.appendChild(labels);
 
-  // Build 37 hidden labels around a radius
-  // Radius chosen relative to wrapper size at runtime
-  // We will position using percentage-like translate with a computed px radius.
-  // Use a reasonable default, then adjust on next animation frame after layout.
   function buildLabels() {
     labels.innerHTML = "";
     const rect = wrap.getBoundingClientRect();
@@ -214,18 +242,13 @@ function setupWheelWrapperAndLabels() {
       el.setAttribute("aria-hidden", "true");
       el.dataset.number = String(n);
 
-      // Place each label at its pocket center:
-      // rotate(angle) -> move up by radius -> rotate back so text stays upright.
       el.style.transform = `rotate(${angle}deg) translate(0, ${-radius}px) rotate(${-angle}deg) translate(-50%, -50%)`;
-
-      // Keep text present but invisible
       el.textContent = String(n);
 
       labels.appendChild(el);
     }
   }
 
-  // Build now and rebuild on resize
   requestAnimationFrame(buildLabels);
   window.addEventListener("resize", () => requestAnimationFrame(buildLabels), { passive: true });
 
@@ -240,7 +263,7 @@ function getRotationDeg(el) {
   if (tr === "none") return 0;
 
   // matrix(a, b, c, d, tx, ty)
-  const m = tr.match(/^matrix\((.+)\)$/);
+  const m = tr.match(/^matrix\((.+)\)$/); // FIX: correct regex (no over-escaping)
   if (!m) return 0;
 
   const parts = m[1].split(",").map((p) => parseFloat(p.trim()));
@@ -252,8 +275,6 @@ function getRotationDeg(el) {
 
 // Convert final wheel rotation to the number under the pointer (top)
 function numberAtPointer(rotationDeg) {
-  // If wheel rotates clockwise by +rotationDeg,
-  // the pointer shows the slot at index = round((-rotationDeg + offset)/degPerSlot)
   const corrected = rotationDeg + POINTER_OFFSET_DEG;
   const idx = mod(Math.round((-corrected) / DEG_PER_SLOT), TOTAL_SLOTS);
   return WHEEL_ORDER[idx];
@@ -264,10 +285,7 @@ function spinToNumber(targetNumber) {
   const idx = WHEEL_ORDER.indexOf(targetNumber);
   if (idx === -1) throw new Error("Target not found in wheel order: " + targetNumber);
 
-  // To bring slot idx to the top, rotation must be -idx*DEG_PER_SLOT (plus pointer offset)
   const targetAngle = -(idx * DEG_PER_SLOT) - POINTER_OFFSET_DEG;
-
-  // Keep forward spin: add extra full spins and continue from lastRotationDeg
   const extra = EXTRA_FULL_SPINS * 360;
 
   const finalRotation = lastRotationDeg + extra + targetAngle;
@@ -291,6 +309,8 @@ function handlePlaceBet() {
   }
   if (userBets.includes(selectedNumber)) {
     setStatus("You already bet on this number.", "error");
+    // keep it visually locked anyway
+    setChipLocked(selectedNumber, true);
     return;
   }
   if (userBets.length >= MAX_BETS_PER_USER) {
@@ -301,10 +321,16 @@ function handlePlaceBet() {
   walletBalance -= FIXED_BET_AMOUNT;
   userBets.push(selectedNumber);
 
+  // NEW: mark chip red (bet already placed)
+  setChipLocked(selectedNumber, true);
+
+  // Optional: clear selection after placing bet (clean UX)
+  setSelectedNumber(null);
+
   updateWalletUI();
   updateUserBetsUI();
   refreshControls();
-  setStatus(`Bet placed on ${selectedNumber}.`, "ok");
+  setStatus(`Bet placed.`, "ok");
 }
 
 function handleSpin() {
@@ -345,29 +371,4 @@ function handleSpin() {
     // Simple payout demo: if any bet matches, pay totalBet*20
     const totalBetAmount = userBets.length * FIXED_BET_AMOUNT;
     if (userBets.includes(shownNumber)) {
-      const winAmount = totalBetAmount * 20;
-      walletBalance += winAmount;
-      updateWalletUI();
-      setStatus(`You WON! Number ${shownNumber}. Payout: ${winAmount} coins.`, "ok");
-    } else {
-      setStatus(`You lost. Result was ${shownNumber}.`, "error");
-    }
-
-    isSpinning = false;
-    refreshControls();
-  }, SPIN_DURATION_MS + 60);
-}
-
-// ------------------ Init ------------------
-setupWheelWrapperAndLabels();
-
-createNumberGrid();
-updateWalletUI();
-updateUserBetsUI();
-refreshControls();
-
-if (placeBetBtn) placeBetBtn.addEventListener("click", handlePlaceBet);
-if (spinBtn) spinBtn.addEventListener("click", handleSpin);
-
-setSelectedNumber(null);
-setStatus("");
+      const winAmount = t
