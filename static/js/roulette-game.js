@@ -6,11 +6,14 @@ const EURO_WHEEL_ORDER = [
   0, 32, 15, 19, 4, 21, 2, 25, 17, 34, 6, 27, 13, 36,
   11, 30, 8, 23, 10, 5, 24, 16, 33, 1, 20, 14, 31, 9,
   22, 18, 29, 7, 28, 12, 35, 3, 26
-]; // 37 slots [web:353]
+]; // 37 slots
 
 const TOTAL_SLOTS = EURO_WHEEL_ORDER.length; // 37
 const DEGREES_PER_SLOT = 360 / TOTAL_SLOTS;
-const BASE_OFFSET_DEG = 0; // tweak if pointer is slightly off center
+
+// IMPORTANT: image alignment tweak.
+// Start with -68; if pointer is slightly off, adjust by small steps (e.g. -64, -72).
+let BASE_OFFSET_DEG = -68;
 
 const FIXED_BET_AMOUNT = 200;
 const MAX_BETS_PER_USER = 20;
