@@ -8,30 +8,35 @@
 </head>
 <body>
   <div class="app">
-    <header class="top-bar">
-      <div class="game-title">
-        <div class="game-name">Roulette Wheel</div>
-        <div class="game-sub">60 min round · 36 players max</div>
+   <header class="top-bar top-bar--roulette">
+  <div class="hud-left">
+    <div class="hud-card hud-card--game">
+      <div class="hud-title">GAME</div>
+      <div class="hud-gameid" id="gameIdText">G17709713672</div>
+
+      <div class="hud-meta">
+        <span id="totalPlayersText">3 PLAYERS</span>
+        <span class="dot">•</span>
+        <span>You: <span id="usernameText">demo</span></span>
+        <span class="dot">•</span>
+        <span>Bets: <span id="userBetsCountText">0</span></span>
       </div>
-      <div class="game-info">
-        <div class="info-box">
-          <span>Wallet</span>
-          <strong id="walletBalance">10000</strong>
-        </div>
-        <div class="info-box">
-          <span>Your bets</span>
-          <strong><span id="userBetCount">0</span>/20</strong>
-        </div>
-        <div class="info-box">
-          <span>Players</span>
-          <strong id="playerCount">1</strong>
-        </div>
-        <div class="info-box">
-          <span>Time left</span>
-          <strong id="timerText">60:00</strong>
-        </div>
-      </div>
-    </header>
+    </div>
+  </div>
+
+  <div class="hud-center">
+    <div class="timer-pill" id="timerPill">
+      <span id="timerText">60:00</span>
+    </div>
+  </div>
+
+  <div class="hud-right">
+    <div class="coins-pill" id="coinsPill">
+      <span class="coin-ico" aria-hidden="true"></span>
+      <span id="walletBalance">10000</span>
+    </div>
+  </div>
+</header>
 
     <main class="layout">
       <!-- WHEEL SIDE -->
