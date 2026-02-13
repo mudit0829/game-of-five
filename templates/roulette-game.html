@@ -8,44 +8,43 @@
 </head>
 <body>
   <div class="app">
-   <header class="top-bar top-bar--roulette">
-  <div class="hud-left">
-    <div class="hud-card hud-card--game">
-      <div class="hud-title">GAME</div>
-      <div class="hud-gameid" id="gameIdText">G17709713672</div>
+    <header class="top-bar top-bar--roulette">
+      <div class="hud-left">
+        <div class="hud-card hud-card--game">
+          <div class="hud-title">GAME</div>
+          <div class="hud-gameid" id="gameIdText">--</div>
 
-      <div class="hud-meta">
-        <span id="totalPlayersText">3 PLAYERS</span>
-        <span class="dot">•</span>
-        <span>You: <span id="usernameText">demo</span></span>
-        <span class="dot">•</span>
-        <span>Bets: <span id="userBetsCountText">0</span></span>
+          <div class="hud-meta">
+            <span id="totalPlayersText">0 PLAYERS</span>
+            <span class="dot">•</span>
+            <span>You: <span id="usernameText">--</span></span>
+            <span class="dot">•</span>
+            <span>Bets: <span id="userBetsCountText">0</span></span>
+          </div>
+        </div>
       </div>
-    </div>
-  </div>
 
-  <div class="hud-center">
-    <div class="timer-pill" id="timerPill">
-      <span id="timerText">60:00</span>
-    </div>
-  </div>
+      <div class="hud-center">
+        <div class="timer-pill" id="timerPill">
+          <span id="timerText">00:00</span>
+        </div>
+      </div>
 
-  <div class="hud-right">
-    <div class="coins-pill" id="coinsPill">
-      <span class="coin-ico" aria-hidden="true"></span>
-      <span id="walletBalance">10000</span>
-    </div>
-  </div>
-</header>
+      <div class="hud-right">
+        <div class="coins-pill" id="coinsPill">
+          <span class="coin-ico" aria-hidden="true"></span>
+          <span id="walletBalance">0</span>
+        </div>
+      </div>
+    </header>
 
     <main class="layout">
       <!-- WHEEL SIDE -->
       <section class="wheel-panel">
         <div class="wheel-wrapper">
           <div class="wheel-border">
-            <!-- pointer -->
             <div class="wheel-pointer"></div>
-            <!-- wheel image -->
+
             <img
               id="rouletteWheel"
               class="wheel-img"
@@ -55,7 +54,7 @@
           </div>
         </div>
 
-        <button id="spinBtn" class="spin-button">
+        <button id="spinBtn" class="spin-button" type="button">
           SPIN WHEEL
         </button>
 
@@ -70,9 +69,7 @@
             <div class="numbers-sub">Fixed bet: 200 coins per number</div>
           </div>
 
-          <div id="numbersGrid" class="numbers-grid">
-            <!-- JS will generate 0–36 buttons -->
-          </div>
+          <div id="numbersGrid" class="numbers-grid"></div>
         </div>
 
         <div class="my-bets-card">
@@ -80,12 +77,13 @@
             <span>Your bets in this round</span>
             <span class="small">(max 20 numbers, one bet per number)</span>
           </div>
+
           <div id="myBetsRow" class="my-bets-row">
             <span class="none-label">none</span>
           </div>
         </div>
 
-        <button id="placeBetBtn" class="bet-main-button">
+        <button id="placeBetBtn" class="bet-main-button" type="button">
           PLACE BET (200 COINS)
         </button>
 
@@ -94,6 +92,17 @@
     </main>
   </div>
 
+  <!-- Pass Flask session user to JS safely -->
+  <script>
+    window.__USER_ID__ = {{ session.get('userid') | tojson }};
+    window.__USERNAME__ = {{ session.get('username') | tojson }};
+    window.__GAMETYPE__ = "roulette";
+  </script>
+
+  <!-- Required for your app.py Socket.IO events (joinGame/placeBet/updateTable) -->
+  <script src="/socket.io/socket.io.js"></script> <!-- provides io() [web:123][file:104] -->
+
+  <!-- Your game JS -->
   <script src="{{ url_for('static', filename='js/roulette-game.js') }}"></script>
 </body>
 </html>
