@@ -1,7 +1,5 @@
-// ================== Roulette Wheel (Angle-Verified Result + Global Locked Numbers) ==================
+// ================== Roulette Wheel (Angle-Verified Result + SOCKET Multiplayer Locks) ==================
 
-// Wheel order you provided (European single zero)
-// Clockwise order starting from 0 at the pointer when rotation = 0
 const WHEEL_ORDER = [
   0,32,15,19,4,21,2,25,17,34,6,27,13,36,11,30,8,23,10,5,24,16,33,1,20,14,31,9,22,18,29,7,28,12,35,3,26
 ];
@@ -9,60 +7,55 @@ const WHEEL_ORDER = [
 const TOTAL_SLOTS = WHEEL_ORDER.length;      // 37
 const DEG_PER_SLOT = 360 / TOTAL_SLOTS;
 
-// Optional tiny correction if your pointer graphic is not exactly at 12 o'clock.
 const POINTER_OFFSET_DEG = 0;
-
-// Spin animation
 const SPIN_DURATION_MS = 4200;
 const EXTRA_FULL_SPINS = 5;
 
-// Betting (demo)
+// UI-only (server enforces its own limits) [file:104]
 const FIXED_BET_AMOUNT = 200;
-const MAX_BETS_PER_USER = 20;
-
-// ------------------ Multiplayer sync ------------------
-// If you have backend endpoints, turn this ON and set correct URLs.
-const API_ENABLED = false;
-
-const API = {
-  // Should return: { lockedNumbers: number[] }
-  stateUrl: "/api/roulette/state",
-  // POST body: { number: 17 }
-  // Should return: { ok: true, lockedNumbers: number[], walletBalance?: number, userBets?: number[] }
-  placeBetUrl: "/api/roulette/bet"
-};
-
-// Polling to catch bets from other players (use WebSocket later for real-time)
-const STATE_POLL_MS = 1200;
-
-// Demo fallback (no backend): sync between tabs
-const LS_LOCKED_KEY = "roulette_locked_numbers_v1";
 
 // ------------------ State ------------------
 let walletBalance = 10000;
-let userBets = [];
 let selectedNumber = null;
 let isSpinning = false;
+let lastRotationDeg = 0;
 
-let lastRotationDeg = 0; // keep increasing so wheel always spins forward
+let wheelRotateEl = null;
 
-// Numbers already bet by ANY player in this round
+// Current table/round from backend
+let currentRoundCode = null;
+let currentTableNumber = null;
+
+// Taken numbers by any player in THIS table/round
 let lockedNumbers = new Set();
 
+// The latest players list from backend table
+let currentPlayers = []; // [{userid, username, number}, ...]
+
 // ------------------ DOM ------------------
-const wheelImg = document.getElementById("rouletteWheel"); // <img id="rouletteWheel" ...>
+const wheelImg = document.getElementById("rouletteWheel");
 const spinBtn = document.getElementById("spinBtn");
 const placeBetBtn = document.getElementById("placeBetBtn");
 
 const walletBalanceSpan = document.getElementById("walletBalance");
-const userBetCountSpan = document.getElementById("userBetCount");
+
+// FIX: your header uses userBetsCountText (not userBetCount)
+const headerUserBetsCount = document.getElementById("userBetsCountText");
+const headerTotalPlayers = document.getElementById("totalPlayersText");
+const headerUsername = document.getElementById("usernameText");
+
 const numbersGrid = document.getElementById("numbersGrid");
 const myBetsRow = document.getElementById("myBetsRow");
 const statusEl = document.getElementById("statusMessage");
 const lastResultEl = document.getElementById("lastResult");
+const timerTextEl = document.getElementById("timerText");
 
-// Rotating wrapper we create around the image (no HTML change needed)
-let wheelRotateEl = null;
+// ------------------ User from Flask session ------------------
+const USER_ID = window.__USER_ID__;
+const USERNAME = window.__USERNAME__ || "demo";
+const GAMETYPE = window.__GAMETYPE__ || "roulette";
+
+if (headerUsername) headerUsername.textContent = USERNAME || "demo";
 
 // ------------------ Helpers ------------------
 function mod(n, m) {
@@ -77,54 +70,14 @@ function setStatus(msg, type = "") {
 }
 
 function updateWalletUI() {
-  if (walletBalanceSpan) walletBalanceSpan.textContent = walletBalance.toFixed(0);
+  if (walletBalanceSpan) walletBalanceSpan.textContent = String(Math.floor(walletBalance));
 }
 
-function updateUserBetsUI() {
-  if (userBetCountSpan) userBetCountSpan.textContent = userBets.length;
-
-  if (!myBetsRow) return;
-  myBetsRow.innerHTML = "";
-
-  if (userBets.length === 0) {
-    const span = document.createElement("span");
-    span.className = "none-label";
-    span.textContent = "none";
-    myBetsRow.appendChild(span);
-    return;
-  }
-
-  userBets.slice().sort((a,b)=>a-b).forEach((n) => {
-    const chip = document.createElement("span");
-    chip.className = "my-bet-chip";
-    chip.textContent = n;
-    myBetsRow.appendChild(chip);
-  });
-}
-
-// ---- Locked chips UI ----
-// Using classList is the clean way to apply UI state (locked/red). [web:79]
-function getChipEl(n) {
-  return document.querySelector(`.num-chip[data-number="${n}"]`);
-}
-
-function setChipLockedUI(n, locked) {
-  const el = getChipEl(n);
-  if (!el) return;
-
-  el.classList.toggle("bet-locked", !!locked); // [web:79]
-  if (locked) {
-    el.disabled = true; // actually blocks betting [web:98]
-  }
-}
-
-function syncAllChipsLockedUI() {
-  document.querySelectorAll(".num-chip").forEach((chip) => {
-    const n = parseInt(chip.dataset.number, 10);
-    const isLocked = lockedNumbers.has(n);
-    chip.classList.toggle("bet-locked", isLocked); // [web:79]
-    if (isLocked) chip.disabled = true; // [web:98]
-  });
+function formatMMSS(totalSeconds) {
+  const s = Math.max(0, parseInt(totalSeconds, 10) || 0);
+  const mm = String(Math.floor(s / 60)).padStart(2, "0");
+  const ss = String(s % 60).padStart(2, "0");
+  return `${mm}:${ss}`;
 }
 
 function setSelectedNumber(n) {
@@ -136,35 +89,72 @@ function setSelectedNumber(n) {
   });
 }
 
-function refreshControls() {
-  const atLimit = userBets.length >= MAX_BETS_PER_USER;
+function getChipEl(n) {
+  return document.querySelector(`.num-chip[data-number="${n}"]`);
+}
 
+function applyLockedStateToChips() {
+  document.querySelectorAll(".num-chip").forEach((chip) => {
+    const n = parseInt(chip.dataset.number, 10);
+    const isLocked = lockedNumbers.has(n);
+
+    chip.classList.toggle("bet-locked", isLocked); // [web:79]
+    chip.disabled = isLocked || isSpinning; // real lock when taken; also disable while spinning [file:104]
+  });
+
+  // If user selected a number that becomes locked, clear selection
+  if (selectedNumber !== null && lockedNumbers.has(selectedNumber)) {
+    setSelectedNumber(null);
+  }
+}
+
+function updateMyBetsUIFromPlayers() {
+  if (!myBetsRow) return;
+  myBetsRow.innerHTML = "";
+
+  const myNums = currentPlayers
+    .filter(p => String(p.userid) === String(USER_ID))
+    .map(p => parseInt(p.number, 10))
+    .filter(n => Number.isFinite(n))
+    .sort((a,b)=>a-b);
+
+  if (headerUserBetsCount) headerUserBetsCount.textContent = String(myNums.length);
+
+  if (myNums.length === 0) {
+    const span = document.createElement("span");
+    span.className = "none-label";
+    span.textContent = "none";
+    myBetsRow.appendChild(span);
+    return;
+  }
+
+  myNums.forEach((n) => {
+    const chip = document.createElement("span");
+    chip.className = "my-bet-chip";
+    chip.textContent = String(n);
+    myBetsRow.appendChild(chip);
+  });
+}
+
+function updateHeaderPlayersCount() {
+  if (!headerTotalPlayers) return;
+  const count = currentPlayers.length;
+  headerTotalPlayers.textContent = `${count} PLAYERS`;
+}
+
+function refreshControls() {
   if (placeBetBtn) {
     placeBetBtn.disabled =
       isSpinning ||
-      atLimit ||
-      walletBalance < FIXED_BET_AMOUNT ||
       selectedNumber === null ||
       lockedNumbers.has(selectedNumber);
   }
 
   if (spinBtn) {
-    spinBtn.disabled = isSpinning || userBets.length === 0;
+    // For now, keep spin enabled only if user has at least 1 bet in this table
+    const myBetCount = currentPlayers.filter(p => String(p.userid) === String(USER_ID)).length;
+    spinBtn.disabled = isSpinning || myBetCount === 0;
   }
-
-  // Chips:
-  // - Locked numbers: always disabled
-  // - Otherwise: disabled only during spinning or when at limit
-  document.querySelectorAll(".num-chip").forEach((chip) => {
-    const n = parseInt(chip.dataset.number, 10);
-    if (lockedNumbers.has(n)) {
-      chip.disabled = true; // [web:98]
-      chip.classList.add("bet-locked"); // [web:79]
-    } else {
-      chip.disabled = isSpinning || atLimit; // [web:98]
-      chip.classList.remove("bet-locked"); // [web:79]
-    }
-  });
 }
 
 // ------------------ Build number grid ------------------
@@ -176,7 +166,7 @@ function createNumberGrid() {
     const btn = document.createElement("button");
     btn.type = "button";
     btn.className = "num-chip";
-    btn.textContent = n;
+    btn.textContent = String(n);
     btn.dataset.number = String(n);
 
     btn.addEventListener("click", () => {
@@ -196,46 +186,18 @@ function createNumberGrid() {
 
     numbersGrid.appendChild(btn);
   }
-
-  syncAllChipsLockedUI();
-  refreshControls();
 }
 
-// ------------------ Wheel DOM wrapper + hidden labels ------------------
+// ------------------ Wheel wrapper + hidden labels ------------------
 function injectWheelStylesOnce() {
   if (document.getElementById("wheelHiddenLabelStyles")) return;
   const style = document.createElement("style");
   style.id = "wheelHiddenLabelStyles";
   style.textContent = `
-    #wheelRotate {
-      position: relative;
-      display: inline-block;
-      will-change: transform;
-      transform: rotate(0deg);
-      transform-origin: 50% 50%;
-    }
-    #wheelRotate img {
-      display: block;
-      width: 100%;
-      height: auto;
-      transform: none !important;
-    }
-    #wheelLabels {
-      position: absolute;
-      inset: 0;
-      pointer-events: none;
-    }
-    .wheel-label {
-      position: absolute;
-      left: 50%;
-      top: 50%;
-      transform-origin: 0 0;
-      font-size: 10px;
-      font-weight: 700;
-      opacity: 0; /* fully hidden */
-      user-select: none;
-      white-space: nowrap;
-    }
+    #wheelRotate{ position:relative; display:inline-block; will-change:transform; transform:rotate(0deg); transform-origin:50% 50%; }
+    #wheelRotate img{ display:block; width:100%; height:auto; transform:none !important; }
+    #wheelLabels{ position:absolute; inset:0; pointer-events:none; }
+    .wheel-label{ position:absolute; left:50%; top:50%; transform-origin:0 0; font-size:10px; font-weight:700; opacity:0; user-select:none; white-space:nowrap; }
   `;
   document.head.appendChild(style);
 }
@@ -258,7 +220,6 @@ function setupWheelWrapperAndLabels() {
 
   const wrap = document.createElement("div");
   wrap.id = "wheelRotate";
-
   parent.insertBefore(wrap, wheelImg);
   wrap.appendChild(wheelImg);
 
@@ -279,7 +240,6 @@ function setupWheelWrapperAndLabels() {
       el.className = "wheel-label";
       el.setAttribute("aria-hidden", "true");
       el.dataset.number = String(n);
-
       el.style.transform = `rotate(${angle}deg) translate(0, ${-radius}px) rotate(${-angle}deg) translate(-50%, -50%)`;
       el.textContent = String(n);
       labels.appendChild(el);
@@ -298,6 +258,7 @@ function getRotationDeg(el) {
   const tr = st.transform || "none";
   if (tr === "none") return 0;
 
+  // FIX: correct regex (your pasted one had extra escaping)
   const m = tr.match(/^matrix\((.+)\)$/);
   if (!m) return 0;
 
@@ -328,147 +289,130 @@ function spinToNumber(targetNumber) {
   wheelRotateEl.style.transform = `rotate(${finalRotation}deg)`;
 }
 
-// ------------------ Locked numbers sync (API or localStorage demo) ------------------
-function loadLockedFromLocalStorage() {
-  try {
-    const raw = localStorage.getItem(LS_LOCKED_KEY);
-    const arr = raw ? JSON.parse(raw) : [];
-    lockedNumbers = new Set(arr.map((x) => parseInt(x, 10)).filter((x) => Number.isFinite(x)));
-  } catch {
-    lockedNumbers = new Set();
-  }
-}
+// ------------------ Backend state (HTTP) ------------------
+// Your app has: GET /api/tables/<gametype> returning tables with bets[] [file:104]
+async function fetchRouletteTableState() {
+  const res = await fetch(`/api/tables/${encodeURIComponent(GAMETYPE)}`);
+  if (!res.ok) return;
 
-function saveLockedToLocalStorage() {
-  const arr = Array.from(lockedNumbers.values()).sort((a,b)=>a-b);
-  localStorage.setItem(LS_LOCKED_KEY, JSON.stringify(arr));
-}
-
-async function fetchStateFromServer() {
-  const res = await fetch(API.stateUrl, { method: "GET" });
-  if (!res.ok) throw new Error("State fetch failed");
   const data = await res.json();
-  const arr = Array.isArray(data.lockedNumbers) ? data.lockedNumbers : [];
-  lockedNumbers = new Set(arr.map((x) => parseInt(x, 10)).filter((x) => Number.isFinite(x)));
+  const tables = Array.isArray(data.tables) ? data.tables : [];
+
+  // pick an active started table (closest match to what server uses) [file:104]
+  const t =
+    tables.find(x => x && x.isstarted && !x.isfinished && !x.isbettingclosed) ||
+    tables.find(x => x && x.isstarted && !x.isfinished) ||
+    tables[0];
+
+  if (!t) return;
+
+  currentRoundCode = t.roundcode || currentRoundCode;
+  currentTableNumber = t.tablenumber ?? currentTableNumber;
+
+  currentPlayers = Array.isArray(t.bets) ? t.bets : [];
+  lockedNumbers = new Set(currentPlayers.map(p => parseInt(p.number, 10)).filter(n => Number.isFinite(n)));
+
+  updateHeaderPlayersCount();
+  updateMyBetsUIFromPlayers();
+  applyLockedStateToChips();
+  refreshControls();
+
+  if (timerTextEl) timerTextEl.textContent = formatMMSS(t.timeremaining);
 }
 
-async function placeBetOnServer(number) {
-  const res = await fetch(API.placeBetUrl, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ number })
+// ------------------ Socket.IO ------------------
+// Server supports joinGame/placeBet and broadcasts updateTable/betSuccess/betError [file:104]
+let socket = null;
+
+function initSocket() {
+  if (typeof io !== "function") {
+    setStatus("Socket client not loaded. Check /socket.io/socket.io.js", "error");
+    return;
+  }
+
+  socket = io();
+
+  socket.on("connect", () => {
+    socket.emit("joinGame", { gametype: GAMETYPE, userid: USER_ID }); // [file:104]
+    setStatus("", "");
   });
-  const data = await res.json().catch(() => ({}));
-  if (!res.ok || data.ok === false) {
-    throw new Error(data.message || "Bet rejected");
-  }
-  if (Array.isArray(data.lockedNumbers)) {
-    lockedNumbers = new Set(data.lockedNumbers.map((x) => parseInt(x, 10)).filter((x) => Number.isFinite(x)));
-  } else {
-    lockedNumbers.add(number);
-  }
-  if (typeof data.walletBalance === "number") walletBalance = data.walletBalance;
-  if (Array.isArray(data.userBets)) userBets = data.userBets;
+
+  socket.on("betError", (data) => {
+    setStatus(data?.message || "Bet rejected.", "error"); // [file:104]
+    // refresh state so locked numbers sync
+    fetchRouletteTableState();
+  });
+
+  socket.on("betSuccess", (data) => {
+    if (typeof data?.newbalance === "number") {
+      walletBalance = data.newbalance;
+      updateWalletUI();
+    }
+    setStatus(data?.message || "Bet placed.", "ok"); // [file:104]
+
+    // Server may include players list [file:104]
+    if (Array.isArray(data?.players)) {
+      currentPlayers = data.players;
+      lockedNumbers = new Set(currentPlayers.map(p => parseInt(p.number, 10)).filter(n => Number.isFinite(n)));
+      updateHeaderPlayersCount();
+      updateMyBetsUIFromPlayers();
+      applyLockedStateToChips();
+      refreshControls();
+    } else {
+      fetchRouletteTableState();
+    }
+  });
+
+  socket.on("updateTable", (payload) => {
+    if (!payload || payload.gametype !== GAMETYPE) return;
+
+    if (payload.roundcode) currentRoundCode = payload.roundcode;
+    if (typeof payload.tablenumber !== "undefined") currentTableNumber = payload.tablenumber;
+
+    if (Array.isArray(payload.players)) {
+      currentPlayers = payload.players; // [file:104]
+      lockedNumbers = new Set(currentPlayers.map(p => parseInt(p.number, 10)).filter(n => Number.isFinite(n)));
+      updateHeaderPlayersCount();
+      updateMyBetsUIFromPlayers();
+      applyLockedStateToChips();
+      refreshControls();
+    }
+
+    if (typeof payload.timeremaining === "number" && timerTextEl) {
+      timerTextEl.textContent = formatMMSS(payload.timeremaining);
+    }
+  });
 }
 
-function startStateSync() {
-  if (API_ENABLED) {
-    // Poll server
-    setInterval(async () => {
-      if (isSpinning) return;
-      try {
-        await fetchStateFromServer();
-        syncAllChipsLockedUI();
-        refreshControls();
-      } catch {
-        // silent
-      }
-    }, STATE_POLL_MS);
-  } else {
-    // Demo: keep tabs in sync
-    loadLockedFromLocalStorage();
-    window.addEventListener("storage", (e) => {
-      if (e.key !== LS_LOCKED_KEY) return;
-      loadLockedFromLocalStorage();
-      syncAllChipsLockedUI();
-      refreshControls();
-    });
-    // Optional: also refresh every second
-    setInterval(() => {
-      loadLockedFromLocalStorage();
-      syncAllChipsLockedUI();
-      refreshControls();
-    }, STATE_POLL_MS);
-  }
-}
-
-// ------------------ Betting handlers ------------------
-async function handlePlaceBet() {
+// ------------------ Actions ------------------
+function handlePlaceBet() {
   if (isSpinning) return;
 
-  if (selectedNumber === null || selectedNumber === undefined) {
+  if (selectedNumber === null) {
     setStatus("Select a number first.", "error");
     return;
   }
 
   if (lockedNumbers.has(selectedNumber)) {
     setStatus("This number is already bet by another player.", "error");
-    setChipLockedUI(selectedNumber, true);
-    refreshControls();
     return;
   }
 
-  if (walletBalance < FIXED_BET_AMOUNT) {
-    setStatus("Insufficient balance.", "error");
+  if (!socket || !socket.connected) {
+    setStatus("Socket not connected. Refresh page.", "error");
     return;
   }
 
-  if (userBets.includes(selectedNumber)) {
-    setStatus("You already bet on this number.", "error");
-    return;
-  }
+  socket.emit("placeBet", {
+    gametype: GAMETYPE,
+    userid: USER_ID,
+    username: USERNAME,
+    number: selectedNumber,
+    roundcode: currentRoundCode // keep same round if available [file:104]
+  });
 
-  if (userBets.length >= MAX_BETS_PER_USER) {
-    setStatus(`Max ${MAX_BETS_PER_USER} bets allowed.`, "error");
-    return;
-  }
-
-  try {
-    if (API_ENABLED) {
-      // Backend must validate: only one bet per number globally
-      await placeBetOnServer(selectedNumber);
-    } else {
-      // Demo-only local lock
-      lockedNumbers.add(selectedNumber);
-      saveLockedToLocalStorage();
-    }
-  } catch (err) {
-    setStatus(err?.message || "Bet rejected.", "error");
-    // Refresh state after rejection (maybe someone else took it)
-    if (API_ENABLED) {
-      try { await fetchStateFromServer(); } catch {}
-    } else {
-      loadLockedFromLocalStorage();
-    }
-    syncAllChipsLockedUI();
-    refreshControls();
-    return;
-  }
-
-  // Local player state (still shown in your UI)
-  walletBalance -= FIXED_BET_AMOUNT;
-  userBets.push(selectedNumber);
-
-  // Lock UI
-  setChipLockedUI(selectedNumber, true);
-  selectedNumber = null;
   setSelectedNumber(null);
-
-  updateWalletUI();
-  updateUserBetsUI();
-  syncAllChipsLockedUI();
   refreshControls();
-  setStatus("Bet placed.", "ok");
 }
 
 function handleSpin() {
@@ -477,15 +421,13 @@ function handleSpin() {
     setStatus("Wheel not ready (missing #rouletteWheel).", "error");
     return;
   }
-  if (userBets.length === 0) {
-    setStatus("Place at least one bet before spinning.", "error");
-    return;
-  }
 
+  // DEMO: spin target is random locally; backend result logic is separate in app.py [file:104]
   const targetNumber = WHEEL_ORDER[Math.floor(Math.random() * TOTAL_SLOTS)];
 
   isSpinning = true;
   setStatus("Spinning...", "ok");
+  applyLockedStateToChips();
   refreshControls();
 
   try {
@@ -494,6 +436,7 @@ function handleSpin() {
     console.error(e);
     isSpinning = false;
     setStatus("Spin failed. Check console.", "error");
+    applyLockedStateToChips();
     refreshControls();
     return;
   }
@@ -504,34 +447,22 @@ function handleSpin() {
 
     if (lastResultEl) lastResultEl.textContent = `Result: ${shownNumber}`;
 
-    const totalBetAmount = userBets.length * FIXED_BET_AMOUNT;
-    if (userBets.includes(shownNumber)) {
-      const winAmount = totalBetAmount * 20;
-      walletBalance += winAmount;
-      updateWalletUI();
-      setStatus(`You WON! Number ${shownNumber}. Payout: ${winAmount} coins.`, "ok");
-    } else {
-      setStatus(`You lost. Result was ${shownNumber}.`, "error");
-    }
-
     isSpinning = false;
+    setStatus("", "");
+    applyLockedStateToChips();
     refreshControls();
-  }, SPIN_DURATION_MS + 60);
+  }, SPIN_DURATION_MS + 80);
 }
 
 // ------------------ Init ------------------
 setupWheelWrapperAndLabels();
-
-if (!API_ENABLED) {
-  loadLockedFromLocalStorage();
-}
-
 createNumberGrid();
 updateWalletUI();
-updateUserBetsUI();
-syncAllChipsLockedUI();
-refreshControls();
-startStateSync();
+
+fetchRouletteTableState();
+setInterval(fetchRouletteTableState, 1500);
+
+initSocket();
 
 if (placeBetBtn) placeBetBtn.addEventListener("click", handlePlaceBet);
 if (spinBtn) spinBtn.addEventListener("click", handleSpin);
