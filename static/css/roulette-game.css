@@ -550,3 +550,18 @@ body {
   height: clamp(14px, 3.8vw, 18px);
 }
 
+/* When this number already has a bet, show red */
+.num-chip.bet-locked {
+  background: rgba(210, 60, 60, 0.20);
+  border-color: rgba(255, 120, 120, 0.85);
+  box-shadow:
+    0 0 0 2px rgba(210, 60, 60, 0.35),
+    0 10px 20px rgba(0, 0, 0, 0.40);
+  color: #ffe9e9;
+}
+
+/* Optional: keep selected hover subtle when locked */
+.num-chip.bet-locked:hover {
+  transform: translateY(-1px);
+  background: rgba(210, 60, 60, 0.26);
+}
