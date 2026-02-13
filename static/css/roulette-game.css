@@ -565,3 +565,18 @@ body {
   transform: translateY(-1px);
   background: rgba(210, 60, 60, 0.26);
 }
+.num-chip { color: #eaf2ff; }  /* ensure numbers are visible */
+
+.num-chip.bet-locked{
+  background: rgba(220, 60, 60, 0.22);
+  border-color: rgba(255, 120, 120, 0.85);
+  color: #fff;
+  opacity: 1 !important;        /* important: don’t fade locked chips */
+  filter: none !important;
+}
+
+/* keep disabled still readable */
+.num-chip:disabled{
+  opacity: 1;                   /* do not fade */
+  cursor: not-allowed;
+}
