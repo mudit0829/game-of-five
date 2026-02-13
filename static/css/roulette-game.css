@@ -243,7 +243,7 @@ body {
   box-shadow: 0 3px 14px rgba(34, 197, 94, 0.7);
 }
 
-/* INACTIVE / LOCKED NUMBER CHIPS (like other games) */
+/* INACTIVE / LOCKED NUMBER CHIPS */
 .num-chip:disabled,
 .num-chip.locked {
   opacity: 0.35;
