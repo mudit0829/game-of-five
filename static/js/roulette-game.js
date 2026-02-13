@@ -12,8 +12,9 @@ const TOTAL_SLOTS = EURO_WHEEL_ORDER.length; // 37
 const DEGREES_PER_SLOT = 360 / TOTAL_SLOTS;
 
 // IMPORTANT: image alignment tweak.
-// Start with -68; if pointer is slightly off, adjust by small steps (e.g. -64, -72).
-let BASE_OFFSET_DEG = -68;
+// Start with 0. If pointer sits slightly to left/right, adjust this in small steps
+// e.g. -5, -10, +5, etc., until pointer is exactly in the middle of the pocket.
+let BASE_OFFSET_DEG = 0;
 
 const FIXED_BET_AMOUNT = 200;
 const MAX_BETS_PER_USER = 20;
