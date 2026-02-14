@@ -100,7 +100,9 @@
   </script>
 
   <!-- Required for your app.py Socket.IO events (joinGame/placeBet/updateTable) -->
-  <script src="/socket.io/socket.io.js"></script> <!-- provides io() [web:123][file:104] -->
+  <script src="https://cdn.socket.io/4.8.3/socket.io.min.js"
+        integrity="sha384-kzavj5fiMwLKzzD1f8S7TeoVIEi7uKHvbTA3ueZkrzYq75pNQUiUi6Dy98Q3fxb0"
+        crossorigin="anonymous"></script>
 
   <!-- Your game JS -->
   <script src="{{ url_for('static', filename='js/roulette-game.js') }}"></script>
