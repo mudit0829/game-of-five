@@ -39,7 +39,6 @@
     </header>
 
     <main class="layout">
-      <!-- WHEEL SIDE -->
       <section class="wheel-panel">
         <div class="wheel-wrapper">
           <div class="wheel-border">
@@ -61,7 +60,6 @@
         <div id="lastResult" class="last-result">Result: --</div>
       </section>
 
-      <!-- BETTING SIDE -->
       <section class="bet-panel">
         <div class="numbers-card">
           <div class="numbers-header">
@@ -92,19 +90,16 @@
     </main>
   </div>
 
-  <!-- Pass Flask session user to JS safely -->
   <script>
     window.__USER_ID__ = {{ session.get('userid') | tojson }};
     window.__USERNAME__ = {{ session.get('username') | tojson }};
     window.__GAMETYPE__ = "roulette";
   </script>
 
-  <!-- Required for your app.py Socket.IO events (joinGame/placeBet/updateTable) -->
   <script src="https://cdn.socket.io/4.8.3/socket.io.min.js"
-        integrity="sha384-kzavj5fiMwLKzzD1f8S7TeoVIEi7uKHvbTA3ueZkrzYq75pNQUiUi6Dy98Q3fxb0"
-        crossorigin="anonymous"></script>
+          integrity="sha384-kzavj5fiMwLKzzD1f8S7TeoVIEi7uKHvbTA3ueZkrzYq75pNQUiUi6Dy98Q3fxb0"
+          crossorigin="anonymous"></script>
 
-  <!-- Your game JS -->
   <script src="{{ url_for('static', filename='js/roulette-game.js') }}"></script>
 </body>
 </html>
