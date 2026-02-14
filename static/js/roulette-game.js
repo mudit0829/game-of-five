@@ -4,45 +4,35 @@ const WHEEL_ORDER = [
   0,32,15,19,4,21,2,25,17,34,6,27,13,36,11,30,8,23,10,5,24,16,33,1,20,14,31,9,22,18,29,7,28,12,35,3,26
 ];
 
-const TOTAL_SLOTS = WHEEL_ORDER.length;      // 37
+const TOTAL_SLOTS = WHEEL_ORDER.length;
 const DEG_PER_SLOT = 360 / TOTAL_SLOTS;
 
 const POINTER_OFFSET_DEG = 0;
 const SPIN_DURATION_MS = 4200;
 const EXTRA_FULL_SPINS = 5;
 
-// UI-only (server enforces its own limits) [file:104]
-const FIXED_BET_AMOUNT = 200;
-
-// ------------------ State ------------------
-let walletBalance = 10000;
+let walletBalance = 0;
 let selectedNumber = null;
 let isSpinning = false;
 let lastRotationDeg = 0;
 
 let wheelRotateEl = null;
 
-// Current table/round from backend
 let currentRoundCode = null;
 let currentTableNumber = null;
 
-// Taken numbers by any player in THIS table/round
 let lockedNumbers = new Set();
+let currentPlayers = [];
 
-// The latest players list from backend table
-let currentPlayers = []; // [{userid, username, number}, ...]
-
-// ------------------ DOM ------------------
 const wheelImg = document.getElementById("rouletteWheel");
 const spinBtn = document.getElementById("spinBtn");
 const placeBetBtn = document.getElementById("placeBetBtn");
 
 const walletBalanceSpan = document.getElementById("walletBalance");
-
-// FIX: your header uses userBetsCountText (not userBetCount)
 const headerUserBetsCount = document.getElementById("userBetsCountText");
 const headerTotalPlayers = document.getElementById("totalPlayersText");
 const headerUsername = document.getElementById("usernameText");
+const gameIdTextEl = document.getElementById("gameIdText");
 
 const numbersGrid = document.getElementById("numbersGrid");
 const myBetsRow = document.getElementById("myBetsRow");
@@ -50,17 +40,21 @@ const statusEl = document.getElementById("statusMessage");
 const lastResultEl = document.getElementById("lastResult");
 const timerTextEl = document.getElementById("timerText");
 
-// ------------------ User from Flask session ------------------
 const USER_ID = window.__USER_ID__;
 const USERNAME = window.__USERNAME__ || "demo";
 const GAMETYPE = window.__GAMETYPE__ || "roulette";
 
-if (headerUsername) headerUsername.textContent = USERNAME || "demo";
+// --- Debug helpers (so console is not empty) ---
+console.log("[Roulette] JS loaded", { USER_ID, USERNAME, GAMETYPE });
 
-// ------------------ Helpers ------------------
-function mod(n, m) {
-  return ((n % m) + m) % m;
-}
+window.addEventListener("error", (e) => {
+  console.error("[Roulette] window.error:", e.message, e.error);
+});
+window.addEventListener("unhandledrejection", (e) => {
+  console.error("[Roulette] unhandledrejection:", e.reason);
+});
+
+if (headerUsername) headerUsername.textContent = USERNAME || "demo";
 
 function setStatus(msg, type = "") {
   if (!statusEl) return;
@@ -82,30 +76,28 @@ function formatMMSS(totalSeconds) {
 
 function setSelectedNumber(n) {
   selectedNumber = n;
-
   document.querySelectorAll(".num-chip").forEach((chip) => {
     const v = parseInt(chip.dataset.number, 10);
-    chip.classList.toggle("selected", v === n); // [web:79]
+    chip.classList.toggle("selected", v === n);
   });
-}
-
-function getChipEl(n) {
-  return document.querySelector(`.num-chip[data-number="${n}"]`);
 }
 
 function applyLockedStateToChips() {
   document.querySelectorAll(".num-chip").forEach((chip) => {
     const n = parseInt(chip.dataset.number, 10);
     const isLocked = lockedNumbers.has(n);
-
-    chip.classList.toggle("bet-locked", isLocked); // [web:79]
-    chip.disabled = isLocked || isSpinning; // real lock when taken; also disable while spinning [file:104]
+    chip.classList.toggle("bet-locked", isLocked);
+    chip.disabled = isLocked || isSpinning;
   });
 
-  // If user selected a number that becomes locked, clear selection
   if (selectedNumber !== null && lockedNumbers.has(selectedNumber)) {
     setSelectedNumber(null);
   }
+}
+
+function updateHeaderPlayersCount() {
+  if (!headerTotalPlayers) return;
+  headerTotalPlayers.textContent = `${currentPlayers.length} PLAYERS`;
 }
 
 function updateMyBetsUIFromPlayers() {
@@ -136,28 +128,21 @@ function updateMyBetsUIFromPlayers() {
   });
 }
 
-function updateHeaderPlayersCount() {
-  if (!headerTotalPlayers) return;
-  const count = currentPlayers.length;
-  headerTotalPlayers.textContent = `${count} PLAYERS`;
-}
-
-function refreshControls() {
+function refreshControls(socketConnected) {
   if (placeBetBtn) {
     placeBetBtn.disabled =
       isSpinning ||
+      !socketConnected ||
       selectedNumber === null ||
       lockedNumbers.has(selectedNumber);
   }
 
   if (spinBtn) {
-    // For now, keep spin enabled only if user has at least 1 bet in this table
     const myBetCount = currentPlayers.filter(p => String(p.userid) === String(USER_ID)).length;
     spinBtn.disabled = isSpinning || myBetCount === 0;
   }
 }
 
-// ------------------ Build number grid ------------------
 function createNumberGrid() {
   if (!numbersGrid) return;
 
@@ -175,20 +160,17 @@ function createNumberGrid() {
       if (lockedNumbers.has(n)) {
         setStatus("This number is already bet by another player.", "error");
         setSelectedNumber(null);
-        refreshControls();
         return;
       }
 
       setSelectedNumber(n);
       setStatus("");
-      refreshControls();
     });
 
     numbersGrid.appendChild(btn);
   }
 }
 
-// ------------------ Wheel wrapper + hidden labels ------------------
 function injectWheelStylesOnce() {
   if (document.getElementById("wheelHiddenLabelStyles")) return;
   const style = document.createElement("style");
@@ -205,6 +187,7 @@ function injectWheelStylesOnce() {
 function setupWheelWrapperAndLabels() {
   if (!wheelImg) {
     console.error("Missing #rouletteWheel image element.");
+    setStatus("Wheel image missing (#rouletteWheel).", "error");
     return;
   }
 
@@ -227,38 +210,19 @@ function setupWheelWrapperAndLabels() {
   labels.id = "wheelLabels";
   wrap.appendChild(labels);
 
-  function buildLabels() {
-    labels.innerHTML = "";
-    const rect = wrap.getBoundingClientRect();
-    const radius = Math.min(rect.width, rect.height) * 0.43;
-
-    for (let i = 0; i < TOTAL_SLOTS; i++) {
-      const n = WHEEL_ORDER[i];
-      const angle = i * DEG_PER_SLOT;
-
-      const el = document.createElement("div");
-      el.className = "wheel-label";
-      el.setAttribute("aria-hidden", "true");
-      el.dataset.number = String(n);
-      el.style.transform = `rotate(${angle}deg) translate(0, ${-radius}px) rotate(${-angle}deg) translate(-50%, -50%)`;
-      el.textContent = String(n);
-      labels.appendChild(el);
-    }
-  }
-
-  requestAnimationFrame(buildLabels);
-  window.addEventListener("resize", () => requestAnimationFrame(buildLabels), { passive: true });
-
   wheelRotateEl = wrap;
 }
 
-// ------------------ Rotation math ------------------
+function mod(n, m) {
+  return ((n % m) + m) % m;
+}
+
 function getRotationDeg(el) {
   const st = window.getComputedStyle(el);
   const tr = st.transform || "none";
   if (tr === "none") return 0;
 
-  // FIX: correct regex (your pasted one had extra escaping)
+  // FIXED: this must match "matrix(...)" (no double backslashes)
   const m = tr.match(/^matrix\((.+)\)$/);
   if (!m) return 0;
 
@@ -289,57 +253,88 @@ function spinToNumber(targetNumber) {
   wheelRotateEl.style.transform = `rotate(${finalRotation}deg)`;
 }
 
-// ------------------ Backend state (HTTP) ------------------
-// Your app has: GET /api/tables/<gametype> returning tables with bets[] [file:104]
+// ---- HTTP state fetch (your backend has /api/tables/<gametype>) ----
 async function fetchRouletteTableState() {
-  const res = await fetch(`/api/tables/${encodeURIComponent(GAMETYPE)}`);
-  if (!res.ok) return;
+  try {
+    const res = await fetch(`/api/tables/${encodeURIComponent(GAMETYPE)}`);
+    if (!res.ok) {
+      console.warn("[Roulette] /api/tables not ok:", res.status);
+      return;
+    }
 
-  const data = await res.json();
-  const tables = Array.isArray(data.tables) ? data.tables : [];
+    const data = await res.json();
+    const tables = Array.isArray(data.tables) ? data.tables : [];
+    const t =
+      tables.find(x => x && x.isstarted && !x.isfinished && !x.isbettingclosed) ||
+      tables.find(x => x && x.isstarted && !x.isfinished) ||
+      tables[0];
 
-  // pick an active started table (closest match to what server uses) [file:104]
-  const t =
-    tables.find(x => x && x.isstarted && !x.isfinished && !x.isbettingclosed) ||
-    tables.find(x => x && x.isstarted && !x.isfinished) ||
-    tables[0];
+    if (!t) return;
 
-  if (!t) return;
+    currentRoundCode = t.roundcode || currentRoundCode;
+    currentTableNumber = t.tablenumber ?? currentTableNumber;
 
-  currentRoundCode = t.roundcode || currentRoundCode;
-  currentTableNumber = t.tablenumber ?? currentTableNumber;
+    // SHOW GAME ID
+    if (gameIdTextEl) gameIdTextEl.textContent = currentRoundCode ? String(currentRoundCode) : "--";
 
-  currentPlayers = Array.isArray(t.bets) ? t.bets : [];
-  lockedNumbers = new Set(currentPlayers.map(p => parseInt(p.number, 10)).filter(n => Number.isFinite(n)));
+    currentPlayers = Array.isArray(t.bets) ? t.bets : [];
+    lockedNumbers = new Set(
+      currentPlayers
+        .map(p => parseInt(p.number, 10))
+        .filter(n => Number.isFinite(n))
+    );
 
-  updateHeaderPlayersCount();
-  updateMyBetsUIFromPlayers();
-  applyLockedStateToChips();
-  refreshControls();
+    updateHeaderPlayersCount();
+    updateMyBetsUIFromPlayers();
+    applyLockedStateToChips();
 
-  if (timerTextEl) timerTextEl.textContent = formatMMSS(t.timeremaining);
+    if (timerTextEl) timerTextEl.textContent = formatMMSS(t.timeremaining);
+  } catch (e) {
+    console.error("[Roulette] fetchRouletteTableState failed:", e);
+  }
 }
 
-// ------------------ Socket.IO ------------------
-// Server supports joinGame/placeBet and broadcasts updateTable/betSuccess/betError [file:104]
+// ---- Socket.IO ----
 let socket = null;
+let socketConnected = false;
 
 function initSocket() {
   if (typeof io !== "function") {
-    setStatus("Socket client not loaded. Check /socket.io/socket.io.js", "error");
+    setStatus("Socket client not loaded (CDN failed).", "error");
     return;
   }
 
-  socket = io();
+  // Force polling + no upgrade (more reliable on many deployments) [web:127]
+  socket = io(window.location.origin, {
+    transports: ["polling"],
+    upgrade: false
+  });
 
   socket.on("connect", () => {
-    socket.emit("joinGame", { gametype: GAMETYPE, userid: USER_ID }); // [file:104]
+    socketConnected = true;
+    console.log("[Roulette] socket connected:", socket.id);
     setStatus("", "");
+
+    socket.emit("joinGame", { gametype: GAMETYPE, userid: USER_ID });
+    refreshControls(true);
+  });
+
+  socket.on("connect_error", (err) => {
+    socketConnected = false;
+    console.error("[Roulette] connect_error:", err);
+    setStatus(`Socket error: ${err?.message || err}`, "error");
+    refreshControls(false);
+  });
+
+  socket.on("disconnect", (reason) => {
+    socketConnected = false;
+    console.warn("[Roulette] socket disconnected:", reason);
+    setStatus("Socket disconnected. Refresh page.", "error");
+    refreshControls(false);
   });
 
   socket.on("betError", (data) => {
-    setStatus(data?.message || "Bet rejected.", "error"); // [file:104]
-    // refresh state so locked numbers sync
+    setStatus(data?.message || "Bet rejected.", "error");
     fetchRouletteTableState();
   });
 
@@ -348,16 +343,16 @@ function initSocket() {
       walletBalance = data.newbalance;
       updateWalletUI();
     }
-    setStatus(data?.message || "Bet placed.", "ok"); // [file:104]
+    setStatus(data?.message || "Bet placed.", "ok");
 
-    // Server may include players list [file:104]
     if (Array.isArray(data?.players)) {
       currentPlayers = data.players;
-      lockedNumbers = new Set(currentPlayers.map(p => parseInt(p.number, 10)).filter(n => Number.isFinite(n)));
+      lockedNumbers = new Set(
+        currentPlayers.map(p => parseInt(p.number, 10)).filter(n => Number.isFinite(n))
+      );
       updateHeaderPlayersCount();
       updateMyBetsUIFromPlayers();
       applyLockedStateToChips();
-      refreshControls();
     } else {
       fetchRouletteTableState();
     }
@@ -367,15 +362,16 @@ function initSocket() {
     if (!payload || payload.gametype !== GAMETYPE) return;
 
     if (payload.roundcode) currentRoundCode = payload.roundcode;
-    if (typeof payload.tablenumber !== "undefined") currentTableNumber = payload.tablenumber;
+    if (gameIdTextEl) gameIdTextEl.textContent = currentRoundCode ? String(currentRoundCode) : "--";
 
     if (Array.isArray(payload.players)) {
-      currentPlayers = payload.players; // [file:104]
-      lockedNumbers = new Set(currentPlayers.map(p => parseInt(p.number, 10)).filter(n => Number.isFinite(n)));
+      currentPlayers = payload.players;
+      lockedNumbers = new Set(
+        currentPlayers.map(p => parseInt(p.number, 10)).filter(n => Number.isFinite(n))
+      );
       updateHeaderPlayersCount();
       updateMyBetsUIFromPlayers();
       applyLockedStateToChips();
-      refreshControls();
     }
 
     if (typeof payload.timeremaining === "number" && timerTextEl) {
@@ -384,9 +380,13 @@ function initSocket() {
   });
 }
 
-// ------------------ Actions ------------------
 function handlePlaceBet() {
   if (isSpinning) return;
+
+  if (!USER_ID) {
+    setStatus("You are not logged in (missing user id). Login again.", "error");
+    return;
+  }
 
   if (selectedNumber === null) {
     setStatus("Select a number first.", "error");
@@ -398,8 +398,8 @@ function handlePlaceBet() {
     return;
   }
 
-  if (!socket || !socket.connected) {
-    setStatus("Socket not connected. Refresh page.", "error");
+  if (!socket || !socketConnected) {
+    setStatus("Socket not connected yet. Wait 2 seconds or refresh.", "error");
     return;
   }
 
@@ -408,38 +408,34 @@ function handlePlaceBet() {
     userid: USER_ID,
     username: USERNAME,
     number: selectedNumber,
-    roundcode: currentRoundCode // keep same round if available [file:104]
+    roundcode: currentRoundCode
   });
 
   setSelectedNumber(null);
-  refreshControls();
+  refreshControls(socketConnected);
 }
 
 function handleSpin() {
   if (isSpinning) return;
   if (!wheelRotateEl) {
-    setStatus("Wheel not ready (missing #rouletteWheel).", "error");
+    setStatus("Wheel not ready.", "error");
     return;
   }
 
-  // DEMO: spin target is random locally; backend result logic is separate in app.py [file:104]
+  const myBetCount = currentPlayers.filter(p => String(p.userid) === String(USER_ID)).length;
+  if (myBetCount === 0) {
+    setStatus("Place at least one bet before spinning.", "error");
+    return;
+  }
+
   const targetNumber = WHEEL_ORDER[Math.floor(Math.random() * TOTAL_SLOTS)];
 
   isSpinning = true;
   setStatus("Spinning...", "ok");
   applyLockedStateToChips();
-  refreshControls();
+  refreshControls(socketConnected);
 
-  try {
-    spinToNumber(targetNumber);
-  } catch (e) {
-    console.error(e);
-    isSpinning = false;
-    setStatus("Spin failed. Check console.", "error");
-    applyLockedStateToChips();
-    refreshControls();
-    return;
-  }
+  spinToNumber(targetNumber);
 
   window.setTimeout(() => {
     const finalDeg = getRotationDeg(wheelRotateEl);
@@ -450,7 +446,7 @@ function handleSpin() {
     isSpinning = false;
     setStatus("", "");
     applyLockedStateToChips();
-    refreshControls();
+    refreshControls(socketConnected);
   }, SPIN_DURATION_MS + 80);
 }
 
@@ -458,7 +454,10 @@ function handleSpin() {
 setupWheelWrapperAndLabels();
 createNumberGrid();
 updateWalletUI();
+setSelectedNumber(null);
+setStatus("");
 
+// Pull initial table state (roundcode, timer, locked numbers) from backend [file:104]
 fetchRouletteTableState();
 setInterval(fetchRouletteTableState, 1500);
 
@@ -466,6 +465,3 @@ initSocket();
 
 if (placeBetBtn) placeBetBtn.addEventListener("click", handlePlaceBet);
 if (spinBtn) spinBtn.addEventListener("click", handleSpin);
-
-setSelectedNumber(null);
-setStatus("");
