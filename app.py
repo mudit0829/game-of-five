@@ -51,9 +51,26 @@ socketio = SocketIO(
 # Super Admin (secret URL + password)
 # ---------------------------------------------------
 
-SUPERADMIN_SECRET = os.environ.get("SUPERADMIN_SECRET", "change-this-secret")
-SUPERADMIN_PASS = os.environ.get("SUPERADMIN_PASS", "change-this-password")
-APP_TIMEZONE = os.environ.get("APP_TIMEZONE", "Asia/Kolkata")  # used only for display consistency
+def _get_env(*names, default=""):
+    for n in names:
+        v = os.environ.get(n)
+        if v is not None and str(v).strip() != "":
+            return v
+    return default
+
+# Accept BOTH naming styles to avoid Render mismatch
+SUPERADMIN_SECRET = str(
+    _get_env("SUPERADMIN_SECRET", "SUPERADMINSECRET", default="change-this-secret")
+).strip()
+
+SUPERADMIN_PASS = str(
+    _get_env("SUPERADMIN_PASS", "SUPERADMINPASS", default="change-this-password")
+).strip()
+
+APP_TIMEZONE = str(_get_env("APP_TIMEZONE", "APPTIMEZONE", default="Asia/Kolkata")).strip()
+
+print("SUPERADMIN_SECRET repr =", repr(SUPERADMIN_SECRET), "len =", len(SUPERADMIN_SECRET))
+print("SUPERADMIN_PASS set? =", bool(SUPERADMIN_PASS), "len =", len(SUPERADMIN_PASS))
 
 # forced_winners: (game_type, round_code) -> int forced_number
 forced_winners = {}
@@ -608,13 +625,14 @@ def start_all_game_tables():
 
 @app.route("/sa/<secret>")
 def super_admin_page(secret):
-    if secret != SUPERADMIN_SECRET:
+    if (secret or "").strip() != (SUPERADMIN_SECRET or "").strip():
         return "Not found", 404
     return render_template("super_admin.html", secret=secret)
 
+
 @app.route("/api/sa/<secret>/rounds", methods=["POST"])
 def sa_rounds(secret):
-    if secret != SUPERADMIN_SECRET:
+    if (secret or "").strip() != (SUPERADMIN_SECRET or "").strip():
         return jsonify({"error": "Not found"}), 404
     if not sa_authorized(request):
         return jsonify({"error": "Unauthorized"}), 401
@@ -635,18 +653,17 @@ def sa_rounds(secret):
                     "is_started": t.is_started(),
                     "is_betting_closed": t.is_betting_closed,
                     "forced_number": forced_winners.get((game_type, t.round_code)),
-                    "allowed_to_force": (now < t.start_time),  # ✅ only before game begins
+                    "allowed_to_force": (now < t.start_time),
                 }
             )
 
-    # sort: soonest first
     out.sort(key=lambda x: (x["starts_in"], x["game_type"], x["table_number"]))
     return jsonify({"timezone": APP_TIMEZONE, "rounds": out})
 
 
 @app.route("/api/sa/<secret>/force-winner", methods=["POST"])
 def sa_force_winner(secret):
-    if secret != SUPERADMIN_SECRET:
+    if (secret or "").strip() != (SUPERADMIN_SECRET or "").strip():
         return jsonify({"error": "Not found"}), 404
     if not sa_authorized(request):
         return jsonify({"error": "Unauthorized"}), 401
@@ -661,7 +678,6 @@ def sa_force_winner(secret):
     if not round_code:
         return jsonify({"success": False, "message": "round_code required"}), 400
 
-    # find table by round_code to enforce "before game begins"
     tables = game_tables.get(game_type, [])
     table = None
     for t in tables:
@@ -674,7 +690,6 @@ def sa_force_winner(secret):
     if datetime.now() >= table.start_time:
         return jsonify({"success": False, "message": "You can force winner only before the round begins"}), 400
 
-    # clear
     if number is None or str(number).strip() == "":
         forced_winners.pop((game_type, round_code), None)
         return jsonify({"success": True, "message": "Forced winner cleared"})
