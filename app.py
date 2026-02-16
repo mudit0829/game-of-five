@@ -337,18 +337,34 @@ class GameTable:
         )
         return success
 
-    def calculate_result(self):
-        # Winner must be from numbers that were actually bet this round
-        bet_numbers = [
-            b.get("number")
-            for b in (self.bets or [])
-            if b.get("number") is not None
-        ]
+   def calculate_result(self):
+    # Winner must be from numbers that were actually bet this round
+    bet_numbers = [
+        b.get("number")
+        for b in (self.bets or [])
+        if b.get("number") is not None
+    ]
 
-        # If no bets exist, fall back to old behavior
-        if not bet_numbers:
-            self.result = random.choice(self.getnumberrange())
-            return self.result
+    # If no bets exist, fall back to old behavior
+    if not bet_numbers:
+        self.result = random.choice(self.get_number_range())
+        return self.result
+
+    # Optional: keep your 16% "favor real user" behavior,
+    # but still only from real users' bet numbers.
+    real_numbers = [
+        b.get("number")
+        for b in (self.bets or [])
+        if (not b.get("is_bot")) and b.get("number") is not None
+    ]
+
+    if real_numbers and random.random() < 0.16:
+        self.result = random.choice(real_numbers)
+    else:
+        self.result = random.choice(bet_numbers)
+
+    return self.result
+
 
         # Optional: keep your 16% "favor real user" behavior,
         # but still only from real users' bet numbers.
@@ -743,6 +759,7 @@ def login_post():
         ensure_wallet_for_user(user)
 
     session["user_id"] = user.id
+    session["userid"] = user.id  # alias for older templates/JS
     session["username"] = user.username
     if remember_me:
         session.permanent = True
@@ -803,6 +820,7 @@ def register_page():
     ensure_wallet_for_user(user)
 
     session["user_id"] = user.id
+    session["userid"] = user.id  # alias for older templates/JS
     session["username"] = user.username
 
     return jsonify(
