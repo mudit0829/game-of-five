@@ -91,7 +91,8 @@
   </div>
 
   <script>
-    window.__USER_ID__ = {{ session.get('userid') | tojson }};
+    // FIX: app.py uses session["user_id"] [file:197]
+    window.__USER_ID__ = {{ session.get('user_id') | tojson }};
     window.__USERNAME__ = {{ session.get('username') | tojson }};
     window.__GAMETYPE__ = "roulette";
   </script>
