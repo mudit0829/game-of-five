@@ -261,7 +261,7 @@ class GameTable:
             return list(range(37))
         return list(range(10))
 
-    def add_bet(self, user_id, username, number, is_bot=False):
+        def add_bet(self, user_id, username, number, is_bot=False):
         try:
             number_int = int(number)
         except (TypeError, ValueError):
@@ -283,12 +283,11 @@ class GameTable:
         else:
             user_id_norm = user_id
 
-       user_bets = [b for b in self.bets if b["user_id"] == user_id_norm]
+        user_bets = [b for b in self.bets if b["user_id"] == user_id_norm]
 
-max_bets_per_user = 20 if self.game_type == "roulette" else 3
-if len(user_bets) >= max_bets_per_user:
-    return False, f"Maximum {max_bets_per_user} bets per user"
-
+        max_bets_per_user = 20 if self.game_type == "roulette" else 3
+        if len(user_bets) >= max_bets_per_user:
+            return False, f"Maximum {max_bets_per_user} bets per user"
 
         if len(self.bets) >= self.max_players:
             return False, "All slots are full"
