@@ -1,0 +1,175 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <title>Super Admin - Force Winner</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <style>
+    body{font-family:Arial, sans-serif; background:#0b1220; color:#e7eefc; padding:16px;}
+    .card{background:#111a2e; border:1px solid #223055; border-radius:12px; padding:14px; margin-bottom:14px;}
+    input, select, button{padding:10px; border-radius:10px; border:1px solid #2a3a66; background:#0b1220; color:#e7eefc;}
+    button{cursor:pointer; background:#1c7c3a; border:none;}
+    button:disabled{opacity:.5; cursor:not-allowed;}
+    .row{display:flex; gap:10px; flex-wrap:wrap; align-items:center;}
+    table{width:100%; border-collapse:collapse;}
+    th, td{border-bottom:1px solid #223055; padding:10px; text-align:left; font-size:14px;}
+    .small{opacity:.8; font-size:12px;}
+    .bad{color:#ff7272;}
+    .ok{color:#68ff9a;}
+  </style>
+</head>
+<body>
+  <h2>Super Admin: Force Winner (Before Round Starts)</h2>
+  <div class="card">
+    <div class="row">
+      <input id="pass" type="password" placeholder="Super admin password" />
+      <button id="loadBtn">Load rounds</button>
+      <span id="status" class="small"></span>
+    </div>
+    <p class="small">
+      Rule: You can set forced winner only before start_time. If nobody bets that number, system uses normal logic.
+    </p>
+  </div>
+
+  <div class="card">
+    <div class="row">
+      <select id="roundSelect" style="min-width:320px;"></select>
+      <input id="num" type="number" placeholder="Winning number" />
+      <button id="setBtn">Set</button>
+      <button id="clearBtn" style="background:#8a2d2d;">Clear</button>
+    </div>
+    <div class="small" id="roundInfo"></div>
+  </div>
+
+  <div class="card">
+    <h3>Live rounds</h3>
+    <table>
+      <thead>
+        <tr>
+          <th>Game</th>
+          <th>Table</th>
+          <th>Round Code</th>
+          <th>Start</th>
+          <th>Starts In</th>
+          <th>Forced</th>
+          <th>Allowed</th>
+        </tr>
+      </thead>
+      <tbody id="tbody"></tbody>
+    </table>
+  </div>
+
+<script>
+  const SECRET = "{{ secret }}";
+
+  const passEl = document.getElementById("pass");
+  const loadBtn = document.getElementById("loadBtn");
+  const setBtn = document.getElementById("setBtn");
+  const clearBtn = document.getElementById("clearBtn");
+  const statusEl = document.getElementById("status");
+  const roundSelect = document.getElementById("roundSelect");
+  const numEl = document.getElementById("num");
+  const tbody = document.getElementById("tbody");
+  const roundInfo = document.getElementById("roundInfo");
+
+  let rounds = [];
+
+  function setStatus(msg, isBad=false){
+    statusEl.textContent = msg;
+    statusEl.className = "small " + (isBad ? "bad" : "ok");
+  }
+
+  function fmtSec(s){
+    s = Number(s||0);
+    const sign = s < 0 ? "-" : "";
+    s = Math.abs(s);
+    const mm = String(Math.floor(s/60)).padStart(2,"0");
+    const ss = String(s%60).padStart(2,"0");
+    return sign + mm + ":" + ss;
+  }
+
+  async function loadRounds(){
+    const password = passEl.value.trim();
+    if(!password){ setStatus("Password required", true); return; }
+
+    setStatus("Loading...");
+    const res = await fetch(`/api/sa/${SECRET}/rounds`, {
+      method:"POST",
+      headers: {"Content-Type":"application/json"},
+      body: JSON.stringify({password})
+    });
+    const data = await res.json();
+    if(!res.ok){ setStatus(data.error || "Failed", true); return; }
+
+    rounds = data.rounds || [];
+    roundSelect.innerHTML = "";
+    rounds.forEach((r, idx)=>{
+      const opt = document.createElement("option");
+      opt.value = String(idx);
+      opt.textContent = `${r.game_type} | T${r.table_number} | ${r.round_code} | starts_in ${fmtSec(r.starts_in)}`;
+      roundSelect.appendChild(opt);
+    });
+
+    renderTable();
+    updateRoundInfo();
+    setStatus("Loaded");
+  }
+
+  function updateRoundInfo(){
+    const idx = parseInt(roundSelect.value||"0",10);
+    const r = rounds[idx];
+    if(!r){ roundInfo.textContent = ""; return; }
+    roundInfo.textContent =
+      `Selected: ${r.game_name} (${r.game_type}) | Table ${r.table_number} | Round ${r.round_code} | Start ${r.start_time} | Allowed: ${r.allowed_to_force ? "YES" : "NO"} | Forced: ${r.forced_number ?? "-"}`;
+    setBtn.disabled = !r.allowed_to_force;
+    clearBtn.disabled = !r.allowed_to_force;
+  }
+
+  function renderTable(){
+    tbody.innerHTML = "";
+    rounds.forEach(r=>{
+      const tr = document.createElement("tr");
+      tr.innerHTML = `
+        <td>${r.game_type}</td>
+        <td>${r.table_number}</td>
+        <td>${r.round_code}</td>
+        <td>${r.start_time}</td>
+        <td>${fmtSec(r.starts_in)}</td>
+        <td>${r.forced_number ?? "-"}</td>
+        <td>${r.allowed_to_force ? "<span class='ok'>YES</span>" : "<span class='bad'>NO</span>"}</td>
+      `;
+      tbody.appendChild(tr);
+    });
+  }
+
+  async function setForce(clear=false){
+    const password = passEl.value.trim();
+    if(!password){ setStatus("Password required", true); return; }
+
+    const idx = parseInt(roundSelect.value||"0",10);
+    const r = rounds[idx];
+    if(!r){ setStatus("Select a round", true); return; }
+
+    const num = clear ? "" : numEl.value;
+    if(!clear && (num === "" || num === null)){ setStatus("Enter number", true); return; }
+
+    const res = await fetch(`/api/sa/${SECRET}/force-winner`, {
+      method:"POST",
+      headers: {"Content-Type":"application/json"},
+      body: JSON.stringify({password, game_type: r.game_type, round_code: r.round_code, number: num})
+    });
+
+    const data = await res.json();
+    if(!res.ok){ setStatus(data.message || "Failed", true); return; }
+
+    setStatus(data.message || "Done");
+    await loadRounds();
+  }
+
+  loadBtn.addEventListener("click", loadRounds);
+  roundSelect.addEventListener("change", updateRoundInfo);
+  setBtn.addEventListener("click", ()=>setForce(false));
+  clearBtn.addEventListener("click", ()=>setForce(true));
+</script>
+</body>
+</html>
