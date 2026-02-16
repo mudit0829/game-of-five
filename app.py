@@ -608,10 +608,9 @@ def start_all_game_tables():
 
 @app.route("/sa/<secret>")
 def super_admin_page(secret):
-    if (secret or "").strip() != (SUPERADMIN_SECRET or "").strip():
-    return "Not found", 404
+    if secret != SUPERADMIN_SECRET:
+        return "Not found", 404
     return render_template("super_admin.html", secret=secret)
-
 
 @app.route("/api/sa/<secret>/rounds", methods=["POST"])
 def sa_rounds(secret):
