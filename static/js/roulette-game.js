@@ -1,4 +1,4 @@
-// ================== Roulette Wheel (Angle-Verified Result + SOCKET Multiplayer Locks) ==================
+// ================== Roulette Wheel (Backend-aligned: snake_case API + socket events) ==================
 
 const WHEEL_ORDER = [
   0,32,15,19,4,21,2,25,17,34,6,27,13,36,11,30,8,23,10,5,24,16,33,1,20,14,31,9,22,18,29,7,28,12,35,3,26
@@ -40,12 +40,13 @@ const statusEl = document.getElementById("statusMessage");
 const lastResultEl = document.getElementById("lastResult");
 const timerTextEl = document.getElementById("timerText");
 
-const USER_ID = window.__USER_ID__;
-const USERNAME = window.__USERNAME__ || "demo";
+const USER_ID = window.__USER_ID__;          // should be from template
+const USERNAME = window.__USERNAME__ || "";  // should be from template
 const GAMETYPE = window.__GAMETYPE__ || "roulette";
 
-// --- Debug helpers (so console is not empty) ---
-console.log("[Roulette] JS loaded", { USER_ID, USERNAME, GAMETYPE });
+const preferredRoundCode = new URLSearchParams(window.location.search).get("table"); // your ?table=R...
+
+console.log("[Roulette] JS loaded", { USER_ID, USERNAME, GAMETYPE, preferredRoundCode });
 
 window.addEventListener("error", (e) => {
   console.error("[Roulette] window.error:", e.message, e.error);
@@ -54,7 +55,7 @@ window.addEventListener("unhandledrejection", (e) => {
   console.error("[Roulette] unhandledrejection:", e.reason);
 });
 
-if (headerUsername) headerUsername.textContent = USERNAME || "demo";
+if (headerUsername) headerUsername.textContent = USERNAME || "Player";
 
 function setStatus(msg, type = "") {
   if (!statusEl) return;
@@ -105,7 +106,7 @@ function updateMyBetsUIFromPlayers() {
   myBetsRow.innerHTML = "";
 
   const myNums = currentPlayers
-    .filter(p => String(p.userid) === String(USER_ID))
+    .filter(p => String(p.user_id) === String(USER_ID))
     .map(p => parseInt(p.number, 10))
     .filter(n => Number.isFinite(n))
     .sort((a,b)=>a-b);
@@ -138,7 +139,7 @@ function refreshControls(socketConnected) {
   }
 
   if (spinBtn) {
-    const myBetCount = currentPlayers.filter(p => String(p.userid) === String(USER_ID)).length;
+    const myBetCount = currentPlayers.filter(p => String(p.user_id) === String(USER_ID)).length;
     spinBtn.disabled = isSpinning || myBetCount === 0;
   }
 }
@@ -160,17 +161,20 @@ function createNumberGrid() {
       if (lockedNumbers.has(n)) {
         setStatus("This number is already bet by another player.", "error");
         setSelectedNumber(null);
+        refreshControls(socketConnected);
         return;
       }
 
       setSelectedNumber(n);
       setStatus("");
+      refreshControls(socketConnected);
     });
 
     numbersGrid.appendChild(btn);
   }
 }
 
+// ------------------ Wheel wrapper ------------------
 function injectWheelStylesOnce() {
   if (document.getElementById("wheelHiddenLabelStyles")) return;
   const style = document.createElement("style");
@@ -213,6 +217,7 @@ function setupWheelWrapperAndLabels() {
   wheelRotateEl = wrap;
 }
 
+// ------------------ Rotation math ------------------
 function mod(n, m) {
   return ((n % m) + m) % m;
 }
@@ -222,7 +227,7 @@ function getRotationDeg(el) {
   const tr = st.transform || "none";
   if (tr === "none") return 0;
 
-  // FIXED: this must match "matrix(...)" (no double backslashes)
+  // Correct: matches "matrix(a,b,c,d,e,f)"
   const m = tr.match(/^matrix\((.+)\)$/);
   if (!m) return 0;
 
@@ -253,48 +258,80 @@ function spinToNumber(targetNumber) {
   wheelRotateEl.style.transform = `rotate(${finalRotation}deg)`;
 }
 
-// ---- HTTP state fetch (your backend has /api/tables/<gametype>) ----
+// ------------------ Backend (HTTP) ------------------
+async function fetchBalance() {
+  try {
+    const res = await fetch("/api/balance", { cache: "no-store" });
+    if (!res.ok) return;
+    const data = await res.json();
+    if (typeof data?.balance === "number") {
+      walletBalance = data.balance;
+      updateWalletUI();
+    }
+  } catch (e) {
+    console.warn("[Roulette] fetchBalance failed:", e);
+  }
+}
+
+function chooseTable(tables) {
+  if (!Array.isArray(tables) || tables.length === 0) return null;
+
+  if (preferredRoundCode) {
+    const exact = tables.find(t => t && t.round_code === preferredRoundCode);
+    if (exact) return exact;
+  }
+
+  return (
+    tables.find(t => t && t.is_started && !t.is_finished && !t.is_betting_closed) ||
+    tables.find(t => t && t.is_started && !t.is_finished) ||
+    tables[0]
+  );
+}
+
 async function fetchRouletteTableState() {
   try {
-    const res = await fetch(`/api/tables/${encodeURIComponent(GAMETYPE)}`);
+    const res = await fetch(`/api/tables/${encodeURIComponent(GAMETYPE)}`, { cache: "no-store" });
+    const ct = res.headers.get("content-type") || "";
+
     if (!res.ok) {
-      console.warn("[Roulette] /api/tables not ok:", res.status);
+      console.warn("[Roulette] /api/tables status:", res.status);
+      return;
+    }
+
+    // If login_required redirects, you may get HTML instead of JSON
+    if (!ct.includes("application/json")) {
+      setStatus("Session expired. Please login again.", "error");
       return;
     }
 
     const data = await res.json();
-    const tables = Array.isArray(data.tables) ? data.tables : [];
-    const t =
-      tables.find(x => x && x.isstarted && !x.isfinished && !x.isbettingclosed) ||
-      tables.find(x => x && x.isstarted && !x.isfinished) ||
-      tables[0];
+    const t = chooseTable(data.tables);
 
     if (!t) return;
 
-    currentRoundCode = t.roundcode || currentRoundCode;
-    currentTableNumber = t.tablenumber ?? currentTableNumber;
+    currentRoundCode = t.round_code || currentRoundCode;
+    currentTableNumber = t.table_number ?? currentTableNumber;
 
-    // SHOW GAME ID
     if (gameIdTextEl) gameIdTextEl.textContent = currentRoundCode ? String(currentRoundCode) : "--";
 
+    // backend sends bets[] with {user_id, username, number} [file:197]
     currentPlayers = Array.isArray(t.bets) ? t.bets : [];
     lockedNumbers = new Set(
-      currentPlayers
-        .map(p => parseInt(p.number, 10))
-        .filter(n => Number.isFinite(n))
+      currentPlayers.map(p => parseInt(p.number, 10)).filter(n => Number.isFinite(n))
     );
 
     updateHeaderPlayersCount();
     updateMyBetsUIFromPlayers();
     applyLockedStateToChips();
 
-    if (timerTextEl) timerTextEl.textContent = formatMMSS(t.timeremaining);
+    if (timerTextEl) timerTextEl.textContent = formatMMSS(t.time_remaining);
+    refreshControls(socketConnected);
   } catch (e) {
     console.error("[Roulette] fetchRouletteTableState failed:", e);
   }
 }
 
-// ---- Socket.IO ----
+// ------------------ Socket.IO (backend-aligned names) ------------------
 let socket = null;
 let socketConnected = false;
 
@@ -304,7 +341,6 @@ function initSocket() {
     return;
   }
 
-  // Force polling + no upgrade (more reliable on many deployments) [web:127]
   socket = io(window.location.origin, {
     transports: ["polling"],
     upgrade: false
@@ -313,9 +349,9 @@ function initSocket() {
   socket.on("connect", () => {
     socketConnected = true;
     console.log("[Roulette] socket connected:", socket.id);
-    setStatus("", "");
+    setStatus("");
 
-    socket.emit("joinGame", { gametype: GAMETYPE, userid: USER_ID });
+    socket.emit("join_game", { game_type: GAMETYPE, user_id: USER_ID });
     refreshControls(true);
   });
 
@@ -333,16 +369,21 @@ function initSocket() {
     refreshControls(false);
   });
 
-  socket.on("betError", (data) => {
+  socket.on("bet_error", (data) => {
     setStatus(data?.message || "Bet rejected.", "error");
+    fetchBalance();
     fetchRouletteTableState();
   });
 
-  socket.on("betSuccess", (data) => {
-    if (typeof data?.newbalance === "number") {
-      walletBalance = data.newbalance;
+  socket.on("bet_success", (data) => {
+    if (typeof data?.new_balance === "number") {
+      walletBalance = data.new_balance;
       updateWalletUI();
     }
+
+    if (data?.round_code) currentRoundCode = data.round_code;
+    if (gameIdTextEl) gameIdTextEl.textContent = currentRoundCode ? String(currentRoundCode) : "--";
+
     setStatus(data?.message || "Bet placed.", "ok");
 
     if (Array.isArray(data?.players)) {
@@ -356,12 +397,14 @@ function initSocket() {
     } else {
       fetchRouletteTableState();
     }
+
+    refreshControls(socketConnected);
   });
 
-  socket.on("updateTable", (payload) => {
-    if (!payload || payload.gametype !== GAMETYPE) return;
+  socket.on("update_table", (payload) => {
+    if (!payload || payload.game_type !== GAMETYPE) return;
 
-    if (payload.roundcode) currentRoundCode = payload.roundcode;
+    if (payload.round_code) currentRoundCode = payload.round_code;
     if (gameIdTextEl) gameIdTextEl.textContent = currentRoundCode ? String(currentRoundCode) : "--";
 
     if (Array.isArray(payload.players)) {
@@ -374,17 +417,20 @@ function initSocket() {
       applyLockedStateToChips();
     }
 
-    if (typeof payload.timeremaining === "number" && timerTextEl) {
-      timerTextEl.textContent = formatMMSS(payload.timeremaining);
+    if (typeof payload.time_remaining === "number" && timerTextEl) {
+      timerTextEl.textContent = formatMMSS(payload.time_remaining);
     }
+
+    refreshControls(socketConnected);
   });
 }
 
+// ------------------ Actions ------------------
 function handlePlaceBet() {
   if (isSpinning) return;
 
   if (!USER_ID) {
-    setStatus("You are not logged in (missing user id). Login again.", "error");
+    setStatus("Login missing (user id is null). Logout + login again.", "error");
     return;
   }
 
@@ -403,12 +449,12 @@ function handlePlaceBet() {
     return;
   }
 
-  socket.emit("placeBet", {
-    gametype: GAMETYPE,
-    userid: USER_ID,
+  socket.emit("place_bet", {
+    game_type: GAMETYPE,
+    user_id: USER_ID,
     username: USERNAME,
     number: selectedNumber,
-    roundcode: currentRoundCode
+    round_code: currentRoundCode
   });
 
   setSelectedNumber(null);
@@ -422,7 +468,7 @@ function handleSpin() {
     return;
   }
 
-  const myBetCount = currentPlayers.filter(p => String(p.userid) === String(USER_ID)).length;
+  const myBetCount = currentPlayers.filter(p => String(p.user_id) === String(USER_ID)).length;
   if (myBetCount === 0) {
     setStatus("Place at least one bet before spinning.", "error");
     return;
@@ -435,7 +481,16 @@ function handleSpin() {
   applyLockedStateToChips();
   refreshControls(socketConnected);
 
-  spinToNumber(targetNumber);
+  try {
+    spinToNumber(targetNumber);
+  } catch (e) {
+    console.error(e);
+    isSpinning = false;
+    setStatus("Spin failed. Check console.", "error");
+    applyLockedStateToChips();
+    refreshControls(socketConnected);
+    return;
+  }
 
   window.setTimeout(() => {
     const finalDeg = getRotationDeg(wheelRotateEl);
@@ -444,7 +499,7 @@ function handleSpin() {
     if (lastResultEl) lastResultEl.textContent = `Result: ${shownNumber}`;
 
     isSpinning = false;
-    setStatus("", "");
+    setStatus("");
     applyLockedStateToChips();
     refreshControls(socketConnected);
   }, SPIN_DURATION_MS + 80);
@@ -453,13 +508,16 @@ function handleSpin() {
 // ------------------ Init ------------------
 setupWheelWrapperAndLabels();
 createNumberGrid();
-updateWalletUI();
+
 setSelectedNumber(null);
 setStatus("");
 
-// Pull initial table state (roundcode, timer, locked numbers) from backend [file:104]
+fetchBalance();
+updateWalletUI();
+
 fetchRouletteTableState();
 setInterval(fetchRouletteTableState, 1500);
+setInterval(fetchBalance, 5000);
 
 initSocket();
 
