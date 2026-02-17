@@ -674,7 +674,7 @@ def super_admin_panel():
 def sa_rounds():
     """Get rounds filtered by date and time slot, only those >60 min away"""
     date_str = request.args.get("date")  # Format: YYYY-MM-DD
-    time_slot = request.args.get("time_slot")  # Format: "12-13" for 12 PM - 1 PM
+    time_slot = request.args.get("time_slot")  # Format: "22-23" for 10 PM - 11 PM
     
     if not date_str or not time_slot:
         return jsonify({"error": "date and time_slot required"}), 400
@@ -693,26 +693,45 @@ def sa_rounds():
     now = datetime.now()
     cutoff_time = now + timedelta(minutes=60)  # Only show rounds >60 min away
     
+    # Calculate all possible rounds in the time slot
     out = []
-    for game_type, tables in game_tables.items():
-        for t in tables:
-            # Filter: must be within time slot AND >60 min away
-            if slot_start <= t.start_time < slot_end and t.start_time > cutoff_time:
-                minutes_until = int((t.start_time - now).total_seconds() / 60)
+    
+    for game_type in GAME_CONFIGS.keys():
+        for table_number in range(1, 7):  # Tables 1-6
+            # Calculate round start times for this table
+            # Each table has a stagger: table N starts at (N-1) * 60 seconds offset
+            table_offset = (table_number - 1) * 60
+            
+            # Start from the slot_start and generate rounds every 5 minutes (300 seconds)
+            current_time = floor_to_period(slot_start, ROUND_SECONDS) + timedelta(seconds=table_offset)
+            
+            # Generate all rounds within this hour slot
+            while current_time < slot_end:
+                # Only include if >60 minutes away
+                if current_time > cutoff_time:
+                    minutes_until = int((current_time - now).total_seconds() / 60)
+                    round_code = make_round_code(game_type, current_time, table_number)
+                    
+                    # Check if this round already exists with a forced winner
+                    forced_number = forced_winners.get((game_type, round_code))
+                    
+                    out.append({
+                        "game_type": game_type,
+                        "game_name": GAME_CONFIGS[game_type]["name"],
+                        "table_number": table_number,
+                        "round_code": round_code,
+                        "start_time": current_time.strftime("%Y-%m-%d %H:%M:%S"),
+                        "minutes_until_start": minutes_until,
+                        "forced_number": forced_number,
+                        "can_force": True
+                    })
                 
-                out.append({
-                    "game_type": game_type,
-                    "game_name": GAME_CONFIGS[game_type]["name"],
-                    "table_number": t.table_number,
-                    "round_code": t.round_code,
-                    "start_time": t.start_time.strftime("%Y-%m-%d %H:%M:%S"),
-                    "minutes_until_start": minutes_until,
-                    "forced_number": forced_winners.get((game_type, t.round_code)),
-                    "can_force": True
-                })
+                # Move to next round (5 minutes later)
+                current_time += timedelta(seconds=ROUND_SECONDS)
     
     out.sort(key=lambda x: x["start_time"])
     return jsonify({"rounds": out, "total": len(out)})
+
 
 
 @app.route("/api/sa/force-winner", methods=["POST"])
