@@ -1,4 +1,3 @@
-
 from flask import (
     Flask,
     render_template,
@@ -48,29 +47,12 @@ socketio = SocketIO(
 )
 
 # ---------------------------------------------------
-# Super Admin (secret URL + password)
+# Super Admin credentials (CHANGE THESE!)
 # ---------------------------------------------------
 
-def _get_env(*names, default=""):
-    for n in names:
-        v = os.environ.get(n)
-        if v is not None and str(v).strip() != "":
-            return v
-    return default
-
-# Accept BOTH naming styles to avoid Render mismatch
-SUPERADMIN_SECRET = str(
-    _get_env("SUPERADMIN_SECRET", "SUPERADMINSECRET", default="change-this-secret")
-).strip()
-
-SUPERADMIN_PASS = str(
-    _get_env("SUPERADMIN_PASS", "SUPERADMINPASS", default="change-this-password")
-).strip()
-
-APP_TIMEZONE = str(_get_env("APP_TIMEZONE", "APPTIMEZONE", default="Asia/Kolkata")).strip()
-
-print("SUPERADMIN_SECRET repr =", repr(SUPERADMIN_SECRET), "len =", len(SUPERADMIN_SECRET))
-print("SUPERADMIN_PASS set? =", bool(SUPERADMIN_PASS), "len =", len(SUPERADMIN_PASS))
+SUPERADMIN_USERNAME = "superadmin"  # ✅ Change this
+SUPERADMIN_PASSWORD = "SuperPass@2026"  # ✅ Change this
+APP_TIMEZONE = "Asia/Kolkata"
 
 # forced_winners: (game_type, round_code) -> int forced_number
 forced_winners = {}
@@ -214,15 +196,6 @@ def make_round_code(game_type: str, start_time: datetime, table_number: int) -> 
     return f"{initial}_{stamp}_{int(table_number)}"
 
 
-def sa_authorized(req) -> bool:
-    # Can send password as header "X-SA-PASS" or JSON field "password"
-    pw = req.headers.get("X-SA-PASS")
-    if pw:
-        return pw == SUPERADMIN_PASS
-    data = req.get_json(silent=True) or {}
-    return (data.get("password") or "") == SUPERADMIN_PASS
-
-
 # ---------------------------------------------------
 # Helpers
 # ---------------------------------------------------
@@ -259,6 +232,18 @@ def admin_required(f):
 
         return f(*args, **kwargs)
 
+    return decorated
+
+
+def superadmin_required(f):
+    """Check if user is logged in as super admin"""
+    @wraps(f)
+    def decorated(*args, **kwargs):
+        if "is_superadmin" not in session or not session.get("is_superadmin"):
+            if request.path.startswith("/api/sa/"):
+                return jsonify({"error": "Super admin access required"}), 403
+            return redirect(url_for("sa_login_page"))
+        return f(*args, **kwargs)
     return decorated
 
 
@@ -619,24 +604,50 @@ def start_all_game_tables():
 
 
 # ---------------------------------------------------
-# Super Admin routes (secret URL + password)
+# Super Admin routes (login-based)
 # ---------------------------------------------------
 
+@app.route("/sa-login")
+def sa_login_page():
+    if "is_superadmin" in session and session.get("is_superadmin"):
+        return redirect(url_for("super_admin_panel"))
+    return render_template("sa-login.html")
 
-@app.route("/sa/<secret>")
-def super_admin_page(secret):
-    if (secret or "").strip() != (SUPERADMIN_SECRET or "").strip():
-        return "Not found", 404
-    return render_template("super_admin.html", secret=secret)
+
+@app.route("/sa-login", methods=["POST"])
+def sa_login_post():
+    data = request.get_json() or {}
+    username = data.get("username", "").strip()
+    password = data.get("password", "")
+
+    if not username or not password:
+        return jsonify({"success": False, "message": "Username and password required"}), 400
+
+    if username == SUPERADMIN_USERNAME and password == SUPERADMIN_PASSWORD:
+        session["is_superadmin"] = True
+        session["superadmin_username"] = username
+        session.permanent = True
+        return jsonify({"success": True, "redirect": url_for("super_admin_panel")})
+    
+    return jsonify({"success": False, "message": "Invalid credentials"}), 401
 
 
-@app.route("/api/sa/<secret>/rounds", methods=["POST"])
-def sa_rounds(secret):
-    if (secret or "").strip() != (SUPERADMIN_SECRET or "").strip():
-        return jsonify({"error": "Not found"}), 404
-    if not sa_authorized(request):
-        return jsonify({"error": "Unauthorized"}), 401
+@app.route("/sa-logout")
+def sa_logout():
+    session.pop("is_superadmin", None)
+    session.pop("superadmin_username", None)
+    return redirect(url_for("sa_login_page"))
 
+
+@app.route("/sa")
+@superadmin_required
+def super_admin_panel():
+    return render_template("super_admin.html", username=session.get("superadmin_username", "SuperAdmin"))
+
+
+@app.route("/api/sa/rounds", methods=["GET"])
+@superadmin_required
+def sa_rounds():
     out = []
     now = datetime.now()
     for game_type, tables in game_tables.items():
@@ -661,13 +672,9 @@ def sa_rounds(secret):
     return jsonify({"timezone": APP_TIMEZONE, "rounds": out})
 
 
-@app.route("/api/sa/<secret>/force-winner", methods=["POST"])
-def sa_force_winner(secret):
-    if (secret or "").strip() != (SUPERADMIN_SECRET or "").strip():
-        return jsonify({"error": "Not found"}), 404
-    if not sa_authorized(request):
-        return jsonify({"error": "Unauthorized"}), 401
-
+@app.route("/api/sa/force-winner", methods=["POST"])
+@superadmin_required
+def sa_force_winner():
     data = request.get_json() or {}
     game_type = (data.get("game_type") or "").lower()
     round_code = data.get("round_code") or ""
@@ -679,11 +686,7 @@ def sa_force_winner(secret):
         return jsonify({"success": False, "message": "round_code required"}), 400
 
     tables = game_tables.get(game_type, [])
-    table = None
-    for t in tables:
-        if t.round_code == round_code:
-            table = t
-            break
+    table = next((t for t in tables if t.round_code == round_code), None)
     if not table:
         return jsonify({"success": False, "message": "Round not found"}), 404
 
@@ -713,7 +716,6 @@ def sa_force_winner(secret):
 # ---------------------------------------------------
 # API: tables and history
 # ---------------------------------------------------
-
 
 @app.route("/api/tables/<game_type>")
 def get_game_tables_api(game_type):
@@ -1666,9 +1668,10 @@ with app.app_context():
     print("📍 Admin URL: http://localhost:10000/admin")
     print("👤 Admin Username: admin")
     print("🔐 Admin Password: admin123")
-    print("=" * 60 + "\n")
-
-    print("🔒 Super Admin URL (set in Render env): /sa/<SUPERADMIN_SECRET>")
+    print("=" * 60)
+    print(f"🔒 Super Admin Login: http://localhost:10000/sa-login")
+    print(f"👤 Username: {SUPERADMIN_USERNAME}")
+    print(f"🔐 Password: {SUPERADMIN_PASSWORD}")
     print("=" * 60 + "\n")
 
 
