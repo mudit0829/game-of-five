@@ -165,6 +165,21 @@ class Transaction(db.Model):
     datetime = db.Column(db.DateTime, default=datetime.utcnow, index=True)
 
 
+class ForcedWinnerHistory(db.Model):
+    """History of all forced winner bets set by Super Admin"""
+    id = db.Column(db.Integer, primary_key=True)
+    round_code = db.Column(db.String(100), nullable=False, index=True)
+    game_type = db.Column(db.String(50), nullable=False)
+    game_name = db.Column(db.String(100))
+    table_number = db.Column(db.Integer)
+    forced_number = db.Column(db.Integer, nullable=False)
+    round_start_time = db.Column(db.DateTime, nullable=False)
+    forced_at = db.Column(db.DateTime, default=datetime.utcnow)
+    forced_by = db.Column(db.String(100))
+    status = db.Column(db.String(20), default="active")  # active, cleared, executed
+    note = db.Column(db.Text)
+
+
 # ---------------------------------------------------
 # In-memory structures
 # ---------------------------------------------------
@@ -564,6 +579,15 @@ def manage_game_table(table: GameTable):
                         )
                         db.session.add(win_tx)
 
+                    # Update forced winner history status to 'executed'
+                    history_record = ForcedWinnerHistory.query.filter_by(
+                        round_code=table.round_code,
+                        status="active"
+                    ).first()
+                    if history_record:
+                        history_record.status = "executed"
+                        history_record.note = f"Executed. Winner: {result}"
+
                     db.session.commit()
 
                     # ✅ clear forced winner after round ends (one-round only)
@@ -604,7 +628,7 @@ def start_all_game_tables():
 
 
 # ---------------------------------------------------
-# Super Admin routes (login-based)
+# Super Admin routes (login-based with history)
 # ---------------------------------------------------
 
 @app.route("/sa-login")
@@ -648,69 +672,178 @@ def super_admin_panel():
 @app.route("/api/sa/rounds", methods=["GET"])
 @superadmin_required
 def sa_rounds():
-    out = []
+    """Get rounds filtered by date and time slot, only those >60 min away"""
+    date_str = request.args.get("date")  # Format: YYYY-MM-DD
+    time_slot = request.args.get("time_slot")  # Format: "12-13" for 12 PM - 1 PM
+    
+    if not date_str or not time_slot:
+        return jsonify({"error": "date and time_slot required"}), 400
+    
+    try:
+        # Parse date and time slot
+        target_date = datetime.strptime(date_str, "%Y-%m-%d").date()
+        start_hour, end_hour = map(int, time_slot.split("-"))
+        
+        slot_start = datetime.combine(target_date, datetime.min.time()).replace(hour=start_hour)
+        slot_end = datetime.combine(target_date, datetime.min.time()).replace(hour=end_hour)
+        
+    except (ValueError, AttributeError):
+        return jsonify({"error": "Invalid date or time_slot format"}), 400
+    
     now = datetime.now()
+    cutoff_time = now + timedelta(minutes=60)  # Only show rounds >60 min away
+    
+    out = []
     for game_type, tables in game_tables.items():
         for t in tables:
-            out.append(
-                {
+            # Filter: must be within time slot AND >60 min away
+            if slot_start <= t.start_time < slot_end and t.start_time > cutoff_time:
+                minutes_until = int((t.start_time - now).total_seconds() / 60)
+                
+                out.append({
                     "game_type": game_type,
                     "game_name": GAME_CONFIGS[game_type]["name"],
                     "table_number": t.table_number,
                     "round_code": t.round_code,
                     "start_time": t.start_time.strftime("%Y-%m-%d %H:%M:%S"),
-                    "starts_in": int((t.start_time - now).total_seconds()),
-                    "time_remaining": t.get_time_remaining(),
-                    "is_started": t.is_started(),
-                    "is_betting_closed": t.is_betting_closed,
+                    "minutes_until_start": minutes_until,
                     "forced_number": forced_winners.get((game_type, t.round_code)),
-                    "allowed_to_force": (now < t.start_time),
-                }
-            )
-
-    out.sort(key=lambda x: (x["starts_in"], x["game_type"], x["table_number"]))
-    return jsonify({"timezone": APP_TIMEZONE, "rounds": out})
+                    "can_force": True
+                })
+    
+    out.sort(key=lambda x: x["start_time"])
+    return jsonify({"rounds": out, "total": len(out)})
 
 
 @app.route("/api/sa/force-winner", methods=["POST"])
 @superadmin_required
 def sa_force_winner():
     data = request.get_json() or {}
-    game_type = (data.get("game_type") or "").lower()
     round_code = data.get("round_code") or ""
     number = data.get("number", None)
-
-    if game_type not in GAME_CONFIGS:
-        return jsonify({"success": False, "message": "Invalid game_type"}), 400
+    
     if not round_code:
         return jsonify({"success": False, "message": "round_code required"}), 400
-
-    tables = game_tables.get(game_type, [])
-    table = next((t for t in tables if t.round_code == round_code), None)
+    
+    # Find the table by round_code
+    table = None
+    game_type = None
+    for gt, tables in game_tables.items():
+        for t in tables:
+            if t.round_code == round_code:
+                table = t
+                game_type = gt
+                break
+        if table:
+            break
+    
     if not table:
         return jsonify({"success": False, "message": "Round not found"}), 404
-
-    if datetime.now() >= table.start_time:
-        return jsonify({"success": False, "message": "You can force winner only before the round begins"}), 400
-
+    
+    now = datetime.now()
+    minutes_until = (table.start_time - now).total_seconds() / 60
+    
+    # Enforce 60-minute rule
+    if minutes_until < 60:
+        return jsonify({
+            "success": False, 
+            "message": f"Time expired! You can only force winner >60 minutes before start. This round starts in {int(minutes_until)} minutes."
+        }), 400
+    
+    # Clear forced winner
     if number is None or str(number).strip() == "":
         forced_winners.pop((game_type, round_code), None)
+        
+        # Update history status to 'cleared'
+        history_record = ForcedWinnerHistory.query.filter_by(
+            round_code=round_code, 
+            status="active"
+        ).first()
+        if history_record:
+            history_record.status = "cleared"
+            history_record.note = f"Cleared at {now.strftime('%Y-%m-%d %H:%M:%S')}"
+            db.session.commit()
+        
         return jsonify({"success": True, "message": "Forced winner cleared"})
-
+    
+    # Set forced winner
     try:
         n = int(number)
     except (TypeError, ValueError):
         return jsonify({"success": False, "message": "Invalid number"}), 400
-
+    
     if game_type == "roulette":
         if n < 0 or n > 36:
             return jsonify({"success": False, "message": "Roulette number must be 0-36"}), 400
     else:
         if n < 0 or n > 9:
             return jsonify({"success": False, "message": "Number must be 0-9"}), 400
-
+    
     forced_winners[(game_type, round_code)] = n
-    return jsonify({"success": True, "message": "Forced winner set", "game_type": game_type, "round_code": round_code, "number": n})
+    
+    # Save to history
+    existing = ForcedWinnerHistory.query.filter_by(
+        round_code=round_code,
+        status="active"
+    ).first()
+    
+    if existing:
+        existing.forced_number = n
+        existing.forced_at = now
+        existing.note = f"Updated at {now.strftime('%Y-%m-%d %H:%M:%S')}"
+    else:
+        history_record = ForcedWinnerHistory(
+            round_code=round_code,
+            game_type=game_type,
+            game_name=GAME_CONFIGS[game_type]["name"],
+            table_number=table.table_number,
+            forced_number=n,
+            round_start_time=table.start_time,
+            forced_by=session.get("superadmin_username", "unknown"),
+            status="active",
+            note=f"Forced {int(minutes_until)} minutes before start"
+        )
+        db.session.add(history_record)
+    
+    db.session.commit()
+    
+    return jsonify({
+        "success": True, 
+        "message": f"Forced winner set to {n} for {round_code}",
+        "round_code": round_code,
+        "number": n
+    })
+
+
+@app.route("/api/sa/history", methods=["GET"])
+@superadmin_required
+def sa_history():
+    """Get history of all forced winners"""
+    limit = request.args.get("limit", 100, type=int)
+    
+    history = (
+        ForcedWinnerHistory.query
+        .order_by(ForcedWinnerHistory.forced_at.desc())
+        .limit(limit)
+        .all()
+    )
+    
+    out = []
+    for h in history:
+        out.append({
+            "id": h.id,
+            "round_code": h.round_code,
+            "game_name": h.game_name,
+            "table_number": h.table_number,
+            "forced_number": h.forced_number,
+            "round_start_time": h.round_start_time.strftime("%Y-%m-%d %H:%M:%S"),
+            "forced_at": h.forced_at.strftime("%Y-%m-%d %H:%M:%S"),
+            "forced_by": h.forced_by,
+            "status": h.status,
+            "note": h.note or ""
+        })
+    
+    return jsonify({"history": out, "total": len(out)})
 
 
 # ---------------------------------------------------
@@ -869,7 +1002,7 @@ def login_post():
         return jsonify({"success": False, "message": "Invalid username or password"}), 401
 
     if user.is_blocked:
-        return jsonify({"success": False, "message": f"Your account is blocked. Reason: {user.block_reason or 'No reason provided'}"}), 403
+        return jsonify({"success": False, "message": f"Your account is blocked. Reason: {user.block_reason or 'No reason provided'}\"}), 403
 
     if not user.is_admin:
         ensure_wallet_for_user(user)
@@ -1489,11 +1622,14 @@ def handle_join_game(data):
 
 @socketio.on("place_bet")
 def handle_place_bet(data):
+    """Handle user bet placement - FORCED WINNERS DON'T BLOCK USER BETS"""
     game_type = data.get("game_type")
     raw_user_id = data.get("user_id")
     username = data.get("username")
     number = data.get("number")
     round_code = data.get("round_code")
+
+    print(f"🎯 Bet attempt: user={raw_user_id}, game={game_type}, number={number}, round={round_code}")
 
     if game_type not in GAME_CONFIGS:
         emit("bet_error", {"message": "Invalid game type"})
@@ -1554,13 +1690,17 @@ def handle_place_bet(data):
         emit("bet_error", {"message": "Insufficient balance"})
         return
 
+    # ✅ CRITICAL: Add bet to table (forced winners don't interfere here)
     success, message = table.add_bet(user_id, username, number)
     if not success:
+        print(f"❌ Bet rejected: {message}")
         emit("bet_error", {"message": message})
         return
 
+    # Deduct balance
     wallet.balance -= bet_amount
 
+    # Log transaction
     bet_tx = Transaction(
         user_id=user_id,
         kind="bet",
@@ -1573,12 +1713,16 @@ def handle_place_bet(data):
     db.session.add(bet_tx)
     db.session.commit()
 
+    print(f"✅ Bet placed successfully: user={user_id}, number={number}, round={table.round_code}")
+
+    # Prepare players list for broadcast
     players_data = []
     for bet in table.bets:
         players_data.append(
             {"user_id": str(bet["user_id"]), "username": bet["username"], "number": bet["number"]}
         )
 
+    # Emit success to the user
     emit(
         "bet_success",
         {
@@ -1591,6 +1735,7 @@ def handle_place_bet(data):
         },
     )
 
+    # Broadcast table update to all clients
     emit(
         "update_table",
         {
@@ -1651,7 +1796,7 @@ def seed_demo_users():
 with app.app_context():
     print("🔧 Creating database tables...")
     db.create_all()
-    print("✅ Database tables created")
+    print("✅ Database tables created (including ForcedWinnerHistory)")
 
     print("👥 Seeding demo users...")
     seed_demo_users()
