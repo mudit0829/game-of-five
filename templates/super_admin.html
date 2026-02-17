@@ -14,7 +14,7 @@
             padding: 20px;
         }
         .container {
-            max-width: 1400px;
+            max-width: 1600px;
             margin: 0 auto;
         }
         .header {
@@ -50,6 +50,25 @@
             margin-bottom: 20px;
             font-size: 24px;
         }
+        .filter-section {
+            display: flex;
+            gap: 15px;
+            align-items: center;
+            flex-wrap: wrap;
+            margin-bottom: 20px;
+        }
+        .filter-section label {
+            font-weight: 600;
+        }
+        input, select {
+            padding: 10px;
+            font-size: 16px;
+            border-radius: 5px;
+            border: none;
+            background: white;
+            color: #333;
+            min-width: 150px;
+        }
         .btn {
             padding: 12px 24px;
             border: none;
@@ -57,7 +76,6 @@
             font-size: 16px;
             font-weight: 600;
             cursor: pointer;
-            margin-right: 10px;
         }
         .btn-primary {
             background: #27ae60;
@@ -66,10 +84,13 @@
         .btn-primary:hover {
             background: #229954;
         }
-        .loading {
-            text-align: center;
-            padding: 20px;
-            font-size: 18px;
+        .btn-secondary {
+            background: #3498db;
+            color: white;
+        }
+        .btn-danger {
+            background: #e74c3c;
+            color: white;
         }
         .rules {
             background: rgba(52, 152, 219, 0.2);
@@ -78,24 +99,13 @@
             margin-top: 15px;
             border-left: 4px solid #3498db;
         }
-        .game-selector {
-            margin: 20px 0;
-        }
-        select, input {
-            padding: 10px;
-            font-size: 16px;
-            border-radius: 5px;
-            border: none;
-            margin-right: 10px;
-            background: white;
-            color: #333;
-        }
-        .rounds-section {
+        .section {
             background: rgba(255,255,255,0.1);
             padding: 30px;
             border-radius: 10px;
+            margin-bottom: 30px;
         }
-        .rounds-section h2 {
+        .section h2 {
             margin-bottom: 20px;
         }
         table {
@@ -118,79 +128,164 @@
         tr:hover {
             background: rgba(255,255,255,0.05);
         }
+        tr.selected {
+            background: rgba(52, 152, 219, 0.3);
+            border-left: 4px solid #3498db;
+        }
         .status-badge {
             padding: 5px 10px;
             border-radius: 3px;
             font-size: 12px;
             font-weight: 600;
         }
-        .status-upcoming {
-            background: #f39c12;
-        }
-        .status-live {
+        .status-active {
             background: #27ae60;
         }
-        .status-closed {
-            background: #e74c3c;
+        .status-cleared {
+            background: #95a5a6;
         }
-        .btn-secondary {
+        .status-executed {
             background: #3498db;
-            color: white;
         }
-        .btn-danger {
-            background: #e74c3c;
-            color: white;
+        .force-input-section {
+            display: flex;
+            gap: 15px;
+            align-items: center;
+            margin-top: 20px;
+            padding: 20px;
+            background: rgba(0,0,0,0.2);
+            border-radius: 5px;
+        }
+        .alert {
+            padding: 15px;
+            border-radius: 5px;
+            margin-bottom: 15px;
+        }
+        .alert-success {
+            background: rgba(39, 174, 96, 0.3);
+            border-left: 4px solid #27ae60;
+        }
+        .alert-error {
+            background: rgba(231, 76, 60, 0.3);
+            border-left: 4px solid #e74c3c;
+        }
+        .alert-info {
+            background: rgba(52, 152, 219, 0.3);
+            border-left: 4px solid #3498db;
         }
     </style>
 </head>
 <body>
     <div class="container">
         <div class="header">
-            <h1>🔐 Super Admin: Force Winner (Before Round Starts)</h1>
+            <h1>🔐 Super Admin: Force Winner Control</h1>
             <a href="/sa-logout" class="logout-btn">Logout</a>
         </div>
 
         <div class="control-panel">
-            <h2>⚙️ Control Panel</h2>
-            <button class="btn btn-primary" onclick="loadRounds()">🔄 Load rounds</button>
-            <div class="loading" id="loading" style="display: none;">Loading...</div>
+            <h2>⚙️ Load Rounds</h2>
             
+            <div class="filter-section">
+                <div>
+                    <label>Select Date:</label>
+                    <input type="date" id="dateInput" required>
+                </div>
+                
+                <div>
+                    <label>Select Time Slot:</label>
+                    <select id="timeSlot" required>
+                        <option value="">-- Select Time --</option>
+                        <option value="0-1">12 AM - 1 AM</option>
+                        <option value="1-2">1 AM - 2 AM</option>
+                        <option value="2-3">2 AM - 3 AM</option>
+                        <option value="3-4">3 AM - 4 AM</option>
+                        <option value="4-5">4 AM - 5 AM</option>
+                        <option value="5-6">5 AM - 6 AM</option>
+                        <option value="6-7">6 AM - 7 AM</option>
+                        <option value="7-8">7 AM - 8 AM</option>
+                        <option value="8-9">8 AM - 9 AM</option>
+                        <option value="9-10">9 AM - 10 AM</option>
+                        <option value="10-11">10 AM - 11 AM</option>
+                        <option value="11-12">11 AM - 12 PM</option>
+                        <option value="12-13">12 PM - 1 PM</option>
+                        <option value="13-14">1 PM - 2 PM</option>
+                        <option value="14-15">2 PM - 3 PM</option>
+                        <option value="15-16">3 PM - 4 PM</option>
+                        <option value="16-17">4 PM - 5 PM</option>
+                        <option value="17-18">5 PM - 6 PM</option>
+                        <option value="18-19">6 PM - 7 PM</option>
+                        <option value="19-20">7 PM - 8 PM</option>
+                        <option value="20-21">8 PM - 9 PM</option>
+                        <option value="21-22">9 PM - 10 PM</option>
+                        <option value="22-23">10 PM - 11 PM</option>
+                        <option value="23-24">11 PM - 12 AM</option>
+                    </select>
+                </div>
+                
+                <button class="btn btn-primary" onclick="loadRounds()">🔄 Load Rounds</button>
+            </div>
+
             <div class="rules">
-                <strong>Rule:</strong> You can set forced winner only before start_time. 
+                <strong>⚠️ Rule:</strong> You can only force winner for rounds starting >60 minutes from now. 
                 If nobody bets that number, system uses normal logic.
             </div>
 
-            <div class="game-selector">
-                <select id="gameSelect" onchange="filterByGame()">
-                    <option value="">All Games</option>
-                    <option value="silver">Silver Game</option>
-                    <option value="gold">Gold Game</option>
-                    <option value="diamond">Diamond Game</option>
-                    <option value="platinum">Platinum Game</option>
-                    <option value="roulette">Roulette Game</option>
-                </select>
-                <input type="number" id="winningNumber" placeholder="Winning number" min="0" max="36">
-                <button class="btn btn-secondary" onclick="setForced()">Set</button>
-                <button class="btn btn-danger" onclick="clearForced()">Clear</button>
-            </div>
+            <div id="alertBox"></div>
         </div>
 
-        <div class="rounds-section">
-            <h2>📋 Live rounds</h2>
+        <div class="section">
+            <h2>📋 Available Rounds (Click to Select)</h2>
             <table id="roundsTable">
                 <thead>
                     <tr>
+                        <th>Round Code</th>
                         <th>Game</th>
                         <th>Table</th>
-                        <th>Round Code</th>
-                        <th>Start</th>
-                        <th>Starts In</th>
-                        <th>Force</th>
+                        <th>Start Time</th>
+                        <th>Time Until Start</th>
+                        <th>Current Force</th>
                     </tr>
                 </thead>
                 <tbody id="roundsBody">
                     <tr>
-                        <td colspan="6" style="text-align: center;">Click "Load rounds" to fetch data</td>
+                        <td colspan="6" style="text-align: center;">Select date and time slot, then click "Load Rounds"</td>
+                    </tr>
+                </tbody>
+            </table>
+
+            <div class="force-input-section" id="forceSection" style="display: none;">
+                <div>
+                    <strong>Selected Round:</strong> <span id="selectedRoundCode">None</span>
+                </div>
+                <div>
+                    <label>Force Number:</label>
+                    <input type="number" id="forceNumber" placeholder="Enter number" min="0" max="36" style="width: 150px;">
+                </div>
+                <button class="btn btn-secondary" onclick="setForce()">✅ Set Force</button>
+                <button class="btn btn-danger" onclick="clearForce()">❌ Clear Force</button>
+            </div>
+        </div>
+
+        <div class="section">
+            <h2>📜 Force History</h2>
+            <button class="btn btn-primary" onclick="loadHistory()">🔄 Refresh History</button>
+            <table style="margin-top: 20px;">
+                <thead>
+                    <tr>
+                        <th>Round Code</th>
+                        <th>Game</th>
+                        <th>Table</th>
+                        <th>Forced Number</th>
+                        <th>Round Start</th>
+                        <th>Forced At</th>
+                        <th>Forced By</th>
+                        <th>Status</th>
+                        <th>Note</th>
+                    </tr>
+                </thead>
+                <tbody id="historyBody">
+                    <tr>
+                        <td colspan="9" style="text-align: center;">Click "Refresh History" to load</td>
                     </tr>
                 </tbody>
             </table>
@@ -198,96 +293,93 @@
     </div>
 
     <script>
-        let allRounds = [];
         let selectedRound = null;
 
+        // Set today's date as default
+        document.getElementById('dateInput').valueAsDate = new Date();
+
+        function showAlert(message, type = 'info') {
+            const alertBox = document.getElementById('alertBox');
+            alertBox.innerHTML = `<div class="alert alert-${type}">${message}</div>`;
+            setTimeout(() => alertBox.innerHTML = '', 5000);
+        }
+
         async function loadRounds() {
-            const loading = document.getElementById('loading');
+            const date = document.getElementById('dateInput').value;
+            const timeSlot = document.getElementById('timeSlot').value;
             const tbody = document.getElementById('roundsBody');
-            
-            loading.style.display = 'block';
+
+            if (!date || !timeSlot) {
+                showAlert('Please select both date and time slot', 'error');
+                return;
+            }
+
             tbody.innerHTML = '<tr><td colspan="6" style="text-align: center;">Loading...</td></tr>';
 
             try {
-                // ✅ Changed to GET method (no POST)
-                const res = await fetch('/api/sa/rounds', {
-                    method: 'GET',
-                    headers: {
-                        'Content-Type': 'application/json'
-                    }
-                });
-
+                const res = await fetch(`/api/sa/rounds?date=${date}&time_slot=${timeSlot}`);
+                
                 if (!res.ok) {
-                    throw new Error(`HTTP ${res.status}: ${res.statusText}`);
+                    const error = await res.json();
+                    throw new Error(error.message || error.error || 'Failed to load rounds');
                 }
 
                 const data = await res.json();
-                allRounds = data.rounds || [];
-                renderRounds(allRounds);
+                const rounds = data.rounds || [];
+
+                if (rounds.length === 0) {
+                    tbody.innerHTML = '<tr><td colspan="6" style="text-align: center;">No rounds found for this time slot (or all start within 60 minutes)</td></tr>';
+                    return;
+                }
+
+                tbody.innerHTML = rounds.map(r => `
+                    <tr onclick="selectRound('${r.round_code}', '${r.game_name}', ${r.table_number}, ${r.forced_number})" style="cursor: pointer;">
+                        <td><strong>${r.round_code}</strong></td>
+                        <td>${r.game_name}</td>
+                        <td>Table ${r.table_number}</td>
+                        <td>${r.start_time}</td>
+                        <td><span class="status-badge status-active">${r.minutes_until_start} minutes</span></td>
+                        <td>${r.forced_number !== null && r.forced_number !== undefined ? `<strong style="color: #f39c12;">✓ ${r.forced_number}</strong>` : '-'}</td>
+                    </tr>
+                `).join('');
+
+                showAlert(`Loaded ${rounds.length} rounds for selected time slot`, 'success');
 
             } catch (err) {
                 console.error('Load error:', err);
                 tbody.innerHTML = `<tr><td colspan="6" style="text-align: center; color: #e74c3c;">Error: ${err.message}</td></tr>`;
-            } finally {
-                loading.style.display = 'none';
+                showAlert(err.message, 'error');
             }
         }
 
-        function renderRounds(rounds) {
-            const tbody = document.getElementById('roundsBody');
+        function selectRound(roundCode, gameName, tableNumber, currentForce) {
+            selectedRound = roundCode;
             
-            if (rounds.length === 0) {
-                tbody.innerHTML = '<tr><td colspan="6" style="text-align: center;">No rounds found</td></tr>';
-                return;
+            // Highlight selected row
+            document.querySelectorAll('#roundsBody tr').forEach(tr => tr.classList.remove('selected'));
+            event.currentTarget.classList.add('selected');
+            
+            // Show force section
+            document.getElementById('forceSection').style.display = 'flex';
+            document.getElementById('selectedRoundCode').textContent = `${roundCode} (${gameName} - Table ${tableNumber})`;
+            
+            // Set current force value if exists
+            if (currentForce !== null && currentForce !== undefined) {
+                document.getElementById('forceNumber').value = currentForce;
+            } else {
+                document.getElementById('forceNumber').value = '';
             }
-
-            tbody.innerHTML = rounds.map(r => {
-                const statusClass = r.starts_in < 0 
-                    ? 'status-live' 
-                    : (r.is_betting_closed ? 'status-closed' : 'status-upcoming');
-                
-                const statusText = r.starts_in < 0 
-                    ? '🟢 LIVE' 
-                    : (r.is_betting_closed ? '🔴 Closed' : `⏳ ${Math.floor(r.starts_in / 60)}m ${r.starts_in % 60}s`);
-
-                const forceDisplay = r.forced_number !== null && r.forced_number !== undefined
-                    ? `<span style="color: #f39c12; font-weight: 600;">✓ ${r.forced_number}</span>`
-                    : '-';
-
-                const canForce = r.allowed_to_force;
-
-                return `
-                    <tr style="cursor: ${canForce ? 'pointer' : 'default'}; opacity: ${canForce ? 1 : 0.5};" 
-                        onclick="${canForce ? `selectRound('${r.game_type}', '${r.round_code}', ${r.forced_number})` : ''}">
-                        <td>${r.game_name}</td>
-                        <td>Table ${r.table_number}</td>
-                        <td>${r.round_code}</td>
-                        <td>${r.start_time}</td>
-                        <td><span class="status-badge ${statusClass}">${statusText}</span></td>
-                        <td>${forceDisplay}</td>
-                    </tr>
-                `;
-            }).join('');
         }
 
-        function selectRound(gameType, roundCode, currentForced) {
-            selectedRound = { gameType, roundCode };
-            document.getElementById('gameSelect').value = gameType;
-            if (currentForced !== null && currentForced !== undefined) {
-                document.getElementById('winningNumber').value = currentForced;
-            }
-            console.log('Selected:', selectedRound);
-        }
-
-        async function setForced() {
+        async function setForce() {
             if (!selectedRound) {
-                alert('Please select a round from the table first');
+                showAlert('Please select a round first', 'error');
                 return;
             }
 
-            const number = document.getElementById('winningNumber').value;
+            const number = document.getElementById('forceNumber').value;
             if (number === '') {
-                alert('Please enter a winning number');
+                showAlert('Please enter a force number', 'error');
                 return;
             }
 
@@ -296,8 +388,7 @@
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
-                        game_type: selectedRound.gameType,
-                        round_code: selectedRound.roundCode,
+                        round_code: selectedRound,
                         number: parseInt(number)
                     })
                 });
@@ -305,19 +396,24 @@
                 const data = await res.json();
                 
                 if (data.success) {
-                    alert(`✅ ${data.message}`);
-                    loadRounds();
+                    showAlert(`✅ ${data.message}`, 'success');
+                    loadRounds(); // Reload to show updated force
+                    loadHistory(); // Reload history
                 } else {
-                    alert(`❌ ${data.message}`);
+                    showAlert(`❌ ${data.message}`, 'error');
                 }
             } catch (err) {
-                alert('Error: ' + err.message);
+                showAlert('Error: ' + err.message, 'error');
             }
         }
 
-        async function clearForced() {
+        async function clearForce() {
             if (!selectedRound) {
-                alert('Please select a round from the table first');
+                showAlert('Please select a round first', 'error');
+                return;
+            }
+
+            if (!confirm('Are you sure you want to clear the forced winner for this round?')) {
                 return;
             }
 
@@ -326,8 +422,7 @@
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
-                        game_type: selectedRound.gameType,
-                        round_code: selectedRound.roundCode,
+                        round_code: selectedRound,
                         number: null
                     })
                 });
@@ -335,33 +430,54 @@
                 const data = await res.json();
                 
                 if (data.success) {
-                    alert(`✅ ${data.message}`);
-                    document.getElementById('winningNumber').value = '';
+                    showAlert(`✅ ${data.message}`, 'success');
+                    document.getElementById('forceNumber').value = '';
                     loadRounds();
+                    loadHistory();
                 } else {
-                    alert(`❌ ${data.message}`);
+                    showAlert(`❌ ${data.message}`, 'error');
                 }
             } catch (err) {
-                alert('Error: ' + err.message);
+                showAlert('Error: ' + err.message, 'error');
             }
         }
 
-        function filterByGame() {
-            const selectedGame = document.getElementById('gameSelect').value;
-            if (selectedGame === '') {
-                renderRounds(allRounds);
-            } else {
-                const filtered = allRounds.filter(r => r.game_type === selectedGame);
-                renderRounds(filtered);
+        async function loadHistory() {
+            const tbody = document.getElementById('historyBody');
+            tbody.innerHTML = '<tr><td colspan="9" style="text-align: center;">Loading...</td></tr>';
+
+            try {
+                const res = await fetch('/api/sa/history');
+                const data = await res.json();
+                const history = data.history || [];
+
+                if (history.length === 0) {
+                    tbody.innerHTML = '<tr><td colspan="9" style="text-align: center;">No history records found</td></tr>';
+                    return;
+                }
+
+                tbody.innerHTML = history.map(h => `
+                    <tr>
+                        <td><strong>${h.round_code}</strong></td>
+                        <td>${h.game_name}</td>
+                        <td>Table ${h.table_number}</td>
+                        <td><strong style="color: #f39c12;">${h.forced_number}</strong></td>
+                        <td>${h.round_start_time}</td>
+                        <td>${h.forced_at}</td>
+                        <td>${h.forced_by}</td>
+                        <td><span class="status-badge status-${h.status}">${h.status.toUpperCase()}</span></td>
+                        <td>${h.note}</td>
+                    </tr>
+                `).join('');
+
+            } catch (err) {
+                console.error('History load error:', err);
+                tbody.innerHTML = `<tr><td colspan="9" style="text-align: center; color: #e74c3c;">Error: ${err.message}</td></tr>`;
             }
         }
 
-        // Auto-refresh every 10 seconds
-        setInterval(() => {
-            if (allRounds.length > 0) {
-                loadRounds();
-            }
-        }, 10000);
+        // Auto-load history on page load
+        loadHistory();
     </script>
 </body>
 </html>
