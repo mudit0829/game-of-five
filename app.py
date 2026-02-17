@@ -733,10 +733,10 @@ def sa_rounds():
     return jsonify({"rounds": out, "total": len(out)})
 
 
-
 @app.route("/api/sa/force-winner", methods=["POST"])
 @superadmin_required
 def sa_force_winner():
+    """Force a winner for a specific round - works with future rounds too"""
     data = request.get_json() or {}
     round_code = data.get("round_code") or ""
     number = data.get("number", None)
@@ -744,23 +744,36 @@ def sa_force_winner():
     if not round_code:
         return jsonify({"success": False, "message": "round_code required"}), 400
     
-    # Find the table by round_code
-    table = None
-    game_type = None
-    for gt, tables in game_tables.items():
-        for t in tables:
-            if t.round_code == round_code:
-                table = t
-                game_type = gt
-                break
-        if table:
-            break
-    
-    if not table:
-        return jsonify({"success": False, "message": "Round not found"}), 404
+    # Extract info from round_code (format: G_20260217_2200_1)
+    try:
+        parts = round_code.split("_")
+        game_initial = parts[0]
+        date_stamp = parts[1]  # YYYYMMDD
+        time_stamp = parts[2]  # HHMM
+        table_num = int(parts[3])
+        
+        # Map initial to game_type
+        game_type_map = {
+            "S": "silver",
+            "G": "gold", 
+            "D": "diamond",
+            "P": "platinum",
+            "R": "roulette"
+        }
+        game_type = game_type_map.get(game_initial)
+        
+        if not game_type:
+            return jsonify({"success": False, "message": "Invalid round code format"}), 400
+        
+        # Parse the round start time
+        round_start_str = f"{date_stamp}_{time_stamp}"
+        round_start = datetime.strptime(round_start_str, "%Y%m%d_%H%M")
+        
+    except (IndexError, ValueError) as e:
+        return jsonify({"success": False, "message": f"Invalid round code format: {str(e)}"}), 400
     
     now = datetime.now()
-    minutes_until = (table.start_time - now).total_seconds() / 60
+    minutes_until = (round_start - now).total_seconds() / 60
     
     # Enforce 60-minute rule
     if minutes_until < 60:
@@ -815,9 +828,9 @@ def sa_force_winner():
             round_code=round_code,
             game_type=game_type,
             game_name=GAME_CONFIGS[game_type]["name"],
-            table_number=table.table_number,
+            table_number=table_num,
             forced_number=n,
-            round_start_time=table.start_time,
+            round_start_time=round_start,
             forced_by=session.get("superadmin_username", "unknown"),
             status="active",
             note=f"Forced {int(minutes_until)} minutes before start"
