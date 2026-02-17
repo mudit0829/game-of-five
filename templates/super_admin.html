@@ -1,175 +1,367 @@
-<!doctype html>
-<html>
+<!DOCTYPE html>
+<html lang="en">
 <head>
-  <meta charset="utf-8" />
-  <title>Super Admin - Force Winner</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <style>
-    body{font-family:Arial, sans-serif; background:#0b1220; color:#e7eefc; padding:16px;}
-    .card{background:#111a2e; border:1px solid #223055; border-radius:12px; padding:14px; margin-bottom:14px;}
-    input, select, button{padding:10px; border-radius:10px; border:1px solid #2a3a66; background:#0b1220; color:#e7eefc;}
-    button{cursor:pointer; background:#1c7c3a; border:none;}
-    button:disabled{opacity:.5; cursor:not-allowed;}
-    .row{display:flex; gap:10px; flex-wrap:wrap; align-items:center;}
-    table{width:100%; border-collapse:collapse;}
-    th, td{border-bottom:1px solid #223055; padding:10px; text-align:left; font-size:14px;}
-    .small{opacity:.8; font-size:12px;}
-    .bad{color:#ff7272;}
-    .ok{color:#68ff9a;}
-  </style>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Super Admin - Force Winner</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%);
+            min-height: 100vh;
+            color: white;
+            padding: 20px;
+        }
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+        .header {
+            background: rgba(255,255,255,0.1);
+            padding: 20px;
+            border-radius: 10px;
+            margin-bottom: 30px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .header h1 {
+            font-size: 28px;
+        }
+        .logout-btn {
+            background: #e74c3c;
+            color: white;
+            padding: 10px 20px;
+            border-radius: 5px;
+            text-decoration: none;
+            font-weight: 600;
+        }
+        .logout-btn:hover {
+            background: #c0392b;
+        }
+        .control-panel {
+            background: rgba(255,255,255,0.1);
+            padding: 30px;
+            border-radius: 10px;
+            margin-bottom: 30px;
+        }
+        .control-panel h2 {
+            margin-bottom: 20px;
+            font-size: 24px;
+        }
+        .btn {
+            padding: 12px 24px;
+            border: none;
+            border-radius: 5px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            margin-right: 10px;
+        }
+        .btn-primary {
+            background: #27ae60;
+            color: white;
+        }
+        .btn-primary:hover {
+            background: #229954;
+        }
+        .loading {
+            text-align: center;
+            padding: 20px;
+            font-size: 18px;
+        }
+        .rules {
+            background: rgba(52, 152, 219, 0.2);
+            padding: 15px;
+            border-radius: 5px;
+            margin-top: 15px;
+            border-left: 4px solid #3498db;
+        }
+        .game-selector {
+            margin: 20px 0;
+        }
+        select, input {
+            padding: 10px;
+            font-size: 16px;
+            border-radius: 5px;
+            border: none;
+            margin-right: 10px;
+            background: white;
+            color: #333;
+        }
+        .rounds-section {
+            background: rgba(255,255,255,0.1);
+            padding: 30px;
+            border-radius: 10px;
+        }
+        .rounds-section h2 {
+            margin-bottom: 20px;
+        }
+        table {
+            width: 100%;
+            background: rgba(255,255,255,0.05);
+            border-collapse: collapse;
+            border-radius: 10px;
+            overflow: hidden;
+        }
+        th {
+            background: rgba(0,0,0,0.3);
+            padding: 15px;
+            text-align: left;
+            font-weight: 600;
+        }
+        td {
+            padding: 15px;
+            border-bottom: 1px solid rgba(255,255,255,0.1);
+        }
+        tr:hover {
+            background: rgba(255,255,255,0.05);
+        }
+        .status-badge {
+            padding: 5px 10px;
+            border-radius: 3px;
+            font-size: 12px;
+            font-weight: 600;
+        }
+        .status-upcoming {
+            background: #f39c12;
+        }
+        .status-live {
+            background: #27ae60;
+        }
+        .status-closed {
+            background: #e74c3c;
+        }
+        .btn-secondary {
+            background: #3498db;
+            color: white;
+        }
+        .btn-danger {
+            background: #e74c3c;
+            color: white;
+        }
+    </style>
 </head>
 <body>
-  <h2>Super Admin: Force Winner (Before Round Starts)</h2>
-  <div class="card">
-    <div class="row">
-      <input id="pass" type="password" placeholder="Super admin password" />
-      <button id="loadBtn">Load rounds</button>
-      <span id="status" class="small"></span>
+    <div class="container">
+        <div class="header">
+            <h1>🔐 Super Admin: Force Winner (Before Round Starts)</h1>
+            <a href="/sa-logout" class="logout-btn">Logout</a>
+        </div>
+
+        <div class="control-panel">
+            <h2>⚙️ Control Panel</h2>
+            <button class="btn btn-primary" onclick="loadRounds()">🔄 Load rounds</button>
+            <div class="loading" id="loading" style="display: none;">Loading...</div>
+            
+            <div class="rules">
+                <strong>Rule:</strong> You can set forced winner only before start_time. 
+                If nobody bets that number, system uses normal logic.
+            </div>
+
+            <div class="game-selector">
+                <select id="gameSelect" onchange="filterByGame()">
+                    <option value="">All Games</option>
+                    <option value="silver">Silver Game</option>
+                    <option value="gold">Gold Game</option>
+                    <option value="diamond">Diamond Game</option>
+                    <option value="platinum">Platinum Game</option>
+                    <option value="roulette">Roulette Game</option>
+                </select>
+                <input type="number" id="winningNumber" placeholder="Winning number" min="0" max="36">
+                <button class="btn btn-secondary" onclick="setForced()">Set</button>
+                <button class="btn btn-danger" onclick="clearForced()">Clear</button>
+            </div>
+        </div>
+
+        <div class="rounds-section">
+            <h2>📋 Live rounds</h2>
+            <table id="roundsTable">
+                <thead>
+                    <tr>
+                        <th>Game</th>
+                        <th>Table</th>
+                        <th>Round Code</th>
+                        <th>Start</th>
+                        <th>Starts In</th>
+                        <th>Force</th>
+                    </tr>
+                </thead>
+                <tbody id="roundsBody">
+                    <tr>
+                        <td colspan="6" style="text-align: center;">Click "Load rounds" to fetch data</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
     </div>
-    <p class="small">
-      Rule: You can set forced winner only before start_time. If nobody bets that number, system uses normal logic.
-    </p>
-  </div>
 
-  <div class="card">
-    <div class="row">
-      <select id="roundSelect" style="min-width:320px;"></select>
-      <input id="num" type="number" placeholder="Winning number" />
-      <button id="setBtn">Set</button>
-      <button id="clearBtn" style="background:#8a2d2d;">Clear</button>
-    </div>
-    <div class="small" id="roundInfo"></div>
-  </div>
+    <script>
+        let allRounds = [];
+        let selectedRound = null;
 
-  <div class="card">
-    <h3>Live rounds</h3>
-    <table>
-      <thead>
-        <tr>
-          <th>Game</th>
-          <th>Table</th>
-          <th>Round Code</th>
-          <th>Start</th>
-          <th>Starts In</th>
-          <th>Forced</th>
-          <th>Allowed</th>
-        </tr>
-      </thead>
-      <tbody id="tbody"></tbody>
-    </table>
-  </div>
+        async function loadRounds() {
+            const loading = document.getElementById('loading');
+            const tbody = document.getElementById('roundsBody');
+            
+            loading.style.display = 'block';
+            tbody.innerHTML = '<tr><td colspan="6" style="text-align: center;">Loading...</td></tr>';
 
-<script>
-  const SECRET = "{{ secret }}";
+            try {
+                // ✅ Changed to GET method (no POST)
+                const res = await fetch('/api/sa/rounds', {
+                    method: 'GET',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    }
+                });
 
-  const passEl = document.getElementById("pass");
-  const loadBtn = document.getElementById("loadBtn");
-  const setBtn = document.getElementById("setBtn");
-  const clearBtn = document.getElementById("clearBtn");
-  const statusEl = document.getElementById("status");
-  const roundSelect = document.getElementById("roundSelect");
-  const numEl = document.getElementById("num");
-  const tbody = document.getElementById("tbody");
-  const roundInfo = document.getElementById("roundInfo");
+                if (!res.ok) {
+                    throw new Error(`HTTP ${res.status}: ${res.statusText}`);
+                }
 
-  let rounds = [];
+                const data = await res.json();
+                allRounds = data.rounds || [];
+                renderRounds(allRounds);
 
-  function setStatus(msg, isBad=false){
-    statusEl.textContent = msg;
-    statusEl.className = "small " + (isBad ? "bad" : "ok");
-  }
+            } catch (err) {
+                console.error('Load error:', err);
+                tbody.innerHTML = `<tr><td colspan="6" style="text-align: center; color: #e74c3c;">Error: ${err.message}</td></tr>`;
+            } finally {
+                loading.style.display = 'none';
+            }
+        }
 
-  function fmtSec(s){
-    s = Number(s||0);
-    const sign = s < 0 ? "-" : "";
-    s = Math.abs(s);
-    const mm = String(Math.floor(s/60)).padStart(2,"0");
-    const ss = String(s%60).padStart(2,"0");
-    return sign + mm + ":" + ss;
-  }
+        function renderRounds(rounds) {
+            const tbody = document.getElementById('roundsBody');
+            
+            if (rounds.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="6" style="text-align: center;">No rounds found</td></tr>';
+                return;
+            }
 
-  async function loadRounds(){
-    const password = passEl.value.trim();
-    if(!password){ setStatus("Password required", true); return; }
+            tbody.innerHTML = rounds.map(r => {
+                const statusClass = r.starts_in < 0 
+                    ? 'status-live' 
+                    : (r.is_betting_closed ? 'status-closed' : 'status-upcoming');
+                
+                const statusText = r.starts_in < 0 
+                    ? '🟢 LIVE' 
+                    : (r.is_betting_closed ? '🔴 Closed' : `⏳ ${Math.floor(r.starts_in / 60)}m ${r.starts_in % 60}s`);
 
-    setStatus("Loading...");
-    const res = await fetch(`/api/sa/${SECRET}/rounds`, {
-      method:"POST",
-      headers: {"Content-Type":"application/json"},
-      body: JSON.stringify({password})
-    });
-    const data = await res.json();
-    if(!res.ok){ setStatus(data.error || "Failed", true); return; }
+                const forceDisplay = r.forced_number !== null && r.forced_number !== undefined
+                    ? `<span style="color: #f39c12; font-weight: 600;">✓ ${r.forced_number}</span>`
+                    : '-';
 
-    rounds = data.rounds || [];
-    roundSelect.innerHTML = "";
-    rounds.forEach((r, idx)=>{
-      const opt = document.createElement("option");
-      opt.value = String(idx);
-      opt.textContent = `${r.game_type} | T${r.table_number} | ${r.round_code} | starts_in ${fmtSec(r.starts_in)}`;
-      roundSelect.appendChild(opt);
-    });
+                const canForce = r.allowed_to_force;
 
-    renderTable();
-    updateRoundInfo();
-    setStatus("Loaded");
-  }
+                return `
+                    <tr style="cursor: ${canForce ? 'pointer' : 'default'}; opacity: ${canForce ? 1 : 0.5};" 
+                        onclick="${canForce ? `selectRound('${r.game_type}', '${r.round_code}', ${r.forced_number})` : ''}">
+                        <td>${r.game_name}</td>
+                        <td>Table ${r.table_number}</td>
+                        <td>${r.round_code}</td>
+                        <td>${r.start_time}</td>
+                        <td><span class="status-badge ${statusClass}">${statusText}</span></td>
+                        <td>${forceDisplay}</td>
+                    </tr>
+                `;
+            }).join('');
+        }
 
-  function updateRoundInfo(){
-    const idx = parseInt(roundSelect.value||"0",10);
-    const r = rounds[idx];
-    if(!r){ roundInfo.textContent = ""; return; }
-    roundInfo.textContent =
-      `Selected: ${r.game_name} (${r.game_type}) | Table ${r.table_number} | Round ${r.round_code} | Start ${r.start_time} | Allowed: ${r.allowed_to_force ? "YES" : "NO"} | Forced: ${r.forced_number ?? "-"}`;
-    setBtn.disabled = !r.allowed_to_force;
-    clearBtn.disabled = !r.allowed_to_force;
-  }
+        function selectRound(gameType, roundCode, currentForced) {
+            selectedRound = { gameType, roundCode };
+            document.getElementById('gameSelect').value = gameType;
+            if (currentForced !== null && currentForced !== undefined) {
+                document.getElementById('winningNumber').value = currentForced;
+            }
+            console.log('Selected:', selectedRound);
+        }
 
-  function renderTable(){
-    tbody.innerHTML = "";
-    rounds.forEach(r=>{
-      const tr = document.createElement("tr");
-      tr.innerHTML = `
-        <td>${r.game_type}</td>
-        <td>${r.table_number}</td>
-        <td>${r.round_code}</td>
-        <td>${r.start_time}</td>
-        <td>${fmtSec(r.starts_in)}</td>
-        <td>${r.forced_number ?? "-"}</td>
-        <td>${r.allowed_to_force ? "<span class='ok'>YES</span>" : "<span class='bad'>NO</span>"}</td>
-      `;
-      tbody.appendChild(tr);
-    });
-  }
+        async function setForced() {
+            if (!selectedRound) {
+                alert('Please select a round from the table first');
+                return;
+            }
 
-  async function setForce(clear=false){
-    const password = passEl.value.trim();
-    if(!password){ setStatus("Password required", true); return; }
+            const number = document.getElementById('winningNumber').value;
+            if (number === '') {
+                alert('Please enter a winning number');
+                return;
+            }
 
-    const idx = parseInt(roundSelect.value||"0",10);
-    const r = rounds[idx];
-    if(!r){ setStatus("Select a round", true); return; }
+            try {
+                const res = await fetch('/api/sa/force-winner', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        game_type: selectedRound.gameType,
+                        round_code: selectedRound.roundCode,
+                        number: parseInt(number)
+                    })
+                });
 
-    const num = clear ? "" : numEl.value;
-    if(!clear && (num === "" || num === null)){ setStatus("Enter number", true); return; }
+                const data = await res.json();
+                
+                if (data.success) {
+                    alert(`✅ ${data.message}`);
+                    loadRounds();
+                } else {
+                    alert(`❌ ${data.message}`);
+                }
+            } catch (err) {
+                alert('Error: ' + err.message);
+            }
+        }
 
-    const res = await fetch(`/api/sa/${SECRET}/force-winner`, {
-      method:"POST",
-      headers: {"Content-Type":"application/json"},
-      body: JSON.stringify({password, game_type: r.game_type, round_code: r.round_code, number: num})
-    });
+        async function clearForced() {
+            if (!selectedRound) {
+                alert('Please select a round from the table first');
+                return;
+            }
 
-    const data = await res.json();
-    if(!res.ok){ setStatus(data.message || "Failed", true); return; }
+            try {
+                const res = await fetch('/api/sa/force-winner', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        game_type: selectedRound.gameType,
+                        round_code: selectedRound.roundCode,
+                        number: null
+                    })
+                });
 
-    setStatus(data.message || "Done");
-    await loadRounds();
-  }
+                const data = await res.json();
+                
+                if (data.success) {
+                    alert(`✅ ${data.message}`);
+                    document.getElementById('winningNumber').value = '';
+                    loadRounds();
+                } else {
+                    alert(`❌ ${data.message}`);
+                }
+            } catch (err) {
+                alert('Error: ' + err.message);
+            }
+        }
 
-  loadBtn.addEventListener("click", loadRounds);
-  roundSelect.addEventListener("change", updateRoundInfo);
-  setBtn.addEventListener("click", ()=>setForce(false));
-  clearBtn.addEventListener("click", ()=>setForce(true));
-</script>
+        function filterByGame() {
+            const selectedGame = document.getElementById('gameSelect').value;
+            if (selectedGame === '') {
+                renderRounds(allRounds);
+            } else {
+                const filtered = allRounds.filter(r => r.game_type === selectedGame);
+                renderRounds(filtered);
+            }
+        }
+
+        // Auto-refresh every 10 seconds
+        setInterval(() => {
+            if (allRounds.length > 0) {
+                loadRounds();
+            }
+        }, 10000);
+    </script>
 </body>
 </html>
