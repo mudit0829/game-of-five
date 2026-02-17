@@ -1002,7 +1002,7 @@ def login_post():
         return jsonify({"success": False, "message": "Invalid username or password"}), 401
 
     if user.is_blocked:
-        return jsonify({"success": False, "message": f"Your account is blocked. Reason: {user.block_reason or 'No reason provided'}\"}), 403
+        return jsonify({"success": False, "message": f"Your account is blocked. Reason: {user.block_reason or 'No reason provided'}"}), 403
 
     if not user.is_admin:
         ensure_wallet_for_user(user)
