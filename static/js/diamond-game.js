@@ -13,6 +13,100 @@ const HOME_URL = "/home";
 // ✅ SAME AS GOLD/SILVER
 const MAX_BETS_PER_ROUND = 3;
 
+// ================= AUDIO + VIBRATION (NEW) =================
+// Browsers often block sound until user interacts once. [web:392]
+const BG_AUDIO_SRC = "/static/audio/diamond.mp3";
+const RESULT_AUDIO_SRC = "/static/audio/result.mp3";
+
+const bgAudio = new Audio(BG_AUDIO_SRC);
+bgAudio.loop = true;
+bgAudio.preload = "auto";
+bgAudio.volume = 0.7;
+
+const resultAudio = new Audio(RESULT_AUDIO_SRC);
+resultAudio.loop = false;
+resultAudio.preload = "auto";
+resultAudio.volume = 1.0;
+
+let audioUnlocked = false;
+let bgRoundCodePlaying = null;
+let resultTriggeredForRound = null;
+
+function unlockAudioOnce() {
+  if (audioUnlocked) return;
+  audioUnlocked = true;
+
+  // Prime audio elements after first gesture
+  try {
+    bgAudio.play().then(() => {
+      bgAudio.pause();
+      bgAudio.currentTime = 0;
+    }).catch(() => {});
+  } catch (e) {}
+
+  try {
+    resultAudio.play().then(() => {
+      resultAudio.pause();
+      resultAudio.currentTime = 0;
+    }).catch(() => {});
+  } catch (e) {}
+}
+
+["pointerdown", "touchstart", "mousedown", "keydown"].forEach((evt) => {
+  window.addEventListener(evt, unlockAudioOnce, { once: true, passive: true });
+});
+
+function stopDiamondLoop() {
+  try {
+    if (!bgAudio.paused) bgAudio.pause();
+    bgAudio.currentTime = 0;
+  } catch (e) {}
+}
+
+function startDiamondLoopIfAllowed(roundCode, hasResultOrFinished) {
+  if (!audioUnlocked) return;
+  if (!roundCode) return;
+  if (hasResultOrFinished) return;
+
+  if (bgRoundCodePlaying !== roundCode) {
+    bgRoundCodePlaying = roundCode;
+    resultTriggeredForRound = null; // allow result sfx again for new round
+    stopDiamondLoop();
+  }
+
+  if (bgAudio.paused) {
+    bgAudio.currentTime = 0;
+    bgAudio.play().catch(() => {});
+  }
+}
+
+function playResultSoundOnce(roundCode) {
+  if (!audioUnlocked) return;
+  if (!roundCode) return;
+  if (resultTriggeredForRound === roundCode) return;
+
+  resultTriggeredForRound = roundCode;
+
+  stopDiamondLoop();
+  try {
+    resultAudio.currentTime = 0;
+    resultAudio.play().catch(() => {});
+  } catch (e) {}
+}
+
+// Vibration API support depends on device/browser. [web:384]
+function vibrateOnResult() {
+  try {
+    if ("vibrate" in navigator) {
+      navigator.vibrate([120, 60, 120]);
+    }
+  } catch (e) {}
+}
+
+document.addEventListener("visibilitychange", () => {
+  if (document.hidden) stopDiamondLoop();
+});
+
 // ================= DOM REFERENCES =================
 
 const rangeEl = document.querySelector(".range");
@@ -563,6 +657,8 @@ async function fetchTableData() {
         if (tablePollInterval) clearInterval(tablePollInterval);
         if (localTimerInterval) clearInterval(localTimerInterval);
 
+        stopDiamondLoop(); // NEW
+
         setStatus("This game has finished. You'll be taken back to lobby to join a new one.", "error");
         setTimeout(() => window.history.back(), 2000);
         return;
@@ -595,14 +691,12 @@ function updateGameUI(table) {
     const maxPlayers = typeof table.max_players === "number" ? table.max_players : null;
     const isFull = table.is_full === true || (maxPlayers !== null && table.players >= maxPlayers);
 
-    // ✅ SAME AS GOLD: full => disable ALL number buttons
     if (isFull) {
       setNumberChipsDisabled(true);
     } else if (!gameFinished && myBets.length < MAX_BETS_PER_ROUND) {
       setNumberChipsDisabled(false);
     }
 
-    // ✅ SAME AS GOLD: 3/3 => disable ALL numbers + bet button
     if (myBets.length >= MAX_BETS_PER_ROUND) {
       setNumberChipsDisabled(true);
       if (placeBetBtn) placeBetBtn.disabled = true;
@@ -619,11 +713,13 @@ function updateGameUI(table) {
       disableBettingUI(true);
       if (tablePollInterval) clearInterval(tablePollInterval);
       if (localTimerInterval) clearInterval(localTimerInterval);
+
+      stopDiamondLoop(); // NEW
+
       showSlotsFullPopup();
       return;
     }
   } else {
-    // still update bet button state even if shot in progress
     const maxPlayers = typeof table.max_players === "number" ? table.max_players : null;
     const isFull = table.is_full === true || (maxPlayers !== null && table.players >= maxPlayers);
     if (placeBetBtn && !gameFinished) placeBetBtn.disabled = !!table.is_betting_closed || !!table.is_finished || isFull;
@@ -635,7 +731,14 @@ function updateGameUI(table) {
 
   const hasResult = table.result !== null && table.result !== undefined && table.result !== "";
 
+  // ================= AUDIO CONTROL (NEW) =================
+  startDiamondLoopIfAllowed(table.round_code, hasResult || !!table.is_finished);
+
   if (hasResult && table.result !== lastResultShown) {
+    // stop loop + play result + vibrate once per round
+    playResultSoundOnce(table.round_code);
+    vibrateOnResult();
+
     lastResultShown = table.result;
 
     setStatus(`Winning number: ${table.result}`, "ok");
@@ -655,6 +758,7 @@ function updateGameUI(table) {
       setTimeout(() => showEndPopup(outcomeInfo), 1000);
     }
   } else if (!hasResult) {
+    // new round / still running
     lastResultShown = null;
     clearStuckArrows();
     clearShotPath();
@@ -719,6 +823,7 @@ socket.on("bet_error", (payload) => {
 
 numChips.forEach((chip) => {
   chip.addEventListener("click", () => {
+    unlockAudioOnce(); // NEW: helps on mobile
     if (gameFinished) return;
     if (chip.disabled || chip.dataset.locked === "1") return; // ✅ hard guard
     const n = parseInt(chip.dataset.number, 10);
@@ -728,6 +833,8 @@ numChips.forEach((chip) => {
 
 if (placeBetBtn) {
   placeBetBtn.addEventListener("click", () => {
+    unlockAudioOnce(); // NEW
+
     if (gameFinished) {
       setStatus("This game has already finished.", "error");
       return;
@@ -738,7 +845,6 @@ if (placeBetBtn) {
       return;
     }
 
-    // ✅ 3-bet limit (same as gold)
     const myCountNow = countMyBetsFromTable(currentTable);
     if (myCountNow >= MAX_BETS_PER_ROUND) {
       setStatus(`You can place only ${MAX_BETS_PER_ROUND} bets in this game.`, "error");
@@ -753,6 +859,7 @@ if (placeBetBtn) {
     if (slotsFull) {
       setStatus("All slots are full for this game.", "error");
       disableBettingUI(true);
+      stopDiamondLoop(); // NEW
       return;
     }
 
