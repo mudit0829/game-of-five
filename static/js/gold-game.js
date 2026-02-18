@@ -14,6 +14,100 @@ const HOME_URL = "/home";
 // ✅ SAME AS SILVER
 const MAX_BETS_PER_ROUND = 3;
 
+// ================= AUDIO + VIBRATION (NEW) =================
+// Browsers usually require a user gesture before audio can play. [web:392]
+const BG_AUDIO_SRC = "/static/audio/gold.mp3";
+const RESULT_AUDIO_SRC = "/static/audio/result.mp3";
+
+const bgAudio = new Audio(BG_AUDIO_SRC);
+bgAudio.loop = true;
+bgAudio.preload = "auto";
+bgAudio.volume = 0.7;
+
+const resultAudio = new Audio(RESULT_AUDIO_SRC);
+resultAudio.loop = false;
+resultAudio.preload = "auto";
+resultAudio.volume = 1.0;
+
+let audioUnlocked = false;
+let bgRoundCodePlaying = null;
+let resultTriggeredForRound = null;
+
+function unlockAudioOnce() {
+  if (audioUnlocked) return;
+  audioUnlocked = true;
+
+  // Prime both audio elements so later play() works after gesture
+  try {
+    bgAudio.play().then(() => {
+      bgAudio.pause();
+      bgAudio.currentTime = 0;
+    }).catch(() => {});
+  } catch (e) {}
+
+  try {
+    resultAudio.play().then(() => {
+      resultAudio.pause();
+      resultAudio.currentTime = 0;
+    }).catch(() => {});
+  } catch (e) {}
+}
+
+// unlock on first user interaction
+["pointerdown", "touchstart", "mousedown", "keydown"].forEach((evt) => {
+  window.addEventListener(evt, unlockAudioOnce, { once: true, passive: true });
+});
+
+function startGoldLoopIfAllowed(roundCode, hasResultOrFinished) {
+  if (!audioUnlocked) return;
+  if (!roundCode) return;
+  if (hasResultOrFinished) return;
+
+  if (bgRoundCodePlaying !== roundCode) {
+    bgRoundCodePlaying = roundCode;
+    stopGoldLoop();
+  }
+
+  if (bgAudio.paused) {
+    bgAudio.currentTime = 0;
+    bgAudio.play().catch(() => {});
+  }
+}
+
+function stopGoldLoop() {
+  try {
+    if (!bgAudio.paused) bgAudio.pause();
+    bgAudio.currentTime = 0;
+  } catch (e) {}
+}
+
+function playResultSoundOnce(roundCode) {
+  if (!audioUnlocked) return;
+  if (!roundCode) return;
+  if (resultTriggeredForRound === roundCode) return;
+
+  resultTriggeredForRound = roundCode;
+
+  stopGoldLoop();
+  try {
+    resultAudio.currentTime = 0;
+    resultAudio.play().catch(() => {});
+  } catch (e) {}
+}
+
+// Vibration API: works only on supported devices/browsers. [web:384]
+function vibrateOnResult() {
+  try {
+    if ("vibrate" in navigator) {
+      navigator.vibrate([120, 60, 120]);
+    }
+  } catch (e) {}
+}
+
+document.addEventListener("visibilitychange", () => {
+  if (document.hidden) stopGoldLoop();
+});
+
 // ================= DOM REFERENCES =================
 const pitch = document.querySelector(".pitch");
 const ballImg = document.getElementById("ballSprite");
@@ -187,13 +281,8 @@ function setSelectedNumber(n) {
 function setNumberChipsDisabled(disabled) {
   const d = !!disabled;
   numChips.forEach((c) => {
-    // Works if it's a <button>
     try { c.disabled = d; } catch (e) {}
-
-    // Fallback for div/span chips: hard lock flag read by click handler
     c.dataset.locked = d ? "1" : "0";
-
-    // Optional: keep UI consistent if CSS doesn't style disabled
     c.classList.toggle("locked", d);
     if (d) c.classList.remove("selected");
   });
@@ -413,13 +502,11 @@ function freezeKickVideoAt2s() {
   }
 }
 
-// keep same positioning call name safety
 function positionKickVideoAt2sHack(v) {
   positionKickVideoAtBall(v);
 }
 
 // ================= BALL + DOTTED PATH (LOCKED) =================
-// Slower by 50%
 const BALL_SHOT_DURATION_MS = 1125;
 const BALL_SHOT_START_DELAY_MS = 420;
 const BALL_RESET_DELAY_MS = 1350;
@@ -674,6 +761,7 @@ async function fetchTableData() {
         localTimerInterval = null;
 
         cleanupKickVideo();
+        stopGoldLoop(); // NEW
 
         setStatus("This game has finished. You'll be taken back to lobby to join a new one.", "error");
         setTimeout(() => window.history.back(), 2000);
@@ -745,11 +833,22 @@ function updateGameUI(table) {
     localTimerInterval = null;
 
     cleanupKickVideo();
+    stopGoldLoop(); // NEW
     showSlotsFullPopup();
     return;
   }
 
   const hasResult = table.resultValue !== null && table.resultValue !== undefined && table.resultValue !== "";
+
+  // ================= AUDIO CONTROL (NEW) =================
+  // Loop gold.mp3 while the round is active and result not declared
+  startGoldLoopIfAllowed(table.roundCode, hasResult || table.isFinished);
+
+  // When result becomes known (your "<=2s" timing), stop loop, play result once, vibrate once
+  if (hasResult && table.timeRemaining <= 2) {
+    playResultSoundOnce(table.roundCode);
+    vibrateOnResult();
+  }
 
   maybeStartKickVideo();
   freezeKickVideoAt2s();
@@ -774,10 +873,12 @@ function updateGameUI(table) {
       disableBettingUI(true);
 
       if (tablePollInterval) clearInterval(tablePollInterval);
-        tablePollInterval = null;
+      tablePollInterval = null;
 
       if (localTimerInterval) clearInterval(localTimerInterval);
       localTimerInterval = null;
+
+      stopGoldLoop(); // NEW
 
       const outcomeInfo = determineUserOutcome(table);
 
@@ -855,20 +956,19 @@ socket.on("beterror", handleBetError);
 numChips.forEach((chip) => {
   chip.addEventListener("click", () => {
     if (gameFinished) return;
-
-    // ✅ HARD GUARD (works even if chip is div/span and "disabled" doesn't block)
     if (chip.disabled || chip.dataset.locked === "1") return;
-
     setSelectedNumber(parseInt(chip.dataset.number, 10));
   });
 });
 
 if (placeBetBtn) {
   placeBetBtn.addEventListener("click", () => {
+    // try to unlock audio on bet click too (safe)
+    unlockAudioOnce();
+
     if (gameFinished) return setStatus("This game has already finished.", "error");
     if (!currentTable) return setStatus("Game is not ready yet. Please wait...", "error");
 
-    // ✅ SAME AS SILVER: 3 bets max
     const myCountNow = countMyBetsFromTable(currentTable);
     if (myCountNow >= MAX_BETS_PER_ROUND) {
       setStatus(`You can place only ${MAX_BETS_PER_ROUND} bets in this game.`, "error");
@@ -877,7 +977,6 @@ if (placeBetBtn) {
       return;
     }
 
-    // ✅ SAME AS SILVER: full => lock UI and block
     const maxPlayers = typeof currentTable.maxPlayers === "number" ? currentTable.maxPlayers : null;
     const isFull = maxPlayers !== null && currentTable.playersCount >= maxPlayers;
     if (isFull) {
