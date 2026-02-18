@@ -21,6 +21,103 @@ const LANDING_Y_OFFSET_PX = 10;
 // Arc height (px) — this sets CSS var used by your new jump animation
 const JUMP_ARC_HEIGHT_PX = 95;
 
+// ================= AUDIO + VIBRATION (NEW) =================
+// NOTE: Most browsers require a user gesture before audio can play. [web:392]
+const BG_AUDIO_SRC = "/static/audio/silver.mp3";
+const RESULT_AUDIO_SRC = "/static/audio/result.mp3";
+
+const bgAudio = new Audio(BG_AUDIO_SRC);
+bgAudio.loop = true;
+bgAudio.preload = "auto";
+bgAudio.volume = 0.7;
+
+const resultAudio = new Audio(RESULT_AUDIO_SRC);
+resultAudio.loop = false;
+resultAudio.preload = "auto";
+resultAudio.volume = 1.0;
+
+let audioUnlocked = false;
+let bgRoundCodePlaying = null;
+let resultTriggeredForRound = null;
+
+function unlockAudioOnce() {
+  if (audioUnlocked) return;
+  audioUnlocked = true;
+
+  // "Prime" audio so later play() works more reliably after gesture
+  try {
+    bgAudio.play().then(() => {
+      bgAudio.pause();
+      bgAudio.currentTime = 0;
+    }).catch(() => {});
+  } catch (e) {}
+
+  try {
+    resultAudio.play().then(() => {
+      resultAudio.pause();
+      resultAudio.currentTime = 0;
+    }).catch(() => {});
+  } catch (e) {}
+}
+
+// unlock on first user interaction (tap/click)
+["pointerdown", "touchstart", "mousedown", "keydown"].forEach((evt) => {
+  window.addEventListener(evt, unlockAudioOnce, { once: true, passive: true });
+});
+
+function startSilverLoopIfAllowed(roundCode, hasResultOrFinished) {
+  if (!audioUnlocked) return;
+  if (!roundCode) return;
+  if (hasResultOrFinished) return;
+
+  // if new round, restart loop clean
+  if (bgRoundCodePlaying !== roundCode) {
+    bgRoundCodePlaying = roundCode;
+    stopSilverLoop(); // stop any old round loop
+  }
+
+  if (bgAudio.paused) {
+    bgAudio.currentTime = 0;
+    bgAudio.play().catch(() => {});
+  }
+}
+
+function stopSilverLoop() {
+  try {
+    if (!bgAudio.paused) bgAudio.pause();
+    bgAudio.currentTime = 0;
+  } catch (e) {}
+}
+
+function playResultSoundOnce(roundCode) {
+  if (!audioUnlocked) return;
+  if (!roundCode) return;
+
+  if (resultTriggeredForRound === roundCode) return;
+  resultTriggeredForRound = roundCode;
+
+  stopSilverLoop();
+
+  try {
+    resultAudio.currentTime = 0;
+    resultAudio.play().catch(() => {});
+  } catch (e) {}
+}
+
+// Vibration: only works on supported devices and requires user activation in many browsers. [web:384]
+function vibrateOnResult() {
+  try {
+    if ("vibrate" in navigator) {
+      navigator.vibrate([120, 60, 120]);
+    }
+  } catch (e) {}
+}
+
+// If user switches tabs, pause loop; when back, loop can resume by updateGameUI()
+document.addEventListener("visibilitychange", () => {
+  if (document.hidden) stopSilverLoop();
+});
+
 // ================= DOM REFERENCES =================
 const pondEl = document.querySelector(".pond");
 const frogContainer = document.getElementById("frogContainer");
@@ -335,6 +432,7 @@ async function fetchTableData() {
         if (tablePollInterval) clearInterval(tablePollInterval);
         tablePollInterval = null;
 
+        stopSilverLoop(); // NEW
         setTimeout(() => window.history.back(), 2000);
         return;
       }
@@ -394,11 +492,22 @@ function updateGameUI(table) {
     disableBettingUI(true);
     if (tablePollInterval) clearInterval(tablePollInterval);
     tablePollInterval = null;
+    stopSilverLoop(); // NEW
     showSlotsFullPopup();
     return;
   }
 
   const hasResult = table.resultValue !== null && table.resultValue !== undefined && table.resultValue !== "";
+
+  // ================= AUDIO CONTROL (NEW) =================
+  // Play silver loop while game is running and result not declared
+  startSilverLoopIfAllowed(table.roundCode, hasResult || table.isFinished);
+
+  // As soon as result becomes known (<=2s logic you already use), stop loop + play result sound + vibrate once
+  if (hasResult && table.timeRemaining <= 2) {
+    playResultSoundOnce(table.roundCode);
+    vibrateOnResult();
+  }
 
   // Jump at <= 2 seconds when result is known
   if (hasResult && table.timeRemaining <= 2) {
@@ -423,6 +532,8 @@ function updateGameUI(table) {
 
       if (tablePollInterval) clearInterval(tablePollInterval);
       tablePollInterval = null;
+
+      stopSilverLoop(); // NEW (extra safety)
 
       const outcomeInfo = determineUserOutcome(table);
       const delay = Math.max(0, (hopLandingETA || 0) - Date.now() + 250);
@@ -493,6 +604,9 @@ numChips.forEach((chip) => {
 
 if (placeBetBtn) {
   placeBetBtn.addEventListener("click", () => {
+    // ensure audio unlock attempt happens on bet click too
+    unlockAudioOnce();
+
     if (gameFinished) return setStatus("Game finished", "error");
     if (!currentTable) return setStatus("Game not ready", "error");
 
