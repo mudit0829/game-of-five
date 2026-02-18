@@ -24,6 +24,83 @@ let currentTableNumber = null;
 let lockedNumbers = new Set();
 let currentPlayers = [];
 
+// ================= AUDIO + VIBRATION (NEW) =================
+// Browsers often block audio until user interacts once. [web:392]
+const BG_AUDIO_SRC = "/static/audio/roulette.mp3";
+const RESULT_AUDIO_SRC = "/static/audio/result.mp3";
+
+const spinLoopAudio = new Audio(BG_AUDIO_SRC);
+spinLoopAudio.loop = true;
+spinLoopAudio.preload = "auto";
+spinLoopAudio.volume = 0.75;
+
+const resultAudio = new Audio(RESULT_AUDIO_SRC);
+resultAudio.loop = false;
+resultAudio.preload = "auto";
+resultAudio.volume = 1.0;
+
+let audioUnlocked = false;
+
+function unlockAudioOnce() {
+  if (audioUnlocked) return;
+  audioUnlocked = true;
+
+  // Prime both audio elements (best effort)
+  try {
+    spinLoopAudio.play().then(() => {
+      spinLoopAudio.pause();
+      spinLoopAudio.currentTime = 0;
+    }).catch(() => {});
+  } catch (e) {}
+
+  try {
+    resultAudio.play().then(() => {
+      resultAudio.pause();
+      resultAudio.currentTime = 0;
+    }).catch(() => {});
+  } catch (e) {}
+}
+
+["pointerdown", "touchstart", "mousedown", "keydown"].forEach((evt) => {
+  window.addEventListener(evt, unlockAudioOnce, { once: true, passive: true });
+});
+
+function startSpinLoop() {
+  if (!audioUnlocked) return;
+  try {
+    if (spinLoopAudio.paused) {
+      spinLoopAudio.currentTime = 0;
+      spinLoopAudio.play().catch(() => {});
+    }
+  } catch (e) {}
+}
+
+function stopSpinLoop() {
+  try {
+    if (!spinLoopAudio.paused) spinLoopAudio.pause();
+    spinLoopAudio.currentTime = 0;
+  } catch (e) {}
+}
+
+function playResultOnce() {
+  if (!audioUnlocked) return;
+  try {
+    resultAudio.currentTime = 0;
+    resultAudio.play().catch(() => {});
+  } catch (e) {}
+}
+
+// Vibrate works only on supported devices/browsers; requires user activation. [web:384]
+function vibrateOnResult() {
+  try {
+    if ("vibrate" in navigator) navigator.vibrate([120, 60, 120]);
+  } catch (e) {}
+}
+
+document.addEventListener("visibilitychange", () => {
+  if (document.hidden) stopSpinLoop();
+});
+
 const wheelImg = document.getElementById("rouletteWheel");
 const spinBtn = document.getElementById("spinBtn");
 const placeBetBtn = document.getElementById("placeBetBtn");
@@ -156,6 +233,7 @@ function createNumberGrid() {
     btn.dataset.number = String(n);
 
     btn.addEventListener("click", () => {
+      unlockAudioOnce(); // NEW (helps on mobile)
       if (isSpinning) return;
 
       if (lockedNumbers.has(n)) {
@@ -227,7 +305,6 @@ function getRotationDeg(el) {
   const tr = st.transform || "none";
   if (tr === "none") return 0;
 
-  // Correct: matches "matrix(a,b,c,d,e,f)"
   const m = tr.match(/^matrix\((.+)\)$/);
   if (!m) return 0;
 
@@ -298,7 +375,6 @@ async function fetchRouletteTableState() {
       return;
     }
 
-    // If login_required redirects, you may get HTML instead of JSON
     if (!ct.includes("application/json")) {
       setStatus("Session expired. Please login again.", "error");
       return;
@@ -314,7 +390,6 @@ async function fetchRouletteTableState() {
 
     if (gameIdTextEl) gameIdTextEl.textContent = currentRoundCode ? String(currentRoundCode) : "--";
 
-    // backend sends bets[] with {user_id, username, number} [file:197]
     currentPlayers = Array.isArray(t.bets) ? t.bets : [];
     lockedNumbers = new Set(
       currentPlayers.map(p => parseInt(p.number, 10)).filter(n => Number.isFinite(n))
@@ -427,6 +502,7 @@ function initSocket() {
 
 // ------------------ Actions ------------------
 function handlePlaceBet() {
+  unlockAudioOnce(); // NEW
   if (isSpinning) return;
 
   if (!USER_ID) {
@@ -462,6 +538,7 @@ function handlePlaceBet() {
 }
 
 function handleSpin() {
+  unlockAudioOnce(); // NEW
   if (isSpinning) return;
   if (!wheelRotateEl) {
     setStatus("Wheel not ready.", "error");
@@ -481,11 +558,15 @@ function handleSpin() {
   applyLockedStateToChips();
   refreshControls(socketConnected);
 
+  // NEW: start roulette loop while spinning
+  startSpinLoop();
+
   try {
     spinToNumber(targetNumber);
   } catch (e) {
     console.error(e);
     isSpinning = false;
+    stopSpinLoop(); // NEW
     setStatus("Spin failed. Check console.", "error");
     applyLockedStateToChips();
     refreshControls(socketConnected);
@@ -495,6 +576,11 @@ function handleSpin() {
   window.setTimeout(() => {
     const finalDeg = getRotationDeg(wheelRotateEl);
     const shownNumber = numberAtPointer(finalDeg);
+
+    // NEW: stop loop, play result sound, vibrate
+    stopSpinLoop();
+    playResultOnce();
+    vibrateOnResult();
 
     if (lastResultEl) lastResultEl.textContent = `Result: ${shownNumber}`;
 
