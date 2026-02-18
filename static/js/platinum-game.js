@@ -13,6 +13,98 @@ const USERNAME = GAME_USERNAME || "Player";
 // ✅ SAME AS GOLD/SILVER
 const MAX_BETS_PER_ROUND = 3;
 
+// ================= AUDIO + VIBRATION (NEW) =================
+// Autoplay with sound is usually blocked until the user interacts once. [web:392]
+const BG_AUDIO_SRC = "/static/audio/platinum.mp3";
+const RESULT_AUDIO_SRC = "/static/audio/result.mp3";
+
+const bgAudio = new Audio(BG_AUDIO_SRC);
+bgAudio.loop = true;
+bgAudio.preload = "auto";
+bgAudio.volume = 0.7;
+
+const resultAudio = new Audio(RESULT_AUDIO_SRC);
+resultAudio.loop = false;
+resultAudio.preload = "auto";
+resultAudio.volume = 1.0;
+
+let audioUnlocked = false;
+let bgRoundCodePlaying = null;
+let resultTriggeredForRound = null;
+
+function unlockAudioOnce() {
+  if (audioUnlocked) return;
+  audioUnlocked = true;
+
+  // Prime both audio elements (best effort)
+  try {
+    bgAudio.play().then(() => {
+      bgAudio.pause();
+      bgAudio.currentTime = 0;
+    }).catch(() => {});
+  } catch (e) {}
+
+  try {
+    resultAudio.play().then(() => {
+      resultAudio.pause();
+      resultAudio.currentTime = 0;
+    }).catch(() => {});
+  } catch (e) {}
+}
+
+["pointerdown", "touchstart", "mousedown", "keydown"].forEach((evt) => {
+  window.addEventListener(evt, unlockAudioOnce, { once: true, passive: true });
+});
+
+function stopPlatinumLoop() {
+  try {
+    if (!bgAudio.paused) bgAudio.pause();
+    bgAudio.currentTime = 0;
+  } catch (e) {}
+}
+
+function startPlatinumLoopIfAllowed(roundCode, hasResultOrFinished) {
+  if (!audioUnlocked) return;
+  if (!roundCode) return;
+  if (hasResultOrFinished) return;
+
+  if (bgRoundCodePlaying !== roundCode) {
+    bgRoundCodePlaying = roundCode;
+    resultTriggeredForRound = null; // allow result sfx again for new round
+    stopPlatinumLoop();
+  }
+
+  if (bgAudio.paused) {
+    bgAudio.currentTime = 0;
+    bgAudio.play().catch(() => {});
+  }
+}
+
+function playResultSoundOnce(roundCode) {
+  if (!audioUnlocked) return;
+  if (!roundCode) return;
+  if (resultTriggeredForRound === roundCode) return;
+
+  resultTriggeredForRound = roundCode;
+
+  stopPlatinumLoop();
+  try {
+    resultAudio.currentTime = 0;
+    resultAudio.play().catch(() => {});
+  } catch (e) {}
+}
+
+// Vibrate requires supported device/browser and user activation. [web:384]
+function vibrateOnResult() {
+  try {
+    if ("vibrate" in navigator) navigator.vibrate([120, 60, 120]);
+  } catch (e) {}
+}
+
+document.addEventListener("visibilitychange", () => {
+  if (document.hidden) stopPlatinumLoop();
+});
+
 // ================== DOM REFERENCES ==================
 
 const roundCodeSpan = document.getElementById("roundCode");
@@ -545,6 +637,8 @@ async function fetchTableData() {
         disableBettingUI(true);
         setStatus("This game has finished. You'll be taken back to lobby for a new one.", "error");
 
+        stopPlatinumLoop(); // NEW
+
         if (tablePollInterval) {
           clearInterval(tablePollInterval);
           tablePollInterval = null;
@@ -573,6 +667,10 @@ function updateGameUI(table) {
 
   if (boatOrderRoundCode !== (table.roundCode || "__no_round__")) {
     resetBoatOrderForRound(table.roundCode);
+
+    // NEW: ensure audio tracking resets cleanly on round change
+    bgRoundCodePlaying = null;
+    resultTriggeredForRound = null;
   }
 
   if (roundCodeSpan) roundCodeSpan.textContent = table.roundCode || "--";
@@ -618,6 +716,9 @@ function updateGameUI(table) {
   if (!hasUserBet && (slotsFull || table.isBettingClosed || table.isFinished) && !kickedForNoBet) {
     gameFinished = true;
     disableBettingUI(true);
+
+    stopPlatinumLoop(); // NEW
+
     if (tablePollInterval) {
       clearInterval(tablePollInterval);
       tablePollInterval = null;
@@ -639,10 +740,19 @@ function updateGameUI(table) {
     setNumberChipsDisabled(false);
   }
 
-  if (table.resultValue !== null && table.resultValue !== undefined && table.timeRemaining <= 2) {
+  // ================= AUDIO CONTROL (NEW) =================
+  const hasResult = table.resultValue !== null && table.resultValue !== undefined && table.resultValue !== "";
+  startPlatinumLoopIfAllowed(table.roundCode, hasResult || table.isFinished || slotsFull);
+
+  // Result animation moment (your existing trigger)
+  if (hasResult && table.timeRemaining <= 2) {
     const roundId = table.roundCode || "__no_round__";
     if (resultAnimationShownForRound !== roundId) {
       resultAnimationShownForRound = roundId;
+
+      // stop loop + play result + vibrate (once per round)
+      playResultSoundOnce(table.roundCode);
+      vibrateOnResult();
 
       ensureBoatForWinningNumber(table.resultValue, table.roundCode || "");
 
@@ -653,12 +763,14 @@ function updateGameUI(table) {
     }
   }
 
-  if (table.isFinished && table.resultValue !== null && table.resultValue !== undefined) {
+  if (table.isFinished && hasResult) {
     const roundId = table.roundCode || "__no_round__";
 
     if (resultModalShownForRound !== roundId && hasUserBet) {
       resultModalShownForRound = roundId;
       gameFinished = true;
+
+      stopPlatinumLoop(); // NEW
 
       if (tablePollInterval) {
         clearInterval(tablePollInterval);
@@ -734,6 +846,7 @@ socket.on("updatetable", () => fetchTableData());
 
 document.querySelectorAll(".num-chip").forEach((chip) => {
   chip.addEventListener("click", () => {
+    unlockAudioOnce(); // NEW
     if (gameFinished) return;
     if (chip.disabled || chip.dataset.locked === "1") return; // ✅ hard guard
     const n = parseInt(chip.dataset.number, 10);
@@ -743,6 +856,8 @@ document.querySelectorAll(".num-chip").forEach((chip) => {
 
 if (placeBetBtn) {
   placeBetBtn.addEventListener("click", () => {
+    unlockAudioOnce(); // NEW
+
     if (gameFinished) return setStatus("Game finished", "error");
     if (!currentTable) return setStatus("Game not ready yet", "error");
 
@@ -766,6 +881,7 @@ if (placeBetBtn) {
     if (slotsFull) {
       setStatus("All slots are full for this game.", "error");
       disableBettingUI(true);
+      stopPlatinumLoop(); // NEW
       return;
     }
 
