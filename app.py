@@ -694,7 +694,7 @@ def sa_rounds():
     except (ValueError, AttributeError):
         return jsonify({"error": "Invalid date or time_slot format"}), 400
     
-       now = datetime.utcnow()
+        now = datetime.utcnow()
     cutoff_time = now + timedelta(minutes=60)  # Only show rounds >60 min away
     
     # Calculate all possible rounds in the time slot
