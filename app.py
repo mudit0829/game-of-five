@@ -415,8 +415,8 @@ class GameTable:
 
         return self.result
 
-       def get_winners(self):
-        if self.result is None:
+        def get_winners(self):
+            if self.result is None:
             return []
         winners = []
         for bet in self.bets:
