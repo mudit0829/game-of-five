@@ -396,7 +396,7 @@ class GameTable:
         return success
 
         def calculate_result(self):
-        bet_numbers = [b.get("number") for b in (self.bets or []) if b.get("number") is not None]
+            bet_numbers = [b.get("number") for b in (self.bets or []) if b.get("number") is not None]
 
         if not bet_numbers:
             self.result = random.choice(self.get_number_range())
