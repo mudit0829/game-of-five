@@ -394,9 +394,10 @@ class GameTable:
             is_bot=True,
         )
         return success
-
-        def calculate_result(self):
-            bet_numbers = [b.get("number") for b in (self.bets or []) if b.get("number") is not None]
+    
+    
+    def calculate_result(self):
+        bet_numbers = [b.get("number") for b in (self.bets or []) if b.get("number") is not None]
 
         if not bet_numbers:
             self.result = random.choice(self.get_number_range())
@@ -414,6 +415,7 @@ class GameTable:
             self.result = random.choice(bet_numbers)
 
         return self.result
+
 
     def get_winners(self):
         if self.result is None:
