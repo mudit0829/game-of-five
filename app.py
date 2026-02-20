@@ -430,13 +430,14 @@ class GameTable:
                 )
         return winners
 
-       def get_time_remaining(self):
+          def get_time_remaining(self):
         now = datetime.utcnow()
         if now < self.start_time:
             return int((self.end_time - self.start_time).total_seconds())
         if now >= self.end_time:
             return 0
         return int((self.end_time - now).total_seconds())
+
 
     def get_slots_available(self):
         return self.max_players - len(self.bets)
