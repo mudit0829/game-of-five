@@ -687,11 +687,12 @@ def sa_rounds():
         slot_start = datetime.combine(target_date, datetime.min.time()).replace(hour=start_hour)
         slot_end = datetime.combine(target_date, datetime.min.time()).replace(hour=end_hour)
         
-    except (ValueError, AttributeError):
-        return jsonify({"error": "Invalid date or time_slot format"}), 400
-    
+        except (ValueError, AttributeError):
+            return jsonify({"error": "Invalid date or time_slot format"}), 400
+
         now = datetime.utcnow()
-    cutoff_time = now + timedelta(minutes=60)  # Only show rounds >60 min away
+        cutoff_time = now + timedelta(minutes=60)
+
     
     # Calculate all possible rounds in the time slot
     out = []
