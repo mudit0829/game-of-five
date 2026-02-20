@@ -417,22 +417,22 @@ class GameTable:
 
         def get_winners(self):
             if self.result is None:
-            return []
-        winners = []
-        for bet in self.bets:
-            if bet["number"] == self.result and not bet["is_bot"]:
-                winners.append(
+              return []
+            winners = []
+            for bet in self.bets:
+              if bet["number"] == self.result and not bet["is_bot"]:
+                 winners.append(
                     {"user_id": bet["user_id"], "username": bet["username"], "payout": self.config["payout"]}
                 )
-        return winners
+            return winners
 
-    def get_time_remaining(self):
-        now = datetime.utcnow()
-        if now < self.start_time:
-            return int((self.end_time - self.start_time).total_seconds())
-        if now >= self.end_time:
-            return 0
-        return int((self.end_time - now).total_seconds())
+        def get_time_remaining(self):
+            now = datetime.utcnow()
+            if now < self.start_time:
+                return int((self.end_time - self.start_time).total_seconds())
+            if now >= self.end_time:
+                return 0
+            return int((self.end_time - now).total_seconds())
 
 
     def get_slots_available(self):
