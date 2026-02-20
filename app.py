@@ -395,7 +395,7 @@ class GameTable:
         )
         return success
 
-    def calculate_result(self):
+        def calculate_result(self):
         bet_numbers = [b.get("number") for b in (self.bets or []) if b.get("number") is not None]
 
         if not bet_numbers:
@@ -415,24 +415,24 @@ class GameTable:
 
         return self.result
 
-        def get_winners(self):
-            if self.result is None:
-              return []
-            winners = []
-            for bet in self.bets:
-              if bet["number"] == self.result and not bet["is_bot"]:
-                 winners.append(
+    def get_winners(self):
+        if self.result is None:
+            return []
+        winners = []
+        for bet in self.bets:
+            if bet["number"] == self.result and not bet["is_bot"]:
+                winners.append(
                     {"user_id": bet["user_id"], "username": bet["username"], "payout": self.config["payout"]}
                 )
-            return winners
+        return winners
 
-        def get_time_remaining(self):
-            now = datetime.utcnow()
-            if now < self.start_time:
-                return int((self.end_time - self.start_time).total_seconds())
-            if now >= self.end_time:
-                return 0
-            return int((self.end_time - now).total_seconds())
+    def get_time_remaining(self):
+        now = datetime.utcnow()
+        if now < self.start_time:
+            return int((self.end_time - self.start_time).total_seconds())
+        if now >= self.end_time:
+            return 0
+        return int((self.end_time - now).total_seconds())
 
 
     def get_slots_available(self):
