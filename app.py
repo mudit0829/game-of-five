@@ -52,7 +52,7 @@ socketio = SocketIO(
 
 SUPERADMIN_USERNAME = "superadmin"  # ✅ Change this
 SUPERADMIN_PASSWORD = "SuperPass@2026"  # ✅ Change this
-APP_TIMEZONE = "Asia/Kolkata"
+APP_TIMEZONE = "UTC"
 
 # forced_winners: (game_type, round_code) -> int forced_number
 forced_winners = {}
