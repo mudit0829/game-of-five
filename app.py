@@ -708,9 +708,9 @@ def sa_rounds():
         start_hour, end_hour = map(int, time_slot.split("-"))
 
         slot_start = datetime.combine(target_date, datetime.min.time()).replace(hour=start_hour)
-        slot_start.replace(tzinfo=IST).astimezone(timezone.utc).replace(tzinfo=None)
+        slot_start = slot_start.replace(tzinfo=IST).astimezone(timezone.utc).replace(tzinfo=None)
         slot_end = datetime.combine(target_date, datetime.min.time()).replace(hour=end_hour)
-        slot_end.replace(tzinfo=IST).astimezone(timezone.utc).replace(tzinfo=None)
+        slot_end = slot_end.replace(tzinfo=IST).astimezone(timezone.utc).replace(tzinfo=None)
 
     except (ValueError, AttributeError):
         return jsonify({"error": "Invalid date or time_slot format"}), 400
@@ -810,7 +810,7 @@ def sa_force_winner():
         ).first()
         if history_record:
             history_record.status = "cleared"
-            history_record.note = f"Cleared at {fmt_ist(now, "%Y-%m-%d %H:%M:%S")}"
+            history_record.note = f"Cleared at {fmt_ist(now, '%Y-%m-%d %H:%M:%S')}"
             db.session.commit()
         
         return jsonify({"success": True, "message": "Forced winner cleared"})
@@ -839,7 +839,7 @@ def sa_force_winner():
     if existing:
         existing.forced_number = n
         existing.forced_at = now
-        existing.note = f"Updated at {fmt_ist(now, "%Y-%m-%d %H:%M:%S")}"
+        existing.note = f"Updated at {fmt_ist(now, '%Y-%m-%d %H:%M:%S')}"
     else:
         history_record = ForcedWinnerHistory(
             round_code=round_code,
@@ -1290,8 +1290,8 @@ def help_tickets_api():
                     "subject": t.subject,
                     "message": t.message[:200],
                     "status": t.status,
-                    "created_at": t.created_at.strftime("%Y-%m-%d %H:%M"),
-                    "updated_at": t.updated_at.strftime("%Y-%m-%d %H:%M"),
+                    "created_at": fmt_ist(t.created_at, "%Y-%m-%d %H:%M"),
+                    "updated_at": fmt_ist(t.updated_at, "%Y-%m-%d %H:%M"),
                 }
             )
         return jsonify(out)
@@ -1355,7 +1355,7 @@ def admin_get_users():
                 "password_hash": user.password_hash,
                 "status": "blocked" if user.is_blocked else "active",
                 "balance": wallet.balance if wallet else 0,
-                "created_at": user.created_at.strftime("%Y-%m-%d %H:%M"),
+                "created_at": fmt_ist(user.created_at, "%Y-%m-%d %H:%M"),
                 "block_reason": user.block_reason or "",
             }
         )
@@ -1610,7 +1610,7 @@ def admin_get_transactions():
             game_title = cfg.get("name", rec["game_type"])
             bet_amt = rec.get("bet_amount", cfg.get("bet_amount", 0))
             dt = rec.get("bet_time", datetime.utcnow())
-            dt_str = dt.strftime("%Y-%m-%d %H:%M") if isinstance(dt, datetime) else str(dt)
+            dt_str = fmt_ist(dt, "%Y-%m-%d %H:%M") if isinstance(dt, datetime) else str(dt)
 
             out.append(
                 {
