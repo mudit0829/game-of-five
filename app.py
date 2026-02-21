@@ -11,6 +11,7 @@ from flask_sqlalchemy import SQLAlchemy
 from flask_socketio import SocketIO, emit, join_room
 from flask_cors import CORS
 from datetime import datetime, timedelta, timezone
+from zoneinfo import ZoneInfo
 from functools import wraps
 import threading
 import random
@@ -52,7 +53,26 @@ socketio = SocketIO(
 
 SUPERADMIN_USERNAME = "superadmin"  # ✅ Change this
 SUPERADMIN_PASSWORD = "SuperPass@2026"  # ✅ Change this
-APP_TIMEZONE = "UTC"
+APP_TIMEZONE = "Asia/Kolkata"
+IST = ZoneInfo("Asia/Kolkata")
+
+def as_utc(dt: datetime) -> datetime:
+    # Treat naive datetimes as UTC (your code uses datetime.utcnow() everywhere)
+    if dt is None:
+        return None
+    if dt.tzinfo is None:
+        return dt.replace(tzinfo=timezone.utc)
+    return dt.astimezone(timezone.utc)
+
+def as_ist(dt: datetime) -> datetime:
+    if dt is None:
+        return None
+    return as_utc(dt).astimezone(IST)
+
+def fmt_ist(dt: datetime, fmt: str = "%Y-%m-%d %H:%M") -> str:
+    d = as_ist(dt)
+    return d.strftime(fmt) if d else ""
+
 
 # forced_winners: (game_type, round_code) -> int forced_number
 forced_winners = {}
@@ -208,10 +228,11 @@ def floor_to_period(dt: datetime, period_seconds: int) -> datetime:
     return datetime.utcfromtimestamp(floored)
 
 def make_round_code(game_type: str, start_time: datetime, table_number: int) -> str:
-    # Required format: R_20260216_1330_1 (R = initial letter of game type)
+    # Required format: G_20260217_2200_1
     initial = (game_type or "X")[0].upper()
-    stamp = start_time.strftime("%Y%m%d_%H%M")
+    stamp = as_ist(start_time).strftime("%Y%m%d_%H%M")
     return f"{initial}_{stamp}_{int(table_number)}"
+
 
 
 # ---------------------------------------------------
@@ -562,7 +583,8 @@ def manage_game_table(table: GameTable):
                                     else -table.config["bet_amount"]
                                 )
                                 rec["is_resolved"] = True
-                                rec["date_time"] = now.strftime("%Y-%m-%d %H:%M")
+                                rec["date_time"] = fmt_ist(now, "%Y-%m-%d %H:%M")
+​
 
                     # Winners payout + transaction log
                     for winner in winners:
@@ -686,7 +708,9 @@ def sa_rounds():
         start_hour, end_hour = map(int, time_slot.split("-"))
 
         slot_start = datetime.combine(target_date, datetime.min.time()).replace(hour=start_hour)
+        slot_start.replace(tzinfo=IST).astimezone(timezone.utc).replace(tzinfo=None)
         slot_end = datetime.combine(target_date, datetime.min.time()).replace(hour=end_hour)
+        slot_end.replace(tzinfo=IST).astimezone(timezone.utc).replace(tzinfo=None)
 
     except (ValueError, AttributeError):
         return jsonify({"error": "Invalid date or time_slot format"}), 400
@@ -712,7 +736,7 @@ def sa_rounds():
                         "game_name": GAME_CONFIGS[game_type]["name"],
                         "table_number": table_number,
                         "round_code": round_code,
-                        "start_time": current_time.strftime("%Y-%m-%d %H:%M:%S"),
+                        "start_time": fmt_ist(current_time, "%Y-%m-%d %H:%M:%S"),
                         "minutes_until_start": minutes_until,
                         "forced_number": forced_number,
                         "can_force": True
@@ -759,7 +783,8 @@ def sa_force_winner():
         
         # Parse the round start time
         round_start_str = f"{date_stamp}_{time_stamp}"
-        round_start = datetime.strptime(round_start_str, "%Y%m%d_%H%M")
+        round_start_ist = datetime.strptime(round_start_str, "%Y%m%d_%H%M").replace(tzinfo=IST)
+        round_start = round_start_ist.astimezone(timezone.utc).replace(tzinfo=None)
         
     except (IndexError, ValueError) as e:
         return jsonify({"success": False, "message": f"Invalid round code format: {str(e)}"}), 400
@@ -785,7 +810,7 @@ def sa_force_winner():
         ).first()
         if history_record:
             history_record.status = "cleared"
-            history_record.note = f"Cleared at {now.strftime('%Y-%m-%d %H:%M:%S')}"
+            history_record.note = f"Cleared at {fmt_ist(now, "%Y-%m-%d %H:%M:%S")}"
             db.session.commit()
         
         return jsonify({"success": True, "message": "Forced winner cleared"})
@@ -814,7 +839,7 @@ def sa_force_winner():
     if existing:
         existing.forced_number = n
         existing.forced_at = now
-        existing.note = f"Updated at {now.strftime('%Y-%m-%d %H:%M:%S')}"
+        existing.note = f"Updated at {fmt_ist(now, "%Y-%m-%d %H:%M:%S")}"
     else:
         history_record = ForcedWinnerHistory(
             round_code=round_code,
@@ -860,8 +885,8 @@ def sa_history():
             "game_name": h.game_name,
             "table_number": h.table_number,
             "forced_number": h.forced_number,
-            "round_start_time": h.round_start_time.strftime("%Y-%m-%d %H:%M:%S"),
-            "forced_at": h.forced_at.strftime("%Y-%m-%d %H:%M:%S"),
+            "round_start_time": fmt_ist(h.round_start_time, "%Y-%m-%d %H:%M:%S"),
+            "forced_at": fmt_ist(h.forced_at, "%Y-%m-%d %H:%M:%S"),
             "forced_by": h.forced_by,
             "status": h.status,
             "note": h.note or ""
@@ -1445,7 +1470,7 @@ def admin_get_games():
                     else "active",
                     "result": table.result,
                     "total_bets": sum(b.get("bet_amount", 0) for b in table.bets),
-                    "started_at": table.start_time.strftime("%Y-%m-%d %H:%M"),
+                    "started_at": fmt_ist(table.start_time, "%Y-%m-%d %H:%M"),
                 }
             )
     return jsonify(all_games)
