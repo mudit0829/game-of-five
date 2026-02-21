@@ -584,8 +584,6 @@ def manage_game_table(table: GameTable):
                                 )
                                 rec["is_resolved"] = True
                                 rec["date_time"] = fmt_ist(now, "%Y-%m-%d %H:%M")
-​
-
                     # Winners payout + transaction log
                     for winner in winners:
                         wallet = Wallet.query.filter_by(user_id=winner["user_id"]).first()
