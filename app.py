@@ -966,50 +966,50 @@ def user_games_history_api():
 
     user_bets = user_game_history.get(user_id, [])
 
-    grouped = {}
-    for b in user_bets:
-      key = (b["game_type"], b["round_code"])
-      cfg = GAME_CONFIGS[b["game_type"]]
-      bet_amt = int(cfg["bet_amount"])
-      payout_amt = int(cfg["payout"])
+      grouped = {}
+      for b in user_bets:
+         key = (b["game_type"], b["round_code"])
+         cfg = GAME_CONFIGS[b["game_type"]]
+         bet_amt = int(cfg["bet_amount"])
+         payout_amt = int(cfg["payout"])
 
-      if key not in grouped:
-          grouped[key] = {
-              "game_type": b["game_type"],
-              "round_code": b["round_code"],
-              "bet_amount": bet_amt,
-              "user_bets": [],
-              "winning_number": None,
-              "date_time": "",
-              "status": None,
-              "amount": 0,          # ✅ what UI should show
-              "win_amount": 0,      # ✅ total payout won (no subtraction)
-              "loss_amount": 0,     # ✅ total bet lost
-              "time_remaining": None,
-              "table_number": b.get("table_number"),
-          }
+         if key not in grouped:
+             grouped[key] = {
+                 "game_type": b["game_type"],
+                 "round_code": b["round_code"],
+                 "bet_amount": bet_amt,
+                 "user_bets": [],
+                 "winning_number": None,
+                 "date_time": "",
+                 "status": None,
+                 "amount": 0,          # ✅ what UI should show
+                 "win_amount": 0,      # ✅ total payout won (no subtraction)
+                 "loss_amount": 0,     # ✅ total bet lost
+                 "time_remaining": None,
+                 "table_number": b.get("table_number"),
+             }
 
-      grouped[key]["user_bets"].append(b["number"])
+         grouped[key]["user_bets"].append(b["number"])
 
-      if b.get("winning_number") is not None:
-          grouped[key]["winning_number"] = b["winning_number"]
+         if b.get("winning_number") is not None:
+             grouped[key]["winning_number"] = b["winning_number"]
 
-          if b.get("date_time"):
-              grouped[key]["date_time"] = b["date_time"]
+             if b.get("date_time"):
+                 grouped[key]["date_time"] = b["date_time"]
 
-          if b.get("status") == "win":
-              grouped[key]["win_amount"] += payout_amt
-          elif b.get("status") == "lose":
-              grouped[key]["loss_amount"] += bet_amt
+             if b.get("status") == "win":
+                 grouped[key]["win_amount"] += payout_amt
+             elif b.get("status") == "lose":
+                 grouped[key]["loss_amount"] += bet_amt
 
   # finalize round-level status + display amount
-  for g in grouped.values():
-      if g["winning_number"] is not None:
-          g["status"] = "win" if g["win_amount"] > 0 else "lose"
+     for g in grouped.values():
+         if g["winning_number"] is not None:
+             g["status"] = "win" if g["win_amount"] > 0 else "lose"
           # ✅ Your requirement:
           # If won at least once -> show only winning payout (example: 200)
           # If no wins -> show total loss (example: 150)
-          g["amount"] = g["win_amount"] if g["win_amount"] > 0 else g["loss_amount"]
+             g["amount"] = g["win_amount"] if g["win_amount"] > 0 else g["loss_amount"]
 
 
     all_games = list(grouped.values())
