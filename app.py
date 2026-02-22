@@ -966,8 +966,8 @@ def user_games_history_api():
 
     user_bets = user_game_history.get(user_id, [])
 
-      grouped = {}
-      for b in user_bets:
+     grouped = {}
+     for b in user_bets:
          key = (b["game_type"], b["round_code"])
          cfg = GAME_CONFIGS[b["game_type"]]
          bet_amt = int(cfg["bet_amount"])
