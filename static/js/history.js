@@ -117,7 +117,7 @@ function renderGameCard(game, isCurrent) {
     </div>
   `;
 
-  const btn = document.createElement("button");
+    const btn = document.createElement("button");
   btn.className = "open-game-btn";
 
   if (isCurrent) {
