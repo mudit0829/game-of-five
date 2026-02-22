@@ -63,7 +63,7 @@ function renderGameCard(game, isCurrent) {
   const status = game.status || (isCurrent ? "pending" : "completed");
   const winningNumber =
     typeof game.winning_number === "number" ? game.winning_number : null;
-  const amount = game.amount || 0;
+  const amount = Number(game.amount ?? 0);
   const betTime = game.bet_time || game.date_time || null;
 
   const isWin = status === "win" || amount > 0;
@@ -130,9 +130,16 @@ function renderGameCard(game, isCurrent) {
       window.location.href = `/play/${gameType}?round_code=${encodeURIComponent(roundCode)}`;
     });
   } else {
-    btn.textContent = "View result";
-    btn.disabled = true;
-  }
+    const absAmt = Math.abs(amount);
+  const label = amount > 0 ? "Total Win" : amount < 0 ? "Total Loss" : "Total";
+  const amtText = absAmt.toLocaleString("en-IN");
+
+  // Show amount directly on the green bar
+  btn.textContent = `View result • ${label}: ${amtText}`;
+
+  // Keep disabled if you don't want click navigation
+  btn.disabled = true;
+}
 
   card.appendChild(btn);
   return card;
