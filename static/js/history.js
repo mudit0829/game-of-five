@@ -1,5 +1,4 @@
 // ✅ FINAL FIXED History page logic
-
 function formatTime(sec) {
   const s = Math.max(0, parseInt(sec || 0, 10));
   const m = Math.floor(s / 60);
