@@ -130,16 +130,12 @@ function renderGameCard(game, isCurrent) {
       window.location.href = `/play/${gameType}?round_code=${encodeURIComponent(roundCode)}`;
     });
   } else {
-    const absAmt = Math.abs(amount);
-  const label = amount > 0 ? "Total Win" : amount < 0 ? "Total Loss" : "Total";
-  const amtText = absAmt.toLocaleString("en-IN");
-
-  // Show amount directly on the green bar
-  btn.textContent = `View result • ${label}: ${amtText}`;
-
-  // Keep disabled if you don't want click navigation
-  btn.disabled = true;
+    } else {
+  const label = isWin ? "Total Win" : isLose ? "Total Loss" : "Total";
+  btn.textContent = `View result • ${label}: ${amount.toLocaleString("en-IN")}`;
+  btn.disabled = true; // keep same behavior
 }
+
 
   card.appendChild(btn);
   return card;
