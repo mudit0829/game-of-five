@@ -117,23 +117,22 @@ function renderGameCard(game, isCurrent) {
     </div>
   `;
 
-    const btn = document.createElement("button");
+      const btn = document.createElement("button");
   btn.className = "open-game-btn";
 
   if (isCurrent) {
     btn.textContent = "Go to game";
     btn.disabled = false;
     btn.addEventListener("click", () => {
-      // ✅ CRITICAL FIX: Navigate to game page WITH round_code as URL parameter
-      // This tells the game page to JOIN existing game, not create new bet
+      // Navigate to game page WITH round_code as URL parameter
       window.location.href = `/play/${gameType}?round_code=${encodeURIComponent(roundCode)}`;
     });
   } else {
-    } else {
-  const label = isWin ? "Total Win" : isLose ? "Total Loss" : "Total";
-  btn.textContent = `View result • ${label}: ${amount.toLocaleString("en-IN")}`;
-  btn.disabled = true; // keep same behavior
-}
+    const label = isWin ? "Total Win" : isLose ? "Total Loss" : "Total";
+    btn.textContent = `View result • ${label}: ${amount.toLocaleString("en-IN")}`;
+    btn.disabled = true; // keep same behavior
+  }
+
 
 
   card.appendChild(btn);
