@@ -883,7 +883,11 @@ if (placeBetBtn) {
 }
 
 if (popupHomeBtn) popupHomeBtn.addEventListener("click", () => (window.location.href = HOME_URL));
-if (popupLobbyBtn) popupLobbyBtn.addEventListener("click", () => window.history.back());
+if (popupLobbyBtn) popupLobbyBtn.addEventListener("click", () => {
+  const gameType = window.GAME_TYPE || "diamond";
+  window.location.href = `/game/${gameType}`;
+});
+
 
 // ================= INIT =================
 
