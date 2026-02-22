@@ -1002,7 +1002,11 @@ if (placeBetBtn) {
 }
 
 if (popupHomeBtn) popupHomeBtn.addEventListener("click", () => (window.location.href = HOME_URL));
-if (popupLobbyBtn) popupLobbyBtn.addEventListener("click", () => window.history.back());
+if (popupLobbyBtn) popupLobbyBtn.addEventListener("click", () => {
+  const gameType = window.GAME_TYPE || "gold";
+  window.location.href = `/game/${gameType}`;
+});
+
 
 // ================= INIT =================
 console.log(`[INIT] Game=${GAME}, User=${USER_ID}, Username=${USERNAME}, Bet=${FIXED_BET_AMOUNT}`);
