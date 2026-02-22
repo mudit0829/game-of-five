@@ -65,8 +65,8 @@ function renderGameCard(game, isCurrent) {
   const amount = Number(game.amount ?? 0);
   const betTime = game.bet_time || game.date_time || null;
 
-  const isWin = status === "win" || amount > 0;
-  const isLose = status === "lose" || amount < 0;
+  const isWin = status === "win";
+  const isLose = status === "lose";
 
   if (!isCurrent) {
     if (isWin) card.classList.add("win");
