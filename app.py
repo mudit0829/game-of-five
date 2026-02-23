@@ -1120,18 +1120,19 @@ def login_post():
 
 
 @app.route("/register", methods=["GET", "POST"])
-def register_page():
+def registerpage():
     if request.method == "GET":
-        if "user_id" in session:
+        if session.get("userid") or session.get("user_id"):
             return redirect(url_for("home"))
         return render_template("register.html")
 
     data = request.get_json() or {}
-    username = data.get("username", "").strip()
-    password = data.get("password", "")
+    username = (data.get("username") or "").strip()
+    password = data.get("password") or ""
 
     if not username or not password:
         return jsonify({"success": False, "message": "Username and password required"}), 400
+
     if len(password) < 6:
         return jsonify({"success": False, "message": "Password must be at least 6 characters"}), 400
 
@@ -1139,18 +1140,26 @@ def register_page():
     if existing:
         return jsonify({"success": False, "message": "Username already exists"}), 400
 
-    user = User(username=uname, displayname=uname)
-    user.set_password(password)
+    user = User(username=username, displayname=username)
+    user.setpassword(password)   # uses your sha256 passwordhash method
     db.session.add(user)
     db.session.commit()
 
-    ensure_wallet_for_user(user)
+    ensurewalletforuser(user)
 
-    session["user_id"] = user.id
+    # Set both keys so old/new templates keep working
     session["userid"] = user.id
+    session["user_id"] = user.id
     session["username"] = user.username
+    session.permanent = True
 
-    return jsonify({"success": True, "user_id": user.id, "username": user.username, "redirect": url_for("home")})
+    return jsonify({
+        "success": True,
+        "userid": user.id,
+        "user_id": user.id,
+        "username": user.username,
+        "redirect": url_for("home"),
+    })
 
 
 @app.route("/logout")
@@ -1200,44 +1209,44 @@ def history_page():
 
 
 @app.route("/profile")
-@login_required
-def profile_page():
-    user_id = session.get("user_id")
-    user = User.query.get(user_id)
+@loginrequired
+def profilepage():
+    uid = session.get("userid") or session.get("user_id")
+    user = User.query.get(uid)
     if not user:
         return redirect(url_for("logout"))
 
-    wallet = ensure_wallet_for_user(user)
-    wallet_balance = wallet.balance if wallet else 0
-    joined_at = user.created_at.strftime("%d %b %Y") if user.created_at else "Just now"
+    wallet = ensurewalletforuser(user)
+    walletbalance = wallet.balance if wallet else 0
 
-    transactions = (
-        Transaction.query.filter_by(user_id=user_id)
-        .order_by(Transaction.datetime.desc())
-        .limit(50)
-        .all()
-    )
+    joinedat = user.createdat.strftime("%d %b %Y") if getattr(user, "createdat", None) else "Just now"
+
+    tx_query = Transaction.query
+    if hasattr(Transaction, "userid"):
+        tx_query = tx_query.filter_by(userid=uid)
+    else:
+        tx_query = tx_query.filter_by(user_id=uid)
+
+    transactions = tx_query.order_by(Transaction.datetime.desc()).limit(50).all()
 
     txns = []
     for t in transactions:
-        txns.append(
-            {
-                "kind": t.kind,
-                "amount": t.amount,
-                "datetime": t.datetime.isoformat(),
-                "label": t.label or t.kind.title(),
-                "game_title": t.game_title or "",
-                "note": t.note or "",
-                "balance_after": t.balance_after,
-            }
-        )
+        txns.append({
+            "kind": t.kind,
+            "amount": t.amount,
+            "datetime": t.datetime.isoformat() if getattr(t, "datetime", None) else "",
+            "label": t.label or (t.kind.title() if t.kind else ""),
+            "gametitle": getattr(t, "gametitle", "") or getattr(t, "game_title", "") or "",
+            "note": t.note or "",
+            "balanceafter": getattr(t, "balanceafter", None) if hasattr(t, "balanceafter") else getattr(t, "balance_after", None),
+        })
 
     return render_template(
         "profile.html",
         username=user.username,
-        display_name=user.displayname or user.username,
-        joined_at=joined_at,
-        wallet_balance=wallet_balance,
+        displayname=user.displayname or user.username,
+        joinedat=joinedat,
+        walletbalance=walletbalance,
         email=user.email or "",
         country=user.country or "",
         phone=user.phone or "",
@@ -1246,18 +1255,32 @@ def profile_page():
 
 
 @app.route("/profile/update", methods=["POST"])
-@login_required
-def profile_update():
-    user_id = session.get("user_id")
-    user = User.query.get(user_id)
+@loginrequired
+def profileupdate():
+    uid = session.get("userid") or session.get("user_id")
+    user = User.query.get(uid)
     if not user:
         return jsonify({"success": False, "message": "User not found"}), 404
 
     data = request.get_json() or {}
-    user.display_name = data.get("displayName", user.display_name or user.username)
-    user.email = data.get("email", user.email or "")
-    user.country = data.get("country", user.country or "")
-    user.phone = data.get("phone", user.phone or "")
+
+    display = data.get("displayname") or data.get("displayName") or data.get("display_name")
+    email = data.get("email")
+    country = data.get("country")
+    phone = data.get("phone")
+
+    if display is not None:
+        v = str(display).strip()
+        user.displayname = v if v else user.displayname
+
+    if email is not None:
+        user.email = str(email).strip()
+
+    if country is not None:
+        user.country = str(country).strip()
+
+    if phone is not None:
+        user.phone = str(phone).strip()
 
     db.session.commit()
     return jsonify({"success": True, "message": "Profile updated"})
