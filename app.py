@@ -300,7 +300,7 @@ def admin_required(f):
             session.clear()
             return redirect(url_for("login_page"))
 
-        if not user.is_admin:
+        if not user.isadmin:
             if request.path.startswith("/api/admin/"):
                 return jsonify({"error": "Admin access required"}), 403
             session.clear()
@@ -1394,30 +1394,31 @@ def admin_panel():
 @admin_required
 def admin_get_users():
     users = User.query.filter(User.isadmin == False).all()
-    userlist = []    
-    for user in users:
-        wallet = ensure_wallet_for_user(user)
-        userlist.append({
-            "id": user.id,
-            "username": user.username or '-',
-            "displayname": getattr(user, 'displayname', getattr(user, 'display_name', '')) or '',
-            "email": getattr(user, 'email', '') or '',
-            "country": getattr(user, 'country', '') or '',
-            "phone": getattr(user, 'phone', '') or '',
-            "agentname": getattr(user, 'agentname', '') or getattr(user, 'refer_id', '') or getattr(user, 'referid', '') or '-',
-            "status": "blocked" if getattr(user, 'isblocked', False) else "active",
-            "balance": wallet.balance if wallet else 0,
-            "gamesplayed": getattr(user, 'gamesplayed', 0),  # if you track this
-            "createdat": fmtist(getattr(user, 'createdat', None), "%Y-%m-%d %H:%M") or '-',
-            "blockreason": getattr(user, 'blockreason', '') or ''
-        })
-    
-    return jsonify(userlist)
+    out = []
 
+    for u in users:
+        # Make sure wallet exists (non-admin users only)
+        w = ensure_wallet_for_user(u)
+
+        out.append({
+            "id": u.id,
+            "username": u.username or "",
+            "displayname": getattr(u, "displayname", "") or "",
+            "email": getattr(u, "email", "") or "",
+            "agentname": getattr(u, "agentname", "") or getattr(u, "displayname", "") or "",
+            "country": getattr(u, "country", "") or "",
+            "phone": getattr(u, "phone", "") or "",
+            "status": "blocked" if getattr(u, "isblocked", False) else "active",
+            "balance": int(w.balance) if w else 0,
+            "createdat": fmt_ist(getattr(u, "createdat", None), "%Y-%m-%d %H:%M") if getattr(u, "createdat", None) else "",
+            "blockreason": getattr(u, "blockreason", "") or "",
+        })
+
+    return jsonify(out)
 @app.route("/api/admin/users/<int:user_id>", methods=["PUT"])
 @admin_required
 def admin_update_user(user_id):
-    user = User.query.get(userid)
+    user = User.query.get(user_id)
     if not user:
         return jsonify(success=False, message="User not found"), 404
 
@@ -1547,12 +1548,12 @@ def admin_get_games():
 @app.route("/api/admin/stats", methods=["GET"])
 @admin_required
 def admin_get_stats():
-    total_users = User.query.filter(User.is_admin == False).count()
-    blocked_users = User.query.filter(User.is_admin == False, User.is_blocked == True).count()
+    total_users = User.query.filter(User.isadmin == False).count()
+    blocked_users = User.query.filter(User.isadmin == False, User.isblocked == True).count()
 
     thirty_days_ago = datetime.utcnow() - timedelta(days=30)
     active_users = 0
-    for user in User.query.filter(User.is_admin == False).all():
+    for user in User.query.filter(User.isadmin == False).all():
         wallet = ensure_wallet_for_user(user)
         if wallet and wallet.balance > 0:
             recent_games = [
@@ -1763,7 +1764,7 @@ def admin_announcements():
 @app.route("/api/admin/reports", methods=["GET"])
 @admin_required
 def admin_reports():
-    total_users = User.query.filter(User.is_admin == False).count()
+    total_users = User.query.filter(User.isadmin == False).count()
     total_wallets = Wallet.query.count()
     total_balance = db.session.query(db.func.sum(Wallet.balance)).scalar() or 0
     return jsonify({"total_users": total_users, "total_wallets": total_wallets, "total_balance": total_balance, "top_games": [], "top_users": []})
