@@ -1942,35 +1942,40 @@ def handle_place_bet(data):
 
 
 def seed_demo_users():
-    print("\n🔄 Checking/Creating users...")
-
-    demo_usernames = ["demo"] + [f"demo{i}" for i in range(1, 6)]
-    for uname in demo_usernames:
+    print("👥 Checking/Creating users...")
+    demousernames = [f"demo{i}" for i in range(1, 6)]
+    
+    for uname in demousernames:
         user = User.query.filter_by(username=uname).first()
         if not user:
-            user = User(username=uname, display_name=uname)
+            user = User(username=uname)  # ✅ No display_name!
             user.set_password("demo123")
             db.session.add(user)
             db.session.commit()
-            print(f"✅ Created user: {uname}")
-        ensure_wallet_for_user(user)
-
+            print(f"✅ Created user '{uname}'")
+            ensure_wallet_for_user(user)
+    
+    # Admin user
     admin = User.query.filter_by(username="admin").first()
     if not admin:
-        print("✅ Creating admin user...")
-        admin = User(username="admin", display_name="Admin User", is_admin=True)
+        print("Creating admin user...")
+        admin = User(username="admin")  # ✅ No display_name!
         admin.set_password("admin123")
         db.session.add(admin)
         db.session.commit()
-        print("✅ Admin user created: is_admin=True (NO WALLET)")
+        admin.displayname = "Admin User"  # Safe after creation
+        admin.isadmin = True
+        db.session.commit()
+        print("✅ Admin user created (isadmin=True, NO WALLET)")
     else:
-        if not admin.is_admin:
-            print("⚠️  Fixing admin user: setting is_admin=True")
-            admin.is_admin = True
+        if not admin.isadmin:
+            print("Fixing admin user (setting isadmin=True)")
+            admin.isadmin = True
             db.session.commit()
-        print("✅ Admin user verified: is_admin=True")
+            print("✅ Admin user verified (isadmin=True)")
+    
+    print("✅ All users ready!")
 
-    print("✅ All users ready!\n")
 
 
 # ---------------------------------------------------
