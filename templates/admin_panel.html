@@ -251,10 +251,12 @@
     }
 
     .data-table { width: 100%; border-collapse: collapse; font-size: 14px; }
+
     .data-table thead {
       background: linear-gradient(90deg, #0f172a 0%, #1e293b 100%);
       border-bottom: 2px solid #334155;
     }
+
     .data-table th {
       padding: 18px 20px;
       text-align: left;
@@ -265,12 +267,14 @@
       font-size: 12px;
       white-space: nowrap;
     }
+
     .data-table td {
       padding: 16px 20px;
       border-bottom: 1px solid #334155;
       color: #cbd5e1;
       vertical-align: middle;
     }
+
     .data-table tbody tr:hover { background: rgba(16,185,129,0.05); }
 
     /* BADGES */
@@ -289,21 +293,25 @@
       color: #10b981;
       border: 1px solid rgba(16,185,129,0.3);
     }
+
     .badge-blocked {
       background: rgba(239,68,68,0.2);
       color: #ef4444;
       border: 1px solid rgba(239,68,68,0.3);
     }
+
     .badge-pending {
       background: rgba(245,158,11,0.2);
       color: #f59e0b;
       border: 1px solid rgba(245,158,11,0.3);
     }
+
     .badge-deposit {
       background: rgba(34,197,94,0.2);
       color: #22c55e;
       border: 1px solid rgba(34,197,94,0.3);
     }
+
     .badge-withdrawal {
       background: rgba(239,68,68,0.2);
       color: #ef4444;
@@ -929,6 +937,71 @@
     </div>
   </div>
 
+  <!-- Edit User Profile -->
+  <div id="editUserModal" class="modal">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h2>✏️ Edit User</h2>
+        <p>Update profile details (not wallet)</p>
+      </div>
+
+      <form id="editUserForm">
+        <input type="hidden" id="editUserId" />
+
+        <div class="form-row">
+          <div class="form-group">
+            <label>Username</label>
+            <input type="text" id="editUsername" disabled />
+          </div>
+          <div class="form-group">
+            <label>Status</label>
+            <select id="editStatus">
+              <option value="active">Active</option>
+              <option value="blocked">Blocked</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="form-row">
+          <div class="form-group">
+            <label>Display Name</label>
+            <input type="text" id="editDisplayName" placeholder="Display name" />
+          </div>
+          <div class="form-group">
+            <label>Email</label>
+            <input type="email" id="editEmail" placeholder="Email" />
+          </div>
+        </div>
+
+        <div class="form-row">
+          <div class="form-group">
+            <label>Country</label>
+            <input type="text" id="editCountry" placeholder="Country" />
+          </div>
+          <div class="form-group">
+            <label>Phone</label>
+            <input type="text" id="editPhone" placeholder="Phone" />
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label>Block Reason (only if blocked)</label>
+          <input type="text" id="editBlockReason" placeholder="Reason..." />
+        </div>
+
+        <div class="form-group">
+          <label>Reset Password (optional)</label>
+          <input type="password" id="editPassword" placeholder="Leave blank to keep unchanged" />
+        </div>
+
+        <div class="modal-footer">
+          <button type="submit" class="btn-modal btn-save">Save</button>
+          <button type="button" class="btn-modal btn-cancel" onclick="closeEditUserModal()">Cancel</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
   <!-- Add Funds -->
   <div id="addFundsModal" class="modal">
     <div class="modal-content">
@@ -1215,6 +1288,7 @@
       document.getElementById('deductFundsForm')?.addEventListener('submit', submitDeductFunds);
       document.getElementById('addPromoForm')?.addEventListener('submit', submitAddPromo);
       document.getElementById('announceForm')?.addEventListener('submit', submitAnnounce);
+      document.getElementById('editUserForm')?.addEventListener('submit', submitEditUser);
 
       document.getElementById('searchUsers')?.addEventListener('keyup', filterAndDisplayUsers);
       document.getElementById('searchGames')?.addEventListener('keyup', displayGames);
@@ -1230,7 +1304,6 @@
       try {
         const data = await apiGet('/api/admin/stats');
 
-        // app.py returns totalusers, activegames, totalrevenue, totaldeposit, totalwithdrawal
         document.getElementById('totalUsers').textContent = data.totalusers ?? 0;
         document.getElementById('activeGames').textContent = data.activegames ?? 0;
         document.getElementById('totalRevenue').textContent = fmtINR(data.totalrevenue ?? 0);
@@ -1253,16 +1326,21 @@
 
       try {
         const data = await apiGet('/api/admin/users');
+
+        // Store profile fields if backend sends them
         allUsers = (data || []).map(u => ({
           id: u.id,
           username: u.username || '-',
+          displayname: u.displayname || u.displayName || '',
           email: u.email || '-',
-          agentname: u.agentname || u.refer_id || '-',
+          country: u.country || '',
+          phone: u.phone || '',
+          agentname: u.agentname || u.refer_id || u.referid || '-',
           balance: Number(u.balance || 0),
           gamesplayed: Number(u.gamesplayed || 0),
-          status: u.status || (u.isblocked ? 'blocked' : 'active'),
+          status: (u.status || (u.isblocked ? 'blocked' : 'active')),
           createdat: u.createdat || '-',
-          blockreason: u.blockreason || ''
+          blockreason: u.blockreason || u.blockReason || ''
         }));
 
         buildUserDatalist();
@@ -1317,14 +1395,14 @@
           <td>${fmtINR(user.balance || 0)}</td>
           <td>
             <a href="javascript:;" onclick="openUserGamesPage(${user.id}, '${safeU}')" style="color:#10b981; cursor:pointer;">
-              View
+              ${Number(user.gamesplayed || 0)}
             </a>
           </td>
           <td><span class="badge ${userStatusBadgeClass(status)}">${String(status).toUpperCase()}</span></td>
           <td>${user.createdat || '-'}</td>
           <td>
             <div class="action-buttons">
-              <button class="btn-small btn-edit" onclick="editUserBalance(${user.id}, '${safeU}', ${Number(user.balance || 0)})">✏️ Edit</button>
+              <button class="btn-small btn-edit" onclick="openEditUserModal(${user.id})">✏️ Edit</button>
               ${isBlocked
                 ? `<button class="btn-small btn-unblock" onclick="unblockUser(${user.id})">🔓 Unblock</button>`
                 : `<button class="btn-small btn-block" onclick="blockUser(${user.id})">⛔ Block</button>`
@@ -1336,19 +1414,51 @@
       });
     }
 
-    async function editUserBalance(userId, username, balance) {
-      const newBalance = prompt(`Edit Balance for ${username}\nCurrent: ${fmtINR(balance)}`, String(balance));
-      if (newBalance === null) return;
+    function openEditUserModal(userId) {
+      const u = (allUsers || []).find(x => x.id === userId);
+      if (!u) return;
 
-      const value = parseInt(newBalance, 10);
-      if (Number.isNaN(value) || value < 0) {
-        alert('Invalid amount');
-        return;
-      }
+      document.getElementById('editUserId').value = u.id;
+      document.getElementById('editUsername').value = u.username || '';
+      document.getElementById('editStatus').value = (u.status || 'active').toLowerCase();
+      document.getElementById('editDisplayName').value = u.displayname || '';
+      document.getElementById('editEmail').value = u.email || '';
+      document.getElementById('editCountry').value = u.country || '';
+      document.getElementById('editPhone').value = u.phone || '';
+      document.getElementById('editBlockReason').value = u.blockreason || '';
+      document.getElementById('editPassword').value = '';
+
+      document.getElementById('editUserModal').classList.add('active');
+    }
+
+    function closeEditUserModal() {
+      document.getElementById('editUserModal').classList.remove('active');
+      document.getElementById('editUserForm')?.reset();
+    }
+
+    async function submitEditUser(e) {
+      e.preventDefault();
+
+      const userId = document.getElementById('editUserId').value;
+
+      const payload = {
+        email: document.getElementById('editEmail').value,
+        displayname: document.getElementById('editDisplayName').value,
+        displayName: document.getElementById('editDisplayName').value,
+        country: document.getElementById('editCountry').value,
+        phone: document.getElementById('editPhone').value,
+        status: document.getElementById('editStatus').value,
+        blockreason: document.getElementById('editBlockReason').value,
+        blockReason: document.getElementById('editBlockReason').value
+      };
+
+      const pw = document.getElementById('editPassword').value;
+      if (pw && pw.trim().length) payload.password = pw.trim();
 
       try {
-        const res = await apiSend(`/api/admin/users/${userId}`, 'PUT', { balance: value });
+        const res = await apiSend(`/api/admin/users/${userId}`, 'PUT', payload);
         alert(res.message || 'Updated');
+        closeEditUserModal();
         await loadUsers();
         await loadStats();
       } catch (err) {
@@ -1922,7 +2032,6 @@
     async function loadReports() {
       try {
         const data = await apiGet('/api/admin/reports');
-        // Your app.py reports returns totalusers/totalwallets/totalbalance; map minimally to existing UI
         document.getElementById('newUsers30d').textContent = data.totalusers ?? 0;
         document.getElementById('revenue30d').textContent = fmtINR(data.totalbalance ?? 0);
         document.getElementById('gamesPlayed30d').textContent = 0;
