@@ -288,7 +288,7 @@ def superadmin_required(f):
 
 def ensure_wallet_for_user(user: User) -> Wallet:
     """Ensure the user has a wallet row with starting 10000 coins - ONLY FOR NON-ADMIN USERS"""
-    if user.is_admin:
+    if getattr(user, 'isadmin', False):
         return None
     if not user.wallet:
         wallet = Wallet(user_id=user.id, balance=10000)
