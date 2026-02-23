@@ -1235,7 +1235,7 @@ def profile_page():
     return render_template(
         "profile.html",
         username=user.username,
-        display_name=user.display_name or user.username,
+        display_name=user.displayname or user.username,
         joined_at=joined_at,
         wallet_balance=wallet_balance,
         email=user.email or "",
