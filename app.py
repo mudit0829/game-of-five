@@ -1356,26 +1356,26 @@ def admin_panel():
 @app.route("/api/admin/users", methods=["GET"])
 @admin_required
 def admin_get_users():
-    users = User.query.filter(User.is_admin == False).all()
-    user_list = []
-
+    users = User.query.filter(User.isadmin == False).all()
+    userlist = []    
     for user in users:
         wallet = ensure_wallet_for_user(user)
         userlist.append({
             "id": user.id,
-            "username": user.username,
-            "displayname": user.displayname or "",
-            "email": user.email or "",
-            "country": user.country or "",
-            "phone": user.phone or "",
-            "status": "blocked" if user.isblocked else "active",
+            "username": user.username or '-',
+            "displayname": getattr(user, 'displayname', getattr(user, 'display_name', '')) or '',
+            "email": getattr(user, 'email', '') or '',
+            "country": getattr(user, 'country', '') or '',
+            "phone": getattr(user, 'phone', '') or '',
+            "agentname": getattr(user, 'agentname', '') or getattr(user, 'refer_id', '') or getattr(user, 'referid', '') or '-',
+            "status": "blocked" if getattr(user, 'isblocked', False) else "active",
             "balance": wallet.balance if wallet else 0,
-            "createdat": fmtist(user.createdat, "%Y-%m-%d %H:%M"),
-            "blockreason": user.blockreason or ""
+            "gamesplayed": getattr(user, 'gamesplayed', 0),  # if you track this
+            "createdat": fmtist(getattr(user, 'createdat', None), "%Y-%m-%d %H:%M") or '-',
+            "blockreason": getattr(user, 'blockreason', '') or ''
         })
-
-    return jsonify(user_list)
-
+    
+    return jsonify(userlist)
 
 @app.route("/api/admin/users/<int:user_id>", methods=["PUT"])
 @admin_required
