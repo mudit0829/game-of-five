@@ -132,27 +132,27 @@ GAME_CONFIGS = {
 class User(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     username = db.Column(db.String(80), unique=True, nullable=False, index=True)
-    password_hash = db.Column(db.String(128), nullable=False)
-    created_at = db.Column(db.DateTime, default=datetime.utcnow)
-
-    display_name = db.Column(db.String(120))
+    passwordhash = db.Column(db.String(128), nullable=False)
+    createdat = db.Column(db.DateTime, default=datetime.utcnow)
+    
+    # Profile fields (add these)
+    displayname = db.Column(db.String(120))
     email = db.Column(db.String(200))
     country = db.Column(db.String(100))
     phone = db.Column(db.String(50))
-
-    # Admin fields
-    is_admin = db.Column(db.Boolean, default=False)
-    is_blocked = db.Column(db.Boolean, default=False)
-    block_reason = db.Column(db.Text)
-
-    wallet = db.relationship("Wallet", backref="user", uselist=False)
-    tickets = db.relationship("Ticket", backref="user", lazy=True)
+    
+    isadmin = db.Column(db.Boolean, default=False)
+    isblocked = db.Column(db.Boolean, default=False)
+    blockreason = db.Column(db.Text)
+    
+    wallet = db.relationship('Wallet', backref='user', uselist=False)
+    tickets = db.relationship('Ticket', backref='user', lazy='dynamic')
 
     def set_password(self, password: str):
-        self.password_hash = hashlib.sha256(password.encode()).hexdigest()
+        self.passwordhash = hashlib.sha256(password.encode()).hexdigest()
 
     def check_password(self, password: str) -> bool:
-        return self.password_hash == hashlib.sha256(password.encode()).hexdigest()
+        return self.passwordhash == hashlib.sha256(password.encode()).hexdigest()
 
 
 class Wallet(db.Model):
