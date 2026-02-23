@@ -1361,17 +1361,19 @@ def admin_get_users():
 
     for user in users:
         wallet = ensure_wallet_for_user(user)
-        user_list.append(
-            {
-                "id": user.id,
-                "username": user.username,
-                "email": user.email or "",
-                "password_hash": user.password_hash,
-                "status": "blocked" if user.is_blocked else "active",
-                "balance": wallet.balance if wallet else 0,
-                "created_at": fmt_ist(user.created_at, "%Y-%m-%d %H:%M"),
-                "block_reason": user.block_reason or "",
-            }
+        userlist.append({
+            "id": user.id,
+            "username": user.username,
+            "displayname": user.displayname or "",
+            "email": user.email or "",
+            "country": user.country or "",
+            "phone": user.phone or "",
+            "status": "blocked" if user.isblocked else "active",
+            "balance": wallet.balance if wallet else 0,
+            "createdat": fmtist(user.createdat, "%Y-%m-%d %H:%M"),
+            "blockreason": user.blockreason or ""
+        })
+
         )
 
     return jsonify(user_list)
@@ -1380,40 +1382,47 @@ def admin_get_users():
 @app.route("/api/admin/users/<int:user_id>", methods=["PUT"])
 @admin_required
 def admin_update_user(user_id):
-    user = User.query.get(user_id)
+    user = User.query.get(userid)
     if not user:
-        return jsonify({"success": False, "message": "User not found"}), 404
+        return jsonify(success=False, message="User not found"), 404
 
     data = request.get_json() or {}
 
-    if "username" in data:
-        user.username = data["username"]
+    # Username (optional)
+    if "username" in data and data["username"]:
+        user.username = str(data["username"]).strip()
+
+    # Profile fields
+    if "displayname" in data:
+        user.displayname = (data.get("displayname") or "").strip()
+    if "displayName" in data and not user.displayname:
+        user.displayname = (data.get("displayName") or "").strip()
+
     if "email" in data:
-        user.email = data["email"]
+        user.email = (data.get("email") or "").strip()
+
+    if "country" in data:
+        user.country = (data.get("country") or "").strip()
+
+    if "phone" in data:
+        user.phone = (data.get("phone") or "").strip()
+
+    # Password reset (optional)
     if "password" in data and data["password"]:
-        user.set_password(data["password"])
+        user.set_password(str(data["password"]).strip())
+
+    # Block/unblock via status
     if "status" in data:
-        user.is_blocked = data["status"] == "blocked"
-    if "balance" in data:
-        wallet = ensure_wallet_for_user(user)
-        if wallet:
-            wallet.balance = data["balance"]
-    if "block_reason" in data:
-        user.block_reason = data["block_reason"]
+        user.isblocked = (str(data.get("status")).lower() == "blocked")
 
-    if 'displayname' in data:
-        user.displayname = data['displayname']
-
-    if 'country' in data:
-        user.country = data['country']
-
-    if 'phone' in data:
-        user.phone = data['phone']
-
+    # Block reason
+    if "blockreason" in data:
+        user.blockreason = (data.get("blockreason") or "").strip()
+    if "blockReason" in data and not user.blockreason:
+        user.blockreason = (data.get("blockReason") or "").strip()
 
     db.session.commit()
-    return jsonify({"success": True, "message": "User updated successfully"})
-
+    return jsonify(success=True, message="User updated successfully")
 
 @app.route("/api/admin/users/<int:user_id>/block", methods=["POST"])
 @admin_required
@@ -1549,29 +1558,133 @@ def admin_get_stats():
 @admin_required
 def admin_user_games(user_id):
     bets = user_game_history.get(user_id, [])
-    out = []
+    grouped = {}  # (game_type, round_code, table_number) -> row
+
     for b in bets:
-        cfg = GAME_CONFIGS.get(b["game_type"], {})
-        out.append(
-            {
-                "game_type": b["game_type"],
-                "round_code": b["round_code"],
-                "bet_amount": b.get("bet_amount", cfg.get("bet_amount", 0)),
-                "number": b.get("number"),
-                "table_number": b.get("table_number"),
-                "is_resolved": b.get("is_resolved", False),
-                "status": b.get("status"),
-                "winning_number": b.get("winning_number"),
-                "amount": b.get("amount", 0),
-                "date_time": b.get("date_time")
-                or (
-                    b.get("bet_time").strftime("%Y-%m-%d %H:%M")
-                    if isinstance(b.get("bet_time"), datetime)
-                    else ""
-                ),
+        if not isinstance(b, dict):
+            continue
+
+        game_type = b.get("game_type") or "-"
+        round_code = b.get("round_code") or "-"
+        table_number = b.get("table_number")
+
+        key = (game_type, round_code, table_number)
+
+        cfg = GAME_CONFIGS.get(game_type, {}) or {}
+
+        # bet amount (per pick)
+        bet_amount = b.get("bet_amount", cfg.get("bet_amount", 0))
+        try:
+            bet_amount = int(bet_amount or 0)
+        except Exception:
+            bet_amount = 0
+
+        # net amount (win payout OR -bet_amount depending on your game history logic)
+        amount = b.get("amount", 0)
+        try:
+            amount = int(amount or 0)
+        except Exception:
+            amount = 0
+
+        number = b.get("number", None)
+        is_resolved = bool(b.get("is_resolved", False))
+        status = (b.get("status") or "").lower()  # "win" / "lose" / None
+        winning_number = b.get("winning_number", None)
+
+        date_time = b.get("date_time") or ""
+        bet_time = b.get("bet_time")  # may be datetime
+
+        g = grouped.get(key)
+        if not g:
+            g = {
+                "game_type": game_type,
+                "round_code": round_code,
+                "table_number": table_number,
+
+                "numbers": [],
+                "total_bet_amount": 0,
+
+                "winning_number": None,
+                "result": "pending",   # pending / win / lose / resolved
+                "net_amount": 0,
+
+                "date_time": "",
+
+                # internal helpers
+                "_all_resolved": True,
+                "_any_win": False,
+                "_any_lose": False,
+                "_latest_bt": None,
+                "_sort_ts": 0,
             }
-        )
+            grouped[key] = g
+
+        if number is not None:
+            g["numbers"].append(number)
+
+        g["total_bet_amount"] += bet_amount
+        g["net_amount"] += amount
+
+        if winning_number is not None:
+            g["winning_number"] = winning_number
+
+        if not is_resolved:
+            g["_all_resolved"] = False
+
+        if status == "win":
+            g["_any_win"] = True
+        elif status == "lose":
+            g["_any_lose"] = True
+
+        # Date/time preference: use provided date_time, else latest bet_time
+        if date_time:
+            g["date_time"] = date_time
+
+        if isinstance(bet_time, datetime):
+            if (g["_latest_bt"] is None) or (bet_time > g["_latest_bt"]):
+                g["_latest_bt"] = bet_time
+                g["_sort_ts"] = int(bet_time.timestamp())
+                if not g["date_time"]:
+                    g["date_time"] = bet_time.strftime("%Y-%m-%d %H:%M")
+
+    out = []
+    for g in grouped.values():
+        # unique numbers, keep order
+        seen = set()
+        uniq_nums = []
+        for n in g["numbers"]:
+            if n in seen:
+                continue
+            seen.add(n)
+            uniq_nums.append(n)
+        g["numbers"] = uniq_nums
+
+        # compute round result
+        if g["_all_resolved"]:
+            if g["_any_win"]:
+                g["result"] = "win"
+            elif g["_any_lose"]:
+                g["result"] = "lose"
+            else:
+                g["result"] = "resolved"
+        else:
+            g["result"] = "pending"
+
+        # remove internal fields
+        g.pop("_all_resolved", None)
+        g.pop("_any_win", None)
+        g.pop("_any_lose", None)
+        g.pop("_latest_bt", None)
+
+        out.append(g)
+
+    # newest first (by bet_time if available)
+    out.sort(key=lambda x: x.get("_sort_ts", 0), reverse=True)
+    for g in out:
+        g.pop("_sort_ts", None)
+
     return jsonify(out)
+
 
 
 @app.route("/api/admin/agents", methods=["GET"])
