@@ -1224,55 +1224,55 @@ def history_page():
 def profilepage():
     uid = session.get("userid") or session.get("user_id")
     if not uid:
-        return redirect(url_for("loginpage"))
+        return redirect(url_for("loginpage"))  # your login function name in app.py
 
     user = User.query.get(int(uid))
     if not user:
         return redirect(url_for("logout"))
 
     wallet = ensurewalletforuser(user)
-    walletbalance = wallet.balance if wallet else 0
+    walletbalance = int(wallet.balance) if wallet else 0
 
-    joinedat = user.createdat.strftime("%d %b %Y") if getattr(user, "createdat", None) else "Just now"
+    joinedat = user.createdat.strftime("%d %b %Y") if user.createdat else "Just now"
 
-    # Transactions: support both possible column names
-    q = Transaction.query
-    if hasattr(Transaction, "userid"):
-        q = q.filter_by(userid=int(uid))
-    else:
-        q = q.filter_by(user_id=int(uid))
-
-    transactions = q.order_by(Transaction.datetime.desc()).limit(50).all()
+    # Transactions: your model uses "userid" (not user_id) in file:73
+    transactions = (
+        Transaction.query
+        .filter_by(userid=int(uid))
+        .order_by(Transaction.datetime.desc())
+        .limit(50)
+        .all()
+    )
 
     txns = []
     for t in transactions:
         txns.append({
             "kind": t.kind,
-            "amount": t.amount,
-            "datetime": t.datetime.isoformat() if getattr(t, "datetime", None) else "",
-            "label": t.label or (t.kind.title() if t.kind else ""),
-            "gametitle": getattr(t, "gametitle", "") or "",
-            "note": t.note or "",
-            "balanceafter": getattr(t, "balanceafter", None),
+            "amount": int(t.amount),
+            "datetime": t.datetime.isoformat() if t.datetime else "",
+            "label": (t.label or (t.kind.title() if t.kind else "")),
+            "gametitle": (t.gametitle or ""),
+            "note": (t.note or ""),
+            "balanceafter": int(t.balanceafter) if t.balanceafter is not None else None,
         })
 
     return render_template(
         "profile.html",
         username=user.username,
-        displayname=user.displayname or user.username,
+        displayname=(user.displayname or user.username),
         joinedat=joinedat,
         walletbalance=walletbalance,
-        email=user.email or "",
-        country=user.country or "",
-        phone=user.phone or "",
+        email=(user.email or ""),
+        country=(user.country or ""),
+        phone=(user.phone or ""),
         transactions=txns,
     )
 
 @app.route("/profile/update", methods=["POST"])
-@loginrequired
+@login_required
 def profileupdate():
     uid = session.get("userid") or session.get("user_id")
-    user = User.query.get(uid)
+    user = User.query.get(int(uid)) if uid else None
     if not user:
         return jsonify({"success": False, "message": "User not found"}), 404
 
@@ -1284,21 +1284,16 @@ def profileupdate():
     phone = data.get("phone")
 
     if display is not None:
-        v = str(display).strip()
-        user.displayname = v if v else user.displayname
-
+        user.displayname = str(display).strip() or user.displayname or user.username
     if email is not None:
         user.email = str(email).strip()
-
     if country is not None:
         user.country = str(country).strip()
-
     if phone is not None:
         user.phone = str(phone).strip()
 
     db.session.commit()
     return jsonify({"success": True, "message": "Profile updated"})
-
 
 @app.route("/help")
 @login_required
