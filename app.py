@@ -13,6 +13,7 @@ from flask_cors import CORS
 from datetime import datetime, timedelta, timezone
 from zoneinfo import ZoneInfo
 from functools import wraps
+from sqlalchemy.orm import synonym
 import threading
 import random
 import time
@@ -212,8 +213,11 @@ class Ticket(db.Model):
 
 class Transaction(db.Model):
     id = db.Column(db.Integer, primary_key=True)
+
     user_id = db.Column(db.Integer, db.ForeignKey("user.id"), nullable=False, index=True)
-    kind = db.Column(db.String(50), nullable=False)  # 'bet', 'win', 'added', 'redeem'
+    userid = synonym("user_id")  # ✅ alias so filter_by(userid=...) works too
+
+    kind = db.Column(db.String(50), nullable=False)
     amount = db.Column(db.Integer, nullable=False)
     balance_after = db.Column(db.Integer, nullable=False)
     label = db.Column(db.String(100))
