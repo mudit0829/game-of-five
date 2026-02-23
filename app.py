@@ -278,6 +278,8 @@ def make_round_code(game_type: str, start_time: datetime, table_number: int) -> 
 
 
 def login_required(f):
+    # Backward compatible alias (so older decorators won't crash)
+loginrequired = login_required
     @wraps(f)
     def decorated(*args, **kwargs):
         if "user_id" not in session:
