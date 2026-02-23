@@ -154,6 +154,43 @@ class User(db.Model):
     def check_password(self, password: str) -> bool:
         return self.passwordhash == hashlib.sha256(password.encode()).hexdigest()
 
+    # ---------------- Compatibility aliases (safe) ----------------
+    # Your codebase uses mixed naming (isadmin vs is_admin, etc).
+    # These aliases prevent 500 errors without changing game logic.
+
+    # old method names used in other parts (seed/admin)
+    def setpassword(self, password: str):
+        return self.set_password(password)
+
+    def checkpassword(self, password: str) -> bool:
+        return self.check_password(password)
+
+    # old property names used in login/admin
+    @property
+    def is_admin(self):
+        return bool(self.isadmin)
+
+    @is_admin.setter
+    def is_admin(self, v):
+        self.isadmin = bool(v)
+
+    @property
+    def is_blocked(self):
+        return bool(self.isblocked)
+
+    @is_blocked.setter
+    def is_blocked(self, v):
+        self.isblocked = bool(v)
+
+    @property
+    def block_reason(self):
+        return self.blockreason
+
+    @block_reason.setter
+    def block_reason(self, v):
+        self.blockreason = v
+
+
 
 class Wallet(db.Model):
     id = db.Column(db.Integer, primary_key=True)
@@ -1102,7 +1139,7 @@ def register_page():
     if existing:
         return jsonify({"success": False, "message": "Username already exists"}), 400
 
-    user = User(username=username, display_name=username)
+    user = User(username=uname, displayname=uname)
     user.set_password(password)
     db.session.add(user)
     db.session.commit()
