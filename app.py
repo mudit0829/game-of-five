@@ -220,10 +220,13 @@ class Transaction(db.Model):
     kind = db.Column(db.String(50), nullable=False)
     amount = db.Column(db.Integer, nullable=False)
     balance_after = db.Column(db.Integer, nullable=False)
+    balanceafter = synonym("balance_after")
     label = db.Column(db.String(100))
     game_title = db.Column(db.String(100))
+    gametitle = synonym("game_title")
     note = db.Column(db.Text)
     datetime = db.Column(db.DateTime, default=datetime.utcnow, index=True)
+    
 
 
 class ForcedWinnerHistory(db.Model):
