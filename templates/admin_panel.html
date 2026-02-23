@@ -540,6 +540,43 @@
 
         <!-- USERS -->
         <div id="users" class="section">
+                  <!-- USER GAMES (NEW PAGE) -->
+        <div id="userGames" class="section">
+          <div class="section-header">
+            <h2 class="section-title" id="userGamesTitle">User Games</h2>
+            <button class="btn-primary" onclick="backToUsers()">← Back</button>
+          </div>
+
+          <div class="controls">
+            <div class="search-box">
+              <input type="text" id="searchUserGames" placeholder="Search by round code / game type..." />
+              <button onclick="displayUserGames()">🔍 Search</button>
+            </div>
+          </div>
+
+          <div id="userGamesLoading" class="loading">Loading games...</div>
+
+          <div id="userGamesTableContainer" style="display:none;">
+            <div class="table-container">
+              <table class="data-table">
+                <thead>
+                  <tr>
+                    <th>Round Code</th>
+                    <th>Game</th>
+                    <th>Numbers</th>
+                    <th>Bet</th>
+                    <th>Winning #</th>
+                    <th>Result</th>
+                    <th>Net/Payout</th>
+                    <th>Date/Time</th>
+                  </tr>
+                </thead>
+                <tbody id="userGamesTableBody"></tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+
           <div class="section-header">
             <h2 class="section-title">Users Management</h2>
           </div>
@@ -1036,6 +1073,80 @@
     let allTxns = [];
     let allWalletUsers = [];
 
+        // ---------- Helpers (fix missing data due to backend key names) ----------
+    async function apiGet(url) {
+      const r = await fetch(url, { credentials: 'same-origin' });
+      const ct = r.headers.get('content-type') || '';
+      let data = null;
+
+      if (ct.includes('application/json')) {
+        data = await r.json().catch(() => null);
+      } else {
+        data = await r.text().catch(() => '');
+      }
+
+      if (!r.ok) {
+        const msg = (data && data.message) ? data.message : (typeof data === 'string' ? data : `HTTP ${r.status}`);
+        throw new Error(`${url} -> ${msg}`);
+      }
+      return data;
+    }
+
+    function pick(obj, keys, fallback = '-') {
+      for (const k of keys) {
+        if (obj && obj[k] !== undefined && obj[k] !== null && obj[k] !== '') return obj[k];
+      }
+      return fallback;
+    }
+
+    function pickNum(obj, keys, fallback = 0) {
+      const v = pick(obj, keys, null);
+      const n = Number(v);
+      return Number.isFinite(n) ? n : fallback;
+    }
+
+    function normalizeUser(u) {
+      const blocked = (pick(u, ['status'], '').toLowerCase() === 'blocked') || Boolean(u.blocked);
+      return {
+        id: pick(u, ['id', 'user_id', 'userid']),
+        username: pick(u, ['username', 'user', 'name']),
+        email: pick(u, ['email'], '-'),
+        agentname: pick(u, ['agentname', 'agent_name', 'agent', 'referrer', 'refer_id'], '-'),
+        balance: pickNum(u, ['balance', 'wallet', 'coins', 'points']),
+        gamesplayed: pickNum(u, ['gamesplayed', 'games_played', 'total_games']),
+        status: blocked ? 'blocked' : (pick(u, ['status'], 'active') || 'active'),
+        createdat: pick(u, ['createdat', 'created_at', 'createdAt', 'joined', 'date_joined'], '-'),
+      };
+    }
+
+    function normalizeGame(g) {
+      return {
+        roundcode: pick(g, ['roundcode', 'round_code', 'roundCode', 'code']),
+        gametype: pick(g, ['gametype', 'game_type', 'game', 'type']),
+        players: pickNum(g, ['players', 'player_count']),
+        maxplayers: pickNum(g, ['maxplayers', 'max_players', 'capacity']),
+        winningnumber: pick(g, ['winningnumber', 'winning_number', 'win', 'result'], null),
+        totalbets: pickNum(g, ['totalbets', 'total_bets', 'totalBet', 'bet_total']),
+        payout: pickNum(g, ['payout', 'payout_total', 'total_payout', 'win_total'], null),
+        gamedate: pick(g, ['gamedate', 'game_date', 'date', 'created_at'], '-'),
+        gametime: pick(g, ['gametime', 'game_time', 'time'], ''),
+        status: pick(g, ['status', 'state'], '-'),
+      };
+    }
+
+    function normalizeTxn(t) {
+      return {
+        txnid: pick(t, ['txnid', 'txn_id', 'id']),
+        username: pick(t, ['username', 'user', 'user_name'], '-'),
+        type: pick(t, ['type', 'txn_type'], '-'),
+        amount: pickNum(t, ['amount', 'amt', 'value']),
+        status: pick(t, ['status', 'txn_status'], '-'),
+        txndate: pick(t, ['txndate', 'date', 'created_at', 'createdAt'], '-'),
+        reference: pick(t, ['reference', 'ref', 'order_id', 'roundcode', 'round_code'], '-'),
+      };
+    }
+
+
     document.addEventListener('DOMContentLoaded', function () {
       setupMenuLinks();
       loadStats();
@@ -1152,15 +1263,15 @@
     function loadUsers() {
       document.getElementById('usersLoading').style.display = 'block';
       document.getElementById('usersTableContainer').style.display = 'none';
-
-      fetch('/api/admin/users')
-        .then((r) => r.json())
+      
+      apiGet('/api/admin/users')
         .then((data) => {
-          allUsers = data || [];
+          allUsers = (data || []).map(normalizeUser);
           filterAndDisplayUsers();
           document.getElementById('usersLoading').style.display = 'none';
           document.getElementById('usersTableContainer').style.display = 'block';
         })
+
         .catch((err) => {
           console.error('Error loading users:', err);
           document.getElementById('usersLoading').innerHTML =
@@ -1196,7 +1307,7 @@
           <td>${user.agentname || '-'}</td>
           <td>${fmtINR(user.balance)}</td>
           <td>
-            <a href="javascript:;" onclick="viewUserGames(${user.id})"
+            <a href="javascript:;" onclick="openUserGamesPage(${user.id}, '${(user.username||'').replace(/'/g, "\\'")}')">
                style="color:#10b981; cursor:pointer;">
               ${user.gamesplayed ?? 0}
             </a>
@@ -1415,7 +1526,7 @@
       fetch('/api/admin/games')
         .then((r) => r.json())
         .then((data) => {
-          allGames = data || [];
+          allGames = (data || []).map(normalizeGame);
           displayGames();
           document.getElementById('gamesLoading').style.display = 'none';
           document.getElementById('gamesTableContainer').style.display = 'block';
@@ -1522,7 +1633,7 @@
       fetch('/api/admin/transactions')
         .then((r) => r.json())
         .then((data) => {
-          allTxns = data || [];
+          allTxns = (data || []).map(normalizeTxn);
           displayTransactions();
           document.getElementById('transactionsLoading').style.display = 'none';
           document.getElementById('transactionsTableContainer').style.display = 'block';
@@ -1849,6 +1960,85 @@
     document.addEventListener('click', function (e) {
       if (e.target.classList.contains('modal')) e.target.classList.remove('active');
     });
+
+        let currentUserGames = [];
+    let currentUserMeta = { id: null, username: '' };
+
+    function openUserGamesPage(userId, username) {
+      currentUserMeta = { id: userId, username: username || '' };
+      document.getElementById('userGamesTitle').textContent = `User Games: ${currentUserMeta.username} (#${userId})`;
+      switchSection('userGames');
+      loadUserGames(userId);
+      setTimeout(() => {
+        document.getElementById('searchUserGames')?.focus();
+      }, 50);
+    }
+
+    function backToUsers() {
+      switchSection('users');
+    }
+
+    async function loadUserGames(userId) {
+      document.getElementById('userGamesLoading').style.display = 'block';
+      document.getElementById('userGamesTableContainer').style.display = 'none';
+      currentUserGames = [];
+
+      try {
+        const data = await apiGet(`/api/admin/users/${userId}/games`);
+        currentUserGames = (data || []).map((g) => ({
+          roundcode: pick(g, ['roundcode','round_code','roundCode','code']),
+          gametype: pick(g, ['gametype','game_type','game','type']),
+          numbers: pick(g, ['numbers','chosen_numbers','bet_numbers'], []),
+          betamount: pickNum(g, ['betamount','bet_amount','bet','amount']),
+          winningnumber: pick(g, ['winningnumber','winning_number','win','result'], '-'),
+          status: pick(g, ['status','result','state'], '-'),
+          payout: pickNum(g, ['payout','net','profit','win_amount','winning_amount'], 0),
+          gamedate: pick(g, ['gamedate','game_date','date','created_at'], '-'),
+          gametime: pick(g, ['gametime','game_time','time'], ''),
+        }));
+
+        displayUserGames();
+        document.getElementById('userGamesLoading').style.display = 'none';
+        document.getElementById('userGamesTableContainer').style.display = 'block';
+      } catch (err) {
+        document.getElementById('userGamesLoading').innerHTML =
+          `<div style="color:#ef4444;">Error: ${err.message}</div>`;
+      }
+    }
+
+    function displayUserGames() {
+      const q = (document.getElementById('searchUserGames')?.value || '').toLowerCase();
+      const tbody = document.getElementById('userGamesTableBody');
+      tbody.innerHTML = '';
+
+      const filtered = (currentUserGames || []).filter((g) => {
+        return (g.roundcode || '').toLowerCase().includes(q) || (g.gametype || '').toLowerCase().includes(q);
+      });
+
+      if (!filtered.length) {
+        tbody.innerHTML = '<tr><td colspan="8" class="no-data">No games found</td></tr>';
+        return;
+      }
+
+      filtered.forEach((g) => {
+        const row = document.createElement('tr');
+        const nums = Array.isArray(g.numbers) ? g.numbers.join(', ') : String(g.numbers || '-');
+        const dt = `${g.gamedate || '-'} ${g.gametime || ''}`.trim();
+
+        row.innerHTML = `
+          <td><strong>${g.roundcode || '-'}</strong></td>
+          <td>${g.gametype || '-'}</td>
+          <td>${nums || '-'}</td>
+          <td>${fmtINR(g.betamount || 0)}</td>
+          <td>${g.winningnumber ?? '-'}</td>
+          <td>${String(g.status || '-').toUpperCase()}</td>
+          <td>${fmtINR(g.payout || 0)}</td>
+          <td>${dt}</td>
+        `;
+        tbody.appendChild(row);
+      });
+    }
+
   </script>
 </body>
 </html>
