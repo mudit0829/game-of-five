@@ -1361,7 +1361,7 @@ def admin_get_users():
 
     for user in users:
         wallet = ensure_wallet_for_user(user)
-        userlist.append{
+        userlist.append({
             "id": user.id,
             "username": user.username,
             "displayname": user.displayname or "",
@@ -1372,9 +1372,7 @@ def admin_get_users():
             "balance": wallet.balance if wallet else 0,
             "createdat": fmtist(user.createdat, "%Y-%m-%d %H:%M"),
             "blockreason": user.blockreason or ""
-        }
-
-        )
+        })
 
     return jsonify(user_list)
 
