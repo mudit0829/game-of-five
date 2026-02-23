@@ -345,6 +345,9 @@ def ensure_wallet_for_user(user: User) -> Wallet:
         return wallet
     return user.wallet
 
+# Backward compatible alias (older routes/templates call this name)
+ensurewalletforuser = ensure_wallet_for_user
+
 
 def generate_bot_name():
     prefixes = ["Amit", "Sanjay", "Riya", "Kunal", "Anita", "Rohit", "Meera", "Neeraj"]
