@@ -278,18 +278,25 @@ def make_round_code(game_type: str, start_time: datetime, table_number: int) -> 
 
 
 from functools import wraps
+from werkzeug.routing import BuildError
 
 def login_required(f):
     @wraps(f)
     def decorated(*args, **kwargs):
-        # support both session keys (your app uses both in places)
-        if "user_id" not in session and "userid" not in session:
-            return redirect(url_for("login_page"))
+        uid = session.get("userid") or session.get("user_id")
+        if not uid:
+            # Your app has login view named "loginpage" in app.py
+            try:
+                return redirect(url_for("loginpage"))
+            except BuildError:
+                # fallback (only if your endpoint is actually login_page)
+                return redirect(url_for("login_page"))
         return f(*args, **kwargs)
     return decorated
 
-# Backward compatible alias (MUST be outside the function, no indentation)
+# backward-compatible alias (keep your existing @loginrequired decorators working)
 loginrequired = login_required
+
 
 def admin_required(f):
     """Check if user is logged in AND is admin"""
@@ -1213,10 +1220,13 @@ def history_page():
 
 
 @app.route("/profile")
-@loginrequired
+@login_required
 def profilepage():
     uid = session.get("userid") or session.get("user_id")
-    user = User.query.get(uid)
+    if not uid:
+        return redirect(url_for("loginpage"))
+
+    user = User.query.get(int(uid))
     if not user:
         return redirect(url_for("logout"))
 
@@ -1225,13 +1235,14 @@ def profilepage():
 
     joinedat = user.createdat.strftime("%d %b %Y") if getattr(user, "createdat", None) else "Just now"
 
-    tx_query = Transaction.query
+    # Transactions: support both possible column names
+    q = Transaction.query
     if hasattr(Transaction, "userid"):
-        tx_query = tx_query.filter_by(userid=uid)
+        q = q.filter_by(userid=int(uid))
     else:
-        tx_query = tx_query.filter_by(user_id=uid)
+        q = q.filter_by(user_id=int(uid))
 
-    transactions = tx_query.order_by(Transaction.datetime.desc()).limit(50).all()
+    transactions = q.order_by(Transaction.datetime.desc()).limit(50).all()
 
     txns = []
     for t in transactions:
@@ -1240,9 +1251,9 @@ def profilepage():
             "amount": t.amount,
             "datetime": t.datetime.isoformat() if getattr(t, "datetime", None) else "",
             "label": t.label or (t.kind.title() if t.kind else ""),
-            "gametitle": getattr(t, "gametitle", "") or getattr(t, "game_title", "") or "",
+            "gametitle": getattr(t, "gametitle", "") or "",
             "note": t.note or "",
-            "balanceafter": getattr(t, "balanceafter", None) if hasattr(t, "balanceafter") else getattr(t, "balance_after", None),
+            "balanceafter": getattr(t, "balanceafter", None),
         })
 
     return render_template(
@@ -1256,7 +1267,6 @@ def profilepage():
         phone=user.phone or "",
         transactions=txns,
     )
-
 
 @app.route("/profile/update", methods=["POST"])
 @loginrequired
