@@ -277,17 +277,19 @@ def make_round_code(game_type: str, start_time: datetime, table_number: int) -> 
 # ---------------------------------------------------
 
 
+from functools import wraps
+
 def login_required(f):
-    # Backward compatible alias (so older decorators won't crash)
-loginrequired = login_required
     @wraps(f)
     def decorated(*args, **kwargs):
-        if "user_id" not in session:
+        # support both session keys (your app uses both in places)
+        if "user_id" not in session and "userid" not in session:
             return redirect(url_for("login_page"))
         return f(*args, **kwargs)
-
     return decorated
 
+# Backward compatible alias (MUST be outside the function, no indentation)
+loginrequired = login_required
 
 def admin_required(f):
     """Check if user is logged in AND is admin"""
