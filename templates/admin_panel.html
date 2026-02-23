@@ -4,6 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Admin Panel - Game of Five</title>
+
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
 
@@ -195,6 +196,8 @@
       justify-content: space-between;
       align-items: center;
       margin-bottom: 30px;
+      gap: 12px;
+      flex-wrap: wrap;
     }
 
     .section-title { font-size: 28px; font-weight: bold; color: #e2e8f0; margin: 0; }
@@ -260,11 +263,13 @@
       text-transform: uppercase;
       letter-spacing: 0.5px;
       font-size: 12px;
+      white-space: nowrap;
     }
     .data-table td {
       padding: 16px 20px;
       border-bottom: 1px solid #334155;
       color: #cbd5e1;
+      vertical-align: middle;
     }
     .data-table tbody tr:hover { background: rgba(16,185,129,0.05); }
 
@@ -276,6 +281,7 @@
       font-size: 12px;
       font-weight: 600;
       text-transform: capitalize;
+      white-space: nowrap;
     }
 
     .badge-active {
@@ -540,43 +546,6 @@
 
         <!-- USERS -->
         <div id="users" class="section">
-                  <!-- USER GAMES (NEW PAGE) -->
-        <div id="userGames" class="section">
-          <div class="section-header">
-            <h2 class="section-title" id="userGamesTitle">User Games</h2>
-            <button class="btn-primary" onclick="backToUsers()">← Back</button>
-          </div>
-
-          <div class="controls">
-            <div class="search-box">
-              <input type="text" id="searchUserGames" placeholder="Search by round code / game type..." />
-              <button onclick="displayUserGames()">🔍 Search</button>
-            </div>
-          </div>
-
-          <div id="userGamesLoading" class="loading">Loading games...</div>
-
-          <div id="userGamesTableContainer" style="display:none;">
-            <div class="table-container">
-              <table class="data-table">
-                <thead>
-                  <tr>
-                    <th>Round Code</th>
-                    <th>Game</th>
-                    <th>Numbers</th>
-                    <th>Bet</th>
-                    <th>Winning #</th>
-                    <th>Result</th>
-                    <th>Net/Payout</th>
-                    <th>Date/Time</th>
-                  </tr>
-                </thead>
-                <tbody id="userGamesTableBody"></tbody>
-              </table>
-            </div>
-          </div>
-        </div>
-
           <div class="section-header">
             <h2 class="section-title">Users Management</h2>
           </div>
@@ -607,6 +576,43 @@
                   </tr>
                 </thead>
                 <tbody id="usersTableBody"></tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+
+        <!-- USER GAMES (NEW PAGE) -->
+        <div id="userGames" class="section">
+          <div class="section-header">
+            <h2 class="section-title" id="userGamesTitle">User Games</h2>
+            <button class="btn-primary" onclick="backToUsers()">← Back</button>
+          </div>
+
+          <div class="controls">
+            <div class="search-box">
+              <input type="text" id="searchUserGames" placeholder="Search by round code / game type..." />
+              <button onclick="displayUserGames()">🔍 Search</button>
+            </div>
+          </div>
+
+          <div id="userGamesLoading" class="loading">Loading games...</div>
+
+          <div id="userGamesTableContainer" style="display:none;">
+            <div class="table-container">
+              <table class="data-table">
+                <thead>
+                  <tr>
+                    <th>Round Code</th>
+                    <th>Game</th>
+                    <th>Number</th>
+                    <th>Bet</th>
+                    <th>Winning #</th>
+                    <th>Status</th>
+                    <th>Net/Amount</th>
+                    <th>Date/Time</th>
+                  </tr>
+                </thead>
+                <tbody id="userGamesTableBody"></tbody>
               </table>
             </div>
           </div>
@@ -666,7 +672,6 @@
                     <th>Players</th>
                     <th>Winning #</th>
                     <th>Total Bets</th>
-                    <th>Payout</th>
                     <th>Date/Time</th>
                     <th>Status</th>
                     <th>Actions</th>
@@ -721,12 +726,14 @@
 
           <div class="controls">
             <div class="search-box">
-              <input type="text" id="searchWallet" placeholder="Search by username..." />
-              <button onclick="loadWalletUsers()">🔍 Search</button>
+              <input type="text" id="searchWallet" placeholder="Search by username..." list="usersDatalist" />
+              <button onclick="displayWalletUsers()">🔍 Search</button>
             </div>
             <button class="btn-primary" onclick="openAddFundsModal()">➕ Add Funds</button>
             <button class="btn-primary" onclick="openDeductFundsModal()">➖ Deduct Funds</button>
           </div>
+
+          <datalist id="usersDatalist"></datalist>
 
           <div id="walletLoading" class="loading">Loading wallet users...</div>
           <div id="walletTableContainer" style="display:none;">
@@ -932,7 +939,7 @@
       <form id="addFundsForm">
         <div class="form-group">
           <label>Select User</label>
-          <input type="text" id="addFundsUser" placeholder="Search user..." required />
+          <input type="text" id="addFundsUser" placeholder="Type username..." list="usersDatalist" required />
         </div>
         <div class="form-group">
           <label>Amount (₹)</label>
@@ -960,7 +967,7 @@
       <form id="deductFundsForm">
         <div class="form-group">
           <label>Select User</label>
-          <input type="text" id="deductFundsUser" placeholder="Search user..." required />
+          <input type="text" id="deductFundsUser" placeholder="Type username..." list="usersDatalist" required />
         </div>
         <div class="form-group">
           <label>Amount (₹)</label>
@@ -1058,6 +1065,7 @@
     <div class="modal-content">
       <div class="modal-header">
         <h2 id="detailsTitle">Details</h2>
+        <p id="detailsSubtitle" style="color:#94a3b8; margin-top:8px;"></p>
       </div>
       <div id="detailsContent"></div>
       <div class="modal-footer">
@@ -1073,17 +1081,16 @@
     let allTxns = [];
     let allWalletUsers = [];
 
-        // ---------- Helpers (fix missing data due to backend key names) ----------
+    // ------------------------
+    // Helpers
+    // ------------------------
     async function apiGet(url) {
       const r = await fetch(url, { credentials: 'same-origin' });
       const ct = r.headers.get('content-type') || '';
       let data = null;
 
-      if (ct.includes('application/json')) {
-        data = await r.json().catch(() => null);
-      } else {
-        data = await r.text().catch(() => '');
-      }
+      if (ct.includes('application/json')) data = await r.json().catch(() => null);
+      else data = await r.text().catch(() => '');
 
       if (!r.ok) {
         const msg = (data && data.message) ? data.message : (typeof data === 'string' ? data : `HTTP ${r.status}`);
@@ -1092,76 +1099,68 @@
       return data;
     }
 
-    function pick(obj, keys, fallback = '-') {
-      for (const k of keys) {
-        if (obj && obj[k] !== undefined && obj[k] !== null && obj[k] !== '') return obj[k];
-      }
-      return fallback;
+    async function apiSend(url, method, bodyObj) {
+      const r = await fetch(url, {
+        method,
+        credentials: 'same-origin',
+        headers: { 'Content-Type': 'application/json' },
+        body: bodyObj ? JSON.stringify(bodyObj) : undefined
+      });
+      const ct = r.headers.get('content-type') || '';
+      const data = ct.includes('application/json') ? await r.json().catch(() => ({})) : await r.text().catch(() => '');
+      if (!r.ok) throw new Error((data && data.message) ? data.message : `HTTP ${r.status}`);
+      return data;
     }
 
-    function pickNum(obj, keys, fallback = 0) {
-      const v = pick(obj, keys, null);
-      const n = Number(v);
-      return Number.isFinite(n) ? n : fallback;
+    function fmtINR(n) {
+      const v = Number(n || 0);
+      return '₹' + v.toLocaleString('en-IN');
     }
 
-    function normalizeUser(u) {
-      const blocked = (pick(u, ['status'], '').toLowerCase() === 'blocked') || Boolean(u.blocked);
-      return {
-        id: pick(u, ['id', 'user_id', 'userid']),
-        username: pick(u, ['username', 'user', 'name']),
-        email: pick(u, ['email'], '-'),
-        agentname: pick(u, ['agentname', 'agent_name', 'agent', 'referrer', 'refer_id'], '-'),
-        balance: pickNum(u, ['balance', 'wallet', 'coins', 'points']),
-        gamesplayed: pickNum(u, ['gamesplayed', 'games_played', 'total_games']),
-        status: blocked ? 'blocked' : (pick(u, ['status'], 'active') || 'active'),
-        createdat: pick(u, ['createdat', 'created_at', 'createdAt', 'joined', 'date_joined'], '-'),
-      };
+    function safeLower(x) {
+      return String(x || '').toLowerCase();
     }
 
-    function normalizeGame(g) {
-      return {
-        roundcode: pick(g, ['roundcode', 'round_code', 'roundCode', 'code']),
-        gametype: pick(g, ['gametype', 'game_type', 'game', 'type']),
-        players: pickNum(g, ['players', 'player_count']),
-        maxplayers: pickNum(g, ['maxplayers', 'max_players', 'capacity']),
-        winningnumber: pick(g, ['winningnumber', 'winning_number', 'win', 'result'], null),
-        totalbets: pickNum(g, ['totalbets', 'total_bets', 'totalBet', 'bet_total']),
-        payout: pickNum(g, ['payout', 'payout_total', 'total_payout', 'win_total'], null),
-        gamedate: pick(g, ['gamedate', 'game_date', 'date', 'created_at'], '-'),
-        gametime: pick(g, ['gametime', 'game_time', 'time'], ''),
-        status: pick(g, ['status', 'state'], '-'),
-      };
+    function userStatusBadgeClass(status) {
+      return safeLower(status) === 'blocked' ? 'badge-blocked' : 'badge-active';
     }
 
-    function normalizeTxn(t) {
-      return {
-        txnid: pick(t, ['txnid', 'txn_id', 'id']),
-        username: pick(t, ['username', 'user', 'user_name'], '-'),
-        type: pick(t, ['type', 'txn_type'], '-'),
-        amount: pickNum(t, ['amount', 'amt', 'value']),
-        status: pick(t, ['status', 'txn_status'], '-'),
-        txndate: pick(t, ['txndate', 'date', 'created_at', 'createdAt'], '-'),
-        reference: pick(t, ['reference', 'ref', 'order_id', 'roundcode', 'round_code'], '-'),
-      };
+    function gameStatusBadgeClass(status) {
+      const s = safeLower(status);
+      if (s === 'active') return 'badge-active';
+      if (s === 'completed' || s === 'betting_closed') return 'badge-pending';
+      if (s === 'finished') return 'badge-deposit';
+      return 'badge-pending';
     }
 
+    function txnTypeBadgeClass(type) {
+      const t = String(type || '').toUpperCase();
+      if (t === 'WIN') return 'badge-active';
+      if (t === 'BET') return 'badge-pending';
+      if (t === 'ADDED') return 'badge-deposit';
+      if (t === 'DEDUCTED') return 'badge-withdrawal';
+      return 'badge-pending';
+    }
 
+    function txnStatusBadgeClass(status) {
+      const s = String(status || '').toUpperCase();
+      return (s === 'DONE' || s === 'WIN' || s === 'LOSE') ? 'badge-active' : 'badge-pending';
+    }
+
+    function logout() {
+      window.location.href = '/logout';
+    }
+
+    // ------------------------
+    // Menu
+    // ------------------------
     document.addEventListener('DOMContentLoaded', function () {
       setupMenuLinks();
+      wireForms();
+
+      // Load initial
       loadStats();
       loadUsers();
-
-      document.getElementById('addAgentForm')?.addEventListener('submit', submitAddAgent);
-      document.getElementById('addFundsForm')?.addEventListener('submit', submitAddFunds);
-      document.getElementById('deductFundsForm')?.addEventListener('submit', submitDeductFunds);
-      document.getElementById('addPromoForm')?.addEventListener('submit', submitAddPromo);
-      document.getElementById('announceForm')?.addEventListener('submit', submitAnnounce);
-
-      document.getElementById('searchUsers')?.addEventListener('keyup', filterAndDisplayUsers);
-      document.getElementById('searchTransactions')?.addEventListener('keyup', displayTransactions);
-      document.getElementById('searchWallet')?.addEventListener('keyup', displayWalletUsers);
-      document.getElementById('searchGames')?.addEventListener('keyup', displayGames);
     });
 
     function setupMenuLinks() {
@@ -1185,6 +1184,7 @@
       const titles = {
         dashboard: 'Dashboard',
         users: 'Users Management',
+        userGames: 'User Games',
         agents: 'Agents Management',
         games: 'Game Statistics',
         transactions: 'Transactions Log',
@@ -1209,82 +1209,89 @@
       if (section === 'reports') loadReports();
     }
 
-    function fmtINR(n) {
-      const v = Number(n || 0);
-      return '₹' + v.toLocaleString('en-IN');
+    function wireForms() {
+      document.getElementById('addAgentForm')?.addEventListener('submit', submitAddAgent);
+      document.getElementById('addFundsForm')?.addEventListener('submit', submitAddFunds);
+      document.getElementById('deductFundsForm')?.addEventListener('submit', submitDeductFunds);
+      document.getElementById('addPromoForm')?.addEventListener('submit', submitAddPromo);
+      document.getElementById('announceForm')?.addEventListener('submit', submitAnnounce);
+
+      document.getElementById('searchUsers')?.addEventListener('keyup', filterAndDisplayUsers);
+      document.getElementById('searchGames')?.addEventListener('keyup', displayGames);
+      document.getElementById('searchTransactions')?.addEventListener('keyup', displayTransactions);
+      document.getElementById('searchWallet')?.addEventListener('keyup', displayWalletUsers);
+      document.getElementById('searchUserGames')?.addEventListener('keyup', displayUserGames);
     }
 
-    function userStatusBadgeClass(status) {
-      return (status || '').toLowerCase() === 'blocked' ? 'badge-blocked' : 'badge-active';
+    // ------------------------
+    // Dashboard
+    // ------------------------
+    async function loadStats() {
+      try {
+        const data = await apiGet('/api/admin/stats');
+
+        // app.py returns totalusers, activegames, totalrevenue, totaldeposit, totalwithdrawal
+        document.getElementById('totalUsers').textContent = data.totalusers ?? 0;
+        document.getElementById('activeGames').textContent = data.activegames ?? 0;
+        document.getElementById('totalRevenue').textContent = fmtINR(data.totalrevenue ?? 0);
+        document.getElementById('totalDeposits').textContent = fmtINR(data.totaldeposit ?? 0);
+        document.getElementById('totalWithdrawals').textContent = fmtINR(data.totalwithdrawal ?? 0);
+
+        // Agents are not implemented in backend yet
+        document.getElementById('totalAgents').textContent = 0;
+      } catch (err) {
+        console.error('Error loading stats:', err);
+      }
     }
 
-    function gameStatusBadgeClass(status) {
-      const s = (status || '').toLowerCase();
-      if (s === 'active') return 'badge-active';
-      if (s === 'completed' || s === 'betting_closed') return 'badge-pending';
-      if (s === 'finished') return 'badge-deposit';
-      return 'badge-pending';
-    }
-
-    function txnTypeBadgeClass(type) {
-      const t = (type || '').toUpperCase();
-      if (t === 'WIN') return 'badge-active';
-      if (t === 'BET') return 'badge-pending';
-      if (t === 'ADDED') return 'badge-deposit';
-      if (t === 'REDEEM') return 'badge-withdrawal';
-      return 'badge-pending';
-    }
-
-    function txnStatusBadgeClass(status) {
-      const s = (status || '').toUpperCase();
-      return s === 'DONE' ? 'badge-active' : 'badge-pending';
-    }
-
-    // -------------------------
-    // Dashboard stats
-    // -------------------------
-    function loadStats() {
-      fetch('/api/admin/stats')
-        .then((r) => r.json())
-        .then((data) => {
-          document.getElementById('totalUsers').textContent = data.totalusers ?? 0;
-          document.getElementById('totalAgents').textContent = data.totalagents ?? 0;
-          document.getElementById('activeGames').textContent = data.activegames ?? 0;
-          document.getElementById('totalRevenue').textContent = fmtINR(data.totalrevenue ?? 0);
-          document.getElementById('totalDeposits').textContent = fmtINR(data.totaldeposits ?? 0);
-          document.getElementById('totalWithdrawals').textContent = fmtINR(data.totalwithdrawals ?? 0);
-        })
-        .catch((err) => console.error('Error loading stats:', err));
-    }
-
-    // -------------------------
+    // ------------------------
     // Users
-    // -------------------------
-    function loadUsers() {
+    // ------------------------
+    async function loadUsers() {
       document.getElementById('usersLoading').style.display = 'block';
       document.getElementById('usersTableContainer').style.display = 'none';
-      
-      apiGet('/api/admin/users')
-        .then((data) => {
-          allUsers = (data || []).map(normalizeUser);
-          filterAndDisplayUsers();
-          document.getElementById('usersLoading').style.display = 'none';
-          document.getElementById('usersTableContainer').style.display = 'block';
-        })
 
-        .catch((err) => {
-          console.error('Error loading users:', err);
-          document.getElementById('usersLoading').innerHTML =
-            `<div style="color:#ef4444;">Error: ${err.message}</div>`;
-        });
+      try {
+        const data = await apiGet('/api/admin/users');
+        allUsers = (data || []).map(u => ({
+          id: u.id,
+          username: u.username || '-',
+          email: u.email || '-',
+          agentname: u.agentname || u.refer_id || '-',
+          balance: Number(u.balance || 0),
+          gamesplayed: Number(u.gamesplayed || 0),
+          status: u.status || (u.isblocked ? 'blocked' : 'active'),
+          createdat: u.createdat || '-',
+          blockreason: u.blockreason || ''
+        }));
+
+        buildUserDatalist();
+        filterAndDisplayUsers();
+
+        document.getElementById('usersLoading').style.display = 'none';
+        document.getElementById('usersTableContainer').style.display = 'block';
+      } catch (err) {
+        console.error('Error loading users:', err);
+        document.getElementById('usersLoading').innerHTML = `<div style="color:#ef4444;">Error: ${err.message}</div>`;
+      }
+    }
+
+    function buildUserDatalist() {
+      const dl = document.getElementById('usersDatalist');
+      if (!dl) return;
+      dl.innerHTML = '';
+      (allUsers || []).forEach(u => {
+        const opt = document.createElement('option');
+        opt.value = u.username;
+        dl.appendChild(opt);
+      });
     }
 
     function filterAndDisplayUsers() {
-      const search = (document.getElementById('searchUsers')?.value || '').toLowerCase();
-
+      const search = safeLower(document.getElementById('searchUsers')?.value);
       const filtered = (allUsers || []).filter((u) => {
-        const uname = (u.username || '').toLowerCase();
-        const email = (u.email || '').toLowerCase();
+        const uname = safeLower(u.username);
+        const email = safeLower(u.email);
         return uname.includes(search) || email.includes(search);
       });
 
@@ -1292,38 +1299,35 @@
       tbody.innerHTML = '';
 
       if (!filtered.length) {
-        tbody.innerHTML = '<tr><td colspan="9" class="no-data">No users found</td></tr>';
+        tbody.innerHTML = `<tr><td colspan="9" class="no-data">No users found</td></tr>`;
         return;
       }
 
       filtered.forEach((user) => {
         const row = document.createElement('tr');
-        const status = (user.status || 'active').toLowerCase();
+        const status = String(user.status || 'active');
+        const safeU = String(user.username || '').replace(/'/g, "\\'");
+        const isBlocked = safeLower(status) === 'blocked';
 
         row.innerHTML = `
-          <td>${user.id}</td>
+          <td>${user.id ?? '-'}</td>
           <td><strong>${user.username || '-'}</strong></td>
           <td>${user.email || '-'}</td>
           <td>${user.agentname || '-'}</td>
-          <td>${fmtINR(user.balance)}</td>
+          <td>${fmtINR(user.balance || 0)}</td>
           <td>
-            <a href="javascript:;" onclick="openUserGamesPage(${user.id}, '${(user.username||'').replace(/'/g, "\\'")}')">
-               style="color:#10b981; cursor:pointer;">
-              ${user.gamesplayed ?? 0}
+            <a href="javascript:;" onclick="openUserGamesPage(${user.id}, '${safeU}')" style="color:#10b981; cursor:pointer;">
+              View
             </a>
           </td>
-          <td><span class="badge ${userStatusBadgeClass(status)}">${status.toUpperCase()}</span></td>
+          <td><span class="badge ${userStatusBadgeClass(status)}">${String(status).toUpperCase()}</span></td>
           <td>${user.createdat || '-'}</td>
           <td>
             <div class="action-buttons">
-              <button class="btn-small btn-edit"
-                onclick="editUserBalance(${user.id}, '${(user.username||'').replace(/'/g, "\\'")}', ${Number(user.balance||0)})">
-                ✏️ Edit
-              </button>
-              ${
-                status === 'active'
-                ? `<button class="btn-small btn-block" onclick="blockUser(${user.id})">🔒 Block</button>`
-                : `<button class="btn-small btn-unblock" onclick="unblockUser(${user.id})">🔓 Unblock</button>`
+              <button class="btn-small btn-edit" onclick="editUserBalance(${user.id}, '${safeU}', ${Number(user.balance || 0)})">✏️ Edit</button>
+              ${isBlocked
+                ? `<button class="btn-small btn-unblock" onclick="unblockUser(${user.id})">🔓 Unblock</button>`
+                : `<button class="btn-small btn-block" onclick="blockUser(${user.id})">⛔ Block</button>`
               }
             </div>
           </td>
@@ -1332,121 +1336,144 @@
       });
     }
 
-    function viewUserGames(userId) {
-      fetch(`/api/admin/users/${userId}/games`)
-        .then((r) => r.json())
-        .then((games) => {
-          let html = '<div class="details-grid">';
-
-          if (games && games.length) {
-            games.forEach((g) => {
-              const nums = (g.numbers || []).join(', ');
-              const status = (g.status || 'pending').toUpperCase();
-              const winNo = (g.winningnumber === null || g.winningnumber === undefined) ? '-' : g.winningnumber;
-
-              html += `
-                <div class="detail-item">
-                  <div class="detail-label">Game: ${g.gametype || '-'}</div>
-                  <div class="detail-value">${g.roundcode || '-'}</div>
-                  <div style="color:#94a3b8; margin-top:5px;">Date: ${g.gamedate || '-'}</div>
-                  <div style="color:#94a3b8; margin-top:5px;">Numbers: ${nums || '-'}</div>
-                  <div style="color:#94a3b8; margin-top:5px;">Winning #: ${winNo}</div>
-                  <div style="color:#10b981; margin-top:5px;">
-                    Bet: ${fmtINR(g.betamount || 0)} | Result: ${status} | Net: ${fmtINR(g.payout || 0)}
-                  </div>
-                </div>
-              `;
-            });
-          } else {
-            html = '<div class="no-data">No games played</div>';
-          }
-
-          html += '</div>';
-
-          document.getElementById('detailsTitle').textContent = 'User Games';
-          document.getElementById('detailsContent').innerHTML = html;
-          document.getElementById('detailsModal').classList.add('active');
-        })
-        .catch(() => alert('Error loading games'));
-    }
-
-    function editUserBalance(userId, username, balance) {
-      const newBalance = prompt(
-        `Edit Balance for: ${username}\n\nCurrent: ${fmtINR(balance)}\n\nNew Balance:`
-      );
+    async function editUserBalance(userId, username, balance) {
+      const newBalance = prompt(`Edit Balance for ${username}\nCurrent: ${fmtINR(balance)}`, String(balance));
       if (newBalance === null) return;
 
       const value = parseInt(newBalance, 10);
-      if (isNaN(value) || value < 0) {
+      if (Number.isNaN(value) || value < 0) {
         alert('Invalid amount');
         return;
       }
 
-      fetch(`/api/admin/users/${userId}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ balance: value }),
-      })
-        .then((r) => r.json())
-        .then((res) => {
-          alert(res.message || 'Updated');
-          loadUsers();
-          loadStats();
-        })
-        .catch((err) => alert('Error: ' + err));
+      try {
+        const res = await apiSend(`/api/admin/users/${userId}`, 'PUT', { balance: value });
+        alert(res.message || 'Updated');
+        await loadUsers();
+        await loadStats();
+      } catch (err) {
+        alert('Error: ' + err.message);
+      }
     }
 
-    function blockUser(userId) {
+    async function blockUser(userId) {
+      const reason = prompt('Block reason (optional):', 'Blocked by admin') || 'Blocked by admin';
       if (!confirm('Block this user?')) return;
-      fetch(`/api/admin/users/${userId}/block`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ reason: 'Blocked by admin' }),
-      })
-        .then((r) => r.json())
-        .then((res) => {
-          alert(res.message || 'Blocked');
-          loadUsers();
-          loadStats();
-        })
-        .catch((err) => alert('Error: ' + err));
+
+      try {
+        const res = await apiSend(`/api/admin/users/${userId}/block`, 'POST', { reason });
+        alert(res.message || 'Blocked');
+        await loadUsers();
+        await loadStats();
+      } catch (err) {
+        alert('Error: ' + err.message);
+      }
     }
 
-    function unblockUser(userId) {
+    async function unblockUser(userId) {
       if (!confirm('Unblock this user?')) return;
-      fetch(`/api/admin/users/${userId}/unblock`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-      })
-        .then((r) => r.json())
-        .then((res) => {
-          alert(res.message || 'Unblocked');
-          loadUsers();
-          loadStats();
-        })
-        .catch((err) => alert('Error: ' + err));
+
+      try {
+        const res = await apiSend(`/api/admin/users/${userId}/unblock`, 'POST', {});
+        alert(res.message || 'Unblocked');
+        await loadUsers();
+        await loadStats();
+      } catch (err) {
+        alert('Error: ' + err.message);
+      }
     }
 
-    // -------------------------
-    // Agents (placeholder API)
-    // -------------------------
-    function loadAgents() {
+    // ------------------------
+    // User Games (table page)
+    // ------------------------
+    let currentUserGames = [];
+    let currentUserMeta = { id: null, username: '' };
+
+    function openUserGamesPage(userId, username) {
+      currentUserMeta = { id: userId, username: username || '' };
+      document.getElementById('userGamesTitle').textContent = `User Games: ${currentUserMeta.username} (#${userId})`;
+      switchSection('userGames');
+      loadUserGames(userId);
+    }
+
+    function backToUsers() {
+      switchSection('users');
+    }
+
+    async function loadUserGames(userId) {
+      document.getElementById('userGamesLoading').style.display = 'block';
+      document.getElementById('userGamesTableContainer').style.display = 'none';
+      currentUserGames = [];
+
+      try {
+        const data = await apiGet(`/api/admin/users/${userId}/games`);
+        currentUserGames = (data || []).map(g => ({
+          gametype: g.gametype || '-',
+          roundcode: g.roundcode || '-',
+          number: (g.number === 0 || g.number) ? g.number : '-',
+          betamount: Number(g.betamount || 0),
+          winningnumber: (g.winningnumber === 0 || g.winningnumber) ? g.winningnumber : '-',
+          status: g.status || (g.isresolved ? 'resolved' : 'pending'),
+          amount: Number(g.amount || 0),
+          datetime: g.datetime || '-',
+        }));
+
+        displayUserGames();
+        document.getElementById('userGamesLoading').style.display = 'none';
+        document.getElementById('userGamesTableContainer').style.display = 'block';
+      } catch (err) {
+        document.getElementById('userGamesLoading').innerHTML =
+          `<div style="color:#ef4444;">Error: ${err.message}</div>`;
+      }
+    }
+
+    function displayUserGames() {
+      const q = safeLower(document.getElementById('searchUserGames')?.value);
+      const tbody = document.getElementById('userGamesTableBody');
+      tbody.innerHTML = '';
+
+      const filtered = (currentUserGames || []).filter(g => {
+        return safeLower(g.roundcode).includes(q) || safeLower(g.gametype).includes(q);
+      });
+
+      if (!filtered.length) {
+        tbody.innerHTML = `<tr><td colspan="8" class="no-data">No games found</td></tr>`;
+        return;
+      }
+
+      filtered.forEach(g => {
+        const row = document.createElement('tr');
+        row.innerHTML = `
+          <td><strong>${g.roundcode}</strong></td>
+          <td>${g.gametype}</td>
+          <td>${g.number}</td>
+          <td>${fmtINR(g.betamount)}</td>
+          <td>${g.winningnumber}</td>
+          <td>${String(g.status || '-').toUpperCase()}</td>
+          <td>${fmtINR(g.amount || 0)}</td>
+          <td>${g.datetime || '-'}</td>
+        `;
+        tbody.appendChild(row);
+      });
+    }
+
+    // ------------------------
+    // Agents (backend empty currently)
+    // ------------------------
+    async function loadAgents() {
       document.getElementById('agentsLoading').style.display = 'block';
       document.getElementById('agentsTableContainer').style.display = 'none';
 
-      fetch('/api/admin/agents')
-        .then((r) => r.json())
-        .then((data) => {
-          allAgents = data || [];
-          displayAgents();
-          document.getElementById('agentsLoading').style.display = 'none';
-          document.getElementById('agentsTableContainer').style.display = 'block';
-        })
-        .catch((err) => {
-          console.error('Error:', err);
-          document.getElementById('agentsLoading').innerHTML =
-            `<div style="color:#ef4444;">Error: ${err.message}</div>`;
-        });
+      try {
+        const data = await apiGet('/api/admin/agents');
+        allAgents = Array.isArray(data) ? data : [];
+      } catch (err) {
+        allAgents = [];
+      }
+
+      displayAgents();
+      document.getElementById('agentsLoading').style.display = 'none';
+      document.getElementById('agentsTableContainer').style.display = 'block';
     }
 
     function displayAgents() {
@@ -1454,28 +1481,26 @@
       tbody.innerHTML = '';
 
       if (!allAgents.length) {
-        tbody.innerHTML = '<tr><td colspan="10" class="no-data">No agents found</td></tr>';
+        tbody.innerHTML = `<tr><td colspan="10" class="no-data">No agents found (Agents backend not implemented yet)</td></tr>`;
         return;
       }
 
-      allAgents.forEach((agent) => {
+      allAgents.forEach(agent => {
         const row = document.createElement('tr');
-        const commission = 0;
-
         row.innerHTML = `
           <td>${agent.id ?? '-'}</td>
           <td><strong>${agent.name ?? '-'}</strong></td>
           <td>${agent.email ?? '-'}</td>
-          <td>${agent.salarypercent ?? 0}%</td>
+          <td>${agent.salarypercent ?? 0}</td>
           <td>${agent.usercount ?? 0}</td>
           <td>${fmtINR(agent.totaldeposits ?? 0)}</td>
           <td>${fmtINR(agent.totalwithdrawals ?? 0)}</td>
-          <td>${fmtINR(commission)}</td>
-          <td><span class="badge badge-pending">N/A</span></td>
+          <td>${fmtINR(agent.commission ?? 0)}</td>
+          <td><span class="badge badge-pending">NA</span></td>
           <td>
             <div class="action-buttons">
-              <button class="btn-small btn-edit" onclick="alert('Not implemented')">✏️ Edit</button>
-              <button class="btn-small btn-view" onclick="alert('Not implemented')">👁️ View</button>
+              <button class="btn-small btn-edit" onclick="alert('Not implemented yet')">Edit</button>
+              <button class="btn-small btn-view" onclick="alert('Not implemented yet')">View</button>
             </div>
           </td>
         `;
@@ -1483,248 +1508,237 @@
       });
     }
 
-    function submitAddAgent(e) {
+    async function submitAddAgent(e) {
       e.preventDefault();
-      const data = {
-        name: document.getElementById('agentName').value,
-        email: document.getElementById('agentEmail').value,
-        username: document.getElementById('agentUsername').value,
-        password: document.getElementById('agentPassword').value,
-        salarypercent: parseFloat(document.getElementById('agentSalaryPercent').value),
-      };
-
-      fetch('/api/admin/agents', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(data),
-      })
-        .then((r) => r.json())
-        .then((res) => {
-          alert(res.message || 'Saved');
-          closeAddAgentModal();
-          loadAgents();
-          loadStats();
-        })
-        .catch((err) => alert('Error: ' + err));
+      alert('Agent creation API is not implemented yet in app.py. We will add it next.');
+      closeAddAgentModal();
     }
 
-    function openAddAgentModal() {
-      document.getElementById('addAgentModal').classList.add('active');
-    }
+    function openAddAgentModal() { document.getElementById('addAgentModal').classList.add('active'); }
     function closeAddAgentModal() {
       document.getElementById('addAgentModal').classList.remove('active');
-      document.getElementById('addAgentForm').reset();
+      document.getElementById('addAgentForm')?.reset();
     }
 
-    // -------------------------
+    // ------------------------
     // Games
-    // -------------------------
-    function loadGames() {
+    // ------------------------
+    async function loadGames() {
       document.getElementById('gamesLoading').style.display = 'block';
       document.getElementById('gamesTableContainer').style.display = 'none';
 
-      fetch('/api/admin/games')
-        .then((r) => r.json())
-        .then((data) => {
-          allGames = (data || []).map(normalizeGame);
-          displayGames();
-          document.getElementById('gamesLoading').style.display = 'none';
-          document.getElementById('gamesTableContainer').style.display = 'block';
-        })
-        .catch((err) => {
-          console.error('Error loading games:', err);
-          document.getElementById('gamesLoading').innerHTML =
-            `<div style="color:#ef4444;">Error: ${err.message}</div>`;
-        });
+      try {
+        const data = await apiGet('/api/admin/games');
+        allGames = (data || []).map(g => ({
+          roundcode: g.roundcode || '-',
+          gametype: g.gametype || '-',
+          players: Number(g.players || 0),
+          maxplayers: Number(g.maxplayers || 0),
+          result: (g.result === 0 || g.result) ? g.result : '-',
+          totalbets: Number(g.totalbets || 0),
+          startedat: g.startedat || g.gamedate || '-',
+          status: g.status || (g.isfinished ? 'finished' : (g.isbettingclosed ? 'completed' : 'active'))
+        }));
+
+        displayGames();
+        document.getElementById('gamesLoading').style.display = 'none';
+        document.getElementById('gamesTableContainer').style.display = 'block';
+      } catch (err) {
+        console.error('Error loading games:', err);
+        document.getElementById('gamesLoading').innerHTML = `<div style="color:#ef4444;">Error: ${err.message}</div>`;
+      }
     }
 
     function displayGames() {
-      const search = (document.getElementById('searchGames')?.value || '').toLowerCase();
+      const search = safeLower(document.getElementById('searchGames')?.value);
       const tbody = document.getElementById('gamesTableBody');
       tbody.innerHTML = '';
 
-      const filtered = (allGames || []).filter((g) => {
-        const rc = (g.roundcode || '').toLowerCase();
-        const gt = (g.gametype || '').toLowerCase();
-        return rc.includes(search) || gt.includes(search);
+      const filtered = (allGames || []).filter(g => {
+        return safeLower(g.roundcode).includes(search) || safeLower(g.gametype).includes(search);
       });
 
       if (!filtered.length) {
-        tbody.innerHTML = '<tr><td colspan="9" class="no-data">No games</td></tr>';
+        tbody.innerHTML = `<tr><td colspan="8" class="no-data">No games</td></tr>`;
         return;
       }
 
-      filtered.forEach((game) => {
+      filtered.forEach(game => {
         const row = document.createElement('tr');
-        const dt = `${game.gamedate || '-'} ${game.gametime || ''}`.trim();
-        const win = (game.winningnumber === null || game.winningnumber === undefined) ? '-' : game.winningnumber;
-
         row.innerHTML = `
-          <td><strong>${game.roundcode || '-'}</strong></td>
-          <td>${game.gametype || '-'}</td>
-          <td>${game.players ?? 0}/${game.maxplayers ?? 0}</td>
-          <td>${win}</td>
-          <td>${fmtINR(game.totalbets ?? 0)}</td>
-          <td>${game.payout === null || game.payout === undefined ? '-' : fmtINR(game.payout)}</td>
-          <td>${dt}</td>
-          <td><span class="badge ${gameStatusBadgeClass(game.status)}">${(game.status || '-').toUpperCase()}</span></td>
-          <td><button class="btn-small btn-view" onclick="viewGameDetails('${(game.roundcode||'').replace(/'/g, "\\'")}')">Details</button></td>
+          <td><strong>${game.roundcode}</strong></td>
+          <td>${game.gametype}</td>
+          <td>${game.players}/${game.maxplayers}</td>
+          <td>${game.result}</td>
+          <td>${fmtINR(game.totalbets)}</td>
+          <td>${game.startedat}</td>
+          <td><span class="badge ${gameStatusBadgeClass(game.status)}">${String(game.status || '-').toUpperCase()}</span></td>
+          <td><button class="btn-small btn-view" onclick="viewGameDetails('${String(game.roundcode).replace(/'/g,"\\'")}')">Details</button></td>
         `;
         tbody.appendChild(row);
       });
     }
 
     function viewGameDetails(roundCode) {
-      const game = (allGames || []).find((g) => (g.roundcode || '') === roundCode);
+      const game = (allGames || []).find(g => g.roundcode === roundCode);
       if (!game) return;
-
-      const win = (game.winningnumber === null || game.winningnumber === undefined) ? 'NA' : game.winningnumber;
-      const dt = `${game.gamedate || '-'} ${game.gametime || ''}`.trim();
 
       const html = `
         <div class="details-grid">
-          <div class="detail-item">
-            <div class="detail-label">Round Code</div>
-            <div class="detail-value">${game.roundcode || '-'}</div>
-          </div>
-          <div class="detail-item">
-            <div class="detail-label">Game Type</div>
-            <div class="detail-value">${game.gametype || '-'}</div>
-          </div>
-          <div class="detail-item">
-            <div class="detail-label">Winning Number</div>
-            <div class="detail-value" style="color:#f59e0b">${win}</div>
-          </div>
-          <div class="detail-item">
-            <div class="detail-label">Players</div>
-            <div class="detail-value">${game.players ?? 0}/${game.maxplayers ?? 0}</div>
-          </div>
-          <div class="detail-item">
-            <div class="detail-label">Total Bets</div>
-            <div class="detail-value">${fmtINR(game.totalbets ?? 0)}</div>
-          </div>
-          <div class="detail-item">
-            <div class="detail-label">Payout</div>
-            <div class="detail-value">${game.payout === null || game.payout === undefined ? '-' : fmtINR(game.payout)}</div>
-          </div>
-          <div class="detail-item">
-            <div class="detail-label">Date/Time</div>
-            <div class="detail-value">${dt}</div>
-          </div>
-          <div class="detail-item">
-            <div class="detail-label">Status</div>
-            <div class="detail-value">${(game.status || '-').toUpperCase()}</div>
-          </div>
+          <div class="detail-item"><div class="detail-label">Round Code</div><div class="detail-value">${game.roundcode}</div></div>
+          <div class="detail-item"><div class="detail-label">Game Type</div><div class="detail-value">${game.gametype}</div></div>
+          <div class="detail-item"><div class="detail-label">Winning Number</div><div class="detail-value" style="color:#f59e0b;">${game.result}</div></div>
+          <div class="detail-item"><div class="detail-label">Players</div><div class="detail-value">${game.players}/${game.maxplayers}</div></div>
+          <div class="detail-item"><div class="detail-label">Total Bets</div><div class="detail-value">${fmtINR(game.totalbets)}</div></div>
+          <div class="detail-item"><div class="detail-label">Date/Time</div><div class="detail-value">${game.startedat}</div></div>
+          <div class="detail-item"><div class="detail-label">Status</div><div class="detail-value">${String(game.status || '-').toUpperCase()}</div></div>
         </div>
       `;
 
       document.getElementById('detailsTitle').textContent = 'Game Details';
+      document.getElementById('detailsSubtitle').textContent = '';
       document.getElementById('detailsContent').innerHTML = html;
       document.getElementById('detailsModal').classList.add('active');
     }
 
-    // -------------------------
+    // ------------------------
     // Transactions
-    // -------------------------
-    function loadTransactions() {
+    // ------------------------
+    async function loadTransactions() {
       document.getElementById('transactionsLoading').style.display = 'block';
       document.getElementById('transactionsTableContainer').style.display = 'none';
 
-      fetch('/api/admin/transactions')
-        .then((r) => r.json())
-        .then((data) => {
-          allTxns = (data || []).map(normalizeTxn);
-          displayTransactions();
-          document.getElementById('transactionsLoading').style.display = 'none';
-          document.getElementById('transactionsTableContainer').style.display = 'block';
-        })
-        .catch((err) => {
-          console.error('Error:', err);
-          document.getElementById('transactionsLoading').innerHTML =
-            `<div style="color:#ef4444;">Error: ${err.message}</div>`;
+      try {
+        const data = await apiGet('/api/admin/transactions');
+
+        // Backend does not return txnid; we generate a readable one for UI
+        allTxns = (data || []).map((t, idx) => {
+          const type = String(t.type || '-').toUpperCase();   // BET / WIN
+          const uid = t.userid ?? '-';
+          const rc = t.roundcode ?? '-';
+          const dt = t.datetime ?? t.txndate ?? '-';
+          return {
+            txnid: `TX-${type}-${uid}-${String(rc).slice(-8)}-${idx+1}`,
+            username: t.username || '-',
+            type,
+            amount: Number(t.amount || 0),
+            status: t.status ? String(t.status).toUpperCase() : (type === 'WIN' ? 'WIN' : 'DONE'),
+            datetime: dt,
+            reference: t.roundcode || t.reference || '-',
+            raw: t
+          };
         });
+
+        displayTransactions();
+        document.getElementById('transactionsLoading').style.display = 'none';
+        document.getElementById('transactionsTableContainer').style.display = 'block';
+      } catch (err) {
+        console.error('Error loading transactions:', err);
+        document.getElementById('transactionsLoading').innerHTML = `<div style="color:#ef4444;">Error: ${err.message}</div>`;
+      }
     }
 
     function displayTransactions() {
-      const search = (document.getElementById('searchTransactions')?.value || '').toLowerCase();
+      const search = safeLower(document.getElementById('searchTransactions')?.value);
       const tbody = document.getElementById('transactionsTableBody');
       tbody.innerHTML = '';
 
-      const filtered = (allTxns || []).filter((t) => {
-        const idStr = String(t.txnid ?? '').toLowerCase();
-        const uname = (t.username || '').toLowerCase();
-        return idStr.includes(search) || uname.includes(search);
+      const filtered = (allTxns || []).filter(t => {
+        return safeLower(t.txnid).includes(search) || safeLower(t.username).includes(search);
       });
 
       if (!filtered.length) {
-        tbody.innerHTML = '<tr><td colspan="8" class="no-data">No transactions</td></tr>';
+        tbody.innerHTML = `<tr><td colspan="8" class="no-data">No transactions</td></tr>`;
         return;
       }
 
-      filtered.forEach((txn) => {
+      filtered.forEach(txn => {
         const row = document.createElement('tr');
-        const type = (txn.type || '').toUpperCase();
-        const status = (txn.status || '').toUpperCase();
-
         row.innerHTML = `
-          <td>${txn.txnid ?? '-'}</td>
-          <td>${txn.username || '-'}</td>
-          <td><span class="badge ${txnTypeBadgeClass(type)}">${type || '-'}</span></td>
-          <td>${fmtINR(txn.amount ?? 0)}</td>
-          <td><span class="badge ${txnStatusBadgeClass(status)}">${status || '-'}</span></td>
-          <td>${txn.txndate || '-'}</td>
+          <td>${txn.txnid}</td>
+          <td>${txn.username}</td>
+          <td><span class="badge ${txnTypeBadgeClass(txn.type)}">${txn.type}</span></td>
+          <td>${fmtINR(txn.amount)}</td>
+          <td><span class="badge ${txnStatusBadgeClass(txn.status)}">${txn.status}</span></td>
+          <td>${txn.datetime || '-'}</td>
           <td>${txn.reference || '-'}</td>
-          <td><button class="btn-small btn-view" onclick="alert('Txn ID: ${txn.txnid}')">📋 View</button></td>
+          <td><button class="btn-small btn-view" onclick="viewTxnDetails('${txn.txnid.replace(/'/g,"\\'")}')">View</button></td>
         `;
         tbody.appendChild(row);
       });
     }
 
-    // -------------------------
-    // Wallet
-    // -------------------------
-    function loadWalletUsers() {
+    function viewTxnDetails(txnid) {
+      const txn = (allTxns || []).find(t => t.txnid === txnid);
+      if (!txn) return;
+
+      const t = txn.raw || {};
+      const html = `
+        <div class="details-grid">
+          <div class="detail-item"><div class="detail-label">Txn ID</div><div class="detail-value">${txn.txnid}</div></div>
+          <div class="detail-item"><div class="detail-label">User</div><div class="detail-value">${txn.username}</div></div>
+          <div class="detail-item"><div class="detail-label">Type</div><div class="detail-value">${txn.type}</div></div>
+          <div class="detail-item"><div class="detail-label">Amount</div><div class="detail-value">${fmtINR(txn.amount)}</div></div>
+          <div class="detail-item"><div class="detail-label">Round Code</div><div class="detail-value">${t.roundcode || '-'}</div></div>
+          <div class="detail-item"><div class="detail-label">Game</div><div class="detail-value">${t.gametitle || t.gametype || '-'}</div></div>
+          <div class="detail-item"><div class="detail-label">Status</div><div class="detail-value">${txn.status}</div></div>
+          <div class="detail-item"><div class="detail-label">Date/Time</div><div class="detail-value">${txn.datetime || '-'}</div></div>
+        </div>
+      `;
+
+      document.getElementById('detailsTitle').textContent = 'Transaction Details';
+      document.getElementById('detailsSubtitle').textContent = '';
+      document.getElementById('detailsContent').innerHTML = html;
+      document.getElementById('detailsModal').classList.add('active');
+    }
+
+    // ------------------------
+    // Wallet (uses Users list + working add/deduct API)
+    // ------------------------
+    async function loadWalletUsers() {
       document.getElementById('walletLoading').style.display = 'block';
       document.getElementById('walletTableContainer').style.display = 'none';
 
-      fetch('/api/admin/wallet')
-        .then((r) => r.json())
-        .then((data) => {
-          allWalletUsers = data || [];
-          displayWalletUsers();
-          document.getElementById('walletLoading').style.display = 'none';
-          document.getElementById('walletTableContainer').style.display = 'block';
-        })
-        .catch((err) => {
-          console.error('Error:', err);
-          document.getElementById('walletLoading').innerHTML =
-            `<div style="color:#ef4444;">Error: ${err.message}</div>`;
-        });
+      if (!allUsers.length) {
+        await loadUsers();
+      }
+
+      allWalletUsers = (allUsers || []).map(u => ({
+        id: u.id,
+        username: u.username,
+        balance: Number(u.balance || 0),
+        totaldeposits: 0,
+        totalwithdrawals: 0
+      }));
+
+      displayWalletUsers();
+      document.getElementById('walletLoading').style.display = 'none';
+      document.getElementById('walletTableContainer').style.display = 'block';
     }
 
     function displayWalletUsers() {
-      const search = (document.getElementById('searchWallet')?.value || '').toLowerCase();
+      const search = safeLower(document.getElementById('searchWallet')?.value);
       const tbody = document.getElementById('walletTableBody');
       tbody.innerHTML = '';
 
-      const filtered = (allWalletUsers || []).filter((u) => (u.username || '').toLowerCase().includes(search));
-
+      const filtered = (allWalletUsers || []).filter(u => safeLower(u.username).includes(search));
       if (!filtered.length) {
-        tbody.innerHTML = '<tr><td colspan="5" class="no-data">No users</td></tr>';
+        tbody.innerHTML = `<tr><td colspan="5" class="no-data">No users</td></tr>`;
         return;
       }
 
-      filtered.forEach((user) => {
+      filtered.forEach(user => {
+        const safeU = String(user.username || '').replace(/'/g, "\\'");
         const row = document.createElement('tr');
         row.innerHTML = `
-          <td><strong>${user.username || '-'}</strong></td>
-          <td>${fmtINR(user.balance ?? 0)}</td>
-          <td>${fmtINR(user.totaldeposits ?? 0)}</td>
-          <td>${fmtINR(user.totalwithdrawals ?? 0)}</td>
+          <td><strong>${user.username}</strong></td>
+          <td>${fmtINR(user.balance)}</td>
+          <td>${fmtINR(user.totaldeposits || 0)}</td>
+          <td>${fmtINR(user.totalwithdrawals || 0)}</td>
           <td>
             <div class="action-buttons">
-              <button class="btn-small btn-edit" onclick="selectUserForFunds('${(user.username||'').replace(/'/g, "\\'")}', 'add')">➕ Add</button>
-              <button class="btn-small btn-block" onclick="selectUserForFunds('${(user.username||'').replace(/'/g, "\\'")}', 'deduct')">➖ Deduct</button>
+              <button class="btn-small btn-edit" onclick="selectUserForFunds('${safeU}', 'add')">➕ Add</button>
+              <button class="btn-small btn-block" onclick="selectUserForFunds('${safeU}', 'deduct')">➖ Deduct</button>
             </div>
           </td>
         `;
@@ -1742,165 +1756,146 @@
       }
     }
 
-    function submitAddFunds(e) {
+    async function submitAddFunds(e) {
       e.preventDefault();
-      const user = document.getElementById('addFundsUser').value;
-      const amount = parseFloat(document.getElementById('addFundsAmount').value);
-      const reason = document.getElementById('addFundsReason').value;
+      const username = (document.getElementById('addFundsUser').value || '').trim();
+      const amount = Number(document.getElementById('addFundsAmount').value || 0);
+      const reason = document.getElementById('addFundsReason').value || 'Admin add';
 
-      fetch('/api/admin/wallet/add', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ user, amount, reason }),
-      })
-        .then((r) => r.json())
-        .then((res) => {
-          alert(res.message || 'Done');
-          closeAddFundsModal();
-          loadWalletUsers();
-          loadStats();
-        })
-        .catch((err) => alert('Error: ' + err));
+      const user = (allUsers || []).find(u => u.username === username);
+      if (!user) return alert('User not found: ' + username);
+      if (!amount || amount <= 0) return alert('Invalid amount');
+
+      try {
+        const res = await apiSend(`/api/admin/users/${user.id}/balance`, 'POST', { type: 'add', amount, reason });
+        alert(res.message || 'Done');
+        closeAddFundsModal();
+        await loadUsers();
+        await loadWalletUsers();
+        await loadStats();
+      } catch (err) {
+        alert('Error: ' + err.message);
+      }
     }
 
-    function submitDeductFunds(e) {
+    async function submitDeductFunds(e) {
       e.preventDefault();
-      const user = document.getElementById('deductFundsUser').value;
-      const amount = parseFloat(document.getElementById('deductFundsAmount').value);
-      const reason = document.getElementById('deductFundsReason').value;
+      const username = (document.getElementById('deductFundsUser').value || '').trim();
+      const amount = Number(document.getElementById('deductFundsAmount').value || 0);
+      const reason = document.getElementById('deductFundsReason').value || 'Admin deduct';
 
-      fetch('/api/admin/wallet/deduct', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ user, amount, reason }),
-      })
-        .then((r) => r.json())
-        .then((res) => {
-          alert(res.message || 'Done');
-          closeDeductFundsModal();
-          loadWalletUsers();
-          loadStats();
-        })
-        .catch((err) => alert('Error: ' + err));
+      const user = (allUsers || []).find(u => u.username === username);
+      if (!user) return alert('User not found: ' + username);
+      if (!amount || amount <= 0) return alert('Invalid amount');
+
+      try {
+        const res = await apiSend(`/api/admin/users/${user.id}/balance`, 'POST', { type: 'deduct', amount, reason });
+        alert(res.message || 'Done');
+        closeDeductFundsModal();
+        await loadUsers();
+        await loadWalletUsers();
+        await loadStats();
+      } catch (err) {
+        alert('Error: ' + err.message);
+      }
     }
 
-    function openAddFundsModal() {
-      document.getElementById('addFundsModal').classList.add('active');
-    }
+    function openAddFundsModal() { document.getElementById('addFundsModal').classList.add('active'); }
     function closeAddFundsModal() {
       document.getElementById('addFundsModal').classList.remove('active');
-      document.getElementById('addFundsForm').reset();
+      document.getElementById('addFundsForm')?.reset();
     }
-    function openDeductFundsModal() {
-      document.getElementById('deductFundsModal').classList.add('active');
-    }
+
+    function openDeductFundsModal() { document.getElementById('deductFundsModal').classList.add('active'); }
     function closeDeductFundsModal() {
       document.getElementById('deductFundsModal').classList.remove('active');
-      document.getElementById('deductFundsForm').reset();
+      document.getElementById('deductFundsForm')?.reset();
     }
 
-    // -------------------------
-    // Referrals/Promos/Announcements/Reports (placeholders)
-    // -------------------------
-    function loadReferrals() {
+    // ------------------------
+    // Referrals / Promos / Announcements / Reports (placeholder-safe)
+    // ------------------------
+    async function loadReferrals() {
       document.getElementById('referralsLoading').style.display = 'block';
       document.getElementById('referralsTableContainer').style.display = 'none';
+      const tbody = document.getElementById('referralsTableBody');
+      tbody.innerHTML = '';
 
-      fetch('/api/admin/referrals')
-        .then((r) => r.json())
-        .then((data) => {
-          const tbody = document.getElementById('referralsTableBody');
-          tbody.innerHTML = '';
-          if (!data || !data.length) {
-            tbody.innerHTML = '<tr><td colspan="8" class="no-data">No referral data</td></tr>';
-          }
-          document.getElementById('referralsLoading').style.display = 'none';
-          document.getElementById('referralsTableContainer').style.display = 'block';
-        })
-        .catch((err) => {
-          console.error('Error:', err);
-          document.getElementById('referralsLoading').innerHTML =
-            `<div style="color:#ef4444;">Error: ${err.message}</div>`;
-        });
+      try {
+        const data = await apiGet('/api/admin/referrals');
+        const arr = Array.isArray(data) ? data : [];
+        if (!arr.length) tbody.innerHTML = `<tr><td colspan="8" class="no-data">No referral data (not implemented yet)</td></tr>`;
+      } catch (err) {
+        tbody.innerHTML = `<tr><td colspan="8" class="no-data">No referral data (not implemented yet)</td></tr>`;
+      }
+
+      document.getElementById('referralsLoading').style.display = 'none';
+      document.getElementById('referralsTableContainer').style.display = 'block';
     }
 
-    function loadPromos() {
+    async function loadPromos() {
       document.getElementById('promosLoading').style.display = 'block';
       document.getElementById('promosTableContainer').style.display = 'none';
+      const tbody = document.getElementById('promosTableBody');
+      tbody.innerHTML = '';
 
-      fetch('/api/admin/promos')
-        .then((r) => r.json())
-        .then((data) => {
-          const tbody = document.getElementById('promosTableBody');
-          tbody.innerHTML = '';
-          if (!data || !data.length) {
-            tbody.innerHTML = '<tr><td colspan="8" class="no-data">No promos</td></tr>';
-          }
-          document.getElementById('promosLoading').style.display = 'none';
-          document.getElementById('promosTableContainer').style.display = 'block';
-        })
-        .catch((err) => {
-          console.error('Error:', err);
-          document.getElementById('promosLoading').innerHTML =
-            `<div style="color:#ef4444;">Error: ${err.message}</div>`;
-        });
+      try {
+        const data = await apiGet('/api/admin/promos');
+        const arr = Array.isArray(data) ? data : [];
+        if (!arr.length) tbody.innerHTML = `<tr><td colspan="8" class="no-data">No promos (placeholder backend)</td></tr>`;
+      } catch (err) {
+        tbody.innerHTML = `<tr><td colspan="8" class="no-data">No promos (placeholder backend)</td></tr>`;
+      }
+
+      document.getElementById('promosLoading').style.display = 'none';
+      document.getElementById('promosTableContainer').style.display = 'block';
     }
 
-    function submitAddPromo(e) {
+    async function submitAddPromo(e) {
       e.preventDefault();
       const data = {
         code: document.getElementById('promoCode').value,
         type: document.getElementById('promoType').value,
-        discount: parseFloat(document.getElementById('promoValue').value),
-        maxuses: parseInt(document.getElementById('promoMaxUses').value, 10),
+        discount: Number(document.getElementById('promoValue').value || 0),
+        maxuses: parseInt(document.getElementById('promoMaxUses').value || '0', 10),
         validtill: document.getElementById('promoValidTill').value,
       };
 
-      fetch('/api/admin/promos', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(data),
-      })
-        .then((r) => r.json())
-        .then((res) => {
-          alert(res.message || 'Saved');
-          closeAddPromoModal();
-          loadPromos();
-        })
-        .catch((err) => alert('Error: ' + err));
+      try {
+        const res = await apiSend('/api/admin/promos', 'POST', data);
+        alert(res.message || 'Saved');
+        closeAddPromoModal();
+        loadPromos();
+      } catch (err) {
+        alert('Error: ' + err.message);
+      }
     }
 
-    function openAddPromoModal() {
-      document.getElementById('addPromoModal').classList.add('active');
-    }
+    function openAddPromoModal() { document.getElementById('addPromoModal').classList.add('active'); }
     function closeAddPromoModal() {
       document.getElementById('addPromoModal').classList.remove('active');
-      document.getElementById('addPromoForm').reset();
+      document.getElementById('addPromoForm')?.reset();
     }
 
-    function loadAnnouncements() {
+    async function loadAnnouncements() {
       document.getElementById('announcementsLoading').style.display = 'block';
       document.getElementById('announcementsTableContainer').style.display = 'none';
+      const tbody = document.getElementById('announcementsTableBody');
+      tbody.innerHTML = '';
 
-      fetch('/api/admin/announcements')
-        .then((r) => r.json())
-        .then((data) => {
-          const tbody = document.getElementById('announcementsTableBody');
-          tbody.innerHTML = '';
-          if (!data || !data.length) {
-            tbody.innerHTML = '<tr><td colspan="6" class="no-data">No announcements</td></tr>';
-          }
-          document.getElementById('announcementsLoading').style.display = 'none';
-          document.getElementById('announcementsTableContainer').style.display = 'block';
-        })
-        .catch((err) => {
-          console.error('Error:', err);
-          document.getElementById('announcementsLoading').innerHTML =
-            `<div style="color:#ef4444;">Error: ${err.message}</div>`;
-        });
+      try {
+        const data = await apiGet('/api/admin/announcements');
+        const arr = Array.isArray(data) ? data : [];
+        if (!arr.length) tbody.innerHTML = `<tr><td colspan="6" class="no-data">No announcements (placeholder backend)</td></tr>`;
+      } catch (err) {
+        tbody.innerHTML = `<tr><td colspan="6" class="no-data">No announcements (placeholder backend)</td></tr>`;
+      }
+
+      document.getElementById('announcementsLoading').style.display = 'none';
+      document.getElementById('announcementsTableContainer').style.display = 'block';
     }
 
-    function submitAnnounce(e) {
+    async function submitAnnounce(e) {
       e.preventDefault();
       const data = {
         title: document.getElementById('announceTitle').value,
@@ -1908,137 +1903,42 @@
         target: document.getElementById('announceTarget').value,
       };
 
-      fetch('/api/admin/announcements', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(data),
-      })
-        .then((r) => r.json())
-        .then((res) => {
-          alert(res.message || 'Sent');
-          closeAnnounceModal();
-          loadAnnouncements();
-        })
-        .catch((err) => alert('Error: ' + err));
+      try {
+        const res = await apiSend('/api/admin/announcements', 'POST', data);
+        alert(res.message || 'Sent');
+        closeAnnounceModal();
+        loadAnnouncements();
+      } catch (err) {
+        alert('Error: ' + err.message);
+      }
     }
 
-    function openAnnounceModal() {
-      document.getElementById('announceModal').classList.add('active');
-    }
+    function openAnnounceModal() { document.getElementById('announceModal').classList.add('active'); }
     function closeAnnounceModal() {
       document.getElementById('announceModal').classList.remove('active');
-      document.getElementById('announceForm').reset();
+      document.getElementById('announceForm')?.reset();
     }
 
-    function loadReports() {
-      fetch('/api/admin/reports')
-        .then((r) => r.json())
-        .then((data) => {
-          document.getElementById('newUsers30d').textContent = data.newusers30d ?? 0;
-          document.getElementById('revenue30d').textContent = fmtINR(data.revenue30d ?? 0);
-          document.getElementById('gamesPlayed30d').textContent = data.gamesplayed30d ?? 0;
-          document.getElementById('avgWinRate').textContent = (data.avgwinrate ?? 0) + '%';
-        })
-        .catch((err) => console.error('Error:', err));
+    async function loadReports() {
+      try {
+        const data = await apiGet('/api/admin/reports');
+        // Your app.py reports returns totalusers/totalwallets/totalbalance; map minimally to existing UI
+        document.getElementById('newUsers30d').textContent = data.totalusers ?? 0;
+        document.getElementById('revenue30d').textContent = fmtINR(data.totalbalance ?? 0);
+        document.getElementById('gamesPlayed30d').textContent = 0;
+        document.getElementById('avgWinRate').textContent = '0%';
+      } catch (err) {
+        console.error('Reports error:', err);
+      }
     }
 
-    // -------------------------
-    // Common UI
-    // -------------------------
     function openSecurityModal() {
-      alert('Security settings: 2FA, IP whitelist management coming soon...');
+      alert('Security module will be added next.');
     }
 
     function closeDetailsModal() {
       document.getElementById('detailsModal').classList.remove('active');
     }
-
-    function logout() {
-      if (confirm('Logout?')) window.location.href = '/logout';
-    }
-
-    document.addEventListener('click', function (e) {
-      if (e.target.classList.contains('modal')) e.target.classList.remove('active');
-    });
-
-        let currentUserGames = [];
-    let currentUserMeta = { id: null, username: '' };
-
-    function openUserGamesPage(userId, username) {
-      currentUserMeta = { id: userId, username: username || '' };
-      document.getElementById('userGamesTitle').textContent = `User Games: ${currentUserMeta.username} (#${userId})`;
-      switchSection('userGames');
-      loadUserGames(userId);
-      setTimeout(() => {
-        document.getElementById('searchUserGames')?.focus();
-      }, 50);
-    }
-
-    function backToUsers() {
-      switchSection('users');
-    }
-
-    async function loadUserGames(userId) {
-      document.getElementById('userGamesLoading').style.display = 'block';
-      document.getElementById('userGamesTableContainer').style.display = 'none';
-      currentUserGames = [];
-
-      try {
-        const data = await apiGet(`/api/admin/users/${userId}/games`);
-        currentUserGames = (data || []).map((g) => ({
-          roundcode: pick(g, ['roundcode','round_code','roundCode','code']),
-          gametype: pick(g, ['gametype','game_type','game','type']),
-          numbers: pick(g, ['numbers','chosen_numbers','bet_numbers'], []),
-          betamount: pickNum(g, ['betamount','bet_amount','bet','amount']),
-          winningnumber: pick(g, ['winningnumber','winning_number','win','result'], '-'),
-          status: pick(g, ['status','result','state'], '-'),
-          payout: pickNum(g, ['payout','net','profit','win_amount','winning_amount'], 0),
-          gamedate: pick(g, ['gamedate','game_date','date','created_at'], '-'),
-          gametime: pick(g, ['gametime','game_time','time'], ''),
-        }));
-
-        displayUserGames();
-        document.getElementById('userGamesLoading').style.display = 'none';
-        document.getElementById('userGamesTableContainer').style.display = 'block';
-      } catch (err) {
-        document.getElementById('userGamesLoading').innerHTML =
-          `<div style="color:#ef4444;">Error: ${err.message}</div>`;
-      }
-    }
-
-    function displayUserGames() {
-      const q = (document.getElementById('searchUserGames')?.value || '').toLowerCase();
-      const tbody = document.getElementById('userGamesTableBody');
-      tbody.innerHTML = '';
-
-      const filtered = (currentUserGames || []).filter((g) => {
-        return (g.roundcode || '').toLowerCase().includes(q) || (g.gametype || '').toLowerCase().includes(q);
-      });
-
-      if (!filtered.length) {
-        tbody.innerHTML = '<tr><td colspan="8" class="no-data">No games found</td></tr>';
-        return;
-      }
-
-      filtered.forEach((g) => {
-        const row = document.createElement('tr');
-        const nums = Array.isArray(g.numbers) ? g.numbers.join(', ') : String(g.numbers || '-');
-        const dt = `${g.gamedate || '-'} ${g.gametime || ''}`.trim();
-
-        row.innerHTML = `
-          <td><strong>${g.roundcode || '-'}</strong></td>
-          <td>${g.gametype || '-'}</td>
-          <td>${nums || '-'}</td>
-          <td>${fmtINR(g.betamount || 0)}</td>
-          <td>${g.winningnumber ?? '-'}</td>
-          <td>${String(g.status || '-').toUpperCase()}</td>
-          <td>${fmtINR(g.payout || 0)}</td>
-          <td>${dt}</td>
-        `;
-        tbody.appendChild(row);
-      });
-    }
-
   </script>
 </body>
 </html>
