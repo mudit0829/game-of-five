@@ -572,15 +572,15 @@
               <table class="data-table">
                 <thead>
                   <tr>
-                    <th>ID</th>
-                    <th>Username</th>
-                    <th>Email</th>
-                    <th>Agent</th>
-                    <th>Balance (₹)</th>
-                    <th>Games</th>
-                    <th>Status</th>
-                    <th>Joined</th>
-                    <th>Actions</th>
+                   <th>Round ID</th>
+                   <th>Game Type</th>
+                   <th>Table</th>
+                   <th>Numbers</th>
+                   <th>Total Bet</th>
+                   <th>Winning #</th>
+                   <th>Result</th>
+                   <th>Net/Amount</th>
+                   <th>Date/Time</th>
                   </tr>
                 </thead>
                 <tbody id="usersTableBody"></tbody>
@@ -1511,60 +1511,66 @@
     }
 
     async function loadUserGames(userId) {
-      document.getElementById('userGamesLoading').style.display = 'block';
-      document.getElementById('userGamesTableContainer').style.display = 'none';
-      currentUserGames = [];
+  document.getElementById('userGamesLoading').style.display = 'block';
+  document.getElementById('userGamesTableContainer').style.display = 'none';
+  currentUserGames = [];
 
-      try {
-        const data = await apiGet(`/api/admin/users/${userId}/games`);
-        currentUserGames = (data || []).map(g => ({
-          gametype: g.gametype || '-',
-          roundcode: g.roundcode || '-',
-          number: (g.number === 0 || g.number) ? g.number : '-',
-          betamount: Number(g.betamount || 0),
-          winningnumber: (g.winningnumber === 0 || g.winningnumber) ? g.winningnumber : '-',
-          status: g.status || (g.isresolved ? 'resolved' : 'pending'),
-          amount: Number(g.amount || 0),
-          datetime: g.datetime || '-',
-        }));
+  try {
+    const data = await apiGet(`/api/admin/users/${userId}/games`);
 
-        displayUserGames();
-        document.getElementById('userGamesLoading').style.display = 'none';
-        document.getElementById('userGamesTableContainer').style.display = 'block';
-      } catch (err) {
-        document.getElementById('userGamesLoading').innerHTML =
-          `<div style="color:#ef4444;">Error: ${err.message}</div>`;
-      }
-    }
+    currentUserGames = (data || []).map(g => ({
+      roundcode: g.roundcode || '-',
+      gametype: g.gametype || '-',
+      tablenumber: (g.tablenumber === 0 || g.tablenumber) ? g.tablenumber : '-',
+      numbers: Array.isArray(g.numbers) ? g.numbers : [],
+      totalbet: Number(g.totalbet || 0),
+      winningnumber: (g.winningnumber === 0 || g.winningnumber) ? g.winningnumber : '-',
+      result: (g.result || 'pending'),
+      netamount: Number(g.netamount || 0),
+      datetime: g.datetime || '-',
+    }));
 
-    function displayUserGames() {
-      const q = safeLower(document.getElementById('searchUserGames')?.value);
-      const tbody = document.getElementById('userGamesTableBody');
-      tbody.innerHTML = '';
+    displayUserGames();
+    document.getElementById('userGamesLoading').style.display = 'none';
+    document.getElementById('userGamesTableContainer').style.display = 'block';
+  } catch (err) {
+    document.getElementById('userGamesLoading').innerHTML =
+      `<div style="color:#ef4444;">Error: ${err.message}</div>`;
+  }
+}
 
-      const filtered = (currentUserGames || []).filter(g => {
-        return safeLower(g.roundcode).includes(q) || safeLower(g.gametype).includes(q);
-      });
+function displayUserGames() {
+  const q = safeLower(document.getElementById('searchUserGames')?.value);
+  const tbody = document.getElementById('userGamesTableBody');
+  tbody.innerHTML = '';
 
-      if (!filtered.length) {
-        tbody.innerHTML = `<tr><td colspan="8" class="no-data">No games found</td></tr>`;
-        return;
-      }
+  const filtered = (currentUserGames || []).filter(g => {
+    return safeLower(g.roundcode).includes(q) || safeLower(g.gametype).includes(q);
+  });
 
-      filtered.forEach(g => {
-        const row = document.createElement('tr');
-        row.innerHTML = `
-          <td><strong>${g.roundcode}</strong></td>
-          <td>${g.gametype}</td>
-          <td>${g.number}</td>
-          <td>${fmtINR(g.betamount)}</td>
-          <td>${g.winningnumber}</td>
-          <td>${String(g.status || '-').toUpperCase()}</td>
-          <td>${fmtINR(g.amount || 0)}</td>
-          <td>${g.datetime || '-'}</td>
-        `;
-        tbody.appendChild(row);
-      });
+  if (!filtered.length) {
+    tbody.innerHTML = `<tr><td colspan="9" class="no-data">No games found</td></tr>`;
+    return;
+  }
+
+  filtered.forEach(g => {
+    const nums = (g.numbers || []).join(', ');
+    const row = document.createElement('tr');
+    row.innerHTML = `
+      <td><strong>${g.roundcode}</strong></td>
+      <td>${g.gametype}</td>
+      <td>${g.tablenumber}</td>
+      <td>${nums || '-'}</td>
+      <td>${fmtINR(g.totalbet)}</td>
+      <td>${g.winningnumber}</td>
+      <td>${String(g.result || '-').toUpperCase()}</td>
+      <td>${fmtINR(g.netamount)}</td>
+      <td>${g.datetime || '-'}</td>
+    `;
+    tbody.appendChild(row);
+  });
+}
+
     }
 
     // ------------------------
