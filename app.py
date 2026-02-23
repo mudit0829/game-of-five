@@ -1401,6 +1401,16 @@ def admin_update_user(user_id):
     if "block_reason" in data:
         user.block_reason = data["block_reason"]
 
+    if 'displayname' in data:
+        user.displayname = data['displayname']
+
+    if 'country' in data:
+        user.country = data['country']
+
+    if 'phone' in data:
+        user.phone = data['phone']
+
+
     db.session.commit()
     return jsonify({"success": True, "message": "User updated successfully"})
 
