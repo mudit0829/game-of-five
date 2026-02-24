@@ -1920,7 +1920,7 @@ def admin_get_games():
 from sqlalchemy import or_
 
 @app.route("/api/admin/games/history", methods=["GET"])
-@adminrequired
+@admin_required
 def admingameshistory():
     page = int(request.args.get("page", 1))
     limit = int(request.args.get("limit", 100))
@@ -1962,7 +1962,7 @@ def admingameshistory():
 
 
 @app.route("/api/admin/games/<roundcode>/user-bets", methods=["GET"])
-@adminrequired
+@admin_required
 def admingameuserbets(roundcode):
     include_bots = (request.args.get("includeBots", "0") == "1")
 
