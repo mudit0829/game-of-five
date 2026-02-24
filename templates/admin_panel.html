@@ -639,18 +639,16 @@
               <table class="data-table">
                 <thead>
                   <tr>
-                    <th>ID</th>
-                    <th>Agent Name</th>
-                    <th>Email</th>
-                    <th>Salary %</th>
-                    <th>Users</th>
-                    <th>Total Deposits</th>
-                    <th>Total Withdrawals</th>
-                    <th>Commission</th>
+                    <th>Round Code</th>
+                    <th>Game</th>
+                    <th>Bet Number(s)</th>
+                    <th>Winning #</th>
                     <th>Status</th>
-                    <th>Actions</th>
-                  </tr>
+                    <th>Net/Amount</th>
+                    <th>Date/Time</th>
+                   </tr>
                 </thead>
+
                 <tbody id="agentsTableBody"></tbody>
               </table>
             </div>
@@ -1525,66 +1523,98 @@
     }
 
     async function loadUserGames(userId) {
-  document.getElementById('userGamesLoading').style.display = 'block';
-  document.getElementById('userGamesTableContainer').style.display = 'none';
+  document.getElementById("userGamesLoading").style.display = "block";
+  document.getElementById("userGamesTableContainer").style.display = "none";
   currentUserGames = [];
 
   try {
     const data = await apiGet(`/api/admin/users/${userId}/games`);
 
-    currentUserGames = (data || []).map(g => ({
-      roundcode: g.roundcode || '-',
-      gametype: g.gametype || '-',
-      tablenumber: (g.tablenumber === 0 || g.tablenumber) ? g.tablenumber : '-',
-      numbers: Array.isArray(g.numbers) ? g.numbers : [],
-      totalbet: Number(g.totalbet || 0),
-      winningnumber: (g.winningnumber === 0 || g.winningnumber) ? g.winningnumber : '-',
-      result: (g.result || 'pending'),
-      netamount: Number(g.netamount || 0),
-      datetime: g.datetime || '-',
+    // Backend rows are per bet: { roundcode, gametype, number, betamount, winningnumber, status, amount, datetime } [file:106]
+    const rows = (Array.isArray(data) ? data : []).map(g => ({
+      roundcode: g.roundcode || "-",
+      gametype: g.gametype || g.gametitle || "-",
+      number: (g.number === 0 || g.number) ? String(g.number) : "-",
+      betamount: Number(g.betamount ?? 0),
+      winningnumber: (g.winningnumber === 0 || g.winningnumber) ? String(g.winningnumber) : "-",
+      status: String(g.status || "PENDING").toUpperCase(), // WIN/LOSE/PENDING
+      amount: Number(g.amount ?? 0), // win => +payout, lose => -betamount (your game engine sets this) [file:106]
+      datetime: g.datetime || "-"
     }));
 
+    // Group by (roundcode + gametype)
+    const map = new Map();
+    for (const r of rows) {
+      const key = `${r.roundcode}__${r.gametype}`;
+      if (!map.has(key)) {
+        map.set(key, {
+          roundcode: r.roundcode,
+          gametype: r.gametype,
+          numbers: [],
+          winningnumber: r.winningnumber !== "-" ? r.winningnumber : "-",
+          status: "PENDING",
+          netamount: 0,
+          datetime: r.datetime || "-"
+        });
+      }
+
+      const grp = map.get(key);
+
+      if (r.number !== "-") grp.numbers.push(r.number);
+      if (grp.winningnumber === "-" && r.winningnumber !== "-") grp.winningnumber = r.winningnumber;
+
+      // Net = sum of amounts (positive wins + negative losses) [file:106]
+      grp.netamount += r.amount;
+
+      // status rule: if any WIN => WON, else if any PENDING => PENDING, else LOSE
+      if (r.status === "WIN" || r.status === "WON") grp.status = "WON";
+      else if (grp.status !== "WON" && r.status === "PENDING") grp.status = "PENDING";
+      else if (grp.status !== "WON" && grp.status !== "PENDING") grp.status = "LOSE";
+
+      // keep latest datetime if possible (string compare fallback)
+      if (String(r.datetime) > String(grp.datetime)) grp.datetime = r.datetime;
+    }
+
+    currentUserGames = Array.from(map.values());
     displayUserGames();
-    document.getElementById('userGamesLoading').style.display = 'none';
-    document.getElementById('userGamesTableContainer').style.display = 'block';
+
+    document.getElementById("userGamesLoading").style.display = "none";
+    document.getElementById("userGamesTableContainer").style.display = "block";
   } catch (err) {
-    document.getElementById('userGamesLoading').innerHTML =
-      `<div style="color:#ef4444;">Error: ${err.message}</div>`;
+    document.getElementById("userGamesLoading").innerHTML =
+      `<div style="color:#ef4444">Error: ${err.message}</div>`;
   }
 }
 
 function displayUserGames() {
-  const q = safeLower(document.getElementById('searchUserGames')?.value);
-  const tbody = document.getElementById('userGamesTableBody');
-  tbody.innerHTML = '';
+  const q = safeLower(document.getElementById("searchUserGames")?.value);
+  const tbody = document.getElementById("userGamesTableBody");
+  tbody.innerHTML = "";
 
-  const filtered = (currentUserGames || []).filter(g => {
-    return safeLower(g.roundcode).includes(q) || safeLower(g.gametype).includes(q);
-  });
+  const filtered = currentUserGames.filter(g =>
+    safeLower(g.roundcode).includes(q) || safeLower(g.gametype).includes(q)
+  );
 
   if (!filtered.length) {
-    tbody.innerHTML = `<tr><td colspan="9" class="no-data">No games found</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="7" class="no-data">No games found</td></tr>`;
     return;
   }
 
   filtered.forEach(g => {
-    const nums = (g.numbers || []).join(', ');
-    const row = document.createElement('tr');
+    const nums = g.numbers.length ? g.numbers.join(", ") : "-";
+    const row = document.createElement("tr");
     row.innerHTML = `
       <td><strong>${g.roundcode}</strong></td>
       <td>${g.gametype}</td>
-      <td>${g.tablenumber}</td>
-      <td>${nums || '-'}</td>
-      <td>${fmtINR(g.totalbet)}</td>
+      <td>${nums}</td>
       <td>${g.winningnumber}</td>
-      <td>${String(g.result || '-').toUpperCase()}</td>
+      <td>${String(g.status).toUpperCase()}</td>
       <td>${fmtINR(g.netamount)}</td>
-      <td>${g.datetime || '-'}</td>
+      <td>${g.datetime}</td>
     `;
     tbody.appendChild(row);
   });
 }
-
 
     // ------------------------
     // Agents (backend empty currently)
