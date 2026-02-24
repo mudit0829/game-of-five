@@ -1339,7 +1339,7 @@
           gamesplayed: Number(u.gamesplayed || 0),
           status: (u.status || (u.isblocked ? 'blocked' : 'active')),
           createdat: u.createdat || '-',
-          blockreason: u.blockreason || u.blockReason || ''
+          blockreason: u.blockreason || u.blockReason || '',
           total_games: Number(u.total_games ?? u.gamesplayed ?? 0),
           winning_amount: Number(u.winning_amount ?? u.winningamount ?? 0),
           joining: u.joining ?? u.createdat ?? "-",
