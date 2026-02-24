@@ -1978,42 +1978,41 @@ def admingameshistory():
     return jsonify(items=items, page=page, limit=limit, total=total)
 
 
-@app.route("/api/admin/games/<roundcode>/user-bets", methods=["GET"])
+@app.route("/api/admin/games/<path:roundcode>/user-bets", methods=["GET"])
 @admin_required
 def admingameuserbets(roundcode):
     include_bots = (request.args.get("includeBots", "0") == "1")
 
-    # History bets first
-    bets = GameRoundBet.query.filter_by(round_code=roundcode).all()
+    def norm(s: str) -> str:
+        return (s or "").replace("_", "").strip()
 
-    # If not in history yet (still active), read from live tables
-    if not bets:
-        for game_type, tables in gametables.items():
-            for t in tables:
-                if t.round_code == roundcode:
-                    live = t.bets or []
-                    grouped = {}
-                    for b in live:
-                        if (not include_bots) and b.get("is_bot"):
-                            continue
-                        uname = str(b.get("username", ""))
-                        grouped.setdefault(uname, set()).add(int(b.get("number", 0)))
+    target = norm(roundcode)
 
-                    users = [{"username": u, "numbers": sorted(list(ns))} for u, ns in grouped.items()]
-                    users.sort(key=lambda x: x["username"].lower())
-                    return jsonify(roundcode=roundcode, users=users)
+    # Read from live tables (your project already stores bets here)
+    for gametype, tables in gametables.items():
+        for t in tables:
+            if norm(getattr(t, "roundcode", "")) != target:
+                continue
 
-    # Group history bets by username
-    grouped = {}
-    for b in bets:
-        if (not include_bots) and b.is_bot:
-            continue
-        grouped.setdefault(b.username, set()).add(int(b.number))
+            grouped = {}
+            for b in (t.bets or []):
+                if not isinstance(b, dict):
+                    continue
+                if (not include_bots) and b.get("isbot"):
+                    continue
 
-    users = [{"username": u, "numbers": sorted(list(ns))} for u, ns in grouped.items()]
-    users.sort(key=lambda x: x["username"].lower())
-    return jsonify(roundcode=roundcode, users=users)
+                uname = str(b.get("username", ""))
+                num = b.get("number", None)
+                if num is None:
+                    continue
 
+                grouped.setdefault(uname, set()).add(int(num))
+
+            users = [{"username": u, "numbers": sorted(list(ns))} for u, ns in grouped.items()]
+            users.sort(key=lambda x: x["username"].lower())
+            return jsonify(roundcode=roundcode, users=users)
+
+    return jsonify(roundcode=roundcode, users=[])
 
 @app.route("/api/admin/stats", methods=["GET"])
 @admin_required
