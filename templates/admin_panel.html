@@ -613,14 +613,14 @@
                   <tr>
                     <th>Round Code</th>
                     <th>Game</th>
-                    <th>Number</th>
-                    <th>Bet</th>
+                    <th>Bet Number(s)</th>
                     <th>Winning #</th>
                     <th>Status</th>
                     <th>Net/Amount</th>
                     <th>Date/Time</th>
                   </tr>
                 </thead>
+
                 <tbody id="userGamesTableBody"></tbody>
               </table>
             </div>
@@ -1530,20 +1530,20 @@
   try {
     const data = await apiGet(`/api/admin/users/${userId}/games`);
 
-    // Backend rows are per bet: { roundcode, gametype, number, betamount, winningnumber, status, amount, datetime } [file:106]
-    const rows = (Array.isArray(data) ? data : []).map(g => ({
-      roundcode: g.roundcode || "-",
-      gametype: g.gametype || g.gametitle || "-",
-      number: (g.number === 0 || g.number) ? String(g.number) : "-",
-      betamount: Number(g.betamount ?? 0),
-      winningnumber: (g.winningnumber === 0 || g.winningnumber) ? String(g.winningnumber) : "-",
-      status: String(g.status || "PENDING").toUpperCase(), // WIN/LOSE/PENDING
-      amount: Number(g.amount ?? 0), // win => +payout, lose => -betamount (your game engine sets this) [file:106]
-      datetime: g.datetime || "-"
+    const rows = (Array.isArray(data) ? data : []).map(r => ({
+      roundcode: r.roundcode || "-",
+      gametype: r.gametype || r.gametitle || "-",
+      number: (r.number === 0 || r.number) ? String(r.number) : null,
+      winningnumber: (r.winningnumber === 0 || r.winningnumber) ? String(r.winningnumber) : null,
+      status: String(r.status || "").toLowerCase(),     // "win" / "lose" / "" [file:106]
+      isresolved: !!r.isresolved,                        // [file:106]
+      amount: Number(r.amount ?? 0),                     // win => +payout, lose => -betamount [file:106]
+      datetime: r.datetime || "-"                        // [file:106]
     }));
 
-    // Group by (roundcode + gametype)
+    // Group into 1 row per (roundcode + game)
     const map = new Map();
+
     for (const r of rows) {
       const key = `${r.roundcode}__${r.gametype}`;
       if (!map.has(key)) {
@@ -1551,31 +1551,42 @@
           roundcode: r.roundcode,
           gametype: r.gametype,
           numbers: [],
-          winningnumber: r.winningnumber !== "-" ? r.winningnumber : "-",
-          status: "PENDING",
+          winningnumber: null,
+          resolved: false,
           netamount: 0,
           datetime: r.datetime || "-"
         });
       }
 
-      const grp = map.get(key);
+      const g = map.get(key);
 
-      if (r.number !== "-") grp.numbers.push(r.number);
-      if (grp.winningnumber === "-" && r.winningnumber !== "-") grp.winningnumber = r.winningnumber;
+      if (r.number !== null) g.numbers.push(r.number);
+      if (r.winningnumber !== null) g.winningnumber = r.winningnumber;
 
-      // Net = sum of amounts (positive wins + negative losses) [file:106]
-      grp.netamount += r.amount;
+      g.resolved = g.resolved || r.isresolved;
+      g.netamount += r.amount;
 
-      // status rule: if any WIN => WON, else if any PENDING => PENDING, else LOSE
-      if (r.status === "WIN" || r.status === "WON") grp.status = "WON";
-      else if (grp.status !== "WON" && r.status === "PENDING") grp.status = "PENDING";
-      else if (grp.status !== "WON" && grp.status !== "PENDING") grp.status = "LOSE";
-
-      // keep latest datetime if possible (string compare fallback)
-      if (String(r.datetime) > String(grp.datetime)) grp.datetime = r.datetime;
+      // Keep latest datetime string (good enough since it is consistent "YYYY-MM-DD HH:MM") [file:106]
+      if (String(r.datetime) > String(g.datetime)) g.datetime = r.datetime;
     }
 
-    currentUserGames = Array.from(map.values());
+    currentUserGames = Array.from(map.values()).map(g => {
+      const betNumbers = g.numbers.length ? g.numbers.join(",") : "-";
+      const winning = g.resolved ? (g.winningnumber ?? "-") : "-";
+      const status = g.resolved ? (g.netamount > 0 ? "WON" : "LOSE") : "-";
+      const net = g.resolved ? g.netamount : 0;
+
+      return {
+        roundcode: g.roundcode,
+        gametype: g.gametype,
+        betNumbers,
+        winning,
+        status,
+        net,
+        datetime: g.datetime || "-"
+      };
+    });
+
     displayUserGames();
 
     document.getElementById("userGamesLoading").style.display = "none";
@@ -1601,15 +1612,14 @@ function displayUserGames() {
   }
 
   filtered.forEach(g => {
-    const nums = g.numbers.length ? g.numbers.join(", ") : "-";
     const row = document.createElement("tr");
     row.innerHTML = `
       <td><strong>${g.roundcode}</strong></td>
       <td>${g.gametype}</td>
-      <td>${nums}</td>
-      <td>${g.winningnumber}</td>
-      <td>${String(g.status).toUpperCase()}</td>
-      <td>${fmtINR(g.netamount)}</td>
+      <td>${g.betNumbers}</td>
+      <td>${g.winning}</td>
+      <td>${g.status}</td>
+      <td>${fmtINR(g.net)}</td>
       <td>${g.datetime}</td>
     `;
     tbody.appendChild(row);
