@@ -197,6 +197,33 @@ class Transaction(db.Model):
     note = db.Column(db.Text)
     datetime = db.Column(db.DateTime, default=datetime.utcnow, index=True)
 
+class GameRoundHistory(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    roundcode = db.Column(db.String(120), unique=True, nullable=False, index=True)
+    gametype = db.Column(db.String(50), nullable=False, index=True)
+    tablenumber = db.Column(db.Integer, nullable=False)
+    startedat = db.Column(db.DateTime, nullable=False, index=True)
+    endedat = db.Column(db.DateTime, nullable=False, index=True)
+    result = db.Column(db.Integer)  # winning number
+    status = db.Column(db.String(20), default="finished")
+    players = db.Column(db.Integer, default=0)
+    maxplayers = db.Column(db.Integer, default=0)
+    totalbets = db.Column(db.Integer, default=0)
+    createdat = db.Column(db.DateTime, default=datetime.utcnow, index=True)
+
+class GameRoundBet(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    roundcode = db.Column(db.String(120), nullable=False, index=True)
+    gametype = db.Column(db.String(50), nullable=False, index=True)
+    tablenumber = db.Column(db.Integer, nullable=False)
+    userid = db.Column(db.String(80))  # keep string because bots are "botXYZ"
+    username = db.Column(db.String(120), nullable=False, index=True)
+    number = db.Column(db.Integer, nullable=False)
+    betamount = db.Column(db.Integer, default=0)
+    isbot = db.Column(db.Boolean, default=False)
+    bettime = db.Column(db.DateTime, default=datetime.utcnow, index=True)
+
+
 
 class ForcedWinnerHistory(db.Model):
     """History of all forced winner bets set by Super Admin"""
@@ -536,6 +563,152 @@ def initialize_game_tables():
 
 
 def manage_game_table(table: GameTable):
+    # NOTE: Names are kept exactly as in your original code:
+    # manage_game_table, start_time, end_time, betting_close_time,
+    # is_betting_closed, is_finished, game_type, table_number, round_code,
+    # last_bot_added_at, max_players, bet keys: is_bot, user_id, bet_amount, date_time, etc.
+
+    def _safe_get_bet_amount(b):
+        # supports both "bet_amount" and "betamount" if your bet dict differs
+        return (
+            b.get("bet_amount")
+            if b.get("bet_amount") is not None
+            else (b.get("betamount") if b.get("betamount") is not None else None)
+        )
+
+    def _safe_get_bet_time(b):
+        # supports both "bet_time" and "bettime"
+        bt = b.get("bet_time")
+        if bt is None:
+            bt = b.get("bettime")
+        return bt
+
+    def _set_first_attr(obj, possible_names, value):
+        # set the first attribute name that exists on the model
+        for n in possible_names:
+            try:
+                if hasattr(obj, n):
+                    setattr(obj, n, value)
+                    return True
+            except Exception:
+                pass
+        return False
+
+    def _history_models_available():
+        # Prevent NameError if you haven't created these models yet.
+        return (
+            globals().get("GameRoundHistory") is not None
+            and globals().get("GameRoundBet") is not None
+            and globals().get("db") is not None
+        )
+
+    def _history_exists_for_round(GameRoundHistory, round_code_value):
+        # Try both common column names: round_code or roundcode
+        try:
+            return GameRoundHistory.query.filter_by(round_code=round_code_value).first() is not None
+        except TypeError:
+            pass
+        try:
+            return GameRoundHistory.query.filter_by(roundcode=round_code_value).first() is not None
+        except TypeError:
+            pass
+        # Fallback: no safe way to query without knowing column name
+        return False
+
+    def _save_round_history(table, result, now_utc):
+        """
+        Saves a finished round + all bets into DB (GameRoundHistory + GameRoundBet).
+        This function will:
+        - do nothing if models are missing (no NameError)
+        - avoid duplicate insert for same round_code
+        - not crash the game loop if DB insert fails
+        """
+        if not _history_models_available():
+            # Models not defined; skip saving without breaking.
+            return
+
+        GameRoundHistory = globals().get("GameRoundHistory")
+        GameRoundBet = globals().get("GameRoundBet")
+
+        try:
+            # avoid duplicates
+            if _history_exists_for_round(GameRoundHistory, table.round_code):
+                return
+
+            # Compute total bets
+            default_bet = table.config.get("bet_amount")
+            if default_bet is None:
+                default_bet = table.config.get("betamount", 0)
+
+            total_bets = 0
+            for b in (table.bets or []):
+                amt = _safe_get_bet_amount(b)
+                if amt is None:
+                    amt = default_bet or 0
+                try:
+                    total_bets += int(amt)
+                except Exception:
+                    pass
+
+            # Create history row (set attrs safely without assuming column names)
+            hist = GameRoundHistory()
+            _set_first_attr(hist, ["round_code", "roundcode"], table.round_code)
+            _set_first_attr(hist, ["game_type", "gametype"], table.game_type)
+            _set_first_attr(hist, ["table_number", "tablenumber"], table.table_number)
+            _set_first_attr(hist, ["started_at", "start_time", "startedat"], table.start_time)
+            _set_first_attr(hist, ["ended_at", "end_time", "endedat"], table.end_time)
+            _set_first_attr(hist, ["result", "winning_number", "winningnumber"], result)
+            _set_first_attr(hist, ["status"], "finished")
+            _set_first_attr(hist, ["players"], len(table.bets or []))
+            _set_first_attr(hist, ["max_players", "maxplayers"], int(table.max_players or 0))
+            _set_first_attr(hist, ["total_bets", "totalbets"], int(total_bets or 0))
+            _set_first_attr(hist, ["created_at", "createdat"], now_utc)
+
+            db.session.add(hist)
+
+            # Save bets (one row per bet)
+            for b in (table.bets or []):
+                bet_row = GameRoundBet()
+
+                _set_first_attr(bet_row, ["round_code", "roundcode"], table.round_code)
+                _set_first_attr(bet_row, ["game_type", "gametype"], table.game_type)
+                _set_first_attr(bet_row, ["table_number", "tablenumber"], table.table_number)
+
+                _set_first_attr(bet_row, ["user_id", "userid"], str(b.get("user_id", "")))
+                _set_first_attr(bet_row, ["username"], str(b.get("username", "")))
+
+                try:
+                    _set_first_attr(bet_row, ["number"], int(b.get("number", 0)))
+                except Exception:
+                    _set_first_attr(bet_row, ["number"], 0)
+
+                amt = _safe_get_bet_amount(b)
+                if amt is None:
+                    amt = default_bet or 0
+                try:
+                    _set_first_attr(bet_row, ["bet_amount", "betamount"], int(amt))
+                except Exception:
+                    _set_first_attr(bet_row, ["bet_amount", "betamount"], 0)
+
+                _set_first_attr(bet_row, ["is_bot", "isbot"], bool(b.get("is_bot", False)))
+
+                bt = _safe_get_bet_time(b)
+                if isinstance(bt, datetime):
+                    _set_first_attr(bet_row, ["bet_time", "bettime"], bt)
+                else:
+                    _set_first_attr(bet_row, ["bet_time", "bettime"], now_utc)
+
+                db.session.add(bet_row)
+
+            db.session.commit()
+
+        except Exception as e_hist:
+            print("History save error:", e_hist)
+            try:
+                db.session.rollback()
+            except Exception:
+                pass
+
     with app.app_context():
         while True:
             try:
@@ -563,14 +736,13 @@ def manage_game_table(table: GameTable):
                     table.is_betting_closed = True
                     print(f"{table.game_type} Table {table.table_number}: Betting closed")
 
-                # âœ… PRE-SELECT RESULT at <= 2 seconds remaining (for UI animation)
+                # PRE-SELECT RESULT at <= 2 seconds remaining (for UI animation)
                 if (
                     (not table.is_finished)
                     and (table.result is None)
                     and (len(table.bets) > 0)
                     and (table.get_time_remaining() <= 2)
                 ):
-                    # if a forced winner exists, only use it if bet exists
                     forced = forced_winners.get((table.game_type, table.round_code))
                     if forced is not None:
                         bet_numbers = {b.get("number") for b in (table.bets or [])}
@@ -579,7 +751,8 @@ def manage_game_table(table: GameTable):
                         table.result = table.calculate_result()
 
                     print(
-                        f"{table.game_type} Table {table.table_number}: Pre-selected winner at <=2s: {table.result}"
+                        f"{table.game_type} Table {table.table_number}: "
+                        f"Pre-selected winner at <=2s: {table.result}"
                     )
 
                 # Finish game at end_time
@@ -596,11 +769,9 @@ def manage_game_table(table: GameTable):
 
                     result = table.result
                     winners = table.get_winners()
-                    print(
-                        f"{table.game_type} Table {table.table_number}: Game ended. Winner: {result}"
-                    )
+                    print(f"{table.game_type} Table {table.table_number}: Game ended. Winner: {result}")
 
-                    # History update
+                    # History update (user_game_history)
                     for bet in table.bets:
                         if bet.get("is_bot"):
                             continue
@@ -623,6 +794,7 @@ def manage_game_table(table: GameTable):
                                 )
                                 rec["is_resolved"] = True
                                 rec["date_time"] = fmt_ist(now, "%Y-%m-%d %H:%M")
+
                     # Winners payout + transaction log
                     for winner in winners:
                         wallet = Wallet.query.filter_by(user_id=winner["user_id"]).first()
@@ -649,9 +821,13 @@ def manage_game_table(table: GameTable):
                         history_record.status = "executed"
                         history_record.note = f"Executed. Winner: {result}"
 
+                    # Commit payouts + forced-winner history
                     db.session.commit()
 
-                    # âœ… clear forced winner after round ends (one-round only)
+                    # Save finished round + bets into DB (separate commit; won’t break game loop)
+                    _save_round_history(table, result, now)
+
+                    # clear forced winner after round ends (one-round only)
                     forced_winners.pop((table.game_type, table.round_code), None)
 
                     time.sleep(3)
@@ -663,16 +839,13 @@ def manage_game_table(table: GameTable):
                     table.is_finished = False
 
                     base = floor_to_period(datetime.utcnow(), ROUND_SECONDS)
-                    # keep same staggering by table_number (1..6) => 0..5 minutes
                     table.start_time = base + timedelta(seconds=(table.table_number - 1) * 60)
                     table.end_time = table.start_time + timedelta(seconds=ROUND_SECONDS)
                     table.betting_close_time = table.end_time - timedelta(seconds=15)
                     table.round_code = make_round_code(table.game_type, table.start_time, table.table_number)
 
                     table.last_bot_added_at = None
-                    print(
-                        f"{table.game_type} Table {table.table_number}: New round started - {table.round_code}"
-                    )
+                    print(f"{table.game_type} Table {table.table_number}: New round started - {table.round_code}")
 
                 time.sleep(1)
 
@@ -1743,6 +1916,78 @@ def admin_get_games():
             })
 
     return jsonify(all_games)
+
+@app.route("/api/admin/games/history", methods=["GET"])
+@adminrequired
+def admingameshistory():
+    page = int(request.args.get("page", 1))
+    limit = int(request.args.get("limit", 100))
+    q = (request.args.get("q") or "").strip().lower()
+
+    query = GameRoundHistory.query
+    if q:
+        query = query.filter(
+            db.or_(
+                db.func.lower(GameRoundHistory.roundcode).like(f"%{q}%"),
+                db.func.lower(GameRoundHistory.gametype).like(f"%{q}%")
+            )
+        )
+
+    total = query.count()
+    rows = (query.order_by(GameRoundHistory.endedat.desc())
+                 .offset((page - 1) * limit)
+                 .limit(limit)
+                 .all())
+
+    items = []
+    for r in rows:
+        items.append({
+            "roundcode": r.roundcode,
+            "gametype": r.gametype,
+            "players": r.players,
+            "maxplayers": r.maxplayers,
+            "result": r.result,
+            "totalbets": r.totalbets,
+            "startedat": fmtist(r.startedat, "%Y-%m-%d %H:%M"),
+            "status": r.status
+        })
+
+    return jsonify(items=items, page=page, limit=limit, total=total)
+
+
+@app.route("/api/admin/games/<roundcode>/user-bets", methods=["GET"])
+@adminrequired
+def admingameuserbets(roundcode):
+    include_bots = (request.args.get("includeBots", "0") == "1")
+
+    bets = GameRoundBet.query.filter_by(roundcode=roundcode).all()
+
+    # If not in history yet (active round), read from live tables
+    if not bets:
+        for gametype, tables in gametables.items():
+            for t in tables:
+                if t.roundcode == roundcode:
+                    live = t.bets or []
+                    out = {}
+                    for b in live:
+                        if (not include_bots) and b.get("isbot"):
+                            continue
+                        uname = str(b.get("username", ""))
+                        out.setdefault(uname, set()).add(int(b.get("number", 0)))
+                    items = [{"username": u, "numbers": sorted(list(ns))} for u, ns in out.items()]
+                    items.sort(key=lambda x: x["username"].lower())
+                    return jsonify(roundcode=roundcode, users=items)
+
+    grouped = {}
+    for b in bets:
+        if (not include_bots) and b.isbot:
+            continue
+        grouped.setdefault(b.username, set()).add(int(b.number))
+
+    items = [{"username": u, "numbers": sorted(list(ns))} for u, ns in grouped.items()]
+    items.sort(key=lambda x: x["username"].lower())
+    return jsonify(roundcode=roundcode, users=items)
+
 
 
 @app.route("/api/admin/stats", methods=["GET"])
