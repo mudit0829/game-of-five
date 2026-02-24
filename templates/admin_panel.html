@@ -1529,63 +1529,81 @@
 
   try {
     const data = await apiGet(`/api/admin/users/${userId}/games`);
+    console.log("USER GAMES API SAMPLE:", data?.[0], data);
 
-    const rows = (Array.isArray(data) ? data : []).map(r => ({
-      roundcode: r.roundcode || "-",
-      gametype: r.gametype || r.gametitle || "-",
-      number: (r.number === 0 || r.number) ? String(r.number) : null,
-      winningnumber: (r.winningnumber === 0 || r.winningnumber) ? String(r.winningnumber) : null,
-      status: String(r.status || "").toLowerCase(),     // "win" / "lose" / "" [file:106]
-      isresolved: !!r.isresolved,                        // [file:106]
-      amount: Number(r.amount ?? 0),                     // win => +payout, lose => -betamount [file:106]
-      datetime: r.datetime || "-"                        // [file:106]
-    }));
+    const rows = (Array.isArray(data) ? data : []).map(r => {
+  // accept both new API keys and any old keys
+  const roundcode = r.roundcode || "-";
+  const gametype  = r.gametype || r.gametitle || "-";
 
-    // Group into 1 row per (roundcode + game)
-    const map = new Map();
+  // number can be: r.number (backend), or r.numbers array (older)
+  const nums = Array.isArray(r.numbers)
+    ? r.numbers.map(x => String(x))
+    : ((r.number === 0 || r.number) ? [String(r.number)] : []);
 
-    for (const r of rows) {
-      const key = `${r.roundcode}__${r.gametype}`;
-      if (!map.has(key)) {
-        map.set(key, {
-          roundcode: r.roundcode,
-          gametype: r.gametype,
-          numbers: [],
-          winningnumber: null,
-          resolved: false,
-          netamount: 0,
-          datetime: r.datetime || "-"
-        });
-      }
+  const winningnumber =
+    (r.winningnumber === 0 || r.winningnumber) ? String(r.winningnumber)
+    : ((r.result === 0 || r.result) ? String(r.result) : null);
 
-      const g = map.get(key);
+  const isresolved = !!r.isresolved;
+  const statusRaw = (r.status == null ? "" : String(r.status)).toLowerCase(); // "win"/"lose"/"pending"
+  const amount = Number(r.amount ?? r.netamount ?? 0);
+  const datetime = r.datetime || r.startedat || "-";
 
-      if (r.number !== null) g.numbers.push(r.number);
-      if (r.winningnumber !== null) g.winningnumber = r.winningnumber;
+  return { roundcode, gametype, nums, winningnumber, isresolved, statusRaw, amount, datetime };
+});
 
-      g.resolved = g.resolved || r.isresolved;
-      g.netamount += r.amount;
+// Group into 1 row per (roundcode + gametype)
+const map = new Map();
 
-      // Keep latest datetime string (good enough since it is consistent "YYYY-MM-DD HH:MM") [file:106]
-      if (String(r.datetime) > String(g.datetime)) g.datetime = r.datetime;
-    }
-
-    currentUserGames = Array.from(map.values()).map(g => {
-      const betNumbers = g.numbers.length ? g.numbers.join(",") : "-";
-      const winning = g.resolved ? (g.winningnumber ?? "-") : "-";
-      const status = g.resolved ? (g.netamount > 0 ? "WON" : "LOSE") : "-";
-      const net = g.resolved ? g.netamount : 0;
-
-      return {
-        roundcode: g.roundcode,
-        gametype: g.gametype,
-        betNumbers,
-        winning,
-        status,
-        net,
-        datetime: g.datetime || "-"
-      };
+for (const r of rows) {
+  const key = `${r.roundcode}__${r.gametype}`;
+  if (!map.has(key)) {
+    map.set(key, {
+      roundcode: r.roundcode,
+      gametype: r.gametype,
+      numbersSet: new Set(),
+      winningnumber: null,
+      resolved: false,
+      statusRaw: "",
+      netamount: 0,
+      datetime: r.datetime || "-"
     });
+  }
+
+  const g = map.get(key);
+
+  r.nums.forEach(n => g.numbersSet.add(n));
+  if (r.winningnumber != null) g.winningnumber = r.winningnumber;
+
+  g.resolved = g.resolved || r.isresolved || r.statusRaw === "win" || r.statusRaw === "lose";
+  if (r.statusRaw) g.statusRaw = r.statusRaw;
+
+  g.netamount += r.amount;
+
+  if (String(r.datetime) > String(g.datetime)) g.datetime = r.datetime;
+}
+
+currentUserGames = Array.from(map.values()).map(g => {
+  const betNumbers = g.numbersSet.size
+    ? Array.from(g.numbersSet).sort((a,b)=>Number(a)-Number(b)).join(",")
+    : "-";
+
+  const status =
+    g.resolved
+      ? (g.statusRaw === "win" ? "WON" : (g.statusRaw === "lose" ? "LOSE" : (g.netamount > 0 ? "WON" : "LOSE")))
+      : "PENDING";
+
+  return {
+    roundcode: g.roundcode,
+    gametype: g.gametype,
+    betNumbers,
+    winning: g.resolved ? (g.winningnumber ?? "-") : "-",
+    status,
+    net: g.netamount,          // will be 0 while pending, positive/negative after result
+    datetime: g.datetime || "-"
+  };
+});
 
     displayUserGames();
 
