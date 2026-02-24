@@ -1529,33 +1529,32 @@
 
   try {
     const data = await apiGet(`/api/admin/users/${userId}/games`);
-    console.log("USER GAMES API SAMPLE:", data?.[0], data);
+    console.log("USER GAMES API SAMPLE:", (data && data.length ? data[0] : null), data);
 
-    // Backend already returns 1 row per round, so just map it to what displayUserGames() expects.
+    // Map API -> what displayUserGames() expects in your adminpanel.html [file:131]
     currentUserGames = (Array.isArray(data) ? data : []).map(g => {
-      const roundcode = g.roundcode || g.round_code || "-";
-      const gametype  = g.gametype || g.game_type || "-";
+      const roundcode = g.roundcode || "-";
+      const gametype = g.gametype || "-";
 
+      // backend currently returns per-bet rows: number + betamount etc. [file:131]
+      // if your backend later returns grouped rounds (numbers array), this still works.
       const numbers = Array.isArray(g.numbers)
         ? g.numbers
         : ((g.number === 0 || g.number) ? [g.number] : []);
 
-      const totalbet = Number(
-        g.totalbet ?? g.total_bet ?? g.total_bets ?? g.betamount ?? g.bet_amount ?? 0
-      );
+      const totalbet = Number(g.totalbet || g.betamount || 0);
 
       const winningnumber =
-        (g.winningnumber === 0 || g.winningnumber) ? g.winningnumber
-        : ((g.result === 0 || g.result) ? g.result : "-");
+        (g.winningnumber === 0 || g.winningnumber) ? g.winningnumber : "-";
 
-      const result = (g.result || "pending");     // pending/win/lose (whatever backend sends)
-      const netamount = Number(g.netamount ?? g.amount ?? 0);
-      const datetime = g.datetime || g.startedat || g.started_at || "-";
+      const result = g.status || g.result || "pending"; // your backend sends status in admin user games [file:131]
+      const netamount = Number(g.amount || g.netamount || 0);
+      const datetime = g.datetime || "-";
 
       return {
         roundcode,
         gametype,
-        tablenumber: g.tablenumber ?? "-",  // keep column working if backend sends it
+        tablenumber: (g.tablenumber === 0 || g.tablenumber) ? g.tablenumber : "-",
         numbers,
         totalbet,
         winningnumber,
@@ -1565,7 +1564,7 @@
       };
     });
 
-    displayUserGames(); // IMPORTANT: render after load [file:131]
+    displayUserGames(); // renders the table from currentUserGames [file:131]
 
     document.getElementById("userGamesLoading").style.display = "none";
     document.getElementById("userGamesTableContainer").style.display = "block";
@@ -1575,16 +1574,6 @@
   }
 }
 
-
-    displayUserGames();
-
-    document.getElementById("userGamesLoading").style.display = "none";
-    document.getElementById("userGamesTableContainer").style.display = "block";
-   catch (err) {
-    document.getElementById("userGamesLoading").innerHTML =
-      `<div style="color:#ef4444">Error: ${err.message}</div>`;
-  }
-}
 
 function displayUserGames() {
   const q = safeLower(document.getElementById("searchUserGames")?.value);
