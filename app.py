@@ -1919,43 +1919,60 @@ def admin_get_games():
 
 from sqlalchemy import or_
 
+def _pick_col(Model, *names):
+    for n in names:
+        if hasattr(Model, n):
+            return getattr(Model, n)
+    raise AttributeError(f"{Model.__name__} missing columns: {names}")
+
+def _pick_val(obj, *names):
+    for n in names:
+        if hasattr(obj, n):
+            return getattr(obj, n)
+    return None
+
+def _fmt_ist_safe(dt, fmt="%Y-%m-%d %H:%M"):
+    f = globals().get("fmt_ist") or globals().get("fmtist")
+    return f(dt, fmt) if (f and dt) else ("-" if not dt else dt.strftime(fmt))
+
 @app.route("/api/admin/games/history", methods=["GET"])
-@admin_required
+@admin_required  # keep whatever decorator name your current file uses
 def admingameshistory():
     page = int(request.args.get("page", 1))
     limit = int(request.args.get("limit", 100))
     q = (request.args.get("q") or "").strip().lower()
 
-    query = GameRoundHistory.query
+    ROUND = _pick_col(GameRoundHistory, "round_code", "roundcode")
+    TYPE  = _pick_col(GameRoundHistory, "game_type", "gametype")
+    START = _pick_col(GameRoundHistory, "started_at", "startedat")
+    END   = _pick_col(GameRoundHistory, "ended_at", "endedat")
 
+    query = GameRoundHistory.query
     if q:
         query = query.filter(
             or_(
-                db.func.lower(GameRoundHistory.round_code).like(f"%{q}%"),
-                db.func.lower(GameRoundHistory.game_type).like(f"%{q}%")
+                db.func.lower(ROUND).like(f"%{q}%"),
+                db.func.lower(TYPE).like(f"%{q}%")
             )
         )
 
     total = query.count()
-    rows = (
-        query.order_by(GameRoundHistory.ended_at.desc())
-             .offset((page - 1) * limit)
-             .limit(limit)
-             .all()
-    )
+    rows = (query.order_by(END.desc())
+                 .offset((page - 1) * limit)
+                 .limit(limit)
+                 .all())
 
     items = []
     for r in rows:
         items.append({
-            # return keys used by your admin UI table
-            "roundcode": r.round_code,
-            "gametype": r.game_type,
-            "players": r.players,
-            "maxplayers": r.max_players,
-            "result": r.result,
-            "totalbets": r.total_bets,
-            "startedat": fmt_ist(r.started_at, "%Y-%m-%d %H:%M") if r.started_at else "-",
-            "status": r.status
+            "roundcode": _pick_val(r, "round_code", "roundcode"),
+            "gametype": _pick_val(r, "game_type", "gametype"),
+            "players": _pick_val(r, "players") or 0,
+            "maxplayers": _pick_val(r, "max_players", "maxplayers") or 0,
+            "result": _pick_val(r, "result"),
+            "totalbets": _pick_val(r, "total_bets", "totalbets") or 0,
+            "startedat": _fmt_ist_safe(_pick_val(r, "started_at", "startedat")),
+            "status": _pick_val(r, "status") or "finished",
         })
 
     return jsonify(items=items, page=page, limit=limit, total=total)
