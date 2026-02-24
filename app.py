@@ -1979,33 +1979,37 @@ def admingameshistory():
 
 
 @app.route("/api/admin/games/<path:roundcode>/user-bets", methods=["GET"])
-@admin_required
+@admin_required  # keep your current decorator
 def admingameuserbets(roundcode):
     include_bots = (request.args.get("includeBots", "0") == "1")
 
     def norm(s: str) -> str:
-        return (s or "").replace("_", "").strip()
+        return (s or "").replace("_", "").strip().lower()
 
     target = norm(roundcode)
 
-    # Read from live tables (your project already stores bets here)
-    for gametype, tables in gametables.items():
-        for t in tables:
-            if norm(getattr(t, "roundcode", "")) != target:
+    tables_store = globals().get("game_tables") or globals().get("gametables") or {}
+    for gametype, tables in (tables_store or {}).items():
+        for t in (tables or []):
+            rc = getattr(t, "roundcode", None) or getattr(t, "round_code", None) or ""
+            if norm(rc) != target:
                 continue
 
             grouped = {}
-            for b in (t.bets or []):
+            for b in (getattr(t, "bets", None) or []):
                 if not isinstance(b, dict):
                     continue
-                if (not include_bots) and b.get("isbot"):
+                is_bot = b.get("isbot")
+                if is_bot is None:
+                    is_bot = b.get("is_bot", False)
+
+                if (not include_bots) and is_bot:
                     continue
 
                 uname = str(b.get("username", ""))
                 num = b.get("number", None)
                 if num is None:
                     continue
-
                 grouped.setdefault(uname, set()).add(int(num))
 
             users = [{"username": u, "numbers": sorted(list(ns))} for u, ns in grouped.items()]
@@ -2013,6 +2017,7 @@ def admingameuserbets(roundcode):
             return jsonify(roundcode=roundcode, users=users)
 
     return jsonify(roundcode=roundcode, users=[])
+
 
 @app.route("/api/admin/stats", methods=["GET"])
 @admin_required
