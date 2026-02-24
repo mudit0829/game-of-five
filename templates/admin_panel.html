@@ -1714,83 +1714,171 @@ function displayUserGames() {
     // ------------------------
     // Games
     // ------------------------
-    async function loadGames() {
-      document.getElementById('gamesLoading').style.display = 'block';
-      document.getElementById('gamesTableContainer').style.display = 'none';
+    let allGames = [];
+let gamesPage = 1;
+let gamesLimit = 100;
+let gamesTotal = 0;
 
-      try {
-        const data = await apiGet('/api/admin/games');
-        allGames = (data || []).map(g => ({
-          roundcode: g.roundcode || '-',
-          gametype: g.gametype || '-',
-          players: Number(g.players || 0),
-          maxplayers: Number(g.maxplayers || 0),
-          result: (g.result === 0 || g.result) ? g.result : '-',
-          totalbets: Number(g.totalbets || 0),
-          startedat: g.startedat || g.gamedate || '-',
-          status: g.status || (g.isfinished ? 'finished' : (g.isbettingclosed ? 'completed' : 'active'))
-        }));
+function renderGamesPageInfo() {
+  const el = document.getElementById("gamesPageInfo");
+  if (!el) return;
+  const totalPages = Math.max(1, Math.ceil((gamesTotal || 0) / gamesLimit));
+  el.textContent = `Page ${gamesPage} / ${totalPages} (Total: ${gamesTotal || 0})`;
+}
 
-        displayGames();
-        document.getElementById('gamesLoading').style.display = 'none';
-        document.getElementById('gamesTableContainer').style.display = 'block';
-      } catch (err) {
-        console.error('Error loading games:', err);
-        document.getElementById('gamesLoading').innerHTML = `<div style="color:#ef4444;">Error: ${err.message}</div>`;
-      }
-    }
+function nextGamesPage() {
+  const totalPages = Math.max(1, Math.ceil((gamesTotal || 0) / gamesLimit));
+  if (gamesPage < totalPages) {
+    gamesPage++;
+    loadGames();
+  }
+}
 
-    function displayGames() {
-      const search = safeLower(document.getElementById('searchGames')?.value);
-      const tbody = document.getElementById('gamesTableBody');
-      tbody.innerHTML = '';
+function prevGamesPage() {
+  if (gamesPage > 1) {
+    gamesPage--;
+    loadGames();
+  }
+}
 
-      const filtered = (allGames || []).filter(g => {
-        return safeLower(g.roundcode).includes(search) || safeLower(g.gametype).includes(search);
+async function loadGames() {
+  document.getElementById("gamesLoading").style.display = "block";
+  document.getElementById("gamesTableContainer").style.display = "none";
+
+  try {
+    const search = safeLower(document.getElementById("searchGames")?.value);
+
+    // Active (live) games (in-memory)
+    const active = await apiGet(`/api/admin/games`);
+    const activeArr = Array.isArray(active) ? active : [];
+
+    // History (DB) games (paginated)
+    const histRes = await apiGet(`/api/admin/games/history?page=${gamesPage}&limit=${gamesLimit}&q=${encodeURIComponent(search || "")}`);
+    const historyArr = Array.isArray(histRes?.items) ? histRes.items : [];
+    gamesTotal = Number(histRes?.total || 0);
+
+    // Filter active using search too
+    const activeFiltered = activeArr.filter(g =>
+      !search ||
+      safeLower(g.roundcode).includes(search) ||
+      safeLower(g.gametype).includes(search)
+    );
+
+    // Merge: active first, then history (avoid duplicates by roundcode)
+    const seen = new Set();
+    const merged = [];
+
+    for (const g of activeFiltered) {
+      if (!g?.roundcode || seen.has(g.roundcode)) continue;
+      seen.add(g.roundcode);
+      merged.push({
+        roundcode: g.roundcode || "-",
+        gametype: g.gametype || "-",
+        players: Number(g.players || 0),
+        maxplayers: Number(g.maxplayers || 0),
+        result: (g.result === 0 || g.result) ? g.result : "-",
+        totalbets: Number(g.totalbets || 0),
+        startedat: g.startedat || "-",
+        status: g.status || "active"
       });
+    }
 
-      if (!filtered.length) {
-        tbody.innerHTML = `<tr><td colspan="8" class="no-data">No games</td></tr>`;
-        return;
-      }
-
-      filtered.forEach(game => {
-        const row = document.createElement('tr');
-        row.innerHTML = `
-          <td><strong>${game.roundcode}</strong></td>
-          <td>${game.gametype}</td>
-          <td>${game.players}/${game.maxplayers}</td>
-          <td>${game.result}</td>
-          <td>${fmtINR(game.totalbets)}</td>
-          <td>${game.startedat}</td>
-          <td><span class="badge ${gameStatusBadgeClass(game.status)}">${String(game.status || '-').toUpperCase()}</span></td>
-          <td><button class="btn-small btn-view" onclick="viewGameDetails('${String(game.roundcode).replace(/'/g,"\\'")}')">Details</button></td>
-        `;
-        tbody.appendChild(row);
+    for (const g of historyArr) {
+      if (!g?.roundcode || seen.has(g.roundcode)) continue;
+      seen.add(g.roundcode);
+      merged.push({
+        roundcode: g.roundcode || "-",
+        gametype: g.gametype || "-",
+        players: Number(g.players || 0),
+        maxplayers: Number(g.maxplayers || 0),
+        result: (g.result === 0 || g.result) ? g.result : "-",
+        totalbets: Number(g.totalbets || 0),
+        startedat: g.startedat || "-",
+        status: g.status || "finished"
       });
     }
 
-    function viewGameDetails(roundCode) {
-      const game = (allGames || []).find(g => g.roundcode === roundCode);
-      if (!game) return;
+    allGames = merged;
+    displayGames();
+    renderGamesPageInfo();
 
-      const html = `
-        <div class="details-grid">
-          <div class="detail-item"><div class="detail-label">Round Code</div><div class="detail-value">${game.roundcode}</div></div>
-          <div class="detail-item"><div class="detail-label">Game Type</div><div class="detail-value">${game.gametype}</div></div>
-          <div class="detail-item"><div class="detail-label">Winning Number</div><div class="detail-value" style="color:#f59e0b;">${game.result}</div></div>
-          <div class="detail-item"><div class="detail-label">Players</div><div class="detail-value">${game.players}/${game.maxplayers}</div></div>
-          <div class="detail-item"><div class="detail-label">Total Bets</div><div class="detail-value">${fmtINR(game.totalbets)}</div></div>
-          <div class="detail-item"><div class="detail-label">Date/Time</div><div class="detail-value">${game.startedat}</div></div>
-          <div class="detail-item"><div class="detail-label">Status</div><div class="detail-value">${String(game.status || '-').toUpperCase()}</div></div>
-        </div>
-      `;
+    document.getElementById("gamesLoading").style.display = "none";
+    document.getElementById("gamesTableContainer").style.display = "block";
+  } catch (err) {
+    document.getElementById("gamesLoading").innerHTML =
+      `<div style="color:#ef4444">Error: ${err.message}</div>`;
+  }
+}
 
-      document.getElementById('detailsTitle').textContent = 'Game Details';
-      document.getElementById('detailsSubtitle').textContent = '';
-      document.getElementById('detailsContent').innerHTML = html;
-      document.getElementById('detailsModal').classList.add('active');
+function displayGames() {
+  const search = safeLower(document.getElementById("searchGames")?.value);
+  const tbody = document.getElementById("gamesTableBody");
+  tbody.innerHTML = "";
+
+  const filtered = allGames.filter(g =>
+    !search ||
+    safeLower(g.roundcode).includes(search) ||
+    safeLower(g.gametype).includes(search)
+  );
+
+  if (!filtered.length) {
+    tbody.innerHTML = `<tr><td colspan="8" class="no-data">No games</td></tr>`;
+    return;
+  }
+
+  filtered.forEach(game => {
+    const row = document.createElement("tr");
+    row.innerHTML = `
+      <td><strong>${game.roundcode}</strong></td>
+      <td>${game.gametype}</td>
+      <td>${game.players}/${game.maxplayers}</td>
+      <td>${game.result}</td>
+      <td>${fmtINR(game.totalbets)}</td>
+      <td>${game.startedat}</td>
+      <td><span class="badge ${gameStatusBadgeClass(game.status)}">${String(game.status || "-").toUpperCase()}</span></td>
+      <td><button class="btn-small btn-view" onclick="viewGameDetails('${String(game.roundcode).replace(/'/g, "")}')">Details</button></td>
+    `;
+    tbody.appendChild(row);
+  });
+}
+
+async function viewGameDetails(roundCode) {
+  document.getElementById("detailsTitle").textContent = `Game Bets: ${roundCode}`;
+  document.getElementById("detailsSubtitle").textContent = "";
+
+  try {
+    const res = await apiGet(`/api/admin/games/${encodeURIComponent(roundCode)}/user-bets?includeBots=0`);
+    const users = Array.isArray(res?.users) ? res.users : [];
+
+    if (!users.length) {
+      document.getElementById("detailsContent").innerHTML =
+        `<div class="no-data">No user bets found</div>`;
+      document.getElementById("detailsModal").classList.add("active");
+      return;
     }
+
+    const rowsHtml = users.map(u => `
+      <tr>
+        <td><strong>${u.username}</strong></td>
+        <td>${(u.numbers || []).join(",")}</td>
+      </tr>
+    `).join("");
+
+    document.getElementById("detailsContent").innerHTML = `
+      <div class="table-container">
+        <table class="data-table">
+          <thead><tr><th>Username</th><th>Bet Numbers</th></tr></thead>
+          <tbody>${rowsHtml}</tbody>
+        </table>
+      </div>
+    `;
+    document.getElementById("detailsModal").classList.add("active");
+  } catch (err) {
+    document.getElementById("detailsContent").innerHTML =
+      `<div style="color:#ef4444">Error: ${err.message}</div>`;
+    document.getElementById("detailsModal").classList.add("active");
+  }
+}
 
     // ------------------------
     // Transactions
