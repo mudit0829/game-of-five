@@ -574,6 +574,8 @@
                   <tr>
                    <th>S.No.</th>
                    <th>User Name</th>
+                   <th>Agent Name</th>
+                   <th>Email</th>
                    <th>Status</th>
                    <th>Total Games</th>
                    <th>Winning Amount</th>
@@ -1380,7 +1382,7 @@
       tbody.innerHTML = '';
 
       if (!filtered.length) {
-        tbody.innerHTML = `<tr><td colspan="9" class="no-data">No users found</td></tr>`;
+        tbody.innerHTML = `<tr><td colspan="10" class="no-data">No users found</td></tr>`;
         return;
       }
 
@@ -1397,29 +1399,31 @@
   const joining = user.joining ?? user.createdat ?? "-";
 
   row.innerHTML = `
-    <td>${idx + 1}</td>
-    <td><strong>${user.username || "-"}</strong></td>
-    <td><span class="badge ${userStatusBadgeClass(status)}">${status.toUpperCase()}</span></td>
-    <td>
-      <a href="javascript:void(0)"
-         onclick="openUserGamesPage(${user.id}, '${safeU}')"
-         style="color:#10b981; cursor:pointer">
-        ${totalGames}
-      </a>
-    </td>
-    <td>${fmtINR(winningAmount)}</td>
-    <td>${fmtINR(walletBalance)}</td>
-    <td>${joining}</td>
-    <td>
-      <div class="action-buttons">
-        <button class="btn-small btn-edit" onclick="openEditUserModal(${user.id})">Edit</button>
-        ${isBlocked
-          ? `<button class="btn-small btn-unblock" onclick="unblockUser(${user.id})">Unblock</button>`
-          : `<button class="btn-small btn-block" onclick="blockUser(${user.id})">Block</button>`
-        }
-      </div>
-    </td>
-  `;
+  <td>${idx + 1}</td>
+  <td><strong>${user.username || "-"}</strong></td>
+  <td>${user.agentname || "-"}</td>
+  <td>${user.email || "-"}</td>
+  <td><span class="badge ${userStatusBadgeClass(status)}">${status.toUpperCase()}</span></td>
+  <td>
+    <a href="javascript:void(0)"
+       onclick="openUserGamesPage(${user.id}, '${safeU}')"
+       style="color:#10b981; cursor:pointer">
+      ${totalGames}
+    </a>
+  </td>
+  <td>${fmtINR(winningAmount)}</td>
+  <td>${fmtINR(walletBalance)}</td>
+  <td>${joining}</td>
+  <td>
+    <div class="action-buttons">
+      <button class="btn-small btn-edit" onclick="openEditUserModal(${user.id})">Edit</button>
+      ${isBlocked
+        ? `<button class="btn-small btn-unblock" onclick="unblockUser(${user.id})">Unblock</button>`
+        : `<button class="btn-small btn-block" onclick="blockUser(${user.id})">Block</button>`
+      }
+    </div>
+  </td>
+`;
   tbody.appendChild(row);
 });
 }
