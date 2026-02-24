@@ -1385,35 +1385,57 @@ def get_balance(user_id):
 # ---------------------------------------------------
 
 
-@app.route("/admin")
-@admin_required
-def admin_panel():
-    return render_template("admin_panel.html")
-
-
 @app.route("/api/admin/users", methods=["GET"])
 @admin_required
 def admin_get_users():
     users = User.query.filter(User.is_admin == False).all()
-    user_list = []
 
+    # --- figure out Transaction user column name (supports user_id OR userid) ---
+    tx_user_col = Transaction.user_id if hasattr(Transaction, "user_id") else Transaction.userid
+
+    user_ids = [u.id for u in users]
+
+    # Total Games (count BET)
+    games_map = dict(
+        db.session.query(tx_user_col, func.count(Transaction.id))
+        .filter(tx_user_col.in_(user_ids), Transaction.kind == "bet")
+        .group_by(tx_user_col)
+        .all()
+    )
+
+    # Winning Amount (sum WIN)
+    win_map = dict(
+        db.session.query(tx_user_col, func.coalesce(func.sum(Transaction.amount), 0))
+        .filter(tx_user_col.in_(user_ids), Transaction.kind == "win")
+        .group_by(tx_user_col)
+        .all()
+    )
+
+    user_list = []
     for user in users:
         wallet = ensure_wallet_for_user(user)
-        user_list.append(
-            {
-                "id": user.id,
-                "username": user.username,
-                "email": user.email or "",
-                "password_hash": user.password_hash,
-                "status": "blocked" if user.is_blocked else "active",
-                "balance": wallet.balance if wallet else 0,
-                "created_at": fmt_ist(user.created_at, "%Y-%m-%d %H:%M"),
-                "block_reason": user.block_reason or "",
-            }
-        )
+
+        joining = fmt_ist(user.created_at, "%Y-%m-%d %H:%M") if user.created_at else ""
+
+        user_list.append({
+            "id": user.id,
+            "username": user.username,
+
+            "status": "blocked" if user.is_blocked else "active",
+            "total_games": int(games_map.get(user.id, 0)),
+            "winning_amount": int(win_map.get(user.id, 0)),
+            "balance": int(wallet.balance) if wallet else 0,
+            "joining": joining,          # use this in UI
+            "created_at": joining,       # keep for compatibility (optional)
+
+            # keep only what Edit modal needs
+            "email": user.email or "",
+            "country": user.country or "",
+            "phone": user.phone or "",
+            "block_reason": user.block_reason or "",
+        })
 
     return jsonify(user_list)
-
 
 @app.route("/api/admin/users/<int:user_id>", methods=["PUT"])
 @admin_required
