@@ -1917,6 +1917,8 @@ def admin_get_games():
 
     return jsonify(all_games)
 
+from sqlalchemy import or_
+
 @app.route("/api/admin/games/history", methods=["GET"])
 @adminrequired
 def admingameshistory():
@@ -1925,30 +1927,34 @@ def admingameshistory():
     q = (request.args.get("q") or "").strip().lower()
 
     query = GameRoundHistory.query
+
     if q:
         query = query.filter(
-            db.or_(
-                db.func.lower(GameRoundHistory.roundcode).like(f"%{q}%"),
-                db.func.lower(GameRoundHistory.gametype).like(f"%{q}%")
+            or_(
+                db.func.lower(GameRoundHistory.round_code).like(f"%{q}%"),
+                db.func.lower(GameRoundHistory.game_type).like(f"%{q}%")
             )
         )
 
     total = query.count()
-    rows = (query.order_by(GameRoundHistory.endedat.desc())
-                 .offset((page - 1) * limit)
-                 .limit(limit)
-                 .all())
+    rows = (
+        query.order_by(GameRoundHistory.ended_at.desc())
+             .offset((page - 1) * limit)
+             .limit(limit)
+             .all()
+    )
 
     items = []
     for r in rows:
         items.append({
-            "roundcode": r.roundcode,
-            "gametype": r.gametype,
+            # return keys used by your admin UI table
+            "roundcode": r.round_code,
+            "gametype": r.game_type,
             "players": r.players,
-            "maxplayers": r.maxplayers,
+            "maxplayers": r.max_players,
             "result": r.result,
-            "totalbets": r.totalbets,
-            "startedat": fmtist(r.startedat, "%Y-%m-%d %H:%M"),
+            "totalbets": r.total_bets,
+            "startedat": fmt_ist(r.started_at, "%Y-%m-%d %H:%M") if r.started_at else "-",
             "status": r.status
         })
 
@@ -1960,34 +1966,36 @@ def admingameshistory():
 def admingameuserbets(roundcode):
     include_bots = (request.args.get("includeBots", "0") == "1")
 
-    bets = GameRoundBet.query.filter_by(roundcode=roundcode).all()
+    # History bets first
+    bets = GameRoundBet.query.filter_by(round_code=roundcode).all()
 
-    # If not in history yet (active round), read from live tables
+    # If not in history yet (still active), read from live tables
     if not bets:
-        for gametype, tables in gametables.items():
+        for game_type, tables in gametables.items():
             for t in tables:
-                if t.roundcode == roundcode:
+                if t.round_code == roundcode:
                     live = t.bets or []
-                    out = {}
+                    grouped = {}
                     for b in live:
-                        if (not include_bots) and b.get("isbot"):
+                        if (not include_bots) and b.get("is_bot"):
                             continue
                         uname = str(b.get("username", ""))
-                        out.setdefault(uname, set()).add(int(b.get("number", 0)))
-                    items = [{"username": u, "numbers": sorted(list(ns))} for u, ns in out.items()]
-                    items.sort(key=lambda x: x["username"].lower())
-                    return jsonify(roundcode=roundcode, users=items)
+                        grouped.setdefault(uname, set()).add(int(b.get("number", 0)))
 
+                    users = [{"username": u, "numbers": sorted(list(ns))} for u, ns in grouped.items()]
+                    users.sort(key=lambda x: x["username"].lower())
+                    return jsonify(roundcode=roundcode, users=users)
+
+    # Group history bets by username
     grouped = {}
     for b in bets:
-        if (not include_bots) and b.isbot:
+        if (not include_bots) and b.is_bot:
             continue
         grouped.setdefault(b.username, set()).add(int(b.number))
 
-    items = [{"username": u, "numbers": sorted(list(ns))} for u, ns in grouped.items()]
-    items.sort(key=lambda x: x["username"].lower())
-    return jsonify(roundcode=roundcode, users=items)
-
+    users = [{"username": u, "numbers": sorted(list(ns))} for u, ns in grouped.items()]
+    users.sort(key=lambda x: x["username"].lower())
+    return jsonify(roundcode=roundcode, users=users)
 
 
 @app.route("/api/admin/stats", methods=["GET"])
