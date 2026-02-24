@@ -1340,6 +1340,10 @@
           status: (u.status || (u.isblocked ? 'blocked' : 'active')),
           createdat: u.createdat || '-',
           blockreason: u.blockreason || u.blockReason || ''
+          total_games: Number(u.total_games ?? u.gamesplayed ?? 0),
+          winning_amount: Number(u.winning_amount ?? u.winningamount ?? 0),
+          joining: u.joining ?? u.createdat ?? "-",
+
         }));
 
         buildUserDatalist();
@@ -1380,38 +1384,45 @@
         return;
       }
 
-      filtered.forEach((user) => {
-        const row = document.createElement('tr');
-        const status = String(user.status || 'active');
-        const safeU = String(user.username || '').replace(/'/g, "\\'");
-        const isBlocked = safeLower(status) === 'blocked';
+      filtered.forEach((user, idx) => {
+  const row = document.createElement("tr");
 
-        row.innerHTML = `
-          <td>${user.id ?? '-'}</td>
-          <td><strong>${user.username || '-'}</strong></td>
-          <td>${user.email || '-'}</td>
-          <td>${user.agentname || '-'}</td>
-          <td>${fmtINR(user.balance || 0)}</td>
-          <td>
-            <a href="javascript:;" onclick="openUserGamesPage(${user.id}, '${safeU}')" style="color:#10b981; cursor:pointer;">
-              ${Number(user.gamesplayed || 0)}
-            </a>
-          </td>
-          <td><span class="badge ${userStatusBadgeClass(status)}">${String(status).toUpperCase()}</span></td>
-          <td>${user.createdat || '-'}</td>
-          <td>
-            <div class="action-buttons">
-              <button class="btn-small btn-edit" onclick="openEditUserModal(${user.id})">✏️ Edit</button>
-              ${isBlocked
-                ? `<button class="btn-small btn-unblock" onclick="unblockUser(${user.id})">🔓 Unblock</button>`
-                : `<button class="btn-small btn-block" onclick="blockUser(${user.id})">⛔ Block</button>`
-              }
-            </div>
-          </td>
-        `;
-        tbody.appendChild(row);
-      });
-    }
+  const status = String(user.status || "active");
+  const safeU = String(user.username || "").replace(/'/g, "\\'");
+  const isBlocked = safeLower(status) === "blocked";
+
+  const totalGames = Number(user.total_games ?? user.gamesplayed ?? 0);
+  const winningAmount = Number(user.winning_amount ?? user.winningamount ?? 0);
+  const walletBalance = Number(user.balance ?? 0);
+  const joining = user.joining ?? user.createdat ?? "-";
+
+  row.innerHTML = `
+    <td>${idx + 1}</td>
+    <td><strong>${user.username || "-"}</strong></td>
+    <td><span class="badge ${userStatusBadgeClass(status)}">${status.toUpperCase()}</span></td>
+    <td>
+      <a href="javascript:void(0)"
+         onclick="openUserGamesPage(${user.id}, '${safeU}')"
+         style="color:#10b981; cursor:pointer">
+        ${totalGames}
+      </a>
+    </td>
+    <td>${fmtINR(winningAmount)}</td>
+    <td>${fmtINR(walletBalance)}</td>
+    <td>${joining}</td>
+    <td>
+      <div class="action-buttons">
+        <button class="btn-small btn-edit" onclick="openEditUserModal(${user.id})">Edit</button>
+        ${isBlocked
+          ? `<button class="btn-small btn-unblock" onclick="unblockUser(${user.id})">Unblock</button>`
+          : `<button class="btn-small btn-block" onclick="blockUser(${user.id})">Block</button>`
+        }
+      </div>
+    </td>
+  `;
+  tbody.appendChild(row);
+});
+}
 
     function openEditUserModal(userId) {
       const u = (allUsers || []).find(x => x.id === userId);
