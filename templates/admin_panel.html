@@ -1512,6 +1512,8 @@
 // ------------------------
 // User Games (table page)
 // ------------------------
+// User Games (table page)
+// ------------------------
 let currentUserGames = [];
 let currentUserMeta = { id: null, username: "" };
 
@@ -1527,38 +1529,37 @@ function backToUsers() {
   switchSection("users");
 }
 
-function isTrueBool(v) {
-  if (typeof v === "boolean") return v;
-  if (typeof v === "number") return v === 1;
-  if (typeof v === "string") return ["1", "true", "yes"].includes(v.toLowerCase());
-  return false;
-}
-
 function parseRoundcodeDateTime(roundcode) {
-  // Supports both:
-  // 1) "G_20260224_1701_2" (your UI screenshot) [file:134]
-  // 2) "G2026022417012" (makeroundcode style in backend) [file:106]
+  // Works for: "G_20260224_1711_2"
   try {
     const rc = String(roundcode || "");
-    let y, m, d, hh, mm;
+    const m = rc.match(/^[A-Z]_(\d{8})_(\d{4})_/); // G_YYYYMMDD_HHMM_
+    if (!m) return "-";
+    const date = m[1];
+    const time = m[2];
+    const y = date.slice(0, 4);
+    const mo = date.slice(4, 6);
+    const d = date.slice(6, 8);
+    const hh = time.slice(0, 2);
+    const mm = time.slice(2, 4);
+    return `${y}-${mo}-${d} ${hh}:${mm}`;
+  } catch (e) {
+    return "-";
+  }
+}
 
-    const m1 = rc.match(/^[A-Z]_(\d{8})_(\d{4})_/); // G_YYYYMMDD_HHMM_
-    if (m1) {
-      const date = m1[1], time = m1[2];
-      y = date.slice(0, 4); m = date.slice(4, 6); d = date.slice(6, 8);
-      hh = time.slice(0, 2); mm = time.slice(2, 4);
-      return `${y}-${m}-${d} ${hh}:${mm}`;
-    }
+function pickWinningNumber(g) {
+  // IMPORTANT: allow 0
+  if (g && (g.winningnumber === 0 || g.winningnumber)) return g.winningnumber;
+  if (g && (g.winning_number === 0 || g.winning_number)) return g.winning_number;
+  return null;
+}
 
-    const m2 = rc.match(/^[A-Z](\d{12})\d*$/); // GYYYYMMDDHHMM + table
-    if (m2) {
-      const stamp = m2[1];
-      y = stamp.slice(0, 4); m = stamp.slice(4, 6); d = stamp.slice(6, 8);
-      hh = stamp.slice(8, 10); mm = stamp.slice(10, 12);
-      return `${y}-${m}-${d} ${hh}:${mm}`;
-    }
-  } catch (e) {}
-  return "-";
+function normalizeStatus(resultRaw) {
+  const r = String(resultRaw || "pending").toLowerCase();
+  if (r === "win" || r === "won") return "WON";
+  if (r === "lose" || r === "lost") return "LOSE";
+  return "PENDING";
 }
 
 async function loadUserGames(userId) {
@@ -1570,85 +1571,37 @@ async function loadUserGames(userId) {
     const data = await apiGet(`/api/admin/users/${userId}/games`);
     const arr = Array.isArray(data) ? data : [];
 
-    // Normalize per-bet rows from /api/admin/users/:id/games [file:106]
-    const normalized = arr.map(r => {
-      const roundcode = r.roundcode || "-";
-      const gametype = r.gametype || r.gametitle || "-";
-      const tablenumber = (r.tablenumber === 0 || r.tablenumber) ? String(r.tablenumber) : "-";
+    currentUserGames = arr.map(g => {
+      const roundcode = g.roundcode || g.roundid || "-";
+      const gametype = g.gametype || g.game_type || "-";
 
-      const nums = Array.isArray(r.numbers)
-        ? r.numbers.map(x => String(x))
-        : ((r.number === 0 || r.number) ? [String(r.number)] : []);
+      const numsArr = Array.isArray(g.bettingnumbers)
+        ? g.bettingnumbers
+        : (Array.isArray(g.numbers) ? g.numbers : []);
 
-      const winningnumber =
-        (r.winningnumber === 0 || r.winningnumber) ? String(r.winningnumber)
-        : ((r.result === 0 || r.result) ? String(r.result) : null);
+      const betNumbers = numsArr.length ? numsArr.join(",") : "-";
 
-      const statusRaw = (r.status == null ? "" : String(r.status)).toLowerCase(); // win/lose/pending
-      const isresolved = isTrueBool(r.isresolved);
+      const winNum = pickWinningNumber(g);
+      const winning = (winNum === 0 || winNum) ? String(winNum) : "-";
 
-      const amount = Number((r.amount !== undefined ? r.amount : r.netamount) || 0);
+      // Your API uses "result": win/lose/pending
+      const status = normalizeStatus(g.result);
 
-      // If backend doesn't send datetime for pending, fallback to roundcode-derived datetime.
-      const dt = (r.datetime && String(r.datetime).trim()) ? String(r.datetime).trim() : parseRoundcodeDateTime(roundcode);
+      const net = Number(g.netamount || 0);
 
-      return { roundcode, gametype, tablenumber, nums, winningnumber, statusRaw, isresolved, amount, dt };
-    });
-
-    // Group => 1 row per round (roundcode + gametype + tablenumber)
-    const map = new Map();
-
-    for (const r of normalized) {
-      const key = `${r.roundcode}__${r.gametype}__${r.tablenumber}`;
-      if (!map.has(key)) {
-        map.set(key, {
-          roundcode: r.roundcode,
-          gametype: r.gametype,
-          tablenumber: r.tablenumber,
-          numbersSet: new Set(),
-          winningnumber: null,
-          resolved: false,
-          statusRaw: "",
-          net: 0,
-          dt: r.dt || "-"
-        });
-      }
-
-      const g = map.get(key);
-
-      r.nums.forEach(n => g.numbersSet.add(n));
-      if (r.winningnumber != null) g.winningnumber = r.winningnumber;
-
-      const resolvedNow = r.isresolved || r.statusRaw === "win" || r.statusRaw === "lose" || r.winningnumber != null;
-      g.resolved = g.resolved || resolvedNow;
-
-      if (r.statusRaw) g.statusRaw = r.statusRaw;
-
-      // Only sum amounts that backend has actually set; if still pending, backend usually keeps 0. [file:106]
-      g.net += r.amount;
-
-      if (String(r.dt) > String(g.dt)) g.dt = r.dt;
-    }
-
-    currentUserGames = Array.from(map.values()).map(g => {
-      const betNumbers = g.numbersSet.size
-        ? Array.from(g.numbersSet).sort((a, b) => Number(a) - Number(b)).join(",")
-        : "-";
-
-      const status =
-        !g.resolved ? "PENDING"
-        : (g.statusRaw === "win" ? "WON"
-          : (g.statusRaw === "lose" ? "LOSE"
-            : (g.net > 0 ? "WON" : "LOSE")));
+      // API returns datetime empty, so fallback to roundcode date/time
+      const dt = (g.datetime && String(g.datetime).trim())
+        ? String(g.datetime).trim()
+        : ((g.date_time && String(g.date_time).trim()) ? String(g.date_time).trim() : parseRoundcodeDateTime(roundcode));
 
       return {
-        roundcode: g.roundcode,
-        gametype: g.gametype,
+        roundcode,
+        gametype,
         betNumbers,
-        winning: g.resolved ? (g.winningnumber ?? "-") : "-",
+        winning,
         status,
-        net: g.net,
-        datetime: g.dt || "-"
+        net,
+        datetime: dt || "-"
       };
     });
 
@@ -1663,7 +1616,9 @@ async function loadUserGames(userId) {
 }
 
 function displayUserGames() {
-  const q = safeLower((document.getElementById("searchUserGames") && document.getElementById("searchUserGames").value) || "");
+  const input = document.getElementById("searchUserGames");
+  const q = safeLower(input && input.value ? input.value : "");
+
   const tbody = document.getElementById("userGamesTableBody");
   tbody.innerHTML = "";
 
@@ -1690,6 +1645,7 @@ function displayUserGames() {
     tbody.appendChild(row);
   });
 }
+
 
 
     // ------------------------
