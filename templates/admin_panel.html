@@ -1510,6 +1510,8 @@
     // ------------------------
     // User Games (table page)
 // ------------------------
+// User Games (table page)
+// ------------------------
 let currentUserGames = [];
 let currentUserMeta = { id: null, username: "" };
 
@@ -1525,8 +1527,40 @@ function backToUsers() {
   switchSection("users");
 }
 
-// This version produces: roundcode, gametype, betNumbers, winning, status, net, datetime
-// so it matches your displayUserGames() renderer. [file:131]
+function isTrueBool(v) {
+  if (typeof v === "boolean") return v;
+  if (typeof v === "number") return v === 1;
+  if (typeof v === "string") return ["1", "true", "yes"].includes(v.toLowerCase());
+  return false;
+}
+
+function parseRoundcodeDateTime(roundcode) {
+  // Supports both:
+  // 1) "G_20260224_1701_2" (your UI screenshot) [file:134]
+  // 2) "G2026022417012" (makeroundcode style in backend) [file:106]
+  try {
+    const rc = String(roundcode || "");
+    let y, m, d, hh, mm;
+
+    const m1 = rc.match(/^[A-Z]_(\d{8})_(\d{4})_/); // G_YYYYMMDD_HHMM_
+    if (m1) {
+      const date = m1[1], time = m1[2];
+      y = date.slice(0, 4); m = date.slice(4, 6); d = date.slice(6, 8);
+      hh = time.slice(0, 2); mm = time.slice(2, 4);
+      return `${y}-${m}-${d} ${hh}:${mm}`;
+    }
+
+    const m2 = rc.match(/^[A-Z](\d{12})\d*$/); // GYYYYMMDDHHMM + table
+    if (m2) {
+      const stamp = m2[1];
+      y = stamp.slice(0, 4); m = stamp.slice(4, 6); d = stamp.slice(6, 8);
+      hh = stamp.slice(8, 10); mm = stamp.slice(10, 12);
+      return `${y}-${m}-${d} ${hh}:${mm}`;
+    }
+  } catch (e) {}
+  return "-";
+}
+
 async function loadUserGames(userId) {
   document.getElementById("userGamesLoading").style.display = "block";
   document.getElementById("userGamesTableContainer").style.display = "none";
@@ -1536,12 +1570,12 @@ async function loadUserGames(userId) {
     const data = await apiGet(`/api/admin/users/${userId}/games`);
     const arr = Array.isArray(data) ? data : [];
 
-    // Normalize rows so we can group safely (supports old/new backend keys). [file:106]
-    const rows = arr.map(r => {
+    // Normalize per-bet rows from /api/admin/users/:id/games [file:106]
+    const normalized = arr.map(r => {
       const roundcode = r.roundcode || "-";
       const gametype = r.gametype || r.gametitle || "-";
+      const tablenumber = (r.tablenumber === 0 || r.tablenumber) ? String(r.tablenumber) : "-";
 
-      // number can be: r.number (per-bet API) OR r.numbers[] (grouped API)
       const nums = Array.isArray(r.numbers)
         ? r.numbers.map(x => String(x))
         : ((r.number === 0 || r.number) ? [String(r.number)] : []);
@@ -1551,31 +1585,32 @@ async function loadUserGames(userId) {
         : ((r.result === 0 || r.result) ? String(r.result) : null);
 
       const statusRaw = (r.status == null ? "" : String(r.status)).toLowerCase(); // win/lose/pending
-      const isresolved = !!r.isresolved;
+      const isresolved = isTrueBool(r.isresolved);
 
-      // net can be: r.amount (per-bet API) OR r.netamount (grouped API)
       const amount = Number((r.amount !== undefined ? r.amount : r.netamount) || 0);
 
-      const datetime = r.datetime || r.startedat || r.bettime || "-";
+      // If backend doesn't send datetime for pending, fallback to roundcode-derived datetime.
+      const dt = (r.datetime && String(r.datetime).trim()) ? String(r.datetime).trim() : parseRoundcodeDateTime(roundcode);
 
-      return { roundcode, gametype, nums, winningnumber, statusRaw, isresolved, amount, datetime };
+      return { roundcode, gametype, tablenumber, nums, winningnumber, statusRaw, isresolved, amount, dt };
     });
 
-    // Group into 1 row per (roundcode + gametype)
+    // Group => 1 row per round (roundcode + gametype + tablenumber)
     const map = new Map();
 
-    for (const r of rows) {
-      const key = `${r.roundcode}__${r.gametype}`;
+    for (const r of normalized) {
+      const key = `${r.roundcode}__${r.gametype}__${r.tablenumber}`;
       if (!map.has(key)) {
         map.set(key, {
           roundcode: r.roundcode,
           gametype: r.gametype,
+          tablenumber: r.tablenumber,
           numbersSet: new Set(),
           winningnumber: null,
           resolved: false,
           statusRaw: "",
           net: 0,
-          datetime: r.datetime || "-"
+          dt: r.dt || "-"
         });
       }
 
@@ -1584,13 +1619,15 @@ async function loadUserGames(userId) {
       r.nums.forEach(n => g.numbersSet.add(n));
       if (r.winningnumber != null) g.winningnumber = r.winningnumber;
 
-      g.resolved = g.resolved || r.isresolved || r.statusRaw === "win" || r.statusRaw === "lose";
+      const resolvedNow = r.isresolved || r.statusRaw === "win" || r.statusRaw === "lose" || r.winningnumber != null;
+      g.resolved = g.resolved || resolvedNow;
+
       if (r.statusRaw) g.statusRaw = r.statusRaw;
 
+      // Only sum amounts that backend has actually set; if still pending, backend usually keeps 0. [file:106]
       g.net += r.amount;
 
-      // Keep latest datetime (string compare is OK here because your backend formats consistently)
-      if (String(r.datetime) > String(g.datetime)) g.datetime = r.datetime;
+      if (String(r.dt) > String(g.dt)) g.dt = r.dt;
     }
 
     currentUserGames = Array.from(map.values()).map(g => {
@@ -1608,10 +1645,10 @@ async function loadUserGames(userId) {
         roundcode: g.roundcode,
         gametype: g.gametype,
         betNumbers,
-        winning: g.resolved ? (g.winningnumber || "-") : "-",
+        winning: g.resolved ? (g.winningnumber ?? "-") : "-",
         status,
         net: g.net,
-        datetime: g.datetime || "-"
+        datetime: g.dt || "-"
       };
     });
 
@@ -1626,9 +1663,7 @@ async function loadUserGames(userId) {
 }
 
 function displayUserGames() {
-  const input = document.getElementById("searchUserGames");
-  const q = safeLower(input && input.value ? input.value : "");
-
+  const q = safeLower((document.getElementById("searchUserGames") && document.getElementById("searchUserGames").value) || "");
   const tbody = document.getElementById("userGamesTableBody");
   tbody.innerHTML = "";
 
@@ -1637,7 +1672,6 @@ function displayUserGames() {
   );
 
   if (!filtered.length) {
-    // NOTE: colspan must match your <th> count in HTML.
     tbody.innerHTML = `<tr><td colspan="7" class="no-data">No games found</td></tr>`;
     return;
   }
