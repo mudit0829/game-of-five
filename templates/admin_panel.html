@@ -1508,63 +1508,114 @@
     // ------------------------
     // User Games (table page)
     // ------------------------
-    let currentUserGames = [];
-    let currentUserMeta = { id: null, username: '' };
+    // User Games (table page)
+// ------------------------
+let currentUserGames = [];
+let currentUserMeta = { id: null, username: "" };
 
-    function openUserGamesPage(userId, username) {
-      currentUserMeta = { id: userId, username: username || '' };
-      document.getElementById('userGamesTitle').textContent = `User Games: ${currentUserMeta.username} (#${userId})`;
-      switchSection('userGames');
-      loadUserGames(userId);
-    }
+function openUserGamesPage(userId, username) {
+  currentUserMeta = { id: userId, username: username || "" };
+  document.getElementById("userGamesTitle").textContent =
+    `User Games: ${currentUserMeta.username} (#${userId})`;
+  switchSection("userGames");
+  loadUserGames(userId);
+}
 
-    function backToUsers() {
-      switchSection('users');
-    }
+function backToUsers() {
+  switchSection("users");
+}
 
-    async function loadUserGames(userId) {
+// This version produces: roundcode, gametype, betNumbers, winning, status, net, datetime
+// so it matches your displayUserGames() renderer. [file:131]
+async function loadUserGames(userId) {
   document.getElementById("userGamesLoading").style.display = "block";
   document.getElementById("userGamesTableContainer").style.display = "none";
   currentUserGames = [];
 
   try {
     const data = await apiGet(`/api/admin/users/${userId}/games`);
-    console.log("USER GAMES API SAMPLE:", (data && data.length ? data[0] : null), data);
+    const arr = Array.isArray(data) ? data : [];
 
-    // Map API -> what displayUserGames() expects in your adminpanel.html [file:131]
-    currentUserGames = (Array.isArray(data) ? data : []).map(g => {
-      const roundcode = g.roundcode || "-";
-      const gametype = g.gametype || "-";
+    // Normalize rows so we can group safely (supports old/new backend keys). [file:106]
+    const rows = arr.map(r => {
+      const roundcode = r.roundcode || "-";
+      const gametype = r.gametype || r.gametitle || "-";
 
-      // backend currently returns per-bet rows: number + betamount etc. [file:131]
-      // if your backend later returns grouped rounds (numbers array), this still works.
-      const numbers = Array.isArray(g.numbers)
-        ? g.numbers
-        : ((g.number === 0 || g.number) ? [g.number] : []);
-
-      const totalbet = Number(g.totalbet || g.betamount || 0);
+      // number can be: r.number (per-bet API) OR r.numbers[] (grouped API)
+      const nums = Array.isArray(r.numbers)
+        ? r.numbers.map(x => String(x))
+        : ((r.number === 0 || r.number) ? [String(r.number)] : []);
 
       const winningnumber =
-        (g.winningnumber === 0 || g.winningnumber) ? g.winningnumber : "-";
+        (r.winningnumber === 0 || r.winningnumber) ? String(r.winningnumber)
+        : ((r.result === 0 || r.result) ? String(r.result) : null);
 
-      const result = g.status || g.result || "pending"; // your backend sends status in admin user games [file:131]
-      const netamount = Number(g.amount || g.netamount || 0);
-      const datetime = g.datetime || "-";
+      const statusRaw = (r.status == null ? "" : String(r.status)).toLowerCase(); // win/lose/pending
+      const isresolved = !!r.isresolved;
+
+      // net can be: r.amount (per-bet API) OR r.netamount (grouped API)
+      const amount = Number((r.amount !== undefined ? r.amount : r.netamount) || 0);
+
+      const datetime = r.datetime || r.startedat || r.bettime || "-";
+
+      return { roundcode, gametype, nums, winningnumber, statusRaw, isresolved, amount, datetime };
+    });
+
+    // Group into 1 row per (roundcode + gametype)
+    const map = new Map();
+
+    for (const r of rows) {
+      const key = `${r.roundcode}__${r.gametype}`;
+      if (!map.has(key)) {
+        map.set(key, {
+          roundcode: r.roundcode,
+          gametype: r.gametype,
+          numbersSet: new Set(),
+          winningnumber: null,
+          resolved: false,
+          statusRaw: "",
+          net: 0,
+          datetime: r.datetime || "-"
+        });
+      }
+
+      const g = map.get(key);
+
+      r.nums.forEach(n => g.numbersSet.add(n));
+      if (r.winningnumber != null) g.winningnumber = r.winningnumber;
+
+      g.resolved = g.resolved || r.isresolved || r.statusRaw === "win" || r.statusRaw === "lose";
+      if (r.statusRaw) g.statusRaw = r.statusRaw;
+
+      g.net += r.amount;
+
+      // Keep latest datetime (string compare is OK here because your backend formats consistently)
+      if (String(r.datetime) > String(g.datetime)) g.datetime = r.datetime;
+    }
+
+    currentUserGames = Array.from(map.values()).map(g => {
+      const betNumbers = g.numbersSet.size
+        ? Array.from(g.numbersSet).sort((a, b) => Number(a) - Number(b)).join(",")
+        : "-";
+
+      const status =
+        !g.resolved ? "PENDING"
+        : (g.statusRaw === "win" ? "WON"
+          : (g.statusRaw === "lose" ? "LOSE"
+            : (g.net > 0 ? "WON" : "LOSE")));
 
       return {
-        roundcode,
-        gametype,
-        tablenumber: (g.tablenumber === 0 || g.tablenumber) ? g.tablenumber : "-",
-        numbers,
-        totalbet,
-        winningnumber,
-        result,
-        netamount,
-        datetime
+        roundcode: g.roundcode,
+        gametype: g.gametype,
+        betNumbers,
+        winning: g.resolved ? (g.winningnumber || "-") : "-",
+        status,
+        net: g.net,
+        datetime: g.datetime || "-"
       };
     });
 
-    displayUserGames(); // renders the table from currentUserGames [file:131]
+    displayUserGames();
 
     document.getElementById("userGamesLoading").style.display = "none";
     document.getElementById("userGamesTableContainer").style.display = "block";
@@ -1574,9 +1625,10 @@
   }
 }
 
-
 function displayUserGames() {
-  const q = safeLower(document.getElementById("searchUserGames")?.value);
+  const input = document.getElementById("searchUserGames");
+  const q = safeLower(input && input.value ? input.value : "");
+
   const tbody = document.getElementById("userGamesTableBody");
   tbody.innerHTML = "";
 
@@ -1585,6 +1637,7 @@ function displayUserGames() {
   );
 
   if (!filtered.length) {
+    // NOTE: colspan must match your <th> count in HTML.
     tbody.innerHTML = `<tr><td colspan="7" class="no-data">No games found</td></tr>`;
     return;
   }
@@ -1603,6 +1656,7 @@ function displayUserGames() {
     tbody.appendChild(row);
   });
 }
+
 
     // ------------------------
     // Agents (backend empty currently)
