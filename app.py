@@ -47,6 +47,18 @@ socketio = SocketIO(
     ping_interval=25,
 )
 
+@app.after_request
+def no_cache(resp):
+    # Allow static files to be cached normally
+    if request.path.startswith("/static"):
+        return resp
+
+    resp.headers["Cache-Control"] = "no-store, no-cache, must-revalidate, max-age=0"
+    resp.headers["Pragma"] = "no-cache"
+    resp.headers["Expires"] = "0"
+    return resp
+
+
 # ---------------------------------------------------
 # Super Admin credentials (CHANGE THESE!)
 # ---------------------------------------------------
@@ -239,15 +251,41 @@ def make_round_code(game_type: str, start_time: datetime, table_number: int) -> 
 # Helpers
 # ---------------------------------------------------
 
+def _get_session_user_id():
+    # Compatibility (prevents name-change bugs)
+    return session.get("user_id") or session.get("userid") or session.get("userId")
+
+def _is_admin_user(user):
+    return bool(
+        getattr(user, "is_admin", False) or
+        getattr(user, "isadmin", False) or
+        getattr(user, "isAdmin", False)
+    )
 
 def login_required(f):
     @wraps(f)
     def decorated(*args, **kwargs):
-        if "user_id" not in session:
+        uid = _get_session_user_id()
+        if not uid:
             return redirect(url_for("login_page"))
-        return f(*args, **kwargs)
 
+        # load user (recommended so we can block admins from game pages)
+        user = User.query.get(int(uid)) if str(uid).isdigit() else User.query.get(uid)
+        if not user:
+            session.clear()
+            return redirect(url_for("login_page"))
+
+        # ✅ If admin is trying to access player pages, force to /admin
+        if _is_admin_user(user):
+            # allow admin endpoints only
+            if request.path.startswith("/admin") or request.path.startswith("/api/admin") or request.path.startswith("/static") or request.path.startswith("/logout"):
+                return f(*args, **kwargs)
+            return redirect(url_for("admin_panel"))  # change if your admin route name differs
+
+        return f(*args, **kwargs)
     return decorated
+
+
 
 
 def admin_required(f):
