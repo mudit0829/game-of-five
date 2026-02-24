@@ -281,7 +281,7 @@ def login_required(f):
             # allow admin endpoints only
             if request.path.startswith("/admin") or request.path.startswith("/api/admin") or request.path.startswith("/static") or request.path.startswith("/logout"):
                 return f(*args, **kwargs)
-            return redirect(url_for("admin_panel"))  # change if your admin route name differs
+            return redirect(url_for("adminpanel"))  # change if your admin route name differs
 
         return f(*args, **kwargs)
     return decorated
@@ -1074,7 +1074,7 @@ def index():
     if "user_id" in session:
         user = User.query.get(session.get("user_id"))
         if user and user.is_admin:
-            return redirect(url_for("admin_panel"))
+            return redirect(url_for("adminpanel"))
         return redirect(url_for("home"))
     return redirect(url_for("login_page"))
 
@@ -1084,7 +1084,7 @@ def login_page():
     if "user_id" in session:
         user = User.query.get(session.get("user_id"))
         if user and user.is_admin:
-            return redirect(url_for("admin_panel"))
+            return redirect(url_for("adminpanel"))
         return redirect(url_for("home"))
     return render_template("login.html")
 
@@ -1548,6 +1548,19 @@ def _group_user_rounds(user_id: int):
 # -----------------------------
 # Admin APIs (REPLACE your current ones with these)
 # -----------------------------
+# ---- Admin page route (must exist, otherwise /admin = 404) ----
+
+@app.route("/admin")
+@adminrequired
+def adminpanel():
+    return rendertemplate("adminpanel.html")
+
+# ---- Endpoint alias to stop BuildError from url_for("admin_panel") ----
+# (Keeps your old code working even if it calls url_for("admin_panel"))
+try:
+    app.add_url_rule("/admin", endpoint="admin_panel", view_func=adminpanel)
+except Exception:
+    pass
 
 @app.route("/api/admin/users", methods=["GET"])
 @admin_required
