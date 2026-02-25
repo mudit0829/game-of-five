@@ -1300,7 +1300,7 @@
       document.getElementById('editUserForm')?.addEventListener('submit', submitEditUser);
 
       document.getElementById('searchUsers')?.addEventListener('keyup', filterAndDisplayUsers);
-      document.getElementById('searchGames')?.addEventListener('keyup', displayGames);
+      document.getElementById('searchGames')?.addEventListener('keyup', () => { gamesPage = 1; loadGames();});
       document.getElementById('searchTransactions')?.addEventListener('keyup', displayTransactions);
       document.getElementById('searchWallet')?.addEventListener('keyup', displayWalletUsers);
       document.getElementById('searchUserGames')?.addEventListener('keyup', displayUserGames);
@@ -1731,11 +1731,18 @@ let gamesLimit = 100;
 let gamesTotal = 0;
 
 function renderGamesPageInfo() {
-  const el = document.getElementById("gamesPageInfo");
+  const el = document.getElementById('gamesPageInfo');
   if (!el) return;
+
   const totalPages = Math.max(1, Math.ceil((gamesTotal || 0) / gamesLimit));
-  el.textContent = `Page ${gamesPage} / ${totalPages} (Total: ${gamesTotal || 0})`;
+  el.textContent = `Page ${gamesPage}/${totalPages} | Total ${gamesTotal || 0}`;
+
+  const prevBtn = document.getElementById('gamesPrevBtn');
+  const nextBtn = document.getElementById('gamesNextBtn');
+  if (prevBtn) prevBtn.disabled = gamesPage <= 1;
+  if (nextBtn) nextBtn.disabled = gamesPage >= totalPages;
 }
+
 
 function nextGamesPage() {
   const totalPages = Math.max(1, Math.ceil((gamesTotal || 0) / gamesLimit));
@@ -1764,9 +1771,10 @@ async function loadGames() {
     const activeArr = Array.isArray(active) ? active : [];
 
     // History (DB) games (paginated)
-    const histRes = await apiGet(`/api/admin/games/history?page=${gamesPage}&limit=${gamesLimit}&q=${encodeURIComponent(search || "")}`);
+    const histRes = await apiGet(`/api/admin/games/history?page=${gamesPage}&limit=${gamesLimit}&q=${encodeURIComponent(search)}`);
     const historyArr = Array.isArray(histRes?.items) ? histRes.items : [];
     gamesTotal = Number(histRes?.total || 0);
+
 
     // Filter active using search too
     const activeFiltered = activeArr.filter(g =>
