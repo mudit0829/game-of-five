@@ -2554,7 +2554,7 @@ def admin_get_transactions():
                 })
 
     return jsonify(out)
--------Agent Route-------
+
 
 from flask import render_template, request, redirect, url_for, session
 from sqlalchemy import func
