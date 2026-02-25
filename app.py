@@ -2217,6 +2217,13 @@ def admin_user_games(user_id):
     return jsonify(_group_user_rounds(user_id))
 
 
+from datetime import datetime
+from sqlalchemy import func
+from flask import request, jsonify
+
+# ----------------------------
+# Agents: List + Create
+# ----------------------------
 @app.route('/api/admin/agents', methods=['GET', 'POST'])
 @admin_required
 def adminagents():
@@ -2226,11 +2233,13 @@ def adminagents():
         name = (data.get('name') or data.get('agentName') or '').strip()
         username = (data.get('username') or data.get('agentUsername') or '').strip()
         password = (data.get('password') or data.get('agentPassword') or '').strip()
+
         sp = data.get('salarypercent')
         if sp is None:
             sp = data.get('salaryPercent')
         if sp is None:
             sp = data.get('agentSalaryPercent')
+
         try:
             salarypercent = float(sp or 0)
         except Exception:
@@ -2249,29 +2258,85 @@ def adminagents():
         db.session.commit()
         return jsonify(success=True, message="Agent created", id=a.id)
 
+    # GET: list agents + computed totals
     agents = Agent.query.order_by(Agent.createdat.desc()).all()
     out = []
+
     for a in agents:
-        usercount = User.query.filter_by(agentid=a.id).count()
+        # Get user ids under this agent (User.agentid must exist)
+        rows = User.query.with_entities(User.id).filter_by(agentid=a.id).all()
+        user_ids = [r[0] for r in rows]
+        usercount = len(user_ids)
+
+        totalplayed = 0
+        if user_ids:
+            totalplayed = (
+                db.session.query(func.coalesce(func.sum(Transaction.amount), 0))
+                .filter(Transaction.userid.in_(user_ids))
+                .filter(func.lower(Transaction.kind) == 'bet')
+                .scalar()
+            ) or 0
+
+        totalsalary = (float(totalplayed) * float(a.salarypercent or 0)) / 100.0
+
         out.append({
             "id": a.id,
             "name": a.name,
             "username": a.username,
-            "salarypercent": a.salarypercent,
-            "isblocked": a.isblocked,
+            "salarypercent": float(a.salarypercent or 0),
+            "isblocked": bool(a.isblocked),
             "blockreason": a.blockreason or "",
             "usercount": usercount,
+            "totalplayed": int(totalplayed),
+            "totalsalary": round(totalsalary, 2),
             "createdat": fmt_ist(a.createdat, "%Y-%m-%d %H:%M") if a.createdat else ""
         })
+
     return jsonify(out)
 
 
+# ----------------------------
+# Agents: Update (Edit button)
+# ----------------------------
+@app.route('/api/admin/agents/<int:agentid>', methods=['PUT'])
+@admin_required
+def adminupdateagent(agentid):
+    a = Agent.query.get(agentid)
+    if not a:
+        return jsonify(success=False, message="Agent not found"), 404
+
+    data = request.get_json() or {}
+
+    # allow editing name + salary%
+    if 'name' in data or 'agentName' in data:
+        a.name = (data.get('name') or data.get('agentName') or a.name).strip()
+
+    sp = data.get('salarypercent')
+    if sp is None:
+        sp = data.get('salaryPercent')
+    if sp is not None:
+        try:
+            sp = float(sp)
+        except Exception:
+            return jsonify(success=False, message="salarypercent must be a number"), 400
+        if sp < 0 or sp > 100:
+            return jsonify(success=False, message="salarypercent must be 0-100"), 400
+        a.salarypercent = sp
+
+    db.session.commit()
+    return jsonify(success=True, message="Agent updated")
+
+
+# ----------------------------
+# Agents: Block / Unblock
+# ----------------------------
 @app.route('/api/admin/agents/<int:agentid>/block', methods=['POST'])
 @admin_required
 def adminblockagent(agentid):
     a = Agent.query.get(agentid)
     if not a:
         return jsonify(success=False, message="Agent not found"), 404
+
     data = request.get_json() or {}
     reason = (data.get('reason') or 'Blocked by admin').strip()
 
@@ -2294,12 +2359,55 @@ def adminunblockagent(agentid):
     if a.isblocked:
         a.isblocked = False
         a.blockreason = None
-        openp = AgentBlockPeriod.query.filter_by(agentid=a.id, endat=None).order_by(AgentBlockPeriod.startat.desc()).first()
+
+        openp = (AgentBlockPeriod.query
+                 .filter_by(agentid=a.id, endat=None)
+                 .order_by(AgentBlockPeriod.startat.desc())
+                 .first())
         if openp:
             openp.endat = datetime.utcnow()
+
         db.session.commit()
 
     return jsonify(success=True, message="Agent unblocked")
+
+
+# ----------------------------
+# Agents: Users list (click Users count)
+# ----------------------------
+@app.route('/api/admin/agents/<int:agentid>/users', methods=['GET'])
+@admin_required
+def admin_agent_users(agentid):
+    a = Agent.query.get(agentid)
+    if not a:
+        return jsonify(success=False, message="Agent not found"), 404
+
+    users = User.query.filter_by(agentid=a.id).order_by(User.createdat.asc()).all()
+    user_ids = [u.id for u in users]
+
+    played_map = {}
+    if user_ids:
+        rows = (
+            db.session.query(Transaction.userid, func.coalesce(func.sum(Transaction.amount), 0))
+            .filter(Transaction.userid.in_(user_ids))
+            .filter(func.lower(Transaction.kind) == 'bet')
+            .group_by(Transaction.userid)
+            .all()
+        )
+        played_map = {int(uid): int(total or 0) for uid, total in rows}
+
+    items = []
+    for u in users:
+        amount_played = played_map.get(int(u.id), 0)
+        salary_generated = (amount_played * float(a.salarypercent or 0)) / 100.0
+        items.append({
+            "userid": u.id,
+            "joining": fmt_ist(u.createdat, "%Y-%m-%d %H:%M") if u.createdat else "",
+            "amountplayed": int(amount_played),
+            "salarygenerated": round(salary_generated, 2)
+        })
+
+    return jsonify({"agentid": a.id, "items": items})
 
 
 
