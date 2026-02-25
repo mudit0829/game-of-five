@@ -340,7 +340,7 @@ def login_required(f):
     return decorated
 
 def get_session_agent_id():
-    return session.get('agentid') or session.get('agentId') or session.get('agentID')
+    return session.get('agent_id') or session.get('agentid') or session.get('agentId') or session.get('agentID')
 
 def agent_required(f):
     @wraps(f)
@@ -2224,6 +2224,8 @@ from flask import request, jsonify
 # ----------------------------
 # Agents: List + Create
 # ----------------------------
+
+
 @app.route('/api/admin/agents', methods=['GET', 'POST'])
 @admin_required
 def adminagents():
@@ -2552,6 +2554,78 @@ def admin_get_transactions():
                 })
 
     return jsonify(out)
+-------Agent Route-------
+
+from flask import render_template, request, redirect, url_for, session
+from sqlalchemy import func
+
+@app.route('/agent/login', methods=['GET', 'POST'])
+def agent_login():
+    # Already logged in
+    if get_session_agent_id():
+        return redirect(url_for('agent_panel'))
+
+    error = None
+
+    if request.method == 'POST':
+        username = (request.form.get('username') or '').strip()
+        password = (request.form.get('password') or '').strip()
+
+        if not username or not password:
+            error = "Username and password required."
+            return render_template('agent_login.html', error=error)
+
+        # Find agent by username (case-insensitive)
+        agent = Agent.query.filter(func.lower(Agent.username) == username.lower()).first()
+        if not agent:
+            error = "Invalid credentials."
+            return render_template('agent_login.html', error=error)
+
+        if getattr(agent, 'isblocked', False):
+            error = "Your account is blocked. Contact admin."
+            return render_template('agent_login.html', error=error)
+
+        # Password check: supports werkzeug hash, fallback to plain compare
+        stored = getattr(agent, 'password', None)
+        ok = False
+        if stored is not None:
+            try:
+                from werkzeug.security import check_password_hash
+                ok = check_password_hash(stored, password)
+            except Exception:
+                ok = False
+            if not ok:
+                ok = (str(stored) == password)
+
+        if not ok:
+            error = "Invalid credentials."
+            return render_template('agent_login.html', error=error)
+
+        # SUCCESS: set the correct session key
+        session['agent_id'] = int(agent.id)
+
+        # Optional: clean old keys if they exist
+        session.pop('agentid', None)
+        session.pop('agentId', None)
+        session.pop('agentID', None)
+
+        return redirect(url_for('agent_panel'))
+
+    return render_template('agent_login.html', error=error)
+
+
+@app.route('/agent')
+@agent_required
+def agent_panel():
+    return render_template('agent_panel.html')
+
+
+@app.route('/agent/logout')
+@agent_required
+def agent_logout():
+    for k in ('agent_id', 'agentid', 'agentId', 'agentID'):
+        session.pop(k, None)
+    return redirect(url_for('agent_login'))
 
 
 # ---------------------------------------------------
