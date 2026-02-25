@@ -2560,76 +2560,101 @@ def admin_get_transactions():
 
 from flask import render_template, request, redirect, url_for, session
 from sqlalchemy import func
+from sqlalchemy.inspection import inspect as sa_inspect
 
-def _pick_agent_column(*names):
-    for n in names:
-        if hasattr(Agent, n):
-            return getattr(Agent, n)
+def _agent_column_keys():
+    try:
+        return [c.key for c in sa_inspect(Agent).mapper.column_attrs]
+    except Exception:
+        return []
+
+def _pick_key(keys, preferred):
+    for k in preferred:
+        if k in keys:
+            return k
     return None
 
-def _pick_agent_attr(obj, *names):
-    for n in names:
-        if hasattr(obj, n):
-            return getattr(obj, n)
-    return None
+def _safe_str(x):
+    if x is None:
+        return ""
+    if isinstance(x, (bytes, bytearray)):
+        try:
+            return x.decode("utf-8", "ignore")
+        except Exception:
+            return str(x)
+    return str(x)
 
 @app.route('/agent/login', methods=['GET', 'POST'])
 def agent_login():
-    # already logged in
     if get_session_agent_id():
         return redirect(url_for('agent_panel'))
-
-    error = None
 
     if request.method == 'POST':
         username_in = (request.form.get('username') or '').strip()
         password_in = (request.form.get('password') or '').strip()
 
+        keys = _agent_column_keys()
+
+        # username field candidates (extend as needed)
+        uname_key = _pick_key(keys, [
+            'username', 'agentusername', 'agentUsername', 'login', 'userid', 'user'
+        ])
+
+        # password field candidates (extend as needed)
+        pass_key = _pick_key(keys, [
+            'password', 'passhash', 'passwordhash', 'passwordHash',
+            'agentpassword', 'agentPassword', 'passwd', 'pwd'
+        ])
+
+        print("AGENT_LOGIN: Agent columns ->", keys)
+        print("AGENT_LOGIN: picked uname_key =", uname_key, "pass_key =", pass_key)
+
         if not username_in or not password_in:
             return render_template('agent_login.html', error="Username and password required.")
 
-        # detect username column in Agent model
-        username_col = _pick_agent_column('username', 'agentusername', 'agentUsername', 'user', 'login')
-        if username_col is None:
-            return render_template('agent_login.html', error="Server config error: Agent username field not found.")
+        if not uname_key or not pass_key:
+            return render_template('agent_login.html', error="Server config error: Agent username/password field not found.")
 
-        agent = Agent.query.filter(func.lower(username_col) == username_in.lower()).first()
+        uname_col = getattr(Agent, uname_key)
+        agent = Agent.query.filter(func.lower(uname_col) == username_in.lower()).first()
+
         if not agent:
+            print("AGENT_LOGIN: agent not found for username =", username_in)
             return render_template('agent_login.html', error="Invalid credentials.")
 
         if getattr(agent, 'isblocked', False):
+            print("AGENT_LOGIN: blocked agent id =", agent.id)
             return render_template('agent_login.html', error="Your account is blocked. Contact admin.")
 
-        # detect password field name on agent row
-        stored = _pick_agent_attr(agent, 'password', 'passhash', 'passwordhash', 'passwordHash')
-        if stored is None:
-            return render_template('agent_login.html', error="Server config error: Agent password field not found.")
+        stored = _safe_str(getattr(agent, pass_key, None))
+        print("AGENT_LOGIN: found agent id =", agent.id, "stored_pass_len =", len(stored), "stored_prefix =", stored[:12])
 
         ok = False
-
-        # 1) Try werkzeug hash
+        # Try werkzeug hash first
         try:
             from werkzeug.security import check_password_hash
-            ok = check_password_hash(str(stored), password_in)
+            ok = check_password_hash(stored, password_in)
         except Exception:
             ok = False
 
-        # 2) Fallback plain compare (if DB stored plain)
+        # Fallback: plain compare
         if not ok:
-            ok = (str(stored) == password_in)
+            ok = (stored == password_in)
 
         if not ok:
+            print("AGENT_LOGIN: password mismatch for agent id =", agent.id)
             return render_template('agent_login.html', error="Invalid credentials.")
 
-        # SUCCESS: set both keys so old/new decorators work
+        # success: set BOTH keys so your existing decorator works too
         session['agent_id'] = int(agent.id)
         session['agentid'] = int(agent.id)
         session.pop('agentId', None)
         session.pop('agentID', None)
 
+        print("AGENT_LOGIN: success agent id =", agent.id)
         return redirect(url_for('agent_panel'))
 
-    return render_template('agent_login.html', error=error)
+    return render_template('agent_login.html', error=None)
 
 
 
