@@ -1424,7 +1424,7 @@ def agentpanel():
 
 
 @app.route('/api/agent/users', methods=['GET', 'POST'])
-@agentrequired
+@agent_required
 def agentusers():
     aid = int(getsessionagentid())
 
