@@ -1666,19 +1666,10 @@ function displayUserGames() {
     // ------------------------
     // Agents (backend empty currently)
     // ------------------------
-    async function loadAgents() {
-      document.getElementById('agentsLoading').style.display = 'block';
-      document.getElementById('agentsTableContainer').style.display = 'none';
-
-      try {
-        const data = await apiGet('/api/admin/agents');
-        allAgents = Array.isArray(data) ? data : [];
-      } catch (err) {
-        allAgents = [];
-      }
-
-      displayAgents();
-      function agentStatusBadgeClass(isBlockedOrStatus) {
+    // ------------------------
+// Agents
+// ------------------------
+function agentStatusBadgeClass(isBlockedOrStatus) {
   const s = String(isBlockedOrStatus ?? "").toLowerCase();
   const blocked = (s === "blocked") || (s === "true") || (s === "1");
   return blocked ? "badge-blocked" : "badge-active";
@@ -1693,6 +1684,7 @@ function agentStatusText(isBlockedOrStatus) {
 async function loadAgents() {
   document.getElementById("agentsLoading").style.display = "block";
   document.getElementById("agentsTableContainer").style.display = "none";
+
   try {
     const data = await apiGet("/api/admin/agents");
     allAgents = Array.isArray(data) ? data : [];
@@ -1700,7 +1692,9 @@ async function loadAgents() {
     allAgents = [];
     console.error("loadAgents error:", err);
   }
+
   displayAgents();
+
   document.getElementById("agentsLoading").style.display = "none";
   document.getElementById("agentsTableContainer").style.display = "block";
 }
@@ -1722,8 +1716,6 @@ function displayAgents() {
     const salaryPercent = Number(a.salarypercent ?? a.salaryPercent ?? 0);
 
     const usersCount = Number(a.usercount ?? a.users ?? a.totalusers ?? 0);
-
-    // These should come from backend summary (recommended)
     const totalPlayed = Number(a.totalplayed ?? a.gameplayed ?? a.totalgameplayed ?? 0);
     const totalSalary = Number(a.totalsalary ?? a.salarytotal ?? 0);
 
@@ -1745,8 +1737,8 @@ function displayAgents() {
       <td>
         <div class="action-buttons">
           <button class="btn-small btn-edit" onclick="openEditAgent(${agentId})">Edit</button>
-          <button class="btn-small btn-block" onclick="toggleAgentBlock(${agentId}, '${String(statusRaw).toLowerCase()}')">
-            ${String(statusRaw).toLowerCase() === "blocked" || String(statusRaw) === "true" ? "Unblock" : "Block"}
+          <button class="btn-small btn-block" onclick="toggleAgentBlock(${agentId})">
+            ${String(statusRaw).toLowerCase() === "blocked" || String(statusRaw).toLowerCase() === "true" ? "Unblock" : "Block"}
           </button>
         </div>
       </td>
@@ -1758,41 +1750,34 @@ function displayAgents() {
 async function submitAddAgent(e) {
   e.preventDefault();
 
-  const name = (document.getElementById('agentName').value || '').trim();
-  const username = (document.getElementById('agentUsername').value || '').trim();
-  const password = (document.getElementById('agentPassword').value || '').trim();
-  const salaryPercentRaw = document.getElementById('agentSalaryPercent').value;
-  const salarypercent = Number(salaryPercentRaw || 0);
+  const name = (document.getElementById("agentName").value || "").trim();
+  const username = (document.getElementById("agentUsername").value || "").trim();
+  const password = (document.getElementById("agentPassword").value || "").trim();
+  const salarypercent = Number(document.getElementById("agentSalaryPercent").value || 0);
 
   if (!name || !username || !password) return alert("Name, Username, Password required");
   if (!(salarypercent >= 0 && salarypercent <= 100)) return alert("Salary percent must be 0 to 100");
 
   try {
-    const res = await apiSend('/api/admin/agents', 'POST', {
-      name,
-      username,
-      password,
-      salarypercent
-    });
-
+    const res = await apiSend("/api/admin/agents", "POST", { name, username, password, salarypercent });
     alert(res.message || "Agent created");
     closeAddAgentModal();
-    await loadAgents();   // refresh agents table
-    await loadStats();    // refresh dashboard counters
+    await loadAgents();
+    await loadStats();
   } catch (err) {
     alert("Error: " + err.message);
   }
 }
 
-// --- Agent modal open/close (missing right now) ---
 window.openAddAgentModal = function () {
-  document.getElementById('addAgentModal')?.classList.add('active');
+  document.getElementById("addAgentModal")?.classList.add("active");
 };
 
 window.closeAddAgentModal = function () {
-  document.getElementById('addAgentModal')?.classList.remove('active');
-  document.getElementById('addAgentForm')?.reset();
+  document.getElementById("addAgentModal")?.classList.remove("active");
+  document.getElementById("addAgentForm")?.reset();
 };
+
 window.viewAgentUsers = async function (agentId) {
   document.getElementById("detailsTitle").textContent = "Agent Users";
   document.getElementById("detailsSubtitle").textContent = `Agent ID: ${agentId}`;
