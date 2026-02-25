@@ -2558,63 +2558,79 @@ def admin_get_transactions():
 
     return jsonify(out)
 
-
 from flask import render_template, request, redirect, url_for, session
 from sqlalchemy import func
 
+def _pick_agent_column(*names):
+    for n in names:
+        if hasattr(Agent, n):
+            return getattr(Agent, n)
+    return None
+
+def _pick_agent_attr(obj, *names):
+    for n in names:
+        if hasattr(obj, n):
+            return getattr(obj, n)
+    return None
+
 @app.route('/agent/login', methods=['GET', 'POST'])
 def agent_login():
-    # Already logged in
+    # already logged in
     if get_session_agent_id():
         return redirect(url_for('agent_panel'))
 
     error = None
 
     if request.method == 'POST':
-        username = (request.form.get('username') or '').strip()
-        password = (request.form.get('password') or '').strip()
+        username_in = (request.form.get('username') or '').strip()
+        password_in = (request.form.get('password') or '').strip()
 
-        if not username or not password:
-            error = "Username and password required."
-            return render_template('agent_login.html', error=error)
+        if not username_in or not password_in:
+            return render_template('agent_login.html', error="Username and password required.")
 
-        # Find agent by username (case-insensitive)
-        agent = Agent.query.filter(func.lower(Agent.username) == username.lower()).first()
+        # detect username column in Agent model
+        username_col = _pick_agent_column('username', 'agentusername', 'agentUsername', 'user', 'login')
+        if username_col is None:
+            return render_template('agent_login.html', error="Server config error: Agent username field not found.")
+
+        agent = Agent.query.filter(func.lower(username_col) == username_in.lower()).first()
         if not agent:
-            error = "Invalid credentials."
-            return render_template('agent_login.html', error=error)
+            return render_template('agent_login.html', error="Invalid credentials.")
 
         if getattr(agent, 'isblocked', False):
-            error = "Your account is blocked. Contact admin."
-            return render_template('agent_login.html', error=error)
+            return render_template('agent_login.html', error="Your account is blocked. Contact admin.")
 
-        # Password check: supports werkzeug hash, fallback to plain compare
-        stored = getattr(agent, 'password', None)
+        # detect password field name on agent row
+        stored = _pick_agent_attr(agent, 'password', 'passhash', 'passwordhash', 'passwordHash')
+        if stored is None:
+            return render_template('agent_login.html', error="Server config error: Agent password field not found.")
+
         ok = False
-        if stored is not None:
-            try:
-                from werkzeug.security import check_password_hash
-                ok = check_password_hash(stored, password)
-            except Exception:
-                ok = False
-            if not ok:
-                ok = (str(stored) == password)
+
+        # 1) Try werkzeug hash
+        try:
+            from werkzeug.security import check_password_hash
+            ok = check_password_hash(str(stored), password_in)
+        except Exception:
+            ok = False
+
+        # 2) Fallback plain compare (if DB stored plain)
+        if not ok:
+            ok = (str(stored) == password_in)
 
         if not ok:
-            error = "Invalid credentials."
-            return render_template('agent_login.html', error=error)
+            return render_template('agent_login.html', error="Invalid credentials.")
 
-        # SUCCESS: set the correct session key
+        # SUCCESS: set both keys so old/new decorators work
         session['agent_id'] = int(agent.id)
-
-        # Optional: clean old keys if they exist
-        session.pop('agentid', None)
+        session['agentid'] = int(agent.id)
         session.pop('agentId', None)
         session.pop('agentID', None)
 
         return redirect(url_for('agent_panel'))
 
     return render_template('agent_login.html', error=error)
+
 
 
 @app.route('/agent')
