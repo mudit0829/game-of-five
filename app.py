@@ -2261,7 +2261,7 @@ def adminagents():
             "isblocked": a.isblocked,
             "blockreason": a.blockreason or "",
             "usercount": usercount,
-            "createdat": fmtist(a.createdat, "%Y-%m-%d %H:%M") if a.createdat else ""
+            "createdat": fmt_ist(a.createdat, "%Y-%m-%d %H:%M") if a.createdat else ""
         })
     return jsonify(out)
 
