@@ -158,6 +158,7 @@ class User(db.Model):
     is_blocked = db.Column(db.Boolean, default=False)
     block_reason = db.Column(db.Text)
 
+    agentid = db.Column(db.Integer, db.ForeignKey('agent.id'), nullable=True, index=True)
     wallet = db.relationship("Wallet", backref="user", uselist=False)
     tickets = db.relationship("Ticket", backref="user", lazy=True)
 
@@ -239,6 +240,31 @@ class ForcedWinnerHistory(db.Model):
     status = db.Column(db.String(20), default="active")  # active, cleared, executed
     note = db.Column(db.Text)
 
+class Agent(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    name = db.Column(db.String(120), nullable=False)
+    username = db.Column(db.String(80), unique=True, nullable=False, index=True)
+    passwordhash = db.Column(db.String(128), nullable=False)
+
+    salarypercent = db.Column(db.Float, default=0.0)
+    isblocked = db.Column(db.Boolean, default=False)
+    blockreason = db.Column(db.Text)
+    createdat = db.Column(db.DateTime, default=datetime.utcnow)
+
+    def setpassword(self, password: str):
+        self.passwordhash = hashlib.sha256(password.encode()).hexdigest()
+
+    def checkpassword(self, password: str) -> bool:
+        return self.passwordhash == hashlib.sha256(password.encode()).hexdigest()
+
+
+class AgentBlockPeriod(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    agentid = db.Column(db.Integer, db.ForeignKey('agent.id'), nullable=False, index=True)
+    startat = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
+    endat = db.Column(db.DateTime, nullable=True)  # null => still blocked
+
+
 
 # ---------------------------------------------------
 # In-memory structures
@@ -309,6 +335,34 @@ def login_required(f):
             if request.path.startswith("/admin") or request.path.startswith("/api/admin") or request.path.startswith("/static") or request.path.startswith("/logout"):
                 return f(*args, **kwargs)
             return redirect(url_for("admin_panel"))  # change if your admin route name differs
+
+        return f(*args, **kwargs)
+    return decorated
+
+def get_session_agent_id():
+    return session.get('agentid') or session.get('agentId') or session.get('agentID')
+
+def agent_required(f):
+    @wraps(f)
+    def decorated(*args, **kwargs):
+        aid = get_session_agent_id()
+        if not aid:
+            return redirect(url_for('agentloginpage'))
+        try:
+            aid_int = int(aid)
+        except Exception:
+            session.pop('agentid', None)
+            session.pop('agentId', None)
+            return redirect(url_for('agentloginpage'))
+
+        a = Agent.query.get(aid_int)
+        if not a:
+            session.pop('agentid', None)
+            session.pop('agentId', None)
+            return redirect(url_for('agentloginpage'))
+
+        if a.isblocked:
+            return "Agent is blocked. Contact admin.", 403
 
         return f(*args, **kwargs)
     return decorated
@@ -1333,6 +1387,81 @@ def logout():
     session.clear()
     return redirect(url_for("login_page"))
 
+@app.route('/agent-login')
+def agentloginpage():
+    return render_template('agent-login.html')
+
+@app.route('/agent-login', methods=['POST'])
+def agentloginpost():
+    data = request.get_json() or {}
+    username = (data.get('username') or '').strip()
+    password = (data.get('password') or '').strip()
+
+    a = Agent.query.filter_by(username=username).first()
+    if not a or not a.checkpassword(password):
+        return jsonify(success=False, message="Invalid credentials"), 401
+    if a.isblocked:
+        return jsonify(success=False, message=f"Agent blocked: {a.blockreason or 'Contact admin'}"), 403
+
+    session['agentid'] = a.id
+    session['agentId'] = a.id  # compatibility
+    session['agentusername'] = a.username
+    session.permanent = True
+    return jsonify(success=True, redirect=url_for('agentpanel'))
+
+@app.route('/agent-logout')
+def agentlogout():
+    session.pop('agentid', None)
+    session.pop('agentId', None)
+    session.pop('agentusername', None)
+    return redirect(url_for('agentloginpage'))
+
+@app.route('/agent')
+@agentrequired
+def agentpanel():
+    a = Agent.query.get(int(getsessionagentid()))
+    return render_template('agent_panel.html', agentname=a.name)
+
+
+@app.route('/api/agent/users', methods=['GET', 'POST'])
+@agentrequired
+def agentusers():
+    aid = int(getsessionagentid())
+
+    if request.method == 'POST':
+        data = request.get_json() or {}
+        username = (data.get('username') or '').strip()
+        password = (data.get('password') or '').strip()
+        displayname = (data.get('displayname') or data.get('displayName') or username).strip()
+
+        if not username or not password:
+            return jsonify(success=False, message="username and password required"), 400
+        if len(password) < 6:
+            return jsonify(success=False, message="Password must be at least 6 characters"), 400
+        if User.query.filter_by(username=username).first():
+            return jsonify(success=False, message="Username already exists"), 400
+
+        u = User(username=username, displayname=displayname, isadmin=False, isblocked=False, agentid=aid)
+        u.setpassword(password)
+        db.session.add(u)
+        db.session.commit()
+
+        createwalletforuser(u.id, starting_balance=0)  # start with 0 coins
+        return jsonify(success=True, message="User created", userid=u.id)
+
+    users = User.query.filter_by(agentid=aid).order_by(User.createdat.desc()).all()
+    out = []
+    for u in users:
+        w = Wallet.query.filter_by(userid=u.id).first()
+        out.append({
+            "id": u.id,
+            "username": u.username,
+            "status": "blocked" if u.isblocked else "active",
+            "balance": int(w.balance) if w else 0,
+            "createdat": fmtist(u.createdat, "%Y-%m-%d %H:%M") if u.createdat else ""
+        })
+    return jsonify(out)
+
 
 # ---------------------------------------------------
 # Game pages
@@ -1573,6 +1702,16 @@ def _fmt_ist(dt, fmt="%Y-%m-%d %H:%M"):
 def _ensure_wallet(user):
     fn = globals().get("ensure_wallet_for_user") or globals().get("ensurewalletforuser")
     return fn(user) if fn else None
+
+def _create_wallet_for_user(userid: int, starting_balance: int = 0):
+    w = Wallet.query.filter_by(userid=userid).first()
+    if w:
+        return w
+    w = Wallet(userid=userid, balance=int(starting_balance or 0))
+    db.session.add(w)
+    db.session.commit()
+    return w
+
 
 def _is_admin_user(user):
     return bool(getattr(user, "is_admin", False) or getattr(user, "isadmin", False) or getattr(user, "isAdmin", False))
@@ -2078,10 +2217,90 @@ def admin_user_games(user_id):
     return jsonify(_group_user_rounds(user_id))
 
 
-@app.route("/api/admin/agents", methods=["GET"])
+@app.route('/api/admin/agents', methods=['GET', 'POST'])
 @admin_required
-def admin_get_agents():
-    return jsonify([])
+def adminagents():
+    if request.method == 'POST':
+        data = request.get_json() or {}
+
+        name = (data.get('name') or data.get('agentName') or '').strip()
+        username = (data.get('username') or data.get('agentUsername') or '').strip()
+        password = (data.get('password') or data.get('agentPassword') or '').strip()
+        sp = data.get('salarypercent')
+        if sp is None:
+            sp = data.get('salaryPercent')
+        if sp is None:
+            sp = data.get('agentSalaryPercent')
+        try:
+            salarypercent = float(sp or 0)
+        except Exception:
+            salarypercent = 0
+
+        if not name or not username or not password:
+            return jsonify(success=False, message="name, username, password required"), 400
+        if salarypercent < 0 or salarypercent > 100:
+            return jsonify(success=False, message="salarypercent must be 0-100"), 400
+        if Agent.query.filter_by(username=username).first():
+            return jsonify(success=False, message="Agent username already exists"), 400
+
+        a = Agent(name=name, username=username, salarypercent=salarypercent)
+        a.setpassword(password)
+        db.session.add(a)
+        db.session.commit()
+        return jsonify(success=True, message="Agent created", id=a.id)
+
+    agents = Agent.query.order_by(Agent.createdat.desc()).all()
+    out = []
+    for a in agents:
+        usercount = User.query.filter_by(agentid=a.id).count()
+        out.append({
+            "id": a.id,
+            "name": a.name,
+            "username": a.username,
+            "salarypercent": a.salarypercent,
+            "isblocked": a.isblocked,
+            "blockreason": a.blockreason or "",
+            "usercount": usercount,
+            "createdat": fmtist(a.createdat, "%Y-%m-%d %H:%M") if a.createdat else ""
+        })
+    return jsonify(out)
+
+
+@app.route('/api/admin/agents/<int:agentid>/block', methods=['POST'])
+@admin_required
+def adminblockagent(agentid):
+    a = Agent.query.get(agentid)
+    if not a:
+        return jsonify(success=False, message="Agent not found"), 404
+    data = request.get_json() or {}
+    reason = (data.get('reason') or 'Blocked by admin').strip()
+
+    if not a.isblocked:
+        a.isblocked = True
+        a.blockreason = reason
+        db.session.add(AgentBlockPeriod(agentid=a.id, startat=datetime.utcnow(), endat=None))
+        db.session.commit()
+
+    return jsonify(success=True, message="Agent blocked")
+
+
+@app.route('/api/admin/agents/<int:agentid>/unblock', methods=['POST'])
+@admin_required
+def adminunblockagent(agentid):
+    a = Agent.query.get(agentid)
+    if not a:
+        return jsonify(success=False, message="Agent not found"), 404
+
+    if a.isblocked:
+        a.isblocked = False
+        a.blockreason = None
+        openp = AgentBlockPeriod.query.filter_by(agentid=a.id, endat=None).order_by(AgentBlockPeriod.startat.desc()).first()
+        if openp:
+            openp.endat = datetime.utcnow()
+        db.session.commit()
+
+    return jsonify(success=True, message="Agent unblocked")
+
 
 
 @app.route("/api/admin/wallet", methods=["GET"])
