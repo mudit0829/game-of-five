@@ -339,7 +339,11 @@ def login_required(f):
         return f(*args, **kwargs)
     return decorated
 
+from functools import wraps
+from flask import session, redirect, url_for
+
 def get_session_agent_id():
+    # support both new and old session keys
     return session.get('agent_id') or session.get('agentid') or session.get('agentId') or session.get('agentID')
 
 def agent_required(f):
@@ -347,27 +351,26 @@ def agent_required(f):
     def decorated(*args, **kwargs):
         aid = get_session_agent_id()
         if not aid:
-            return redirect(url_for('agentloginpage'))
+            return redirect(url_for('agent_login'))  # <-- FIXED
+
         try:
             aid_int = int(aid)
         except Exception:
-            session.pop('agentid', None)
-            session.pop('agentId', None)
-            return redirect(url_for('agentloginpage'))
+            for k in ('agent_id', 'agentid', 'agentId', 'agentID'):
+                session.pop(k, None)
+            return redirect(url_for('agent_login'))  # <-- FIXED
 
         a = Agent.query.get(aid_int)
         if not a:
-            session.pop('agentid', None)
-            session.pop('agentId', None)
-            return redirect(url_for('agentloginpage'))
+            for k in ('agent_id', 'agentid', 'agentId', 'agentID'):
+                session.pop(k, None)
+            return redirect(url_for('agent_login'))  # <-- FIXED
 
-        if a.isblocked:
+        if getattr(a, 'isblocked', False):
             return "Agent is blocked. Contact admin.", 403
 
         return f(*args, **kwargs)
     return decorated
-
-
 
 
 def admin_required(f):
