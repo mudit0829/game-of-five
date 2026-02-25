@@ -1,0 +1,164 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Agent Login - Game of Five</title>
+
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    html, body {
+      width: 100%;
+      height: 100%;
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      background: #0f172a;
+      color: #e2e8f0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+    }
+
+    .login-card {
+      width: 100%;
+      max-width: 520px;
+      background: linear-gradient(135deg, #1e293b 0%, #334155 100%);
+      border: 2px solid #334155;
+      border-radius: 14px;
+      box-shadow: 0 20px 60px rgba(0,0,0,0.45);
+      overflow: hidden;
+      position: relative;
+    }
+
+    .login-card::before {
+      content: '';
+      position: absolute;
+      top: 0; left: 0; right: 0;
+      height: 4px;
+      background: linear-gradient(90deg, #10b981, #06b6d4);
+    }
+
+    .login-header {
+      padding: 26px 26px 18px 26px;
+      border-bottom: 2px solid #334155;
+    }
+
+    .login-title {
+      font-size: 22px;
+      font-weight: 800;
+      color: #10b981;
+      margin: 0;
+    }
+
+    .login-sub {
+      margin-top: 8px;
+      color: #94a3b8;
+      font-size: 14px;
+      line-height: 1.4;
+    }
+
+    .login-body {
+      padding: 22px 26px 26px 26px;
+    }
+
+    .form-group { margin-bottom: 16px; }
+    .form-group label {
+      display: block;
+      color: #94a3b8;
+      font-size: 13px;
+      font-weight: 700;
+      text-transform: uppercase;
+      margin-bottom: 8px;
+      letter-spacing: 0.5px;
+    }
+
+    .form-group input {
+      width: 100%;
+      padding: 12px 16px;
+      background: #0f172a;
+      border: 2px solid #334155;
+      color: #e2e8f0;
+      border-radius: 10px;
+      font-size: 14px;
+      transition: all 0.3s ease;
+    }
+
+    .form-group input:focus {
+      outline: none;
+      border-color: #10b981;
+      box-shadow: 0 0 0 3px rgba(16,185,129,0.12);
+    }
+
+    .btn-primary {
+      width: 100%;
+      padding: 12px 18px;
+      background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+      color: white;
+      border: none;
+      border-radius: 10px;
+      cursor: pointer;
+      font-size: 15px;
+      font-weight: 800;
+      transition: all 0.3s ease;
+      margin-top: 6px;
+    }
+
+    .btn-primary:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 8px 18px rgba(16,185,129,0.25);
+    }
+
+    .error-box {
+      margin-top: 12px;
+      background: rgba(239, 68, 68, 0.12);
+      border: 1px solid rgba(239, 68, 68, 0.25);
+      color: #fecaca;
+      padding: 12px 14px;
+      border-radius: 10px;
+      font-size: 14px;
+      display: none;
+    }
+
+    .hint {
+      margin-top: 12px;
+      color: #94a3b8;
+      font-size: 13px;
+      line-height: 1.4;
+    }
+  </style>
+</head>
+
+<body>
+  <div class="login-card">
+    <div class="login-header">
+      <h1 class="login-title">👨‍💼 Agent Login</h1>
+      <div class="login-sub">Login to view your users and salary dashboard.</div>
+    </div>
+
+    <div class="login-body">
+      <form method="POST" action="/agent/login">
+        <div class="form-group">
+          <label>Username</label>
+          <input name="username" autocomplete="username" required />
+        </div>
+
+        <div class="form-group">
+          <label>Password</label>
+          <input name="password" type="password" autocomplete="current-password" required />
+        </div>
+
+        <button class="btn-primary" type="submit">🔐 Login</button>
+
+        {% if error %}
+          <div class="error-box" style="display:block;">{{ error }}</div>
+        {% endif %}
+
+        <div class="hint">
+          If you don’t have credentials, ask Admin to create an agent from Admin Panel → Agents → Add Agent.
+        </div>
+      </form>
+    </div>
+  </div>
+</body>
+</html>
