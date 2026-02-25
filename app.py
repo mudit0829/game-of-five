@@ -2377,6 +2377,8 @@ def adminunblockagent(agentid):
 # ----------------------------
 from sqlalchemy import func
 
+from sqlalchemy import func
+
 @app.route('/api/admin/agents/<int:agentid>/users', methods=['GET'])
 @admin_required
 def admin_agent_users(agentid):
@@ -2385,12 +2387,22 @@ def admin_agent_users(agentid):
         if not a:
             return jsonify(success=False, message="Agent not found"), 404
 
-        # 1) Fetch users of this agent (requires User.agentid column in model + DB)
-        users = User.query.filter_by(agentid=a.id).order_by(User.createdat.asc()).all()
+        # Find which "created" column exists on User model
+        created_col = None
+        for colname in ("createdat", "createdAt", "created_at"):
+            if hasattr(User, colname):
+                created_col = getattr(User, colname)
+                break
 
+        q = User.query.filter_by(agentid=a.id)
+        if created_col is not None:
+            q = q.order_by(created_col.asc())
+        else:
+            q = q.order_by(User.id.asc())
+
+        users = q.all()
         user_ids = [int(u.id) for u in users]
 
-        # 2) Total bet amount per user
         played_map = {}
         if user_ids:
             rows = (
@@ -2404,11 +2416,19 @@ def admin_agent_users(agentid):
 
         items = []
         for u in users:
+            # Read created date safely
+            u_created = (
+                getattr(u, "createdat", None)
+                or getattr(u, "createdAt", None)
+                or getattr(u, "created_at", None)
+            )
+
             amount_played = played_map.get(int(u.id), 0)
             salary_generated = (amount_played * float(a.salarypercent or 0)) / 100.0
+
             items.append({
                 "userid": u.id,
-                "joining": (fmt_ist(u.createdat, "%Y-%m-%d %H:%M") if u.createdat else ""),
+                "joining": fmt_ist(u_created, "%Y-%m-%d %H:%M") if u_created else "",
                 "amountplayed": int(amount_played),
                 "salarygenerated": round(salary_generated, 2)
             })
@@ -2416,8 +2436,8 @@ def admin_agent_users(agentid):
         return jsonify({"agentid": a.id, "items": items})
 
     except Exception as e:
-        # this makes debugging 10x easier than generic "Internal Server Error"
         return jsonify(success=False, message=f"agent users api error: {str(e)}"), 500
+
 
 
 
