@@ -1320,7 +1320,9 @@
         document.getElementById('totalWithdrawals').textContent = fmtINR(data.totalwithdrawal ?? 0);
 
         // Agents are not implemented in backend yet
-        document.getElementById('totalAgents').textContent = 0;
+        const agents = await apiGet('/api/admin/agents');
+        document.getElementById('totalAgents').textContent = Array.isArray(agents) ? agents.length : 0;
+
       } catch (err) {
         console.error('Error loading stats:', err);
       }
@@ -1709,18 +1711,34 @@ function displayUserGames() {
       });
     }
 
-    async function submitAddAgent(e) {
-      e.preventDefault();
-      alert('Agent creation API is not implemented yet in app.py. We will add it next.');
-      closeAddAgentModal();
-    }
+async function submitAddAgent(e) {
+  e.preventDefault();
 
-    function openAddAgentModal() { document.getElementById('addAgentModal').classList.add('active'); }
-    function closeAddAgentModal() {
-      document.getElementById('addAgentModal').classList.remove('active');
-      document.getElementById('addAgentForm')?.reset();
-    }
+  const name = (document.getElementById('agentName').value || '').trim();
+  const username = (document.getElementById('agentUsername').value || '').trim();
+  const password = (document.getElementById('agentPassword').value || '').trim();
+  const salaryPercentRaw = document.getElementById('agentSalaryPercent').value;
+  const salarypercent = Number(salaryPercentRaw || 0);
 
+  if (!name || !username || !password) return alert("Name, Username, Password required");
+  if (!(salarypercent >= 0 && salarypercent <= 100)) return alert("Salary percent must be 0 to 100");
+
+  try {
+    const res = await apiSend('/api/admin/agents', 'POST', {
+      name,
+      username,
+      password,
+      salarypercent
+    });
+
+    alert(res.message || "Agent created");
+    closeAddAgentModal();
+    await loadAgents();   // refresh agents table
+    await loadStats();    // refresh dashboard counters
+  } catch (err) {
+    alert("Error: " + err.message);
+  }
+}
     // ------------------------
     // Games
     // ------------------------
