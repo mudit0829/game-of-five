@@ -1684,7 +1684,7 @@ function displayUserGames() {
       tbody.innerHTML = '';
 
       if (!allAgents.length) {
-        tbody.innerHTML = `<tr><td colspan="10" class="no-data">No agents found (Agents backend not implemented yet)</td></tr>`;
+        tbody.innerHTML = `<tr><td colspan="10" class="no-data">No agents found</td></tr>`;
         return;
       }
 
@@ -1739,6 +1739,19 @@ async function submitAddAgent(e) {
     alert("Error: " + err.message);
   }
 }
+
+// --- Agent modal open/close (missing right now) ---
+window.openAddAgentModal = function () {
+  document.getElementById('addAgentModal')?.classList.add('active');
+};
+
+window.closeAddAgentModal = function () {
+  document.getElementById('addAgentModal')?.classList.remove('active');
+  document.getElementById('addAgentForm')?.reset();
+};
+
+
+    
     // ------------------------
     // Games
     // ------------------------
