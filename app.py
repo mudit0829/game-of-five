@@ -2375,39 +2375,49 @@ def adminunblockagent(agentid):
 # ----------------------------
 # Agents: Users list (click Users count)
 # ----------------------------
+from sqlalchemy import func
+
 @app.route('/api/admin/agents/<int:agentid>/users', methods=['GET'])
 @admin_required
 def admin_agent_users(agentid):
-    a = Agent.query.get(agentid)
-    if not a:
-        return jsonify(success=False, message="Agent not found"), 404
+    try:
+        a = Agent.query.get(agentid)
+        if not a:
+            return jsonify(success=False, message="Agent not found"), 404
 
-    users = User.query.filter_by(agentid=a.id).order_by(User.createdat.asc()).all()
-    user_ids = [u.id for u in users]
+        # 1) Fetch users of this agent (requires User.agentid column in model + DB)
+        users = User.query.filter_by(agentid=a.id).order_by(User.createdat.asc()).all()
 
-    played_map = {}
-    if user_ids:
-        rows = (
-            db.session.query(Transaction.userid, func.coalesce(func.sum(Transaction.amount), 0))
-            .filter(Transaction.userid.in_(user_ids))
-            .filter(func.lower(Transaction.kind) == 'bet')
-            .group_by(Transaction.userid)
-            .all()
-        )
-        played_map = {int(uid): int(total or 0) for uid, total in rows}
+        user_ids = [int(u.id) for u in users]
 
-    items = []
-    for u in users:
-        amount_played = played_map.get(int(u.id), 0)
-        salary_generated = (amount_played * float(a.salarypercent or 0)) / 100.0
-        items.append({
-            "userid": u.id,
-            "joining": fmt_ist(u.createdat, "%Y-%m-%d %H:%M") if u.createdat else "",
-            "amountplayed": int(amount_played),
-            "salarygenerated": round(salary_generated, 2)
-        })
+        # 2) Total bet amount per user
+        played_map = {}
+        if user_ids:
+            rows = (
+                db.session.query(Transaction.userid, func.coalesce(func.sum(Transaction.amount), 0))
+                .filter(Transaction.userid.in_(user_ids))
+                .filter(func.lower(Transaction.kind) == 'bet')
+                .group_by(Transaction.userid)
+                .all()
+            )
+            played_map = {int(uid): int(total or 0) for uid, total in rows}
 
-    return jsonify({"agentid": a.id, "items": items})
+        items = []
+        for u in users:
+            amount_played = played_map.get(int(u.id), 0)
+            salary_generated = (amount_played * float(a.salarypercent or 0)) / 100.0
+            items.append({
+                "userid": u.id,
+                "joining": (fmt_ist(u.createdat, "%Y-%m-%d %H:%M") if u.createdat else ""),
+                "amountplayed": int(amount_played),
+                "salarygenerated": round(salary_generated, 2)
+            })
+
+        return jsonify({"agentid": a.id, "items": items})
+
+    except Exception as e:
+        # this makes debugging 10x easier than generic "Internal Server Error"
+        return jsonify(success=False, message=f"agent users api error: {str(e)}"), 500
 
 
 
