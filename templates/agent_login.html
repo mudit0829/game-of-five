@@ -20,9 +20,13 @@
       padding: 20px;
     }
 
+    .login-wrap {
+      width: 100%;
+      max-width: 560px;
+    }
+
     .login-card {
       width: 100%;
-      max-width: 520px;
       background: linear-gradient(135deg, #1e293b 0%, #334155 100%);
       border: 2px solid #334155;
       border-radius: 14px;
@@ -45,17 +49,20 @@
     }
 
     .login-title {
-      font-size: 22px;
+      font-size: 24px;
       font-weight: 800;
       color: #10b981;
       margin: 0;
+      display: flex;
+      align-items: center;
+      gap: 10px;
     }
 
     .login-sub {
       margin-top: 8px;
       color: #94a3b8;
       font-size: 14px;
-      line-height: 1.4;
+      line-height: 1.45;
     }
 
     .login-body {
@@ -63,6 +70,7 @@
     }
 
     .form-group { margin-bottom: 16px; }
+
     .form-group label {
       display: block;
       color: #94a3b8;
@@ -81,13 +89,19 @@
       color: #e2e8f0;
       border-radius: 10px;
       font-size: 14px;
-      transition: all 0.3s ease;
+      transition: all 0.25s ease;
     }
 
     .form-group input:focus {
       outline: none;
       border-color: #10b981;
       box-shadow: 0 0 0 3px rgba(16,185,129,0.12);
+    }
+
+    .row {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 14px;
     }
 
     .btn-primary {
@@ -100,7 +114,7 @@
       cursor: pointer;
       font-size: 15px;
       font-weight: 800;
-      transition: all 0.3s ease;
+      transition: all 0.25s ease;
       margin-top: 6px;
     }
 
@@ -109,55 +123,101 @@
       box-shadow: 0 8px 18px rgba(16,185,129,0.25);
     }
 
+    .btn-secondary {
+      width: 100%;
+      padding: 12px 18px;
+      background: #334155;
+      color: #cbd5e1;
+      border: 2px solid #334155;
+      border-radius: 10px;
+      cursor: pointer;
+      font-size: 14px;
+      font-weight: 800;
+      transition: all 0.25s ease;
+      margin-top: 10px;
+    }
+
+    .btn-secondary:hover {
+      background: #475569;
+      border-color: #475569;
+      transform: translateY(-1px);
+    }
+
     .error-box {
-      margin-top: 12px;
+      margin-top: 14px;
       background: rgba(239, 68, 68, 0.12);
       border: 1px solid rgba(239, 68, 68, 0.25);
       color: #fecaca;
       padding: 12px 14px;
       border-radius: 10px;
       font-size: 14px;
-      display: none;
+      line-height: 1.4;
     }
 
     .hint {
       margin-top: 12px;
       color: #94a3b8;
       font-size: 13px;
-      line-height: 1.4;
+      line-height: 1.45;
+    }
+
+    .small {
+      margin-top: 10px;
+      color: #64748b;
+      font-size: 12px;
+      line-height: 1.45;
+    }
+
+    @media (max-width: 540px) {
+      .row { grid-template-columns: 1fr; }
+      .login-header, .login-body { padding: 18px; }
     }
   </style>
 </head>
 
 <body>
-  <div class="login-card">
-    <div class="login-header">
-      <h1 class="login-title">👨‍💼 Agent Login</h1>
-      <div class="login-sub">Login to view your users and salary dashboard.</div>
-    </div>
-
-    <div class="login-body">
-      <form method="POST" action="/agent/login">
-        <div class="form-group">
-          <label>Username</label>
-          <input name="username" autocomplete="username" required />
+  <div class="login-wrap">
+    <div class="login-card">
+      <div class="login-header">
+        <h1 class="login-title">👨‍💼 Agent Login</h1>
+        <div class="login-sub">
+          Login to manage your users and check your salary.
         </div>
+      </div>
 
-        <div class="form-group">
-          <label>Password</label>
-          <input name="password" type="password" autocomplete="current-password" required />
-        </div>
+      <div class="login-body">
+        <form method="POST" action="/agent/login">
+          <div class="row">
+            <div class="form-group">
+              <label>Username</label>
+              <input name="username" autocomplete="username" placeholder="agentusername" required />
+            </div>
 
-        <button class="btn-primary" type="submit">🔐 Login</button>
+            <div class="form-group">
+              <label>Password</label>
+              <input name="password" type="password" autocomplete="current-password" placeholder="password" required />
+            </div>
+          </div>
 
-        {% if error %}
-          <div class="error-box" style="display:block;">{{ error }}</div>
-        {% endif %}
+          <button class="btn-primary" type="submit">🔐 Login</button>
 
-        <div class="hint">
-          If you don’t have credentials, ask Admin to create an agent from Admin Panel → Agents → Add Agent.
-        </div>
-      </form>
+          <button class="btn-secondary" type="button" onclick="window.location.href='/'">
+            ⟵ Back to Home
+          </button>
+
+          {% if error %}
+            <div class="error-box">{{ error }}</div>
+          {% endif %}
+
+          <div class="hint">
+            Don’t have credentials? Ask admin to create an agent from Admin Panel → Agents → Add Agent.
+          </div>
+
+          <div class="small">
+            Note: If you are already logged in and still see this page, clear cookies or open in Incognito once.
+          </div>
+        </form>
+      </div>
     </div>
   </div>
 </body>
