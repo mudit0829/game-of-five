@@ -2584,78 +2584,60 @@ def _safe_str(x):
             return str(x)
     return str(x)
 
+from flask import render_template, request, redirect, url_for, session
+from sqlalchemy import func
+
 @app.route('/agent/login', methods=['GET', 'POST'])
 def agent_login():
-    if get_session_agent_id():
+    # already logged in
+    if session.get('agent_id') or session.get('agentid') or session.get('agentId') or session.get('agentID'):
         return redirect(url_for('agent_panel'))
 
+    error = None
+
     if request.method == 'POST':
-        username_in = (request.form.get('username') or '').strip()
-        password_in = (request.form.get('password') or '').strip()
+        username = (request.form.get('username') or '').strip()
+        password = (request.form.get('password') or '').strip()
 
-        keys = _agent_column_keys()
-
-        # username field candidates (extend as needed)
-        uname_key = _pick_key(keys, [
-            'username', 'agentusername', 'agentUsername', 'login', 'userid', 'user'
-        ])
-
-        # password field candidates (extend as needed)
-        pass_key = _pick_key(keys, [
-            'password', 'passhash', 'passwordhash', 'passwordHash',
-            'agentpassword', 'agentPassword', 'passwd', 'pwd'
-        ])
-
-        print("AGENT_LOGIN: Agent columns ->", keys)
-        print("AGENT_LOGIN: picked uname_key =", uname_key, "pass_key =", pass_key)
-
-        if not username_in or not password_in:
+        if not username or not password:
             return render_template('agent_login.html', error="Username and password required.")
 
-        if not uname_key or not pass_key:
-            return render_template('agent_login.html', error="Server config error: Agent username/password field not found.")
-
-        uname_col = getattr(Agent, uname_key)
-        agent = Agent.query.filter(func.lower(uname_col) == username_in.lower()).first()
-
+        agent = Agent.query.filter(func.lower(Agent.username) == username.lower()).first()
         if not agent:
-            print("AGENT_LOGIN: agent not found for username =", username_in)
             return render_template('agent_login.html', error="Invalid credentials.")
 
-        if getattr(agent, 'isblocked', False):
-            print("AGENT_LOGIN: blocked agent id =", agent.id)
+        if agent.isblocked:
             return render_template('agent_login.html', error="Your account is blocked. Contact admin.")
 
-        stored = _safe_str(getattr(agent, pass_key, None))
-        print("AGENT_LOGIN: found agent id =", agent.id, "stored_pass_len =", len(stored), "stored_prefix =", stored[:12])
-
-        ok = False
-        # Try werkzeug hash first
-        try:
-            from werkzeug.security import check_password_hash
-            ok = check_password_hash(stored, password_in)
-        except Exception:
-            ok = False
-
-        # Fallback: plain compare
-        if not ok:
-            ok = (stored == password_in)
-
-        if not ok:
-            print("AGENT_LOGIN: password mismatch for agent id =", agent.id)
+        # IMPORTANT: your model uses SHA-256 passwordhash
+        if not agent.checkpassword(password):
             return render_template('agent_login.html', error="Invalid credentials.")
 
-        # success: set BOTH keys so your existing decorator works too
+        # success: set session (support both new and your decorator key)
         session['agent_id'] = int(agent.id)
         session['agentid'] = int(agent.id)
         session.pop('agentId', None)
         session.pop('agentID', None)
 
-        print("AGENT_LOGIN: success agent id =", agent.id)
         return redirect(url_for('agent_panel'))
 
-    return render_template('agent_login.html', error=None)
+    return render_template('agent_login.html', error=error)
 
+@app.route('/api/agent/profile/password', methods=['PUT'])
+@agent_required
+def api_agent_change_password():
+    a = Agent.query.get(int(get_session_agent_id()))
+    if not a:
+        return jsonify(success=False, message="Agent not found"), 404
+
+    data = request.get_json(silent=True) or {}
+    password = (data.get('password') or '').strip()
+    if not password:
+        return jsonify(success=False, message="Password required"), 400
+
+    a.setpassword(password)   # <-- IMPORTANT (sha256 -> passwordhash)
+    db.session.commit()
+    return jsonify(success=True, message="Password updated")
 
 
 @app.route('/agent')
