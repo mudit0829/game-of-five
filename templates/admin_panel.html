@@ -649,13 +649,16 @@
               <table class="data-table">
                 <thead>
                   <tr>
-                    <th>Round Code</th>
-                    <th>Game</th>
-                    <th>Bet Number(s)</th>
-                    <th>Winning #</th>
+                    <th>S.No.</th>
+                    <th>Agent name</th>
+                    <th>Joining Date</th>
                     <th>Status</th>
-                    <th>Net/Amount</th>
-                    <th>Date/Time</th>
+                    <th>Salary %</th>
+                    <th>Users</th>
+                    <th>Game Played</th>
+                    <th>Total Salary</th>
+                    <th>Actions</th>
+
                    </tr>
                 </thead>
 
@@ -1675,41 +1678,82 @@ function displayUserGames() {
       }
 
       displayAgents();
-      document.getElementById('agentsLoading').style.display = 'none';
-      document.getElementById('agentsTableContainer').style.display = 'block';
-    }
+      function agentStatusBadgeClass(isBlockedOrStatus) {
+  const s = String(isBlockedOrStatus ?? "").toLowerCase();
+  const blocked = (s === "blocked") || (s === "true") || (s === "1");
+  return blocked ? "badge-blocked" : "badge-active";
+}
 
-    function displayAgents() {
-      const tbody = document.getElementById('agentsTableBody');
-      tbody.innerHTML = '';
+function agentStatusText(isBlockedOrStatus) {
+  const s = String(isBlockedOrStatus ?? "").toLowerCase();
+  const blocked = (s === "blocked") || (s === "true") || (s === "1");
+  return blocked ? "BLOCKED" : "ACTIVE";
+}
 
-      if (!allAgents.length) {
-        tbody.innerHTML = `<tr><td colspan="10" class="no-data">No agents found</td></tr>`;
-        return;
-      }
+async function loadAgents() {
+  document.getElementById("agentsLoading").style.display = "block";
+  document.getElementById("agentsTableContainer").style.display = "none";
+  try {
+    const data = await apiGet("/api/admin/agents");
+    allAgents = Array.isArray(data) ? data : [];
+  } catch (err) {
+    allAgents = [];
+    console.error("loadAgents error:", err);
+  }
+  displayAgents();
+  document.getElementById("agentsLoading").style.display = "none";
+  document.getElementById("agentsTableContainer").style.display = "block";
+}
 
-      allAgents.forEach(agent => {
-        const row = document.createElement('tr');
-        row.innerHTML = `
-          <td>${agent.id ?? '-'}</td>
-          <td><strong>${agent.name ?? '-'}</strong></td>
-          <td>${agent.email ?? '-'}</td>
-          <td>${agent.salarypercent ?? 0}</td>
-          <td>${agent.usercount ?? 0}</td>
-          <td>${fmtINR(agent.totaldeposits ?? 0)}</td>
-          <td>${fmtINR(agent.totalwithdrawals ?? 0)}</td>
-          <td>${fmtINR(agent.commission ?? 0)}</td>
-          <td><span class="badge badge-pending">NA</span></td>
-          <td>
-            <div class="action-buttons">
-              <button class="btn-small btn-edit" onclick="alert('Not implemented yet')">Edit</button>
-              <button class="btn-small btn-view" onclick="alert('Not implemented yet')">View</button>
-            </div>
-          </td>
-        `;
-        tbody.appendChild(row);
-      });
-    }
+function displayAgents() {
+  const tbody = document.getElementById("agentsTableBody");
+  tbody.innerHTML = "";
+
+  if (!allAgents.length) {
+    tbody.innerHTML = `<tr><td colspan="9" class="no-data">No agents found</td></tr>`;
+    return;
+  }
+
+  allAgents.forEach((a, idx) => {
+    const agentId = a.id ?? a.agentid ?? a.agentId;
+    const agentName = a.name ?? a.agentname ?? a.agentName ?? "-";
+    const joining = a.createdat ?? a.joining ?? a.joiningdate ?? "-";
+    const statusRaw = (a.status ?? a.isblocked ?? a.isBlocked ?? "active");
+    const salaryPercent = Number(a.salarypercent ?? a.salaryPercent ?? 0);
+
+    const usersCount = Number(a.usercount ?? a.users ?? a.totalusers ?? 0);
+
+    // These should come from backend summary (recommended)
+    const totalPlayed = Number(a.totalplayed ?? a.gameplayed ?? a.totalgameplayed ?? 0);
+    const totalSalary = Number(a.totalsalary ?? a.salarytotal ?? 0);
+
+    const row = document.createElement("tr");
+    row.innerHTML = `
+      <td>${idx + 1}</td>
+      <td><strong>${agentName}</strong></td>
+      <td>${joining}</td>
+      <td><span class="badge ${agentStatusBadgeClass(statusRaw)}">${agentStatusText(statusRaw)}</span></td>
+      <td>${salaryPercent}%</td>
+      <td>
+        <a href="javascript:void(0)" onclick="viewAgentUsers(${agentId})"
+           style="color:#10b981; cursor:pointer;">
+          ${usersCount}
+        </a>
+      </td>
+      <td>${fmtINR(totalPlayed)}</td>
+      <td>${fmtINR(totalSalary)}</td>
+      <td>
+        <div class="action-buttons">
+          <button class="btn-small btn-edit" onclick="openEditAgent(${agentId})">Edit</button>
+          <button class="btn-small btn-block" onclick="toggleAgentBlock(${agentId}, '${String(statusRaw).toLowerCase()}')">
+            ${String(statusRaw).toLowerCase() === "blocked" || String(statusRaw) === "true" ? "Unblock" : "Block"}
+          </button>
+        </div>
+      </td>
+    `;
+    tbody.appendChild(row);
+  });
+}
 
 async function submitAddAgent(e) {
   e.preventDefault();
@@ -1748,6 +1792,53 @@ window.openAddAgentModal = function () {
 window.closeAddAgentModal = function () {
   document.getElementById('addAgentModal')?.classList.remove('active');
   document.getElementById('addAgentForm')?.reset();
+};
+window.viewAgentUsers = async function (agentId) {
+  document.getElementById("detailsTitle").textContent = "Agent Users";
+  document.getElementById("detailsSubtitle").textContent = `Agent ID: ${agentId}`;
+  document.getElementById("detailsContent").innerHTML = "Loading...";
+
+  try {
+    const res = await apiGet(`/api/admin/agents/${agentId}/users`);
+    const users = Array.isArray(res?.items) ? res.items : (Array.isArray(res) ? res : []);
+
+    if (!users.length) {
+      document.getElementById("detailsContent").innerHTML = `<div class="no-data">No users found</div>`;
+      document.getElementById("detailsModal").classList.add("active");
+      return;
+    }
+
+    const rows = users.map((u, i) => `
+      <tr>
+        <td>${i + 1}</td>
+        <td>${u.userid ?? u.id ?? "-"}</td>
+        <td>${u.joining ?? u.joiningdate ?? u.createdat ?? "-"}</td>
+        <td>${fmtINR(Number(u.amountplayed ?? 0))}</td>
+        <td>${fmtINR(Number(u.salarygenerated ?? 0))}</td>
+      </tr>
+    `).join("");
+
+    document.getElementById("detailsContent").innerHTML = `
+      <div class="table-container">
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th>S.No.</th>
+              <th>User Id</th>
+              <th>Joining Date</th>
+              <th>Amount Played</th>
+              <th>Salary Generated</th>
+            </tr>
+          </thead>
+          <tbody>${rows}</tbody>
+        </table>
+      </div>
+    `;
+    document.getElementById("detailsModal").classList.add("active");
+  } catch (err) {
+    document.getElementById("detailsContent").innerHTML = `<div style="color:#ef4444;">Error: ${err.message}</div>`;
+    document.getElementById("detailsModal").classList.add("active");
+  }
 };
 
 
