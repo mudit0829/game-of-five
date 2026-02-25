@@ -240,6 +240,16 @@
       box-shadow: 0 6px 16px rgba(16,185,129,0.3);
     }
 
+    <!-- Games pagination -->
+    <div class="controls" style="justify-content: space-between; margin-top: 20px;">
+      <div id="gamesPageInfo" style="color: #94a3b8; font-size: 14px;"></div>
+      <div style="display: flex; gap: 12px;">
+         <button class="btn-primary" onclick="prevGamesPage()" id="gamesPrevBtn" disabled>← Prev</button>
+         <button class="btn-primary" onclick="nextGamesPage()" id="gamesNextBtn">Next →</button>
+      </div>
+    </div>
+
+    
     /* TABLE */
     .table-container {
       background: #1e293b;
