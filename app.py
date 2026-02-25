@@ -1417,7 +1417,7 @@ def agentlogout():
     return redirect(url_for('agentloginpage'))
 
 @app.route('/agent')
-@agentrequired
+@agent_required
 def agentpanel():
     a = Agent.query.get(int(getsessionagentid()))
     return render_template('agent_panel.html', agentname=a.name)
