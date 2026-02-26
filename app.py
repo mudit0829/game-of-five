@@ -1437,22 +1437,6 @@ def api_agent_profile():
         'status': 'BLOCKED' if a.isblocked else 'ACTIVE'
     })
 
-@app.route('/api/agent/profile/password', methods=['PUT'])
-@agent_required
-def api_agent_change_password():
-    a = Agent.query.get(int(get_session_agent_id()))
-    if not a:
-        return jsonify(success=False, message="Agent not found"), 404
-
-    data = request.get_json() or {}
-    password = (data.get('password') or '').strip()
-    if not password:
-        return jsonify(success=False, message="Password required"), 400
-
-    a.setpassword(password)
-    db.session.commit()
-    return jsonify(success=True, message="Password updated")
-
 @app.route('/api/agent/salary')
 @agent_required
 def api_agent_salary():
