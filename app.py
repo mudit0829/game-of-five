@@ -2383,7 +2383,7 @@ def adminagents():
         if user_ids:
             totalplayed = (
                 db.session.query(func.coalesce(func.sum(Transaction.amount), 0))
-                .filter(Transaction.userid.in_(user_ids))
+                .filter(Transaction.user_id.in_(user_ids))
                 .filter(func.lower(Transaction.kind) == 'bet')
                 .scalar()
             ) or 0
