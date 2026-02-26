@@ -2738,14 +2738,6 @@ def api_agent_stats():
 
 
 
-@app.route('/agent/logout')
-@agent_required
-def agent_logout():
-    for k in ('agent_id', 'agentid', 'agentId', 'agentID'):
-        session.pop(k, None)
-    return redirect(url_for('agent_login'))
-
-
 # ---------------------------------------------------
 # Socket.IO handlers
 # ---------------------------------------------------
