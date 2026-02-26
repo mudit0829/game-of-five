@@ -1411,7 +1411,7 @@ def agentloginpost():
     session['agentId'] = a.id  # compatibility
     session['agentusername'] = a.username
     session.permanent = True
-    return jsonify(success=True, redirect=url_for('agentpanel'))
+    return jsonify(success=True, redirect=url_for('agent_panel'))
 
 @app.route('/agent/logout')
 def agent_logout():
