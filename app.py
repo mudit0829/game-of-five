@@ -1412,57 +1412,147 @@ def agentloginpost():
     session.permanent = True
     return jsonify(success=True, redirect=url_for('agentpanel'))
 
-@app.route('/agent-logout')
-def agentlogout():
-    session.pop('agentid', None)
-    session.pop('agentId', None)
-    session.pop('agentusername', None)
-    return redirect(url_for('agentloginpage'))
+@app.route('/agent/logout')
+def agent_logout():
+    for k in ('agent_id', 'agentid', 'agentId', 'agentID'):
+        session.pop(k, None)
+    return redirect('/agent/login')
 
 @app.route('/agent')
 @agent_required
-def agentpanel():
-    a = Agent.query.get(int(getsessionagentid()))
-    return render_template('agent_panel.html', agentname=a.name)
+def agent_panel():
+    return render_template('agent_panel.html')  # <-- your HTML file
+
+@app.route('/api/agent/profile')
+@agent_required
+def api_agent_profile():
+    a = Agent.query.get(int(get_session_agent_id()))
+    if not a:
+        return jsonify(success=False, message="Agent not found"), 404
+
+    return jsonify({
+        'name': a.name,
+        'username': a.username,
+        'salarypercent': float(a.salarypercent or 0),
+        'status': 'BLOCKED' if a.isblocked else 'ACTIVE'
+    })
+
+@app.route('/api/agent/profile/password', methods=['PUT'])
+@agent_required
+def api_agent_change_password():
+    a = Agent.query.get(int(get_session_agent_id()))
+    if not a:
+        return jsonify(success=False, message="Agent not found"), 404
+
+    data = request.get_json() or {}
+    password = (data.get('password') or '').strip()
+    if not password:
+        return jsonify(success=False, message="Password required"), 400
+
+    a.setpassword(password)
+    db.session.commit()
+    return jsonify(success=True, message="Password updated")
+
+@app.route('/api/agent/salary')
+@agent_required
+def api_agent_salary():
+    a = Agent.query.get(int(get_session_agent_id()))
+    if not a:
+        return jsonify(success=False, message="Agent not found"), 404
+
+    from_date = request.args.get('from')
+    to_date = request.args.get('to')
+
+    user_ids = db.session.query(User.id).filter_by(agentid=a.id).subquery()
+
+    # Total played in range
+    total_played = db.session.query(func.coalesce(func.sum(Transaction.amount), 0)).filter(
+        Transaction.userid.in_(user_ids),
+        func.lower(Transaction.kind) == 'bet'
+    ).scalar() or 0
+
+    total_salary = (total_played * float(a.salarypercent or 0)) / 100.0
+
+    # Per-user breakdown
+    users = User.query.filter_by(agentid=a.id).all()
+    items = []
+
+    for u in users:
+        user_played = db.session.query(func.coalesce(func.sum(Transaction.amount), 0)).filter(
+            Transaction.userid == u.id,
+            func.lower(Transaction.kind) == 'bet'
+        ).scalar() or 0
+        user_salary = (user_played * float(a.salarypercent or 0)) / 100.0
+
+        items.append({
+            "userid": u.id,
+            "joining": fmt_ist(u.created_at, "%Y-%m-%d %H:%M") if u.created_at else "",
+            "amountplayed": int(user_played),
+            "salarygenerated": round(user_salary, 0),
+        })
+
+    return jsonify({
+        'totalplayed': int(total_played),
+        'totalsalary': round(total_salary, 0),
+        'items': items
+    })
+
 
 
 @app.route('/api/agent/users', methods=['GET', 'POST'])
 @agent_required
-def agentusers():
-    aid = int(getsessionagentid())
+def api_agent_users():
+    a = Agent.query.get(int(get_session_agent_id()))
+    if not a:
+        return jsonify(success=False, message="Agent not found"), 404
 
     if request.method == 'POST':
         data = request.get_json() or {}
         username = (data.get('username') or '').strip()
         password = (data.get('password') or '').strip()
-        displayname = (data.get('displayname') or data.get('displayName') or username).strip()
+        display_name = (data.get('displayname') or '').strip()
+        phone = (data.get('phone') or '').strip()
+        email = (data.get('email') or '').strip()
+        country = (data.get('country') or '').strip()
 
         if not username or not password:
-            return jsonify(success=False, message="username and password required"), 400
-        if len(password) < 6:
-            return jsonify(success=False, message="Password must be at least 6 characters"), 400
+            return jsonify(success=False, message="Username and password required"), 400
+
         if User.query.filter_by(username=username).first():
             return jsonify(success=False, message="Username already exists"), 400
 
-        u = User(username=username, displayname=displayname, isadmin=False, isblocked=False, agentid=aid)
-        u.setpassword(password)
-        db.session.add(u)
+        user = User(username=username, agentid=a.id)
+        user.set_password(password)
+        if display_name: user.display_name = display_name
+        if phone: user.phone = phone
+        if email: user.email = email
+        if country: user.country = country
+
+        db.session.add(user)
         db.session.commit()
+        return jsonify(success=True, message="User created", userid=user.id)
 
-        createwalletforuser(u.id, starting_balance=0)  # start with 0 coins
-        return jsonify(success=True, message="User created", userid=u.id)
-
-    users = User.query.filter_by(agentid=aid).order_by(User.createdat.desc()).all()
+    # GET: list users + computed totals
+    users = User.query.filter_by(agentid=a.id).order_by(User.created_at.desc()).all()
     out = []
+
     for u in users:
-        w = Wallet.query.filter_by(userid=u.id).first()
+        user_id = u.id
+        created_at = u.created_at
+        played = db.session.query(func.coalesce(func.sum(Transaction.amount), 0)).filter(
+            Transaction.userid == user_id,
+            func.lower(Transaction.kind) == 'bet'
+        ).scalar() or 0
+        salary_gen = (played * float(a.salarypercent or 0)) / 100.0
+
         out.append({
-            "id": u.id,
+            "userid": user_id,
             "username": u.username,
-            "status": "blocked" if u.isblocked else "active",
-            "balance": int(w.balance) if w else 0,
-            "createdat": fmtist(u.createdat, "%Y-%m-%d %H:%M") if u.createdat else ""
+            "joining": fmt_ist(created_at, "%Y-%m-%d %H:%M") if created_at else "",
+            "amountplayed": int(played),
+            "salarygenerated": round(salary_gen, 0),
         })
+
     return jsonify(out)
 
 
@@ -2639,11 +2729,29 @@ def api_agent_change_password():
     db.session.commit()
     return jsonify(success=True, message="Password updated")
 
-
-@app.route('/agent')
+@app.route('/api/agent/stats')
 @agent_required
-def agent_panel():
-    return render_template('agent_panel.html')
+def api_agent_stats():
+    a = Agent.query.get(int(get_session_agent_id()))
+    if not a:
+        return jsonify(success=False, message="Agent not found"), 404
+
+    # Total users under this agent
+    user_count = User.query.filter_by(agentid=a.id).count()
+
+    # Total salary = total bets from your users * your salary %
+    total_played = db.session.query(func.coalesce(func.sum(Transaction.amount), 0)).filter(
+        Transaction.userid.in_(db.session.query(User.id).filter_by(agentid=a.id).subquery()),
+        func.lower(Transaction.kind) == 'bet'
+    ).scalar() or 0
+
+    total_salary = (total_played * float(a.salarypercent or 0)) / 100.0
+
+    return jsonify({
+        'totalusers': user_count,
+        'totalsalary': round(total_salary, 0)
+    })
+
 
 
 @app.route('/agent/logout')
