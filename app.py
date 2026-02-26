@@ -1440,45 +1440,59 @@ def api_agent_profile():
 @app.route('/api/agent/salary')
 @agent_required
 def api_agent_salary():
-    a = Agent.query.get(int(get_session_agent_id()))
-    if not a:
+    aid = int(get_session_agent_id())
+    agent = Agent.query.get(aid)
+    if not agent:
         return jsonify(success=False, message="Agent not found"), 404
 
-    from_date = request.args.get('from')
-    to_date = request.args.get('to')
+    from_str = request.args.get('from')  # 'YYYY-MM-DD'
+    to_str = request.args.get('to')      # 'YYYY-MM-DD'
 
-    user_ids = db.session.query(User.id).filter_by(agentid=a.id).subquery()
+    # users under this agent
+    users = User.query.filter_by(agentid=aid).all()
+    user_ids = [u.id for u in users]
 
-    # Total played in range
-    total_played = db.session.query(func.coalesce(func.sum(Transaction.amount), 0)).filter(
-        Transaction.userid.in_(user_ids),
+    base_query = db.session.query(Transaction).filter(
+        Transaction.user_id.in_(user_ids),
         func.lower(Transaction.kind) == 'bet'
-    ).scalar() or 0
+    )
 
-    total_salary = (total_played * float(a.salarypercent or 0)) / 100.0
+    if from_str:
+        try:
+            dt_from = datetime.strptime(from_str, "%Y-%m-%d")
+            base_query = base_query.filter(Transaction.datetime >= dt_from)
+        except ValueError:
+            pass
 
-    # Per-user breakdown
-    users = User.query.filter_by(agentid=a.id).all()
+    if to_str:
+        try:
+            dt_to = datetime.strptime(to_str, "%Y-%m-%d") + timedelta(days=1)
+            base_query = base_query.filter(Transaction.datetime < dt_to)
+        except ValueError:
+            pass
+
+    # total played in range
+    total_played = (base_query.with_entities(func.coalesce(func.sum(Transaction.amount), 0)).scalar()) or 0
+    total_salary = (float(total_played) * float(agent.salarypercent or 0)) / 100.0
+
+    # per-user breakdown
     items = []
-
     for u in users:
-        user_played = db.session.query(func.coalesce(func.sum(Transaction.amount), 0)).filter(
-            Transaction.userid == u.id,
-            func.lower(Transaction.kind) == 'bet'
-        ).scalar() or 0
-        user_salary = (user_played * float(a.salarypercent or 0)) / 100.0
+        q_u = base_query.filter(Transaction.user_id == u.id)
+        amount_played = (q_u.with_entities(func.coalesce(func.sum(Transaction.amount), 0)).scalar()) or 0
+        salary_generated = (amount_played * float(agent.salarypercent or 0)) / 100.0
 
         items.append({
             "userid": u.id,
             "joining": fmt_ist(u.created_at, "%Y-%m-%d %H:%M") if u.created_at else "",
-            "amountplayed": int(user_played),
-            "salarygenerated": round(user_salary, 0),
+            "amountplayed": int(amount_played),
+            "salarygenerated": round(salary_generated, 0),
         })
 
     return jsonify({
-        'totalplayed': int(total_played),
-        'totalsalary': round(total_salary, 0),
-        'items': items
+        "totalplayed": int(total_played),
+        "totalsalary": round(total_salary, 0),
+        "items": items,
     })
 
 
@@ -1486,8 +1500,9 @@ def api_agent_salary():
 @app.route('/api/agent/users', methods=['GET', 'POST'])
 @agent_required
 def api_agent_users():
-    a = Agent.query.get(int(get_session_agent_id()))
-    if not a:
+    aid = int(get_session_agent_id())
+    agent = Agent.query.get(aid)
+    if not agent:
         return jsonify(success=False, message="Agent not found"), 404
 
     if request.method == 'POST':
@@ -1505,40 +1520,56 @@ def api_agent_users():
         if User.query.filter_by(username=username).first():
             return jsonify(success=False, message="Username already exists"), 400
 
-        user = User(username=username, agentid=a.id)
-        user.set_password(password)
-        if display_name: user.display_name = display_name
-        if phone: user.phone = phone
-        if email: user.email = email
-        if country: user.country = country
+        u = User(username=username, agentid=aid, is_admin=False, is_blocked=False)
+        u.set_password(password)
+        if display_name:
+            u.display_name = display_name
+        if phone:
+            u.phone = phone
+        if email:
+            u.email = email
+        if country:
+            u.country = country
 
-        db.session.add(user)
+        db.session.add(u)
         db.session.commit()
-        return jsonify(success=True, message="User created", userid=user.id)
 
-    # GET: list users + computed totals
-    users = User.query.filter_by(agentid=a.id).order_by(User.created_at.desc()).all()
+        ensure_wallet_for_user(u)  # starts with 10000 for non-admin
+
+        return jsonify(success=True, message="User created", userid=u.id)
+
+    # GET: list users under agent with stats
+    users = User.query.filter_by(agentid=aid).order_by(User.created_at.desc()).all()
+    user_ids = [u.id for u in users]
+
+    played_map = {}
+    if user_ids:
+        rows = (
+            db.session.query(Transaction.user_id, func.coalesce(func.sum(Transaction.amount), 0))
+            .filter(
+                Transaction.user_id.in_(user_ids),
+                func.lower(Transaction.kind) == 'bet'
+            )
+            .group_by(Transaction.user_id)
+            .all()
+        )
+        played_map = {uid: int(total or 0) for uid, total in rows}
+
     out = []
-
     for u in users:
-        user_id = u.id
-        created_at = u.created_at
-        played = db.session.query(func.coalesce(func.sum(Transaction.amount), 0)).filter(
-            Transaction.userid == user_id,
-            func.lower(Transaction.kind) == 'bet'
-        ).scalar() or 0
-        salary_gen = (played * float(a.salarypercent or 0)) / 100.0
+        amount_played = played_map.get(u.id, 0)
+        salary_generated = (amount_played * float(agent.salarypercent or 0)) / 100.0
 
         out.append({
-            "userid": user_id,
+            "userid": u.id,
             "username": u.username,
-            "joining": fmt_ist(created_at, "%Y-%m-%d %H:%M") if created_at else "",
-            "amountplayed": int(played),
-            "salarygenerated": round(salary_gen, 0),
+            "status": "blocked" if u.is_blocked else "active",
+            "joining": fmt_ist(u.created_at, "%Y-%m-%d %H:%M") if u.created_at else "",
+            "amountplayed": int(amount_played),
+            "salarygenerated": round(salary_generated, 0),
         })
 
     return jsonify(out)
-
 
 # ---------------------------------------------------
 # Game pages
@@ -2716,25 +2747,32 @@ def api_agent_change_password():
 @app.route('/api/agent/stats')
 @agent_required
 def api_agent_stats():
-    a = Agent.query.get(int(get_session_agent_id()))
-    if not a:
+    aid = int(get_session_agent_id())
+    agent = Agent.query.get(aid)
+    if not agent:
         return jsonify(success=False, message="Agent not found"), 404
 
-    # Total users under this agent
-    user_count = User.query.filter_by(agentid=a.id).count()
+    # users under this agent
+    user_ids = [u.id for u in User.query.with_entities(User.id).filter_by(agentid=aid).all()]
+    total_users = len(user_ids)
 
-    # Total salary = total bets from your users * your salary %
-    total_played = db.session.query(func.coalesce(func.sum(Transaction.amount), 0)).filter(
-        Transaction.userid.in_(db.session.query(User.id).filter_by(agentid=a.id).subquery()),
-        func.lower(Transaction.kind) == 'bet'
-    ).scalar() or 0
+    total_played = 0
+    if user_ids:
+        total_played = (
+            db.session.query(func.coalesce(func.sum(Transaction.amount), 0))
+            .filter(
+                Transaction.user_id.in_(user_ids),
+                func.lower(Transaction.kind) == 'bet'
+            )
+            .scalar()
+        ) or 0
 
-    total_salary = (total_played * float(a.salarypercent or 0)) / 100.0
+    total_salary = (float(total_played) * float(agent.salarypercent or 0)) / 100.0
 
-    return jsonify({
-        'totalusers': user_count,
-        'totalsalary': round(total_salary, 0)
-    })
+    return jsonify(
+        totalusers=total_users,
+        totalsalary=round(total_salary, 0),
+    )
 
 
 
