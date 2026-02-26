@@ -1535,7 +1535,7 @@ def api_agent_users():
         db.session.add(u)
         db.session.commit()
 
-        ensure_wallet_for_user(u)  # starts with 10000 for non-admin
+        ensure_wallet_for_user(u, starting_balance=0)   # starts with 10000 for non-admin
 
         return jsonify(success=True, message="User created", userid=u.id)
 
