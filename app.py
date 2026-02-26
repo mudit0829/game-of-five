@@ -409,16 +409,17 @@ def superadmin_required(f):
     return decorated
 
 
-def ensure_wallet_for_user(user: User) -> Wallet:
-    """Ensure the user has a wallet row with starting 10000 coins - ONLY FOR NON-ADMIN USERS"""
+def ensure_wallet_for_user(user: User, starting_balance: int = 10000) -> Wallet:
+    """Ensure wallet exists. Non-admin default = 10000."""
     if user.is_admin:
         return None
     if not user.wallet:
-        wallet = Wallet(user_id=user.id, balance=10000)
+        wallet = Wallet(user_id=user.id, balance=int(starting_balance or 0))
         db.session.add(wallet)
         db.session.commit()
         return wallet
     return user.wallet
+
 
 
 def generate_bot_name():
