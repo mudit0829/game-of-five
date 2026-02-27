@@ -2516,16 +2516,19 @@ def admin_agent_users(agentid):
 
         played_map = {}
         if user_ids:
+            # ✅ Works with both schemas: Transaction.user_id OR Transaction.userid
+            tx_user_col = getattr(Transaction, "user_id", None) or getattr(Transaction, "userid", None)
+            if tx_user_col is None:
+                raise Exception("Transaction model has no user_id or userid column")
+
             rows = (
                 db.session.query(
-                    **Transaction.user_id**,
+                    tx_user_col,
                     func.coalesce(func.sum(Transaction.amount), 0)
                 )
-                .filter(
-                    **Transaction.user_id.in_(user_ids)**,
-                    func.lower(Transaction.kind) == 'bet'
-                )
-                .group_by(**Transaction.user_id**)
+                .filter(tx_user_col.in_(user_ids))
+                .filter(func.lower(Transaction.kind) == 'bet')
+                .group_by(tx_user_col)
                 .all()
             )
             played_map = {int(uid): int(total or 0) for uid, total in rows}
