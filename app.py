@@ -2522,7 +2522,7 @@ def admin_agent_users(agentid):
                     func.coalesce(func.sum(Transaction.amount), 0)
                 )
                 .filter(
-                    **Transaction.user_id.in_(user_ids)**,  # ✅ FIXED: consistent with group_by
+                    **Transaction.user_id.in_(user_ids)**,
                     func.lower(Transaction.kind) == 'bet'
                 )
                 .group_by(**Transaction.user_id**)  # ✅ FIXED: was Transaction.userid
