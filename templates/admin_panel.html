@@ -502,7 +502,7 @@
 
       <ul class="sidebar-menu">
         <li><a class="menu-link active" data-section="dashboard">📊 Dashboard</a></li>
-        <li><a class="menu-link" data-section="subadmins">Sub-Admins</a></li>
+        <li><a class="menu-link" data-section="subadmins">👨‍💼 Sub-Admins</a></li>
         <li><a class="menu-link" data-section="users">👥 Users</a></li>
         <li><a class="menu-link" data-section="agents">👨‍💼 Agents</a></li>
         <li><a class="menu-link" data-section="games">🎮 Games</a></li>
@@ -563,14 +563,39 @@
           </div>
         </div>
 
-        <!-- SUB-ADMINS -->
-        <div id="subadmins" class="section">
-            <div class="section-header">
-                  <h2 class="section-title">Sub-Admin Management</h2>
-                  <button class="btn-primary" onclick="openAddSubAdminModal()">Add Sub-Admin</button>
-        </div>
-    <!-- Same table structure as Agents -->
-        </div>
+        <!-- SUB-ADMINS (COMPLETE) -->
+<div id="subadmins" class="section">
+  <div class="section-header">
+    <h2 class="section-title">Sub-Admin Management</h2>
+    <button class="btn-primary" onclick="openAddSubAdminModal()">➕ Add Sub-Admin</button>
+  </div>
+
+  <div class="controls">
+    <div class="search-box">
+      <input type="text" id="searchSubAdmins" placeholder="Search by name or username..." />
+      <button onclick="displaySubAdmins()">🔍 Search</button>
+    </div>
+  </div>
+
+  <div id="subadminsLoading" class="loading">Loading sub-admins...</div>
+  <div id="subadminsTableContainer" style="display:none;">
+    <div class="table-container">
+      <table class="data-table">
+        <thead>
+          <tr>
+            <th>S.No.</th>
+            <th>Name</th>
+            <th>Username</th>
+            <th>Status</th>
+            <th>Created</th>
+            <th>Actions</th>
+          </tr>
+        </thead>
+        <tbody id="subadminsTableBody"></tbody>
+      </table>
+    </div>
+  </div>
+</div>
 
 
         <!-- USERS -->
@@ -647,6 +672,37 @@
             </div>
           </div>
         </div>
+
+        <!-- Add Sub-Admin Modal -->
+<div id="addSubAdminModal" class="modal">
+  <div class="modal-content">
+    <div class="modal-header">
+      <h2>➕ Add Sub-Admin</h2>
+      <p>Create new sub-admin account</p>
+    </div>
+    <form id="addSubAdminForm">
+      <input type="hidden" id="editSubAdminId" />
+      <div class="form-row">
+        <div class="form-group">
+          <label>Name</label>
+          <input type="text" id="subAdminName" placeholder="Full name" required />
+        </div>
+        <div class="form-group">
+          <label>Username</label>
+          <input type="text" id="subAdminUsername" placeholder="username" required />
+        </div>
+      </div>
+      <div class="form-group">
+        <label>Password</label>
+        <input type="password" id="subAdminPassword" placeholder="Password" required />
+      </div>
+      <div class="modal-footer">
+        <button type="submit" class="btn-modal btn-save">Create Sub-Admin</button>
+        <button type="button" class="btn-modal btn-cancel" onclick="closeAddSubAdminModal()">Cancel</button>
+      </div>
+    </form>
+  </div>
+</div>
 
         <!-- AGENTS -->
         <div id="agents" class="section">
