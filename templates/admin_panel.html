@@ -1412,6 +1412,96 @@ function closeAddSubAdminModal() {
 document.getElementById('addSubAdminForm')?.addEventListener('submit', submitAddSubAdmin);
 document.getElementById('searchSubAdmins')?.addEventListener('keyup', displaySubAdmins);
 
+    // ------------------------ Sub-Admins ------------------------
+let allSubAdmins = [];
+
+async function loadSubAdmins() {
+  const loading = document.getElementById('subadminsLoading');
+  const container = document.getElementById('subadminsTableContainer');
+  const tbody = document.getElementById('subadminsTableBody');
+
+  if (loading) loading.style.display = 'block';
+  if (container) container.style.display = 'none';
+  if (tbody) tbody.innerHTML = '';
+
+  try {
+    const data = await apiGet('/api/admin/subadmins'); // GET list [file:13]
+    allSubAdmins = Array.isArray(data) ? data.map(sa => ({
+      id: sa.id,
+      name: sa.name || '-',
+      username: sa.username || '-',
+      createdat: sa.createdat || sa.created_at || '-'
+    })) : [];
+
+    displaySubAdmins();
+
+    if (loading) loading.style.display = 'none';
+    if (container) container.style.display = 'block';
+  } catch (err) {
+    if (loading) loading.innerHTML = `<div style="color:#ef4444;">Error: ${err.message}</div>`;
+  }
+}
+
+function displaySubAdmins() {
+  const q = safeLower(document.getElementById('searchSubAdmins')?.value || '');
+  const tbody = document.getElementById('subadminsTableBody');
+  if (!tbody) return;
+
+  const filtered = allSubAdmins.filter(sa =>
+    safeLower(sa.name).includes(q) || safeLower(sa.username).includes(q)
+  );
+
+  tbody.innerHTML = '';
+  if (!filtered.length) {
+    tbody.innerHTML = `<tr><td colspan="6" class="no-data">No sub-admins found</td></tr>`;
+    return;
+  }
+
+  filtered.forEach((sa, idx) => {
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+      <td>${idx + 1}</td>
+      <td><strong>${sa.name}</strong></td>
+      <td>${sa.username}</td>
+      <td><span class="badge badge-active">ACTIVE</span></td>
+      <td>${sa.createdat}</td>
+      <td>-</td>
+    `;
+    tbody.appendChild(tr);
+  });
+}
+
+function openAddSubAdminModal() {
+  document.getElementById('addSubAdminModal')?.classList.add('active');
+  document.getElementById('addSubAdminForm')?.reset();
+}
+
+function closeAddSubAdminModal() {
+  document.getElementById('addSubAdminModal')?.classList.remove('active');
+  document.getElementById('addSubAdminForm')?.reset();
+}
+
+async function submitAddSubAdmin(e) {
+  e.preventDefault();
+
+  const name = (document.getElementById('subAdminName')?.value || '').trim();
+  const username = (document.getElementById('subAdminUsername')?.value || '').trim();
+  const password = (document.getElementById('subAdminPassword')?.value || '').trim();
+
+  if (!name || !username || !password) return alert('All fields required');
+
+  try {
+    // Your backend supports POST create here [file:13]
+    const res = await apiSend('/api/admin/subadmins', 'POST', { name, username, password });
+    alert(res.message || 'Sub-admin created');
+    closeAddSubAdminModal();
+    await loadSubAdmins();
+  } catch (err) {
+    alert('Error: ' + err.message);
+  }
+}
+
+
     // ------------------------
     // Users
     // ------------------------
