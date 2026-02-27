@@ -2851,6 +2851,41 @@ def admin_get_transactions():
 
     return jsonify(out)
 
+@app.route('/api/admin/subadmins', methods=['GET', 'POST'])
+@admin_required
+def api_admin_subadmins():
+    if request.method == 'POST':
+        data = request.get_json() or {}
+        name = data.get('name', '').strip()
+        username = data.get('username', '').strip()
+        password = data.get('password', '')
+        
+        if not name or not username or not password:
+            return jsonify({'success': False, 'message': 'All fields required'}), 400
+        
+        if SubAdmin.query.filter_by(username=username).first():
+            return jsonify({'success': False, 'message': 'Username exists'}), 400
+        
+        sa = SubAdmin(name=name, username=username)
+        sa.set_password(password)
+        db.session.add(sa)
+        db.session.commit()
+        
+        return jsonify({'success': True, 'message': 'Sub-admin created', 'id': sa.id})
+    
+    # GET list
+    subadmins = SubAdmin.query.order_by(SubAdmin.created_at.desc()).all()
+    out = []
+    for sa in subadmins:
+        out.append({
+            'id': sa.id,
+            'name': sa.name,
+            'username': sa.username,
+            'created_at': fmt_ist(sa.created_at, '%Y-%m-%d %H:%M')
+        })
+    return jsonify(out)
+
+
 from flask import render_template, request, redirect, url_for, session
 from sqlalchemy import func
 from sqlalchemy.inspection import inspect as sa_inspect
