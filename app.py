@@ -1554,7 +1554,6 @@ def api_agent_users():
             func.lower(Transaction.kind) == 'bet'
         ).group_by(Transaction.user_id).all()
 
-        )
                 playedmap = {int(uid): int(total) or 0 for uid, total in rows}  # ✅ int(uid) to handle user_id as int
 
     out = []
