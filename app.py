@@ -1545,16 +1545,17 @@ def api_agent_users():
 
     played_map = {}
     if user_ids:
-        rows = (
-            db.session.query(Transaction.user_id, func.coalesce(func.sum(Transaction.amount), 0))
-            .filter(
-                Transaction.user_id.in_(user_ids),
-                func.lower(Transaction.kind) == 'bet'
-            )
-            .group_by(Transaction.user_id)
-            .all()
+                # ✅ FIXED: use Transaction.user_id (matches your model)
+        rows = db.session.query(
+            Transaction.user_id,  # ✅ CORRECT column name
+            func.coalesce(func.sum(Transaction.amount), 0)
+        ).filter(
+            Transaction.user_id.in_(user_ids),  # ✅ CORRECT column name
+            func.lower(Transaction.kind) == 'bet'
+        ).group_by(Transaction.user_id).all()
+
         )
-        played_map = {uid: int(total or 0) for uid, total in rows}
+                playedmap = {int(uid): int(total) or 0 for uid, total in rows}  # ✅ int(uid) to handle user_id as int
 
     out = []
     for u in users:
@@ -2517,10 +2518,15 @@ def admin_agent_users(agentid):
         played_map = {}
         if user_ids:
             rows = (
-                db.session.query(Transaction.userid, func.coalesce(func.sum(Transaction.amount), 0))
-                .filter(Transaction.user_id.in_(user_ids))
-                .filter(func.lower(Transaction.kind) == 'bet')
-                .group_by(Transaction.user_id)
+                db.session.query(
+                    **Transaction.user_id**,  # ✅ FIXED: was Transaction.userid
+                    func.coalesce(func.sum(Transaction.amount), 0)
+                )
+                .filter(
+                    **Transaction.user_id.in_(user_ids)**,  # ✅ FIXED: consistent with group_by
+                    func.lower(Transaction.kind) == 'bet'
+                )
+                .group_by(**Transaction.user_id**)  # ✅ FIXED: was Transaction.userid
                 .all()
             )
             played_map = {int(uid): int(total or 0) for uid, total in rows}
@@ -2548,6 +2554,7 @@ def admin_agent_users(agentid):
 
     except Exception as e:
         return jsonify(success=False, message=f"agent users api error: {str(e)}"), 500
+
 
 
 
