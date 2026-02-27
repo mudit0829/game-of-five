@@ -1,0 +1,194 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Sub-Admin Login - Game of Five</title>
+
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    html, body {
+      width: 100%;
+      height: 100%;
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      background: #0f172a;
+      color: #e2e8f0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .login-wrapper {
+      width: 100%;
+      max-width: 420px;
+      background: #1e293b;
+      border-radius: 12px;
+      border: 2px solid #334155;
+      padding: 32px 28px 28px;
+      box-shadow: 0 20px 60px rgba(0,0,0,0.5);
+    }
+
+    .login-header {
+      text-align: center;
+      margin-bottom: 24px;
+    }
+
+    .login-header h1 {
+      font-size: 24px;
+      font-weight: 700;
+      color: #10b981;
+      margin-bottom: 6px;
+    }
+
+    .login-header p {
+      font-size: 14px;
+      color: #94a3b8;
+    }
+
+    .form-group {
+      margin-bottom: 18px;
+    }
+
+    .form-group label {
+      display: block;
+      font-size: 13px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      color: #94a3b8;
+      margin-bottom: 6px;
+    }
+
+    .form-group input {
+      width: 100%;
+      padding: 11px 14px;
+      background: #0f172a;
+      border-radius: 8px;
+      border: 2px solid #334155;
+      color: #e2e8f0;
+      font-size: 14px;
+      transition: all 0.25s ease;
+    }
+
+    .form-group input:focus {
+      outline: none;
+      border-color: #10b981;
+      box-shadow: 0 0 0 3px rgba(16,185,129,0.2);
+    }
+
+    .btn-primary {
+      width: 100%;
+      padding: 12px 18px;
+      border-radius: 8px;
+      border: none;
+      cursor: pointer;
+      background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+      color: #ffffff;
+      font-size: 15px;
+      font-weight: 600;
+      transition: all 0.25s ease;
+      box-shadow: 0 8px 20px rgba(16,185,129,0.35);
+      margin-top: 4px;
+    }
+
+    .btn-primary:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 10px 26px rgba(16,185,129,0.45);
+    }
+
+    .error-msg {
+      margin-top: 10px;
+      font-size: 13px;
+      color: #f97316;
+      text-align: center;
+      min-height: 18px;
+    }
+
+    .footer-text {
+      margin-top: 18px;
+      text-align: center;
+      font-size: 12px;
+      color: #64748b;
+    }
+
+    .footer-text a {
+      color: #10b981;
+      text-decoration: none;
+      font-weight: 600;
+    }
+
+    .footer-text a:hover {
+      text-decoration: underline;
+    }
+  </style>
+</head>
+<body>
+  <div class="login-wrapper">
+    <div class="login-header">
+      <h1>⚙️ Sub-Admin Login</h1>
+      <p>Login to manage users, transactions and queries</p>
+    </div>
+
+    <form id="subadminLoginForm">
+      <div class="form-group">
+        <label>Username</label>
+        <input type="text" id="subadminUsername" placeholder="Enter username" required />
+      </div>
+
+      <div class="form-group">
+        <label>Password</label>
+        <input type="password" id="subadminPassword" placeholder="Enter password" required />
+      </div>
+
+      <button type="submit" class="btn-primary">Login</button>
+      <div id="loginError" class="error-msg"></div>
+    </form>
+
+    <div class="footer-text">
+      Back to <a href="/admin">Admin Panel</a>
+    </div>
+  </div>
+
+  <script>
+    async function subadminLogin(data) {
+      const res = await fetch('/subadmin-login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'same-origin',
+        body: JSON.stringify(data)
+      });
+      const ct = res.headers.get('content-type') || '';
+      const body = ct.includes('application/json')
+        ? await res.json().catch(() => ({}))
+        : await res.text().catch(() => '');
+
+      if (!res.ok || !body.success) {
+        const msg = body.message || (typeof body === 'string' ? body : 'Invalid credentials');
+        throw new Error(msg);
+      }
+      return body;
+    }
+
+    document.getElementById('subadminLoginForm').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const errorEl = document.getElementById('loginError');
+      errorEl.textContent = '';
+
+      const username = document.getElementById('subadminUsername').value.trim();
+      const password = document.getElementById('subadminPassword').value.trim();
+      if (!username || !password) {
+        errorEl.textContent = 'Username and password are required';
+        return;
+      }
+
+      try {
+        const result = await subadminLogin({ username, password });
+        window.location.href = result.redirect || '/subadmin';
+      } catch (err) {
+        errorEl.textContent = err.message || 'Login failed';
+      }
+    });
+  </script>
+</body>
+</html>
