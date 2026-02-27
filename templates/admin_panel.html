@@ -1398,6 +1398,20 @@
       }
     }
 
+    // Sub-Admin Modal Functions (ADD THIS)
+function openAddSubAdminModal() {
+  document.getElementById('addSubAdminModal').classList.add('active');
+  document.getElementById('addSubAdminForm').reset();
+  document.getElementById('editSubAdminId').value = '';
+}
+
+function closeAddSubAdminModal() {
+  document.getElementById('addSubAdminModal').classList.remove('active');
+}
+
+document.getElementById('addSubAdminForm')?.addEventListener('submit', submitAddSubAdmin);
+document.getElementById('searchSubAdmins')?.addEventListener('keyup', displaySubAdmins);
+
     // ------------------------
     // Users
     // ------------------------
