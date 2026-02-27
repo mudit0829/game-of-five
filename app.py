@@ -224,6 +224,20 @@ class GameRoundBet(db.Model):
     isbot = db.Column(db.Boolean, default=False)
     bettime = db.Column(db.DateTime, default=datetime.utcnow, index=True)
 
+class SubAdmin(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    name = db.Column(db.String(120), nullable=False)
+    username = db.Column(db.String(80), unique=True, nullable=False, index=True)
+    password_hash = db.Column(db.String(128), nullable=False)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    
+    def set_password(self, password: str):
+        self.password_hash = hashlib.sha256(password.encode()).hexdigest()
+    
+    def check_password(self, password: str) -> bool:
+        return self.password_hash == hashlib.sha256(password.encode()).hexdigest()
+
+
 
 
 class ForcedWinnerHistory(db.Model):
@@ -396,7 +410,33 @@ def admin_required(f):
 
     return decorated
 
+def get_session_subadmin_id():
+    return session.get('subadmin_id') or session.get('subadminid') or session.get('subAdminId')
 
+def subadmin_required(f):
+    @wraps(f)
+    def decorated(*args, **kwargs):
+        sid = get_session_subadmin_id()
+        if not sid:
+            return redirect(url_for('subadmin_login'))
+        
+        try:
+            sid_int = int(sid)
+        except Exception:
+            for k in ('subadmin_id', 'subadminid', 'subAdminId'):
+                session.pop(k, None)
+            return redirect(url_for('subadmin_login'))
+        
+        sa = SubAdmin.query.get(sid_int)
+        if not sa:
+            for k in ('subadmin_id', 'subadminid', 'subAdminId'):
+                session.pop(k, None)
+            return redirect(url_for('subadmin_login'))
+        
+        return f(*args, **kwargs)
+    return decorated
+
+        
 def superadmin_required(f):
     """Check if user is logged in as super admin"""
     @wraps(f)
@@ -608,6 +648,136 @@ class GameTable:
 # ---------------------------------------------------
 # Table initialization
 # ---------------------------------------------------
+
+@app.route('/subadmin-login')
+def subadmin_login_page():
+    return render_template('subadmin-login.html')
+
+@app.route('/subadmin-login', methods=['POST'])
+def subadmin_login_post():
+    data = request.get_json() or {}
+    username = data.get('username', '').strip()
+    password = data.get('password', '')
+    
+    if not username or not password:
+        return jsonify({'success': False, 'message': 'Username and password required'}), 400
+    
+    sa = SubAdmin.query.filter_by(username=username).first()
+    if not sa or not sa.check_password(password):
+        return jsonify({'success': False, 'message': 'Invalid credentials'}), 401
+    
+    session['subadmin_id'] = sa.id
+    session.permanent = True
+    return jsonify({'success': True, 'redirect': url_for('subadmin_panel')})
+
+@app.route('/subadmin-logout')
+def subadmin_logout():
+    for k in ('subadmin_id', 'subadminid', 'subAdminId'):
+        session.pop(k, None)
+    return redirect(url_for('subadmin_login_page'))
+
+@app.route('/subadmin')
+@subadmin_required
+def subadmin_panel():
+    return render_template('subadmin-panel.html')
+
+# Sub-admin creates users (like agent does)
+@app.route('/api/subadmin/users', methods=['GET', 'POST'])
+@subadmin_required
+def api_subadmin_users():
+    sid = get_session_subadmin_id()
+    if request.method == 'POST':
+        data = request.get_json() or {}
+        username = data.get('username', '').strip()
+        password = data.get('password', '')
+        displayname = data.get('displayname', '').strip()
+        
+        if not username or not password:
+            return jsonify({'success': False, 'message': 'Username and password required'}), 400
+        
+        if User.query.filter_by(username=username).first():
+            return jsonify({'success': False, 'message': 'Username already exists'}), 400
+        
+        u = User(username=username, displayname=displayname, is_admin=False, is_blocked=False)
+        u.set_password(password)
+        db.session.add(u)
+        db.session.commit()
+        ensure_wallet_for_user(u, starting_balance=0)  # 0 balance for subadmin-created users
+        
+        return jsonify({'success': True, 'message': 'User created', 'userid': u.id})
+    
+    # GET: list all users (no filtering, subadmin sees everyone)
+    users = User.query.filter_by(is_admin=False).order_by(User.created_at.desc()).all()
+    out = []
+    for u in users:
+        w = Wallet.query.filter_by(user_id=u.id).first()
+        out.append({
+            'id': u.id,
+            'username': u.username,
+            'status': 'blocked' if u.is_blocked else 'active',
+            'balance': int(w.balance) if w else 0,
+            'created_at': fmt_ist(u.created_at, '%Y-%m-%d %H:%M') if u.created_at else '',
+        })
+    return jsonify(out)
+
+# Sub-admin stats (limited)
+@app.route('/api/subadmin/stats')
+@subadmin_required
+def api_subadmin_stats():
+    total_users = User.query.filter_by(is_admin=False).count()
+    total_agents = Agent.query.count()
+    
+    # Active games (same as admin)
+    active_games = sum(1 for tables in game_tables.values() for t in tables 
+                      if not getattr(t, 'is_finished', False))
+    
+    return jsonify({
+        'total_users': total_users,
+        'total_agents': total_agents,
+        'active_games': active_games
+    })
+
+# Sub-admin transactions (all)
+@app.route('/api/subadmin/transactions')
+@subadmin_required
+def api_subadmin_transactions():
+    txns = Transaction.query.order_by(Transaction.datetime.desc()).limit(100).all()
+    out = []
+    for t in txns:
+        u = User.query.get(t.user_id)
+        out.append({
+            'id': t.id,
+            'user': u.username if u else 'Unknown',
+            'kind': t.kind,
+            'amount': t.amount,
+            'datetime': fmt_ist(t.datetime, '%Y-%m-%d %H:%M'),
+            'label': t.label or '',
+        })
+    return jsonify(out)
+
+# Sub-admin referrals (same as admin, placeholder)
+@app.route('/api/subadmin/referrals')
+@subadmin_required
+def api_subadmin_referrals():
+    return jsonify([])  # Add MLM logic later
+
+# Sub-admin tickets/queries
+@app.route('/api/subadmin/tickets')
+@subadmin_required
+def api_subadmin_tickets():
+    tickets = Ticket.query.order_by(Ticket.created_at.desc()).limit(50).all()
+    out = []
+    for t in tickets:
+        u = User.query.get(t.user_id)
+        out.append({
+            'id': t.id,
+            'subject': t.subject or 'No subject',
+            'message': t.message[:100] + '...' if len(t.message or '') > 100 else t.message,
+            'status': t.status,
+            'created_at': fmt_ist(t.created_at, '%Y-%m-%d %H:%M'),
+            'user': u.username if u else 'Unknown',
+        })
+    return jsonify(out)
 
 
 def initialize_game_tables():
