@@ -2518,14 +2518,14 @@ def admin_agent_users(agentid):
         if user_ids:
             rows = (
                 db.session.query(
-                    **Transaction.user_id**,  # ✅ FIXED: was Transaction.userid
+                    **Transaction.user_id**,
                     func.coalesce(func.sum(Transaction.amount), 0)
                 )
                 .filter(
                     **Transaction.user_id.in_(user_ids)**,
                     func.lower(Transaction.kind) == 'bet'
                 )
-                .group_by(**Transaction.user_id**)  # ✅ FIXED: was Transaction.userid
+                .group_by(**Transaction.user_id**)
                 .all()
             )
             played_map = {int(uid): int(total or 0) for uid, total in rows}
