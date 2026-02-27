@@ -1982,6 +1982,8 @@ def admin_get_users():
     # supports both model styles: is_admin OR isadmin [file:106]
     users = User.query.all()
     users = [u for u in users if not _is_admin_user(u)]
+    agents_map = {a.id: a for a in Agent.query.all()}
+
 
     user_list = []
     for user in users:
@@ -2007,12 +2009,18 @@ def admin_get_users():
         user_list.append({
             "id": user.id,
             "username": getattr(user, "username", "") or "",
-
             "status": "blocked" if _is_blocked_user(user) else "active",
             "total_games": int(total_games),
             "gamesplayed": int(total_games),           # keeps old frontend mapping working [file:105]
             "winning_amount": int(winning_amount),
             "balance": int(getattr(wallet, "balance", 0) if wallet else 0),
+            "agentid": getattr(user, "agentid", None),
+            "agentname": (
+                agents_map.get(getattr(user, "agentid", None)).name
+                if getattr(user, "agentid", None) and agents_map.get(getattr(user, "agentid", None))
+                else "-"
+            ),
+
 
             "joining": joining,
             "created_at": joining,                     # compatibility for older UI [file:105]
