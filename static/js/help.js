@@ -1,18 +1,20 @@
-// help.js – tabs + submit complaint + show details
-
 document.addEventListener("DOMContentLoaded", () => {
-  // ===== MAIN TABS =====
   const tabs = document.querySelectorAll(".section-tabs .tab");
   const sections = {
     contact: document.getElementById("section-contact"),
     complaints: document.getElementById("section-complaints"),
   };
 
+  const helpForm = document.getElementById("helpForm");
+  const helpStatus = document.getElementById("helpStatus");
+  const complaintsList = document.getElementById("complaintsList");
+
   function showSection(name) {
     Object.values(sections).forEach(sec => {
       if (!sec) return;
       sec.classList.remove("active-section");
     });
+
     if (sections[name]) {
       sections[name].classList.add("active-section");
     }
@@ -25,15 +27,20 @@ document.addEventListener("DOMContentLoaded", () => {
   tabs.forEach(tab => {
     tab.addEventListener("click", () => {
       showSection(tab.dataset.target);
+      if (tab.dataset.target === "complaints") {
+        loadComplaints();
+      }
     });
   });
 
-  showSection("contact");
-
-  // ===== SUBMIT COMPLAINT =====
-  const helpForm = document.getElementById("helpForm");
-  const helpStatus = document.getElementById("helpStatus");
-  const complaintsList = document.getElementById("complaintsList");
+  function esc(v) {
+    return String(v || "")
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;")
+      .replace(/"/g, "&quot;")
+      .replace(/'/g, "&#39;");
+  }
 
   function createComplaintCard(c) {
     const wrapper = document.createElement("article");
@@ -41,54 +48,114 @@ document.addEventListener("DOMContentLoaded", () => {
     wrapper.dataset.id = c.id;
 
     const updatesHtml = (c.updates || [])
-      .map(
-        u =>
-          `<li><span class="update-time">${u.time}</span><span class="update-text">${u.text}</span></li>`
-      )
+      .map(u => `
+        <li>
+          <span class="update-time">${esc(u.time)}</span>
+          <span class="update-text">${esc(u.message || u.update_type || "")}</span>
+        </li>
+      `)
       .join("");
 
     wrapper.innerHTML = `
       <div class="complaint-main">
         <div class="complaint-id">
-          ID: <span class="mono">${c.id}</span>
+          ID: <span class="mono">${esc(c.id)}</span>
         </div>
-        <div class="complaint-subject">${c.subject}</div>
+        <div class="complaint-subject">${esc(c.subject)}</div>
         <div class="complaint-meta">
-          ${c.category} • ${c.created_at}
+          ${esc(c.category || "General")} • ${esc(c.created_at || "")}
         </div>
       </div>
+
       <div class="complaint-side">
-        <div class="status-pill status-${(c.status || "Open").toLowerCase()}">
-          ${c.status}
+        <div class="status-pill status-${esc((c.status || "OPEN").toLowerCase())}">
+          ${esc(c.status || "OPEN")}
         </div>
         <div class="complaint-updated">
-          Last update: ${c.last_update}
+          Last update: ${esc(c.last_reply_at || c.updated_at || "")}
         </div>
         <button class="details-btn" type="button">Details</button>
       </div>
+
       <div class="complaint-details">
         <div class="details-label">Message</div>
-        <div class="details-text">${c.message}</div>
-        ${
-          c.original_filename
-            ? `<div class="details-label">Attachment</div>
-               <div class="details-text">${c.original_filename}</div>`
-            : ""
-        }
+        <div class="details-text">${esc(c.message || "")}</div>
+
+        ${c.attachment_name ? `
+          <div class="details-label">Attachment</div>
+          <div class="details-text">${esc(c.attachment_name)}</div>
+        ` : ""}
+
         <div class="details-label">Updates</div>
         <ul class="updates-list">
-          ${updatesHtml}
+          ${updatesHtml || "<li><span class='update-text'>No updates yet.</span></li>"}
         </ul>
       </div>
     `;
 
-    // toggle details
     const detailsBtn = wrapper.querySelector(".details-btn");
-    detailsBtn.addEventListener("click", () => {
+    detailsBtn.addEventListener("click", async () => {
+      if (!wrapper.dataset.loaded) {
+        try {
+          const res = await fetch(`/api/help/tickets/${c.id}`);
+          const data = await res.json();
+
+          if (res.ok) {
+            const updatesList = wrapper.querySelector(".updates-list");
+            updatesList.innerHTML = (data.updates || []).length
+              ? data.updates.map(u => `
+                  <li>
+                    <span class="update-time">${esc(u.time)}</span>
+                    <span class="update-text">${esc(u.message || u.update_type || "")}</span>
+                  </li>
+                `).join("")
+              : "<li><span class='update-text'>No updates yet.</span></li>";
+
+            wrapper.dataset.loaded = "1";
+          }
+        } catch (err) {
+          console.error("Ticket detail load error:", err);
+        }
+      }
+
       wrapper.classList.toggle("show-details");
     });
 
     return wrapper;
+  }
+
+  async function loadComplaints() {
+    if (!complaintsList) return;
+
+    complaintsList.innerHTML = `<div class="empty-state">Loading complaints...</div>`;
+
+    try {
+      const res = await fetch("/api/help/tickets");
+      const data = await res.json();
+
+      if (!res.ok) {
+        complaintsList.innerHTML = `<div class="empty-state">Unable to load complaints.</div>`;
+        return;
+      }
+
+      if (!Array.isArray(data) || data.length === 0) {
+        complaintsList.innerHTML = `
+          <div class="empty-state">
+            No complaints yet.<br>
+            Submit a complaint and it will appear here.
+          </div>
+        `;
+        return;
+      }
+
+      complaintsList.innerHTML = "";
+      data.forEach(c => {
+        complaintsList.appendChild(createComplaintCard(c));
+      });
+    } catch (err) {
+      console.error("Complaint list load error:", err);
+      complaintsList.innerHTML = `<div class="empty-state">Unable to load complaints.</div>`;
+    }
   }
 
   if (helpForm) {
@@ -99,28 +166,22 @@ document.addEventListener("DOMContentLoaded", () => {
       const formData = new FormData(helpForm);
 
       try {
-        const res = await fetch("/help/submit", {
+        const res = await fetch("/api/help/tickets", {
           method: "POST",
           body: formData,
         });
 
         const data = await res.json();
+
         if (!res.ok || !data.success) {
           helpStatus.textContent = data.message || "Unable to submit complaint.";
           return;
         }
 
-        helpStatus.textContent = `Complaint submitted. Your ID is ${data.complaint.id}.`;
+        helpStatus.textContent = `Complaint submitted. Your ID is ${data.ticket_id}.`;
         helpForm.reset();
 
-        // remove "no complaints" message if present
-        const empty = complaintsList.querySelector(".empty-state");
-        if (empty) empty.remove();
-
-        const card = createComplaintCard(data.complaint);
-        complaintsList.prepend(card);
-
-        // auto-switch to complaints tab
+        await loadComplaints();
         showSection("complaints");
       } catch (err) {
         console.error(err);
@@ -129,12 +190,6 @@ document.addEventListener("DOMContentLoaded", () => {
     });
   }
 
-  // Existing complaint cards (server-rendered) – add toggle behavior
-  complaintsList.querySelectorAll(".complaint-card").forEach(card => {
-    const btn = card.querySelector(".details-btn");
-    if (!btn) return;
-    btn.addEventListener("click", () => {
-      card.classList.toggle("show-details");
-    });
-  });
+  showSection("contact");
+  loadComplaints();
 });
