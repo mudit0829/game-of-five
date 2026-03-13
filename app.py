@@ -322,6 +322,14 @@ def migrate_ticket_schema():
     conn = sqlite3.connect(db_path)
     cur = conn.cursor()
 
+    cur.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='ticket'")
+    ticket_exists = cur.fetchone() is not None
+
+    if not ticket_exists:
+        conn.commit()
+        conn.close()
+        return
+
     cur.execute("PRAGMA table_info(ticket)")
     existing = {row[1] for row in cur.fetchall()}
 
@@ -355,10 +363,15 @@ def migrate_ticket_schema():
     """)
 
     cur.execute("UPDATE ticket SET status='OPEN' WHERE status IS NULL OR lower(status)='open'")
-    cur.execute("UPDATE ticket SET last_reply_at=COALESCE(last_reply_at, updated_at, created_at)")
+
+    cur.execute("PRAGMA table_info(ticket)")
+    existing_after = {row[1] for row in cur.fetchall()}
+    if "last_reply_at" in existing_after:
+        cur.execute("UPDATE ticket SET last_reply_at=COALESCE(last_reply_at, updated_at, created_at)")
 
     conn.commit()
     conn.close()
+
 
 
 
