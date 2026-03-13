@@ -1912,10 +1912,398 @@ def profile_update():
     return jsonify({"success": True, "message": "Profile updated"})
 
 
+# ---------------------------------------------------
+# TICKET / QUERY RESOLUTION HELPERS
+# ---------------------------------------------------
+
+def _ticket_age_days(created_at):
+    if not created_at:
+        return 0
+    now_ist = as_ist(datetime.utcnow())
+    created_ist = as_ist(created_at)
+    return max((now_ist.date() - created_ist.date()).days, 0)
+
+def _ticket_age_bucket(days_old):
+    if days_old <= 0:
+        return "0_day"
+    if days_old == 1:
+        return "1_day"
+    if days_old == 2:
+        return "2_day"
+    return "3_plus_day"
+
+def _staff_name(role):
+    if role == "ADMIN":
+        uid = session.get("user_id")
+        u = User.query.get(uid) if uid else None
+        return u.username if u else "admin"
+    if role == "SUBADMIN":
+        sid = get_session_subadmin_id()
+        sa = SubAdmin.query.get(int(sid)) if sid else None
+        return sa.username if sa else "subadmin"
+    return "system"
+
+def _add_ticket_update(ticket, actor_role, actor_name, update_type, message=None, old_status=None, new_status=None, is_internal=False):
+    upd = TicketUpdate(
+        ticket_id=ticket.id,
+        actor_role=actor_role,
+        actor_name=actor_name,
+        update_type=update_type,
+        old_status=old_status,
+        new_status=new_status,
+        message=(message or "").strip(),
+        is_internal=bool(is_internal),
+        created_at=datetime.utcnow(),
+    )
+    db.session.add(upd)
+
+def _serialize_ticket(ticket, include_updates=False, for_user=False):
+    user = User.query.get(ticket.user_id)
+    days_old = _ticket_age_days(ticket.created_at)
+
+    data = {
+        "id": ticket.id,
+        "user_id": ticket.user_id,
+        "username": user.username if user else "Unknown",
+        "subject": ticket.subject or "",
+        "category": ticket.category or "General",
+        "message": ticket.message or "",
+        "status": (ticket.status or "OPEN").upper(),
+        "priority": ticket.priority or "NORMAL",
+        "attachment_name": ticket.attachment_name or "",
+        "attachment_path": ticket.attachment_path or "",
+        "created_at": fmt_ist(ticket.created_at, "%Y-%m-%d %H:%M"),
+        "updated_at": fmt_ist(ticket.updated_at, "%Y-%m-%d %H:%M"),
+        "last_reply_at": fmt_ist(ticket.last_reply_at, "%Y-%m-%d %H:%M") if ticket.last_reply_at else "",
+        "days_old": days_old,
+        "age_bucket": _ticket_age_bucket(days_old),
+        "closed_at": fmt_ist(ticket.closed_at, "%Y-%m-%d %H:%M") if ticket.closed_at else "",
+        "closed_by_role": ticket.closed_by_role or "",
+        "closed_by_name": ticket.closed_by_name or "",
+    }
+
+    if include_updates:
+        q = TicketUpdate.query.filter_by(ticket_id=ticket.id).order_by(TicketUpdate.created_at.asc()).all()
+        updates = []
+        for u in q:
+            if for_user and u.is_internal:
+                continue
+            updates.append({
+                "id": u.id,
+                "actor_role": u.actor_role,
+                "actor_name": u.actor_name or "",
+                "update_type": u.update_type,
+                "old_status": u.old_status or "",
+                "new_status": u.new_status or "",
+                "message": u.message or "",
+                "is_internal": bool(u.is_internal),
+                "time": fmt_ist(u.created_at, "%Y-%m-%d %H:%M"),
+            })
+        data["updates"] = updates
+
+    return data
+
+def _filtered_ticket_list():
+    q = (request.args.get("q") or "").strip().lower()
+    status = (request.args.get("status") or "all").strip().upper()
+    age = (request.args.get("age") or "all").strip()
+
+    rows = Ticket.query.order_by(Ticket.created_at.desc()).all()
+    out = []
+
+    for t in rows:
+        row = _serialize_ticket(t, include_updates=False, for_user=False)
+
+        if q:
+            hay = " ".join([
+                str(row["id"]),
+                row["username"].lower(),
+                row["subject"].lower(),
+                row["category"].lower(),
+                row["status"].lower(),
+            ])
+            if q not in hay:
+                continue
+
+        if status != "ALL" and row["status"] != status:
+            continue
+
+        if age != "all" and row["age_bucket"] != age:
+            continue
+
+        out.append(row)
+
+    return out
+
+
+# ---------------------------------------------------
+# USER HELP / TICKETS
+# ---------------------------------------------------
+
 @app.route("/help")
 @login_required
 def help_page():
     return render_template("help.html")
+
+
+@app.route("/api/help/tickets", methods=["GET", "POST"])
+@login_required
+def help_tickets_api():
+    user_id = session.get("user_id")
+
+    if request.method == "GET":
+        tickets = Ticket.query.filter_by(user_id=user_id).order_by(Ticket.created_at.desc()).all()
+        return jsonify([_serialize_ticket(t, include_updates=False, for_user=True) for t in tickets])
+
+    subject = (request.form.get("subject") or "").strip() or "(no subject)"
+    category = (request.form.get("category") or "General").strip() or "General"
+    message = (request.form.get("message") or "").strip()
+    file = request.files.get("attachment")
+
+    if not message:
+        return jsonify({"success": False, "message": "Message required"}), 400
+
+    attachment_name = None
+    attachment_path = None
+    if file and file.filename:
+        upload_dir = os.path.join(os.path.dirname(__file__), "uploads", "tickets")
+        os.makedirs(upload_dir, exist_ok=True)
+        attachment_name = f"{int(time.time())}_{file.filename}"
+        attachment_path = os.path.join(upload_dir, attachment_name)
+        file.save(attachment_path)
+
+    ticket = Ticket(
+        user_id=user_id,
+        subject=subject,
+        category=category,
+        message=message,
+        status="OPEN",
+        attachment_name=attachment_name,
+        attachment_path=attachment_path,
+        created_at=datetime.utcnow(),
+        updated_at=datetime.utcnow(),
+        last_reply_at=datetime.utcnow(),
+    )
+    db.session.add(ticket)
+    db.session.flush()
+
+    user = User.query.get(user_id)
+    _add_ticket_update(
+        ticket,
+        actor_role="USER",
+        actor_name=user.username if user else "user",
+        update_type="CREATED",
+        message=message,
+        old_status="",
+        new_status="OPEN",
+        is_internal=False,
+    )
+
+    db.session.commit()
+    return jsonify({"success": True, "ticket_id": ticket.id, "message": "Complaint submitted"})
+
+
+@app.route("/api/help/tickets/<int:ticket_id>", methods=["GET"])
+@login_required
+def help_ticket_detail_api(ticket_id):
+    user_id = session.get("user_id")
+    ticket = Ticket.query.filter_by(id=ticket_id, user_id=user_id).first()
+    if not ticket:
+        return jsonify({"success": False, "message": "Ticket not found"}), 404
+    return jsonify(_serialize_ticket(ticket, include_updates=True, for_user=True))
+
+
+# ---------------------------------------------------
+# ADMIN TICKETS
+# ---------------------------------------------------
+
+@app.route("/api/admin/tickets", methods=["GET"])
+@admin_required
+def api_admin_tickets():
+    return jsonify(_filtered_ticket_list())
+
+
+@app.route("/api/admin/tickets/<int:ticket_id>", methods=["GET"])
+@admin_required
+def api_admin_ticket_detail(ticket_id):
+    ticket = Ticket.query.get(ticket_id)
+    if not ticket:
+        return jsonify({"success": False, "message": "Ticket not found"}), 404
+    return jsonify(_serialize_ticket(ticket, include_updates=True, for_user=False))
+
+
+@app.route("/api/admin/tickets/<int:ticket_id>/reply", methods=["POST"])
+@admin_required
+def api_admin_ticket_reply(ticket_id):
+    ticket = Ticket.query.get(ticket_id)
+    if not ticket:
+        return jsonify({"success": False, "message": "Ticket not found"}), 404
+
+    data = request.get_json() or {}
+    message = (data.get("message") or "").strip()
+    new_status = (data.get("status") or "").strip().upper()
+    is_internal = bool(data.get("is_internal", False))
+
+    if not message and not new_status:
+        return jsonify({"success": False, "message": "Reply or status required"}), 400
+
+    if new_status == "CLOSED":
+        return jsonify({"success": False, "message": "Use close API for closing"}), 400
+
+    allowed = {"OPEN", "IN_PROGRESS", "WAITING_USER", "RESOLVED", ""}
+    if new_status not in allowed:
+        return jsonify({"success": False, "message": "Invalid status"}), 400
+
+    old_status = (ticket.status or "OPEN").upper()
+
+    if new_status:
+        ticket.status = new_status
+    ticket.updated_at = datetime.utcnow()
+    ticket.last_reply_at = datetime.utcnow()
+
+    _add_ticket_update(
+        ticket,
+        actor_role="ADMIN",
+        actor_name=_staff_name("ADMIN"),
+        update_type="NOTE" if is_internal and message else ("STATUS" if new_status and not message else "REPLY"),
+        message=message,
+        old_status=old_status,
+        new_status=ticket.status,
+        is_internal=is_internal,
+    )
+
+    db.session.commit()
+    return jsonify({"success": True, "message": "Ticket updated"})
+
+
+@app.route("/api/admin/tickets/<int:ticket_id>/close", methods=["POST"])
+@admin_required
+def api_admin_ticket_close(ticket_id):
+    ticket = Ticket.query.get(ticket_id)
+    if not ticket:
+        return jsonify({"success": False, "message": "Ticket not found"}), 404
+
+    data = request.get_json() or {}
+    close_note = (data.get("message") or "Closed by admin").strip()
+
+    old_status = (ticket.status or "OPEN").upper()
+    ticket.status = "CLOSED"
+    ticket.updated_at = datetime.utcnow()
+    ticket.last_reply_at = datetime.utcnow()
+    ticket.closed_at = datetime.utcnow()
+    ticket.closed_by_role = "ADMIN"
+    ticket.closed_by_name = _staff_name("ADMIN")
+
+    _add_ticket_update(
+        ticket,
+        actor_role="ADMIN",
+        actor_name=ticket.closed_by_name,
+        update_type="CLOSED",
+        message=close_note,
+        old_status=old_status,
+        new_status="CLOSED",
+        is_internal=False,
+    )
+
+    db.session.commit()
+    return jsonify({"success": True, "message": "Ticket closed"})
+
+
+@app.route("/api/admin/tickets/<int:ticket_id>/reopen", methods=["POST"])
+@admin_required
+def api_admin_ticket_reopen(ticket_id):
+    ticket = Ticket.query.get(ticket_id)
+    if not ticket:
+        return jsonify({"success": False, "message": "Ticket not found"}), 404
+
+    data = request.get_json() or {}
+    reopen_note = (data.get("message") or "Reopened by admin").strip()
+
+    old_status = (ticket.status or "CLOSED").upper()
+    ticket.status = "OPEN"
+    ticket.updated_at = datetime.utcnow()
+    ticket.last_reply_at = datetime.utcnow()
+    ticket.closed_at = None
+    ticket.closed_by_role = None
+    ticket.closed_by_name = None
+
+    _add_ticket_update(
+        ticket,
+        actor_role="ADMIN",
+        actor_name=_staff_name("ADMIN"),
+        update_type="REOPENED",
+        message=reopen_note,
+        old_status=old_status,
+        new_status="OPEN",
+        is_internal=False,
+    )
+
+    db.session.commit()
+    return jsonify({"success": True, "message": "Ticket reopened"})
+
+
+# ---------------------------------------------------
+# SUBADMIN TICKETS
+# ---------------------------------------------------
+
+@app.route("/api/subadmin/tickets", methods=["GET"])
+@subadmin_required
+def api_subadmin_tickets():
+    return jsonify(_filtered_ticket_list())
+
+
+@app.route("/api/subadmin/tickets/<int:ticket_id>", methods=["GET"])
+@subadmin_required
+def api_subadmin_ticket_detail(ticket_id):
+    ticket = Ticket.query.get(ticket_id)
+    if not ticket:
+        return jsonify({"success": False, "message": "Ticket not found"}), 404
+    return jsonify(_serialize_ticket(ticket, include_updates=True, for_user=False))
+
+
+@app.route("/api/subadmin/tickets/<int:ticket_id>/reply", methods=["POST"])
+@subadmin_required
+def api_subadmin_ticket_reply(ticket_id):
+    ticket = Ticket.query.get(ticket_id)
+    if not ticket:
+        return jsonify({"success": False, "message": "Ticket not found"}), 404
+
+    data = request.get_json() or {}
+    message = (data.get("message") or "").strip()
+    new_status = (data.get("status") or "").strip().upper()
+    is_internal = bool(data.get("is_internal", False))
+
+    if new_status == "CLOSED":
+        return jsonify({"success": False, "message": "Only admin can close ticket"}), 403
+
+    allowed = {"OPEN", "IN_PROGRESS", "WAITING_USER", "RESOLVED", ""}
+    if new_status not in allowed:
+        return jsonify({"success": False, "message": "Invalid status"}), 400
+
+    if not message and not new_status:
+        return jsonify({"success": False, "message": "Reply or status required"}), 400
+
+    old_status = (ticket.status or "OPEN").upper()
+
+    if new_status:
+        ticket.status = new_status
+    ticket.updated_at = datetime.utcnow()
+    ticket.last_reply_at = datetime.utcnow()
+
+    _add_ticket_update(
+        ticket,
+        actor_role="SUBADMIN",
+        actor_name=_staff_name("SUBADMIN"),
+        update_type="NOTE" if is_internal and message else ("STATUS" if new_status and not message else "REPLY"),
+        message=message,
+        old_status=old_status,
+        new_status=ticket.status,
+        is_internal=is_internal,
+    )
+
+    db.session.commit()
+    return jsonify({"success": True, "message": "Ticket updated"})
+
 
 
 @app.route("/coins", methods=["GET"])
@@ -2506,7 +2894,8 @@ def admin_get_stats():
         if not (getattr(t, "is_finished", False) or getattr(t, "isfinished", False))
     )
 
-    open_tickets = Ticket.query.filter_by(status="open").count()
+    open_tickets = Ticket.query.filter(func.upper(Ticket.status) == "OPEN").count()
+
 
     return jsonify({
         "total_users": total_users,
@@ -3222,6 +3611,7 @@ def seed_demo_users():
 
 with app.app_context():
     print("🔧 Creating database tables...")
+    migrate_ticket_schema()
     db.create_all()
     print("✅ Database tables created (including ForcedWinnerHistory)")
 
