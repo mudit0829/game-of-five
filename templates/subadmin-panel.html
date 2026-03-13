@@ -948,7 +948,7 @@
       document.getElementById('agentsTableContainer').style.display = 'none';
 
       try {
-        const data = await apiGet('/api/subadmin/agents');
+        const data = await apiGet('/api/admin/agents');
         saAgents = Array.isArray(data) ? data : [];
         displayAgents();
         document.getElementById('agentsLoading').style.display = 'none';
@@ -1033,7 +1033,7 @@
       }
 
       try {
-        await apiSend('/api/subadmin/agents', 'POST', {
+        await apiSend('/api/admin/agents', 'POST', {
           name,
           email,
           username,
@@ -1055,7 +1055,7 @@
       document.getElementById('detailsModal').classList.add('active');
 
       try {
-        const res = await apiGet(`/api/subadmin/agents/${encodeURIComponent(agentId)}/users`);
+        const res = await apiGet(`/api/admin/agents/${encodeURIComponent(agentId)}/users`);
         const users = Array.isArray(res?.items) ? res.items : (Array.isArray(res) ? res : []);
 
         if (!users.length) {
@@ -1099,7 +1099,7 @@
     async function toggleAgentBlock(agentId, shouldBlock) {
       try {
         const action = shouldBlock ? 'block' : 'unblock';
-        await apiSend(`/api/subadmin/agents/${encodeURIComponent(agentId)}/${action}`, 'POST', {});
+        await apiSend(`/api/admin/agents/${encodeURIComponent(agentId)}/${action}`, 'POST', {});
         alert(shouldBlock ? 'Agent blocked' : 'Agent unblocked');
         loadAgents();
         loadStats();
