@@ -3611,8 +3611,8 @@ def seed_demo_users():
 
 with app.app_context():
     print("🔧 Creating database tables...")
-    migrate_ticket_schema()
     db.create_all()
+    migrate_ticket_schema()
     print("✅ Database tables created (including ForcedWinnerHistory)")
 
     print("👥 Seeding demo users...")
