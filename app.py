@@ -178,13 +178,51 @@ class Wallet(db.Model):
 
 class Ticket(db.Model):
     id = db.Column(db.Integer, primary_key=True)
-    user_id = db.Column(db.Integer, db.ForeignKey("user.id"), nullable=False)
-    subject = db.Column(db.String(200))
-    message = db.Column(db.Text)
-    status = db.Column(db.String(20), default="open")
-    created_at = db.Column(db.DateTime, default=datetime.utcnow)
-    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    user_id = db.Column(db.Integer, db.ForeignKey("user.id"), nullable=False, index=True)
+
+    subject = db.Column(db.String(200), nullable=False)
+    category = db.Column(db.String(100), default="General")
+    message = db.Column(db.Text, nullable=False)
+
+    status = db.Column(db.String(20), default="OPEN", index=True)   # OPEN / IN_PROGRESS / WAITING_USER / RESOLVED / CLOSED
+    priority = db.Column(db.String(20), default="NORMAL")
+
     attachment_name = db.Column(db.String(255))
+    attachment_path = db.Column(db.String(500))
+
+    created_at = db.Column(db.DateTime, default=datetime.utcnow, index=True)
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, index=True)
+    last_reply_at = db.Column(db.DateTime, default=datetime.utcnow, index=True)
+
+    closed_at = db.Column(db.DateTime)
+    closed_by_role = db.Column(db.String(20))
+    closed_by_name = db.Column(db.String(120))
+
+    updates = db.relationship(
+        "TicketUpdate",
+        backref="ticket",
+        lazy=True,
+        cascade="all, delete-orphan",
+        order_by="TicketUpdate.created_at.asc()"
+    )
+
+
+class TicketUpdate(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    ticket_id = db.Column(db.Integer, db.ForeignKey("ticket.id"), nullable=False, index=True)
+
+    actor_role = db.Column(db.String(20), nullable=False)   # USER / ADMIN / SUBADMIN / SYSTEM
+    actor_name = db.Column(db.String(120))
+
+    update_type = db.Column(db.String(20), nullable=False)  # CREATED / REPLY / STATUS / NOTE / CLOSED / REOPENED
+    old_status = db.Column(db.String(20))
+    new_status = db.Column(db.String(20))
+
+    message = db.Column(db.Text)
+    is_internal = db.Column(db.Boolean, default=False)
+
+    created_at = db.Column(db.DateTime, default=datetime.utcnow, index=True)
+
 
 
 class Transaction(db.Model):
@@ -277,6 +315,51 @@ class AgentBlockPeriod(db.Model):
     agentid = db.Column(db.Integer, db.ForeignKey('agent.id'), nullable=False, index=True)
     startat = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
     endat = db.Column(db.DateTime, nullable=True)  # null => still blocked
+
+import sqlite3
+
+def migrate_ticket_schema():
+    conn = sqlite3.connect(db_path)
+    cur = conn.cursor()
+
+    cur.execute("PRAGMA table_info(ticket)")
+    existing = {row[1] for row in cur.fetchall()}
+
+    add_columns = [
+        ("category", "TEXT DEFAULT 'General'"),
+        ("priority", "TEXT DEFAULT 'NORMAL'"),
+        ("attachment_path", "TEXT"),
+        ("last_reply_at", "DATETIME"),
+        ("closed_at", "DATETIME"),
+        ("closed_by_role", "TEXT"),
+        ("closed_by_name", "TEXT"),
+    ]
+
+    for col, ddl in add_columns:
+        if col not in existing:
+            cur.execute(f"ALTER TABLE ticket ADD COLUMN {col} {ddl}")
+
+    cur.execute("""
+        CREATE TABLE IF NOT EXISTS ticket_update (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            ticket_id INTEGER NOT NULL,
+            actor_role TEXT NOT NULL,
+            actor_name TEXT,
+            update_type TEXT NOT NULL,
+            old_status TEXT,
+            new_status TEXT,
+            message TEXT,
+            is_internal INTEGER DEFAULT 0,
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+        )
+    """)
+
+    cur.execute("UPDATE ticket SET status='OPEN' WHERE status IS NULL OR lower(status)='open'")
+    cur.execute("UPDATE ticket SET last_reply_at=COALESCE(last_reply_at, updated_at, created_at)")
+
+    conn.commit()
+    conn.close()
+
 
 
 
@@ -762,23 +845,6 @@ def api_subadmin_referrals():
     return jsonify([])  # Add MLM logic later
 
 # Sub-admin tickets/queries
-@app.route('/api/subadmin/tickets')
-@subadmin_required
-def api_subadmin_tickets():
-    tickets = Ticket.query.order_by(Ticket.created_at.desc()).limit(50).all()
-    out = []
-    for t in tickets:
-        u = User.query.get(t.user_id)
-        out.append({
-            'id': t.id,
-            'subject': t.subject or 'No subject',
-            'message': t.message[:100] + '...' if len(t.message or '') > 100 else t.message,
-            'status': t.status,
-            'created_at': fmt_ist(t.created_at, '%Y-%m-%d %H:%M'),
-            'user': u.username if u else 'Unknown',
-        })
-    return jsonify(out)
-
 
 def initialize_game_tables():
     for game_type in GAME_CONFIGS.keys():
@@ -1904,48 +1970,6 @@ def redeem_coins():
 
     return jsonify({"success": True, "message": f"Successfully redeemed {amount} coins!", "new_balance": wallet.balance})
 
-
-@app.route("/api/help/tickets", methods=["GET", "POST"])
-@login_required
-def help_tickets_api():
-    user_id = session.get("user_id")
-
-    if request.method == "GET":
-        tickets = (
-            Ticket.query.filter_by(user_id=user_id)
-            .order_by(Ticket.created_at.desc())
-            .all()
-        )
-        out = []
-        for t in tickets:
-            out.append(
-                {
-                    "id": t.id,
-                    "subject": t.subject,
-                    "message": t.message[:200],
-                    "status": t.status,
-                    "created_at": fmt_ist(t.created_at, "%Y-%m-%d %H:%M"),
-                    "updated_at": fmt_ist(t.updated_at, "%Y-%m-%d %H:%M"),
-                }
-            )
-        return jsonify(out)
-
-    subject = request.form.get("subject", "").strip() or "(no subject)"
-    message = request.form.get("message", "").strip()
-    file = request.files.get("attachment")
-
-    attach_name = None
-    if file and file.filename:
-        upload_dir = os.path.join(os.path.dirname(__file__), "uploads")
-        os.makedirs(upload_dir, exist_ok=True)
-        attach_name = f"{int(time.time())}_{file.filename}"
-        file.save(os.path.join(upload_dir, attach_name))
-
-    ticket = Ticket(user_id=user_id, subject=subject, message=message, attachment_name=attach_name)
-    db.session.add(ticket)
-    db.session.commit()
-
-    return jsonify({"success": True, "ticket_id": ticket.id})
 
 
 @app.route("/balance/<user_id>")
