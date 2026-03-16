@@ -1199,6 +1199,204 @@
       document.getElementById('referralsTableContainer').style.display = 'block';
     }
 
+    function esc(x) {
+  return String(x ?? '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
+function queryBadgeClass(status) {
+  const s = String(status || '').toUpperCase();
+  if (s === 'CLOSED') return 'badge-blocked';
+  if (s === 'RESOLVED' || s === 'INPROGRESS' || s === 'WAITINGUSER') return 'badge-pending';
+  return 'badge-active';
+}
+
+async function loadQueries() {
+  document.getElementById('queriesLoading').style.display = 'block';
+  document.getElementById('queriesTableContainer').style.display = 'none';
+
+  const tbody = document.getElementById('queriesTableBody');
+  tbody.innerHTML = '';
+
+  try {
+    const data = await apiGet('/api/subadmin/tickets');
+    saTickets = Array.isArray(data) ? data : [];
+    displayQueries();
+  } catch (err) {
+    tbody.innerHTML = `<tr><td colspan="8" class="no-data">Error loading queries: ${esc(err.message)}</td></tr>`;
+  }
+
+  document.getElementById('queriesLoading').style.display = 'none';
+  document.getElementById('queriesTableContainer').style.display = 'block';
+}
+
+function displayQueries() {
+  const tbody = document.getElementById('queriesTableBody');
+  const search = safeLower(document.getElementById('searchQueries').value || '');
+
+  tbody.innerHTML = '';
+
+  const filtered = saTickets.filter(t => {
+    const hay = [
+      t.id,
+      t.userid,
+      t.username,
+      t.subject,
+      t.status
+    ].map(v => safeLower(v)).join(' ');
+    return !search || hay.includes(search);
+  });
+
+  if (!filtered.length) {
+    tbody.innerHTML = `<tr><td colspan="8" class="no-data">No queries found</td></tr>`;
+    return;
+  }
+
+  filtered.forEach(t => {
+    const row = document.createElement('tr');
+    row.innerHTML = `
+      <td>${esc(t.id)}</td>
+      <td>${esc(t.userid)}</td>
+      <td>${esc(t.username || '-')}</td>
+      <td>${esc(t.subject || '-')}</td>
+      <td><span class="badge ${queryBadgeClass(t.status)}">${esc(t.status || 'OPEN')}</span></td>
+      <td>${esc(t.createdat || '-')}</td>
+      <td>${esc(t.lastreplyat || t.updatedat || '-')}</td>
+      <td>
+        <div class="action-buttons">
+          <button class="btn-small btn-view" onclick="showTicketDetails(${Number(t.id)})">View / Update</button>
+        </div>
+      </td>
+    `;
+    tbody.appendChild(row);
+  });
+}
+
+async function showTicketDetails(ticketId) {
+  document.getElementById('detailsTitle').textContent = `Query #${ticketId}`;
+  document.getElementById('detailsContent').innerHTML = `<div class="loading">Loading query details...</div>`;
+  document.getElementById('detailsModal').classList.add('active');
+
+  try {
+    const t = await apiGet(`/api/subadmin/tickets/${ticketId}`);
+
+    const updatesHtml = Array.isArray(t.updates) && t.updates.length
+      ? t.updates.map(u => `
+          <div class="detail-item" style="margin-top:10px;">
+            <div class="detail-label">${esc(u.actorrole || '')} • ${esc(u.updatetype || '')} • ${esc(u.time || '')}</div>
+            <div style="color:#cbd5e1;font-size:14px;white-space:pre-wrap;">${esc(u.message || '')}</div>
+          </div>
+        `).join('')
+      : `<div class="detail-item" style="margin-top:10px;"><div style="color:#94a3b8;">No updates yet.</div></div>`;
+
+    document.getElementById('detailsContent').innerHTML = `
+      <div class="details-grid">
+        <div class="detail-item">
+          <div class="detail-label">Ticket ID</div>
+          <div class="detail-value">${esc(t.id)}</div>
+        </div>
+        <div class="detail-item">
+          <div class="detail-label">User ID</div>
+          <div class="detail-value">${esc(t.userid)}</div>
+        </div>
+        <div class="detail-item">
+          <div class="detail-label">Username</div>
+          <div class="detail-value">${esc(t.username || '-')}</div>
+        </div>
+        <div class="detail-item">
+          <div class="detail-label">Status</div>
+          <div class="detail-value">${esc(t.status || 'OPEN')}</div>
+        </div>
+        <div class="detail-item">
+          <div class="detail-label">Created</div>
+          <div class="detail-value">${esc(t.createdat || '-')}</div>
+        </div>
+        <div class="detail-item">
+          <div class="detail-label">Last Reply</div>
+          <div class="detail-value">${esc(t.lastreplyat || t.updatedat || '-')}</div>
+        </div>
+      </div>
+
+      <div class="detail-item" style="margin-top:10px;">
+        <div class="detail-label">Subject</div>
+        <div class="detail-value" style="font-size:16px;">${esc(t.subject || '-')}</div>
+      </div>
+
+      <div class="detail-item" style="margin-top:10px;">
+        <div class="detail-label">Category</div>
+        <div style="color:#cbd5e1;font-size:14px;">${esc(t.category || '-')}</div>
+      </div>
+
+      <div class="detail-item" style="margin-top:10px;">
+        <div class="detail-label">Message</div>
+        <div style="color:#cbd5e1;font-size:14px;white-space:pre-wrap;">${esc(t.message || '')}</div>
+      </div>
+
+      ${t.attachmentname ? `
+        <div class="detail-item" style="margin-top:10px;">
+          <div class="detail-label">Attachment</div>
+          <div style="color:#cbd5e1;font-size:14px;">${esc(t.attachmentname)}</div>
+        </div>
+      ` : ''}
+
+      <div class="detail-item" style="margin-top:10px;">
+        <div class="detail-label">Update Status</div>
+        <select id="ticketStatusSelect" style="width:100%;padding:12px;border-radius:8px;border:2px solid #334155;background:#0f172a;color:#e2e8f0;">
+          <option value="OPEN" ${t.status === 'OPEN' ? 'selected' : ''}>OPEN</option>
+          <option value="INPROGRESS" ${t.status === 'INPROGRESS' ? 'selected' : ''}>INPROGRESS</option>
+          <option value="WAITINGUSER" ${t.status === 'WAITINGUSER' ? 'selected' : ''}>WAITINGUSER</option>
+          <option value="RESOLVED" ${t.status === 'RESOLVED' ? 'selected' : ''}>RESOLVED</option>
+        </select>
+      </div>
+
+      <div class="detail-item" style="margin-top:10px;">
+        <div class="detail-label">Reply / Action Note</div>
+        <textarea id="ticketReplyText" style="width:100%;min-height:120px;padding:12px;border-radius:8px;border:2px solid #334155;background:#0f172a;color:#e2e8f0;" placeholder="Write update for user..."></textarea>
+      </div>
+
+      <div class="modal-footer" style="padding:0;margin-top:16px;justify-content:flex-start;">
+        <button class="btn-modal btn-save" onclick="submitTicketUpdate(${Number(ticketId)})">Save Update</button>
+      </div>
+
+      <div style="margin-top:20px;">
+        <div class="detail-label">Timeline</div>
+        ${updatesHtml}
+      </div>
+    `;
+  } catch (err) {
+    document.getElementById('detailsContent').innerHTML =
+      `<div style="color:#ef4444;">Error: ${esc(err.message)}</div>`;
+  }
+}
+
+async function submitTicketUpdate(ticketId) {
+  const status = document.getElementById('ticketStatusSelect').value;
+  const message = document.getElementById('ticketReplyText').value.trim();
+
+  if (!message && !status) {
+    alert('Reply or status required');
+    return;
+  }
+
+  try {
+    await apiSend(`/api/subadmin/tickets/${ticketId}/reply`, 'POST', {
+      status: status,
+      message: message,
+      isinternal: false
+    });
+
+    alert('Ticket updated successfully');
+    await loadQueries();
+    await showTicketDetails(ticketId);
+  } catch (err) {
+    alert('Error: ' + err.message);
+  }
+}
+
     function closeDetailsModal() {
       document.getElementById('detailsModal').classList.remove('active');
     }
