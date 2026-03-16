@@ -1977,7 +1977,7 @@ def _serialize_ticket(ticket, include_updates=False, for_user=False):
     data = {
         "id": ticket.id,
         "user_id": ticket.user_id,
-        "username": user.username if user else "Unknown",
+        "username": user.username if user and user.username else f"User-{ticket.user_id}",
         "subject": ticket.subject or "",
         "category": ticket.category or "General",
         "message": ticket.message or "",
