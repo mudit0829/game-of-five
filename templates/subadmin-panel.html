@@ -1261,12 +1261,12 @@ function displayQueries() {
     const row = document.createElement('tr');
     row.innerHTML = `
   <td>${esc(t.id)}</td>
-  <td>${esc(t.userid ?? t.userid ?? '-')}</td>
+  <td>${esc(t.userid ?? t.user_id ?? t.userId ?? '-')}</td>
   <td>${esc(t.username || '-')}</td>
   <td>${esc(t.subject || '-')}</td>
   <td><span class="badge ${queryBadgeClass(t.status)}">${esc(t.status || 'OPEN')}</span></td>
-  <td>${esc(t.createdat || t.updatedat || '-')}</td>
-  <td>${esc(t.lastreplyat || t.updatedat || '-')}</td>
+  <td>${esc(t.createdat || t.created_at || t.updatedat || '-')}</td>
+  <td>${esc(t.lastreplyat || t.last_reply_at || t.updatedat || '-')}</td>
   <td>
     <div class="action-buttons">
       <button class="btn-small btn-view" onclick="showTicketDetails(${Number(t.id)})">View / Update</button>
@@ -1280,108 +1280,25 @@ function displayQueries() {
 
 async function showTicketDetails(ticketId) {
   document.getElementById('detailsTitle').textContent = `Query #${ticketId}`;
-  document.getElementById('detailsContent').innerHTML = `
-  <div class="details-grid">
-    <div class="detail-item">
-      <div class="detail-label">Ticket ID</div>
-      <div class="detail-value">${esc(t.id)}</div>
-    </div>
-    <div class="detail-item">
-      <div class="detail-label">User ID</div>
-      <div class="detail-value">${esc(t.userid ?? '-')}</div>
-    </div>
-    <div class="detail-item">
-      <div class="detail-label">Username</div>
-      <div class="detail-value">${esc(t.username || '-')}</div>
-    </div>
-    <div class="detail-item">
-      <div class="detail-label">Status</div>
-      <div class="detail-value">${esc(t.status || 'OPEN')}</div>
-    </div>
-    <div class="detail-item">
-      <div class="detail-label">Created</div>
-      <div class="detail-value">${esc(t.createdat || t.updatedat || '-')}</div>
-    </div>
-    <div class="detail-item">
-      <div class="detail-label">Last Reply</div>
-      <div class="detail-value">${esc(t.lastreplyat || t.updatedat || '-')}</div>
-    </div>
-    <div class="detail-item">
-      <div class="detail-label">Closed By</div>
-      <div class="detail-value">${esc(t.closedbyname || '-')}</div>
-    </div>
-    <div class="detail-item">
-      <div class="detail-label">Closed At</div>
-      <div class="detail-value">${esc(t.closedat || '-')}</div>
-    </div>
-  </div>
-
-  <div class="detail-item" style="margin-top:10px;">
-    <div class="detail-label">Subject</div>
-    <div class="detail-value" style="font-size:16px;">${esc(t.subject || '-')}</div>
-  </div>
-
-  <div class="detail-item" style="margin-top:10px;">
-    <div class="detail-label">Category</div>
-    <div style="color:#cbd5e1;font-size:14px;">${esc(t.category || '-')}</div>
-  </div>
-
-  <div class="detail-item" style="margin-top:10px;">
-    <div class="detail-label">Message</div>
-    <div style="color:#cbd5e1;font-size:14px;white-space:pre-wrap;">${esc(t.message || '')}</div>
-  </div>
-
-  ${t.attachmentname ? `
-    <div class="detail-item" style="margin-top:10px;">
-      <div class="detail-label">Attachment</div>
-      <div style="color:#cbd5e1;font-size:14px;">${esc(t.attachmentname)}</div>
-    </div>
-  ` : ''}
-
-  <div class="detail-item" style="margin-top:10px;">
-    <div class="detail-label">Update Status</div>
-    <select id="ticketStatusSelect" style="width:100%;padding:12px;border-radius:8px;border:2px solid #334155;background:#0f172a;color:#e2e8f0;">
-      <option value="OPEN" ${t.status === 'OPEN' ? 'selected' : ''}>OPEN</option>
-      <option value="INPROGRESS" ${t.status === 'INPROGRESS' ? 'selected' : ''}>INPROGRESS</option>
-      <option value="WAITINGUSER" ${t.status === 'WAITINGUSER' ? 'selected' : ''}>WAITINGUSER</option>
-      <option value="RESOLVED" ${t.status === 'RESOLVED' ? 'selected' : ''}>RESOLVED</option>
-    </select>
-  </div>
-
-  <div class="detail-item" style="margin-top:10px;">
-    <div class="detail-label">Reply / Action Note</div>
-    <textarea id="ticketReplyText" style="width:100%;min-height:120px;padding:12px;border-radius:8px;border:2px solid #334155;background:#0f172a;color:#e2e8f0;" placeholder="Write update for user..."></textarea>
-  </div>
-
-  <div class="modal-footer" style="padding:0;margin-top:16px;justify-content:flex-start;">
-    <button class="btn-modal btn-save" onclick="submitTicketUpdate(${Number(ticketId)})">Save Update</button>
-  </div>
-
-  <div style="margin-top:20px;">
-    <div class="detail-label">Timeline</div>
-    ${updatesHtml}
-  </div>
-`;
-
+  document.getElementById('detailsContent').innerHTML = `<div class="loading">Loading query details...</div>`;
   document.getElementById('detailsModal').classList.add('active');
 
   try {
     const t = await apiGet(`/api/subadmin/tickets/${ticketId}`);
 
     const updatesHtml = Array.isArray(t.updates) && t.updates.length
-     ? t.updates.map(u => `
-      <div class="detail-item" style="margin-top:10px;">
-        <div class="detail-label">
-          ${esc(u.actorrole || '')}
-          ${u.actorname ? ' • ' + esc(u.actorname) : ''}
-          ${u.updatetype ? ' • ' + esc(u.updatetype) : ''}
-          ${u.time ? ' • ' + esc(u.time) : ''}
-        </div>
-        <div style="color:#cbd5e1;font-size:14px;white-space:pre-wrap;">${esc(u.message || '-')}</div>
-      </div>
-    `).join('')
-  : `<div class="detail-item" style="margin-top:10px;"><div style="color:#94a3b8;">No updates yet.</div></div>`;
-
+      ? t.updates.map(u => `
+          <div class="detail-item" style="margin-top:10px;">
+            <div class="detail-label">
+              ${esc(u.actorrole || '')}
+              ${u.actorname ? ' • ' + esc(u.actorname) : ''}
+              ${u.updatetype ? ' • ' + esc(u.updatetype) : ''}
+              ${u.time ? ' • ' + esc(u.time) : ''}
+            </div>
+            <div style="color:#cbd5e1;font-size:14px;white-space:pre-wrap;">${esc(u.message || '-')}</div>
+          </div>
+        `).join('')
+      : `<div class="detail-item" style="margin-top:10px;"><div style="color:#94a3b8;">No updates yet.</div></div>`;
 
     document.getElementById('detailsContent').innerHTML = `
       <div class="details-grid">
@@ -1391,7 +1308,7 @@ async function showTicketDetails(ticketId) {
         </div>
         <div class="detail-item">
           <div class="detail-label">User ID</div>
-          <div class="detail-value">${esc(t.userid)}</div>
+          <div class="detail-value">${esc(t.userid ?? t.user_id ?? t.userId ?? '-')}</div>
         </div>
         <div class="detail-item">
           <div class="detail-label">Username</div>
@@ -1403,11 +1320,19 @@ async function showTicketDetails(ticketId) {
         </div>
         <div class="detail-item">
           <div class="detail-label">Created</div>
-          <div class="detail-value">${esc(t.createdat || '-')}</div>
+          <div class="detail-value">${esc(t.createdat || t.created_at || t.updatedat || '-')}</div>
         </div>
         <div class="detail-item">
           <div class="detail-label">Last Reply</div>
-          <div class="detail-value">${esc(t.lastreplyat || t.updatedat || '-')}</div>
+          <div class="detail-value">${esc(t.lastreplyat || t.last_reply_at || t.updatedat || '-')}</div>
+        </div>
+        <div class="detail-item">
+          <div class="detail-label">Closed By</div>
+          <div class="detail-value">${esc(t.closedbyname || '-')}</div>
+        </div>
+        <div class="detail-item">
+          <div class="detail-label">Closed At</div>
+          <div class="detail-value">${esc(t.closedat || '-')}</div>
         </div>
       </div>
 
