@@ -1352,11 +1352,22 @@ async function showTicketDetails(ticketId) {
       </div>
 
       ${t.attachmentname ? `
-        <div class="detail-item" style="margin-top:10px;">
-          <div class="detail-label">Attachment</div>
-          <div style="color:#cbd5e1;font-size:14px;">${esc(t.attachmentname)}</div>
-        </div>
-      ` : ''}
+  <div class="detail-item" style="margin-top:10px;">
+    <div class="detail-label">Attachment</div>
+    <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;">
+      <div style="color:#cbd5e1;font-size:14px;">${esc(t.attachmentname)}</div>
+      <a
+        href="/api/subadmin/tickets/${Number(ticketId)}/attachment"
+        target="_blank"
+        class="btn-small btn-view"
+        style="text-decoration:none;display:inline-block;"
+      >
+        Open File
+      </a>
+    </div>
+  </div>
+` : ''}
+
 
       <div class="detail-item" style="margin-top:10px;">
         <div class="detail-label">Update Status</div>
