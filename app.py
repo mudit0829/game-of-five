@@ -794,7 +794,7 @@ def api_subadmin_users():
         if User.query.filter_by(username=username).first():
             return jsonify({'success': False, 'message': 'Username already exists'}), 400
         
-        u = User(username=username, displayname=displayname, is_admin=False, is_blocked=False)
+        u = User(username=username, display_name=displayname, is_admin=False, is_blocked=False)
         u.set_password(password)
         db.session.add(u)
         db.session.commit()
@@ -2326,10 +2326,14 @@ def api_subadmin_ticket_attachment(ticket_id):
     if not ticket:
         return jsonify({"success": False, "message": "Ticket not found"}), 404
 
-    if not ticket.attachmentpath or not os.path.exists(ticket.attachmentpath):
+    if not ticket.attachment_path or not os.path.exists(ticket.attachment_path):
         return jsonify({"success": False, "message": "Attachment not found"}), 404
 
-    return send_file(ticket.attachmentpath, as_attachment=False, download_name=ticket.attachmentname or "attachment")
+    return send_file(
+        ticket.attachment_path,
+        as_attachment=False,
+        download_name=ticket.attachment_name or "attachment"
+    )
 
 
 @app.route("/coins", methods=["GET"])
