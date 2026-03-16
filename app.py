@@ -2317,6 +2317,19 @@ def api_subadmin_ticket_reply(ticket_id):
     db.session.commit()
     return jsonify({"success": True, "message": "Ticket updated"})
 
+from flask import send_file
+
+@app.route('/api/subadmin/tickets/<int:ticket_id>/attachment', methods=['GET'])
+@subadmin_required
+def api_subadmin_ticket_attachment(ticket_id):
+    ticket = Ticket.query.get(ticket_id)
+    if not ticket:
+        return jsonify({"success": False, "message": "Ticket not found"}), 404
+
+    if not ticket.attachmentpath or not os.path.exists(ticket.attachmentpath):
+        return jsonify({"success": False, "message": "Attachment not found"}), 404
+
+    return send_file(ticket.attachmentpath, as_attachment=False, download_name=ticket.attachmentname or "attachment")
 
 
 @app.route("/coins", methods=["GET"])
