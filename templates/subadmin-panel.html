@@ -823,11 +823,11 @@
           const section = this.dataset.section;
           switchSection(section);
           document.querySelectorAll('.menu-link').forEach(l => l.classList.remove('active'));
-          this.classList.add('active');
-          document.getElementById('searchQueries').addEventListener('keyup', displayQueries);
+          this.classList.add('active');          
         });
       });
 
+      document.getElementById('searchQueries').addEventListener('keyup', displayQueries);
       document.getElementById('createUserForm').addEventListener('submit', submitCreateUser);
       document.getElementById('addAgentForm').addEventListener('submit', submitAddAgent);
       document.getElementById('searchUsers').addEventListener('keyup', displayUsers);
