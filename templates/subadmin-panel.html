@@ -645,32 +645,41 @@
         </div>
 
         <div id="queries" class="section">
-          <div class="section-header">
-            <h2 class="section-title">User Queries</h2>
-          </div>
+  <div class="section-header">
+    <h2 class="section-title">User Queries</h2>
+  </div>
 
-          <div id="queriesLoading" class="loading">Loading queries...</div>
-          <div id="queriesTableContainer" style="display:none;">
-            <div class="table-container">
-              <table class="data-table">
-                <thead>
-                  <tr>
-                    <th>ID</th>
-                    <th>User</th>
-                    <th>Subject</th>
-                    <th>Status</th>
-                    <th>Created</th>
-                    <th>Updated</th>
-                  </tr>
-                </thead>
-                <tbody id="queriesTableBody"></tbody>
-              </table>
-            </div>
-          </div>
-        </div>
-      </div>
+  <div class="controls">
+    <div class="search-box">
+      <input type="text" id="searchQueries" placeholder="Search by ticket id, user id, username, subject..." />
+      <button onclick="displayQueries()">🔍 Search</button>
     </div>
   </div>
+
+  <div id="queriesLoading" class="loading">Loading queries...</div>
+  <div id="queriesTableContainer" style="display:none;">
+    <div class="table-container">
+      <table class="data-table">
+        <thead>
+          <tr>
+            <th>ID</th>
+            <th>User ID</th>
+            <th>Username</th>
+            <th>Subject</th>
+            <th>Status</th>
+            <th>Created</th>
+            <th>Last Reply</th>
+            <th>Action</th>
+          </tr>
+        </thead>
+        <tbody id="queriesTableBody"></tbody>
+      </table>
+    </div>
+  </div>
+</div>
+</div>
+</div>
+</div>
 
   <div id="detailsModal" class="modal">
     <div class="modal-content">
@@ -815,6 +824,7 @@
           switchSection(section);
           document.querySelectorAll('.menu-link').forEach(l => l.classList.remove('active'));
           this.classList.add('active');
+          document.getElementById('searchQueries').addEventListener('keyup', displayQueries);
         });
       });
 
@@ -1187,73 +1197,6 @@
       }
       document.getElementById('referralsLoading').style.display = 'none';
       document.getElementById('referralsTableContainer').style.display = 'block';
-    }
-
-    async function loadQueries() {
-      document.getElementById('queriesLoading').style.display = 'block';
-      document.getElementById('queriesTableContainer').style.display = 'none';
-      const tbody = document.getElementById('queriesTableBody');
-      tbody.innerHTML = '';
-      try {
-        const data = await apiGet('/api/subadmin/tickets');
-        saTickets = Array.isArray(data) ? data : [];
-        if (!saTickets.length) {
-          tbody.innerHTML = `<tr><td colspan="6" class="no-data">No queries</td></tr>`;
-        } else {
-          saTickets.forEach(t => {
-            const row = document.createElement('tr');
-            row.innerHTML = `
-              <td>${t.id}</td>
-              <td>${t.user || '-'}</td>
-              <td>${t.subject || '-'}</td>
-              <td>${t.status || '-'}</td>
-              <td>${t.created_at || '-'}</td>
-              <td>${t.updated_at || '-'}</td>
-            `;
-            row.style.cursor = 'pointer';
-            row.onclick = () => showTicketDetails(t);
-            tbody.appendChild(row);
-          });
-        }
-      } catch (err) {
-        tbody.innerHTML = `<tr><td colspan="6" class="no-data">Error loading queries</td></tr>`;
-      }
-      document.getElementById('queriesLoading').style.display = 'none';
-      document.getElementById('queriesTableContainer').style.display = 'block';
-    }
-
-    function showTicketDetails(t) {
-      const html = `
-        <div class="details-grid">
-          <div class="detail-item">
-            <div class="detail-label">Ticket ID</div>
-            <div class="detail-value">${t.id}</div>
-          </div>
-          <div class="detail-item">
-            <div class="detail-label">User</div>
-            <div class="detail-value">${t.user || '-'}</div>
-          </div>
-          <div class="detail-item">
-            <div class="detail-label">Status</div>
-            <div class="detail-value">${t.status || '-'}</div>
-          </div>
-          <div class="detail-item">
-            <div class="detail-label">Created</div>
-            <div class="detail-value">${t.created_at || '-'}</div>
-          </div>
-        </div>
-        <div class="detail-item" style="margin-top:10px;">
-          <div class="detail-label">Subject</div>
-          <div class="detail-value" style="font-size:16px;">${t.subject || '-'}</div>
-        </div>
-        <div class="detail-item" style="margin-top:10px;">
-          <div class="detail-label">Message</div>
-          <div style="color:#cbd5e1;font-size:14px;white-space:pre-wrap;">${t.message || ''}</div>
-        </div>
-      `;
-      document.getElementById('detailsTitle').textContent = 'Query Details';
-      document.getElementById('detailsContent').innerHTML = html;
-      document.getElementById('detailsModal').classList.add('active');
     }
 
     function closeDetailsModal() {
