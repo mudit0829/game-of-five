@@ -2152,6 +2152,9 @@ def api_admin_ticket_reply(ticket_id):
     if not ticket:
         return jsonify({"success": False, "message": "Ticket not found"}), 404
 
+    if (ticket.status or "").upper() == "CLOSED":
+        return jsonify({"success": False, "message": "Closed ticket cannot be updated"}), 403
+
     data = request.get_json() or {}
     message = (data.get("message") or "").strip()
     new_status = (data.get("status") or "").strip().upper()
@@ -2187,7 +2190,6 @@ def api_admin_ticket_reply(ticket_id):
 
     db.session.commit()
     return jsonify({"success": True, "message": "Ticket updated"})
-
 
 @app.route("/api/admin/tickets/<int:ticket_id>/close", methods=["POST"])
 @admin_required
@@ -2281,6 +2283,9 @@ def api_subadmin_ticket_reply(ticket_id):
     if not ticket:
         return jsonify({"success": False, "message": "Ticket not found"}), 404
 
+    if (ticket.status or "").upper() == "CLOSED":
+        return jsonify({"success": False, "message": "Closed ticket cannot be updated"}), 403
+
     data = request.get_json() or {}
     message = (data.get("message") or "").strip()
     new_status = (data.get("status") or "").strip().upper()
@@ -2316,6 +2321,7 @@ def api_subadmin_ticket_reply(ticket_id):
 
     db.session.commit()
     return jsonify({"success": True, "message": "Ticket updated"})
+
 
 from flask import send_file
 
