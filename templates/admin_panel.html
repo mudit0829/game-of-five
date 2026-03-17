@@ -2555,6 +2555,7 @@ function displayQueries() {
 }
 
 async function showTicketDetails(ticketId) {
+  const t = normalizeTicket(await apiGet(`/api/admin/tickets/${ticketId}`));
   try {
     const t = await apiGet(`/api/admin/tickets/${ticketId}`);
     const isClosed = String(t.status || '').toUpperCase() === 'CLOSED';
@@ -2570,17 +2571,18 @@ async function showTicketDetails(ticketId) {
       </div>
     `).join('');
 
-    const attachmentHtml = t.attachmentname ? `
-      <div class="detail-item" style="margin-bottom:15px;">
-        <div class="detail-label">Attachment</div>
-        <div style="display:flex;gap:12px;align-items:center;flex-wrap:wrap;">
-          <div style="color:#e2e8f0;">${t.attachmentname}</div>
-          <button class="btn-small btn-view" onclick="openAdminTicketAttachment(${t.id})">
-            View Attachment
-          </button>
-        </div>
-      </div>
-    ` : '';
+    const attachmentHtml = (t.attachmentname || t.attachmentpath) ? `
+  <div class="detail-item" style="margin-bottom:15px;">
+    <div class="detail-label">Attachment</div>
+    <div style="display:flex;gap:12px;align-items:center;flex-wrap:wrap;">
+      <div style="color:#e2e8f0;">${t.attachmentname || 'Attachment'}</div>
+      <button class="btn-small btn-view" onclick="openAdminTicketAttachment(${t.id})">
+        View Attachment
+      </button>
+    </div>
+  </div>
+` : '';
+
 
     document.getElementById('detailsTitle').textContent = `Ticket #${t.id}`;
     document.getElementById('detailsSubtitle').textContent = `${t.username || '-'} • ${t.subject || '-'}`;
