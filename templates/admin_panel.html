@@ -2555,34 +2555,27 @@ function displayQueries() {
 }
 
 async function showTicketDetails(ticketId) {
-  const t = normalizeTicket(await apiGet(`/api/admin/tickets/${ticketId}`));
   try {
     const t = await apiGet(`/api/admin/tickets/${ticketId}`);
-    const isClosed = String(t.status || '').toUpperCase() === 'CLOSED';
+    const isClosed = (t.status || '').toUpperCase() === 'CLOSED';
+
+    const attachmentHtml = (t.attachment_name || t.attachment_path) ? `
+      <div class="detail-item" style="margin-bottom:15px;">
+        <div class="detail-label">Attachment</div>
+        <div style="display:flex;gap:12px;align-items:center;flex-wrap:wrap;">
+          <div style="color:#e2e8f0;">${t.attachment_name || 'Attachment'}</div>
+          <button class="btn-small btn-view" onclick="openAdminTicketAttachment(${t.id})">View Attachment</button>
+        </div>
+      </div>
+    ` : '';
 
     const updatesHtml = (t.updates || []).map(u => `
       <div class="detail-item" style="margin-bottom:10px;">
-        <div class="detail-label">${u.actorrole || '-'} • ${u.updatetype || '-'} • ${u.time || '-'}</div>
+        <div class="detail-label">${u.actor_role} • ${u.update_type} • ${u.time}</div>
         <div style="color:#e2e8f0; font-size:14px;">${u.message || '-'}</div>
-        ${(u.oldstatus || u.newstatus)
-          ? `<div style="color:#94a3b8; font-size:12px; margin-top:6px;">${u.oldstatus || '-'} → ${u.newstatus || '-'}</div>`
-          : ''
-        }
+        ${(u.old_status || u.new_status) ? `<div style="color:#94a3b8; font-size:12px; margin-top:6px;">${u.old_status || '-'} → ${u.new_status || '-'}</div>` : ''}
       </div>
     `).join('');
-
-    const attachmentHtml = (t.attachmentname || t.attachmentpath) ? `
-  <div class="detail-item" style="margin-bottom:15px;">
-    <div class="detail-label">Attachment</div>
-    <div style="display:flex;gap:12px;align-items:center;flex-wrap:wrap;">
-      <div style="color:#e2e8f0;">${t.attachmentname || 'Attachment'}</div>
-      <button class="btn-small btn-view" onclick="openAdminTicketAttachment(${t.id})">
-        View Attachment
-      </button>
-    </div>
-  </div>
-` : '';
-
 
     document.getElementById('detailsTitle').textContent = `Ticket #${t.id}`;
     document.getElementById('detailsSubtitle').textContent = `${t.username || '-'} • ${t.subject || '-'}`;
@@ -2591,7 +2584,7 @@ async function showTicketDetails(ticketId) {
       <div class="details-grid">
         <div class="detail-item">
           <div class="detail-label">User ID</div>
-          <div class="detail-value">${t.userid ?? '-'}</div>
+          <div class="detail-value">${t.user_id ?? '-'}</div>
         </div>
         <div class="detail-item">
           <div class="detail-label">Status</div>
@@ -2599,11 +2592,11 @@ async function showTicketDetails(ticketId) {
         </div>
         <div class="detail-item">
           <div class="detail-label">Created</div>
-          <div class="detail-value">${t.createdat || '-'}</div>
+          <div class="detail-value">${t.created_at || '-'}</div>
         </div>
         <div class="detail-item">
           <div class="detail-label">Last Reply</div>
-          <div class="detail-value">${t.lastreplyat || '-'}</div>
+          <div class="detail-value">${t.last_reply_at || '-'}</div>
         </div>
       </div>
 
@@ -2618,8 +2611,8 @@ async function showTicketDetails(ticketId) {
         <div class="detail-label">Update Status</div>
         <select id="ticketStatusSelect" ${isClosed ? 'disabled' : ''} style="width:100%;padding:12px;border-radius:8px;border:2px solid #334155;background:#0f172a;color:#e2e8f0;">
           <option value="OPEN" ${t.status === 'OPEN' ? 'selected' : ''}>OPEN</option>
-          <option value="INPROGRESS" ${t.status === 'INPROGRESS' ? 'selected' : ''}>IN PROGRESS</option>
-          <option value="WAITINGUSER" ${t.status === 'WAITINGUSER' ? 'selected' : ''}>WAITING USER</option>
+          <option value="IN_PROGRESS" ${t.status === 'IN_PROGRESS' ? 'selected' : ''}>IN PROGRESS</option>
+          <option value="WAITING_USER" ${t.status === 'WAITING_USER' ? 'selected' : ''}>WAITING USER</option>
           <option value="RESOLVED" ${t.status === 'RESOLVED' ? 'selected' : ''}>RESOLVED</option>
         </select>
       </div>
@@ -2647,7 +2640,7 @@ async function showTicketDetails(ticketId) {
 
     document.getElementById('detailsModal').classList.add('active');
   } catch (err) {
-    alert('Error: ' + err.message);
+    alert(`Error: ${err.message}`);
   }
 }
 
