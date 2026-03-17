@@ -1285,6 +1285,7 @@ async function showTicketDetails(ticketId) {
 
   try {
     const t = await apiGet(`/api/subadmin/tickets/${ticketId}`);
+    const isClosed = (t.status || '').toUpperCase() === 'CLOSED';
 
     const updatesHtml = Array.isArray(t.updates) && t.updates.length
       ? t.updates.map(u => `
@@ -1365,23 +1366,36 @@ async function showTicketDetails(ticketId) {
 ` : ''}
 
       <div class="detail-item" style="margin-top:10px;">
-        <div class="detail-label">Update Status</div>
+          <div class="detail-label">Update Status</div>
         <select id="ticketStatusSelect" style="width:100%;padding:12px;border-radius:8px;border:2px solid #334155;background:#0f172a;color:#e2e8f0;">
-          <option value="OPEN" ${t.status === 'OPEN' ? 'selected' : ''}>OPEN</option>
-          <option value="INPROGRESS" ${t.status === 'INPROGRESS' ? 'selected' : ''}>INPROGRESS</option>
-          <option value="WAITINGUSER" ${t.status === 'WAITINGUSER' ? 'selected' : ''}>WAITINGUSER</option>
-          <option value="RESOLVED" ${t.status === 'RESOLVED' ? 'selected' : ''}>RESOLVED</option>
+            <option value="OPEN" ${t.status === 'OPEN' ? 'selected' : ''}>OPEN</option>
+            <option value="IN_PROGRESS" ${t.status === 'IN_PROGRESS' ? 'selected' : ''}>IN PROGRESS</option>
+            <option value="WAITING_USER" ${t.status === 'WAITING_USER' ? 'selected' : ''}>WAITING USER</option>
+            <option value="RESOLVED" ${t.status === 'RESOLVED' ? 'selected' : ''}>RESOLVED</option>
         </select>
-      </div>
+     </div>
+
 
       <div class="detail-item" style="margin-top:10px;">
         <div class="detail-label">Reply / Action Note</div>
-        <textarea id="ticketReplyText" style="width:100%;min-height:120px;padding:12px;border-radius:8px;border:2px solid #334155;background:#0f172a;color:#e2e8f0;" placeholder="Write update for user..."></textarea>
+         <textarea id="ticketReplyText"
+           ${isClosed ? 'disabled' : ''}
+          style="width:100%;min-height:120px;padding:12px;border-radius:8px;border:2px solid #334155;background:#0f172a;color:#e2e8f0;"
+            placeholder="${isClosed ? 'Closed ticket - view only' : 'Write update for user...'}"></textarea>
       </div>
 
-      <div class="modal-footer" style="padding:0;margin-top:16px;justify-content:flex-start;">
-        <button class="btn-modal btn-save" onclick="submitTicketUpdate(${Number(ticketId)})">Save Update</button>
-      </div>
+
+     ${isClosed ? `
+  <div class="detail-item" style="margin-top:10px;border-color:#ef4444;">
+    <div class="detail-label">Notice</div>
+    <div style="color:#fca5a5;font-size:14px;">This ticket is closed. No further updates are allowed.</div>
+  </div>
+` : `
+  <div class="modal-footer" style="padding:0;margin-top:16px;justify-content:flex-start;">
+    <button class="btn-modal btn-save" onclick="submitTicketUpdate(${Number(ticketId)})">Save Update</button>
+  </div>
+`}
+
 
       <div style="margin-top:20px;">
         <div class="detail-label">Timeline</div>
