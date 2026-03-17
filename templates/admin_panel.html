@@ -1335,6 +1335,40 @@
       return 'badge-pending';
     }
 
+    function normalizeTicket(raw = {}) {
+  return {
+    id: raw.id ?? '-',
+    userid: raw.userid ?? raw.user_id ?? raw.userId ?? '-',
+    username: raw.username ?? raw.user_name ?? '-',
+    subject: raw.subject ?? '-',
+    status: String(raw.status ?? 'OPEN').toUpperCase(),
+    createdat: raw.createdat ?? raw.created_at ?? '-',
+    lastreplyat: raw.lastreplyat ?? raw.last_reply_at ?? '-',
+    message: raw.message ?? '-',
+    attachmentname: raw.attachmentname ?? raw.attachment_name ?? '',
+    attachmentpath: raw.attachmentpath ?? raw.attachment_path ?? '',
+    updates: Array.isArray(raw.updates) ? raw.updates.map(u => ({
+      id: u.id ?? '',
+      actorrole: u.actorrole ?? u.actor_role ?? '-',
+      actorname: u.actorname ?? u.actor_name ?? '',
+      updatetype: u.updatetype ?? u.update_type ?? '-',
+      oldstatus: u.oldstatus ?? u.old_status ?? '',
+      newstatus: u.newstatus ?? u.new_status ?? '',
+      message: u.message ?? '-',
+      isinternal: u.isinternal ?? u.is_internal ?? false,
+      time: u.time ?? u.createdat ?? u.created_at ?? '-'
+    })) : []
+  };
+}
+
+function queryBadgeClass(status) {
+  const s = String(status || '').toUpperCase().replace(/[\s_]/g, '');
+  if (s === 'CLOSED') return 'badge-blocked';
+  if (s === 'RESOLVED' || s === 'INPROGRESS' || s === 'WAITINGUSER') return 'badge-pending';
+  return 'badge-active';
+}
+
+
     function txnStatusBadgeClass(status) {
       const s = String(status || '').toUpperCase();
       return (s === 'DONE' || s === 'WIN' || s === 'LOSE') ? 'badge-active' : 'badge-pending';
@@ -2470,7 +2504,7 @@ async function loadQueries() {
 
   try {
     const data = await apiGet('/api/admin/tickets');
-    allTickets = Array.isArray(data) ? data : [];
+    allTickets = Array.isArray(data) ? data.map(normalizeTicket) : [];
     displayQueries();
     document.getElementById('queriesLoading').style.display = 'none';
     document.getElementById('queriesTableContainer').style.display = 'block';
@@ -2479,6 +2513,7 @@ async function loadQueries() {
       `<div style="color:#ef4444;">Error: ${err.message}</div>`;
   }
 }
+
 
 function displayQueries() {
   const q = safeLower(document.getElementById('searchQueries')?.value || '');
