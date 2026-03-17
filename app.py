@@ -2136,25 +2136,6 @@ def api_admin_tickets():
     return jsonify(_filtered_ticket_list())
 
 
-from flask import send_file
-
-@app.route("/api/admin/tickets/<int:ticket_id>/attachment", methods=["GET"])
-@admin_required
-def api_admin_ticket_attachment(ticket_id):
-    ticket = Ticket.query.get(ticket_id)
-    if not ticket:
-        return jsonify({"success": False, "message": "Ticket not found"}), 404
-
-    path = getattr(ticket, "attachment_path", None) or getattr(ticket, "attachmentpath", None)
-    name = getattr(ticket, "attachment_name", None) or getattr(ticket, "attachmentname", None) or "attachment"
-
-    if not path or not os.path.exists(path):
-        return jsonify({"success": False, "message": "Attachment not found"}), 404
-
-    return send_file(path, as_attachment=False, download_name=name)
-
-
-
 @app.route("/api/admin/tickets/<int:ticket_id>/reply", methods=["POST"])
 @admin_required
 def api_admin_ticket_reply(ticket_id):
