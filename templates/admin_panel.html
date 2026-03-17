@@ -2661,7 +2661,7 @@ async function submitTicketUpdate(ticketId) {
     await apiSend(`/api/admin/tickets/${ticketId}/reply`, 'POST', {
       status: status,
       message: message,
-      isinternal: false
+      is_internal: false
     });
     alert('Ticket updated successfully');
     await loadQueries();
