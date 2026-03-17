@@ -2077,16 +2077,13 @@ def help_tickets_api():
 
     attachment_name = None
     attachment_path = None
-if file and file.filename:
-    upload_dir = os.path.join(os.path.dirname(__file__), "uploads", "tickets")
-    os.makedirs(upload_dir, exist_ok=True)
-
-    safe_name = secure_filename(file.filename)
-    attachment_name = f"{int(time.time())}_{safe_name}"
-    attachment_path = os.path.join(upload_dir, attachment_name)
-
-    file.save(attachment_path)
-
+    if file and file.filename:
+        upload_dir = os.path.join(os.path.dirname(__file__), "uploads", "tickets")
+        os.makedirs(upload_dir, exist_ok=True)
+        safe_name = secure_filename(file.filename)
+        attachment_name = f"{int(time.time())}_{safe_name}"
+        attachment_path = os.path.join(upload_dir, attachment_name)
+        file.save(attachment_path)
 
     ticket = Ticket(
         user_id=user_id,
