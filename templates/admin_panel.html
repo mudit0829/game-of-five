@@ -2460,7 +2460,7 @@ async function viewGameDetails(roundCode) {
     function queryBadgeClass(status) {
   const s = String(status || '').toUpperCase();
   if (s === 'CLOSED') return 'badge-blocked';
-  if (s === 'RESOLVED' || s === 'IN_PROGRESS' || s === 'WAITING_USER') return 'badge-pending';
+  if (s === 'RESOLVED' || s === 'INPROGRESS' || s === 'WAITINGUSER') return 'badge-pending';
   return 'badge-active';
 }
 
@@ -2488,7 +2488,7 @@ function displayQueries() {
   const filtered = allTickets.filter(t => {
     const hay = [
       t.id,
-      t.user_id,
+      t.userid,
       t.username,
       t.subject,
       t.status
@@ -2505,12 +2505,12 @@ function displayQueries() {
     const row = document.createElement('tr');
     row.innerHTML = `
       <td>${t.id}</td>
-      <td>${t.user_id}</td>
+      <td>${t.userid ?? '-'}</td>
       <td>${t.username || '-'}</td>
       <td>${t.subject || '-'}</td>
       <td><span class="badge ${queryBadgeClass(t.status)}">${String(t.status || '').toUpperCase()}</span></td>
-      <td>${t.created_at || '-'}</td>
-      <td>${t.last_reply_at || '-'}</td>
+      <td>${t.createdat || '-'}</td>
+      <td>${t.lastreplyat || '-'}</td>
       <td>
         <button class="btn-small btn-view" onclick="showTicketDetails(${t.id})">View</button>
       </td>
@@ -2522,15 +2522,30 @@ function displayQueries() {
 async function showTicketDetails(ticketId) {
   try {
     const t = await apiGet(`/api/admin/tickets/${ticketId}`);
-    const isClosed = (t.status || '').toUpperCase() === 'CLOSED';
+    const isClosed = String(t.status || '').toUpperCase() === 'CLOSED';
 
     const updatesHtml = (t.updates || []).map(u => `
       <div class="detail-item" style="margin-bottom:10px;">
-        <div class="detail-label">${u.actor_role} • ${u.update_type} • ${u.time}</div>
+        <div class="detail-label">${u.actorrole || '-'} • ${u.updatetype || '-'} • ${u.time || '-'}</div>
         <div style="color:#e2e8f0; font-size:14px;">${u.message || '-'}</div>
-        ${u.old_status || u.new_status ? `<div style="color:#94a3b8; font-size:12px; margin-top:6px;">${u.old_status || '-'} → ${u.new_status || '-'}</div>` : ''}
+        ${(u.oldstatus || u.newstatus)
+          ? `<div style="color:#94a3b8; font-size:12px; margin-top:6px;">${u.oldstatus || '-'} → ${u.newstatus || '-'}</div>`
+          : ''
+        }
       </div>
     `).join('');
+
+    const attachmentHtml = t.attachmentname ? `
+      <div class="detail-item" style="margin-bottom:15px;">
+        <div class="detail-label">Attachment</div>
+        <div style="display:flex;gap:12px;align-items:center;flex-wrap:wrap;">
+          <div style="color:#e2e8f0;">${t.attachmentname}</div>
+          <button class="btn-small btn-view" onclick="openAdminTicketAttachment(${t.id})">
+            View Attachment
+          </button>
+        </div>
+      </div>
+    ` : '';
 
     document.getElementById('detailsTitle').textContent = `Ticket #${t.id}`;
     document.getElementById('detailsSubtitle').textContent = `${t.username || '-'} • ${t.subject || '-'}`;
@@ -2539,7 +2554,7 @@ async function showTicketDetails(ticketId) {
       <div class="details-grid">
         <div class="detail-item">
           <div class="detail-label">User ID</div>
-          <div class="detail-value">${t.user_id}</div>
+          <div class="detail-value">${t.userid ?? '-'}</div>
         </div>
         <div class="detail-item">
           <div class="detail-label">Status</div>
@@ -2547,11 +2562,11 @@ async function showTicketDetails(ticketId) {
         </div>
         <div class="detail-item">
           <div class="detail-label">Created</div>
-          <div class="detail-value">${t.created_at || '-'}</div>
+          <div class="detail-value">${t.createdat || '-'}</div>
         </div>
         <div class="detail-item">
           <div class="detail-label">Last Reply</div>
-          <div class="detail-value">${t.last_reply_at || '-'}</div>
+          <div class="detail-value">${t.lastreplyat || '-'}</div>
         </div>
       </div>
 
@@ -2560,74 +2575,17 @@ async function showTicketDetails(ticketId) {
         <div style="color:#e2e8f0; white-space:pre-wrap;">${t.message || '-'}</div>
       </div>
 
+      ${attachmentHtml}
+
       <div class="detail-item" style="margin-bottom:15px;">
         <div class="detail-label">Update Status</div>
         <select id="ticketStatusSelect" ${isClosed ? 'disabled' : ''} style="width:100%;padding:12px;border-radius:8px;border:2px solid #334155;background:#0f172a;color:#e2e8f0;">
           <option value="OPEN" ${t.status === 'OPEN' ? 'selected' : ''}>OPEN</option>
-          <option value="IN_PROGRESS" ${t.status === 'IN_PROGRESS' ? 'selected' : ''}>IN PROGRESS</option>
-          <option value="WAITING_USER" ${t.status === 'WAITING_USER' ? 'selected' : ''}>WAITING USER</option>
+          <option value="INPROGRESS" ${t.status === 'INPROGRESS' ? 'selected' : ''}>IN PROGRESS</option>
+          <option value="WAITINGUSER" ${t.status === 'WAITINGUSER' ? 'selected' : ''}>WAITING USER</option>
           <option value="RESOLVED" ${t.status === 'RESOLVED' ? 'selected' : ''}>RESOLVED</option>
         </select>
       </div>
-
-      document.getElementById('detailsContent').innerHTML = `
-  <div class="details-grid">
-    <div class="detail-item">
-      <div class="detail-label">User ID</div>
-      <div class="detail-value">${t.user_id}</div>
-    </div>
-    <div class="detail-item">
-      <div class="detail-label">Status</div>
-      <div class="detail-value">${t.status || '-'}</div>
-    </div>
-    <div class="detail-item">
-      <div class="detail-label">Created</div>
-      <div class="detail-value">${t.created_at || '-'}</div>
-    </div>
-    <div class="detail-item">
-      <div class="detail-label">Last Reply</div>
-      <div class="detail-value">${t.last_reply_at || '-'}</div>
-    </div>
-  </div>
-
-  <div class="detail-item" style="margin-bottom:15px;">
-    <div class="detail-label">Original Message</div>
-    <div style="color:#e2e8f0; white-space:pre-wrap;">${t.message || '-'}</div>
-  </div>
-
-  ${attachmentHtml}
-
-  <div class="detail-item" style="margin-bottom:15px;">
-    <div class="detail-label">Update Status</div>
-    <select id="ticketStatusSelect" ${isClosed ? 'disabled' : ''} style="width:100%;padding:12px;border-radius:8px;border:2px solid #334155;background:#0f172a;color:#e2e8f0;">
-      <option value="OPEN" ${t.status === 'OPEN' ? 'selected' : ''}>OPEN</option>
-      <option value="IN_PROGRESS" ${t.status === 'IN_PROGRESS' ? 'selected' : ''}>IN PROGRESS</option>
-      <option value="WAITING_USER" ${t.status === 'WAITING_USER' ? 'selected' : ''}>WAITING USER</option>
-      <option value="RESOLVED" ${t.status === 'RESOLVED' ? 'selected' : ''}>RESOLVED</option>
-    </select>
-  </div>
-
-  <div class="detail-item" style="margin-bottom:15px;">
-    <div class="detail-label">Reply / Action Note</div>
-    <textarea id="ticketReplyText" ${isClosed ? 'disabled' : ''} style="width:100%;min-height:120px;padding:12px;border-radius:8px;border:2px solid #334155;background:#0f172a;color:#e2e8f0;" placeholder="${isClosed ? 'Closed ticket - view only' : 'Write update for user...'}"></textarea>
-  </div>
-
-  <div class="detail-item" style="margin-bottom:15px;">
-    <div class="detail-label">Timeline</div>
-    ${updatesHtml || '<div class="no-data">No updates found</div>'}
-  </div>
-
-  <div class="modal-footer" style="padding:0;margin-top:16px;justify-content:flex-start;">
-    ${isClosed
-      ? `<button class="btn-modal" onclick="reopenTicket(${t.id})">Reopen Ticket</button>`
-      : `
-        <button class="btn-modal btn-save" onclick="submitTicketUpdate(${t.id})">Save Update</button>
-        <button class="btn-modal btn-cancel" onclick="closeTicket(${t.id})">Close Ticket</button>
-      `
-    }
-  </div>
-`;
-
 
       <div class="detail-item" style="margin-bottom:15px;">
         <div class="detail-label">Reply / Action Note</div>
@@ -2669,9 +2627,8 @@ async function submitTicketUpdate(ticketId) {
     await apiSend(`/api/admin/tickets/${ticketId}/reply`, 'POST', {
       status: status,
       message: message,
-      is_internal: false
+      isinternal: false
     });
-
     alert('Ticket updated successfully');
     await loadQueries();
     await showTicketDetails(ticketId);
