@@ -2136,6 +2136,15 @@ def api_admin_tickets():
     return jsonify(_filtered_ticket_list())
 
 
+@app.route("/api/admin/tickets/<int:ticket_id>", methods=["GET"])
+@admin_required
+def api_admin_ticket_detail(ticket_id):
+    ticket = Ticket.query.get(ticket_id)
+    if not ticket:
+        return jsonify({"success": False, "message": "Ticket not found"}), 404
+    return jsonify(_serialize_ticket(ticket, include_updates=True, for_user=False))
+
+
 @app.route("/api/admin/tickets/<int:ticket_id>/reply", methods=["POST"])
 @admin_required
 def api_admin_ticket_reply(ticket_id):
