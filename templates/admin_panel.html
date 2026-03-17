@@ -1465,23 +1465,42 @@ function queryBadgeClass(status) {
     // Dashboard
     // ------------------------
     async function loadStats() {
-      try {
-        const data = await apiGet('/api/admin/stats');
+  try {
+    const data = await apiGet('/api/admin/stats');
 
-        document.getElementById('totalUsers').textContent = data.totalusers ?? 0;
-        document.getElementById('activeGames').textContent = data.activegames ?? 0;
-        document.getElementById('totalRevenue').textContent = fmtINR(data.totalrevenue ?? 0);
-        document.getElementById('totalDeposits').textContent = fmtINR(data.totaldeposit ?? 0);
-        document.getElementById('totalWithdrawals').textContent = fmtINR(data.totalwithdrawal ?? 0);
+    document.getElementById('totalUsers').textContent =
+      data.total_users ?? data.totalusers ?? 0;
+    document.getElementById('activeGames').textContent =
+      data.active_games ?? data.activegames ?? 0;
+    document.getElementById('totalRevenue').textContent =
+      fmtINR(data.total_revenue ?? data.totalrevenue ?? 0);
+    document.getElementById('totalDeposits').textContent =
+      fmtINR(data.total_deposit ?? data.totaldeposit ?? 0);
+    document.getElementById('totalWithdrawals').textContent =
+      fmtINR(data.total_withdrawal ?? data.totalwithdrawal ?? 0);
 
-        // Agents are not implemented in backend yet
-        const agents = await apiGet('/api/admin/agents');
-        document.getElementById('totalAgents').textContent = Array.isArray(agents) ? agents.length : 0;
+    const agents = await apiGet('/api/admin/agents');
+    document.getElementById('totalAgents').textContent =
+      Array.isArray(agents) ? agents.length : 0;
+  } catch (err) {
+    console.error('Error loading stats:', err);
+  }
+}
 
-      } catch (err) {
-        console.error('Error loading stats:', err);
-      }
-    }
+async function loadReports() {
+  try {
+    const data = await apiGet('/api/admin/reports');
+    document.getElementById('newUsers30d').textContent =
+      data.total_users ?? data.totalusers ?? 0;
+    document.getElementById('revenue30d').textContent =
+      fmtINR(data.total_balance ?? data.totalbalance ?? 0);
+    document.getElementById('gamesPlayed30d').textContent = 0;
+    document.getElementById('avgWinRate').textContent = '0%';
+  } catch (err) {
+    console.error('Reports error:', err);
+  }
+}
+
 
     // Sub-Admin Modal Functions (ADD THIS)
 function openAddSubAdminModal() {
