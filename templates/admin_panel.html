@@ -1487,21 +1487,6 @@ function queryBadgeClass(status) {
   }
 }
 
-async function loadReports() {
-  try {
-    const data = await apiGet('/api/admin/reports');
-    document.getElementById('newUsers30d').textContent =
-      data.total_users ?? data.totalusers ?? 0;
-    document.getElementById('revenue30d').textContent =
-      fmtINR(data.total_balance ?? data.totalbalance ?? 0);
-    document.getElementById('gamesPlayed30d').textContent = 0;
-    document.getElementById('avgWinRate').textContent = '0%';
-  } catch (err) {
-    console.error('Reports error:', err);
-  }
-}
-
-
     // Sub-Admin Modal Functions (ADD THIS)
 function openAddSubAdminModal() {
   document.getElementById('addSubAdminModal').classList.add('active');
@@ -2818,16 +2803,20 @@ async function reopenTicket(ticketId) {
     }
 
     async function loadReports() {
-      try {
-        const data = await apiGet('/api/admin/reports');
-        document.getElementById('newUsers30d').textContent = data.totalusers ?? 0;
-        document.getElementById('revenue30d').textContent = fmtINR(data.totalbalance ?? 0);
-        document.getElementById('gamesPlayed30d').textContent = 0;
-        document.getElementById('avgWinRate').textContent = '0%';
-      } catch (err) {
-        console.error('Reports error:', err);
-      }
-    }
+  try {
+    const data = await apiGet('/api/admin/reports');
+
+    document.getElementById('newUsers30d').textContent =
+      data.total_users ?? data.totalusers ?? 0;
+    document.getElementById('revenue30d').textContent =
+      fmtINR(data.total_balance ?? data.totalbalance ?? 0);
+    document.getElementById('gamesPlayed30d').textContent = 0;
+    document.getElementById('avgWinRate').textContent = '0%';
+  } catch (err) {
+    console.error('Reports error:', err);
+  }
+}
+
 
     function openSecurityModal() {
       alert('Security module will be added next.');
