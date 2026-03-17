@@ -2191,6 +2191,25 @@ def api_admin_ticket_reply(ticket_id):
     db.session.commit()
     return jsonify({"success": True, "message": "Ticket updated"})
 
+from flask import send_file
+
+@app.route('/api/admin/tickets/<int:ticket_id>/attachment', methods=['GET'])
+@admin_required
+def api_admin_ticket_attachment(ticket_id):
+    ticket = Ticket.query.get(ticket_id)
+    if not ticket:
+        return jsonify({"success": False, "message": "Ticket not found"}), 404
+
+    if not ticket.attachment_path or not os.path.exists(ticket.attachment_path):
+        return jsonify({"success": False, "message": "Attachment not found"}), 404
+
+    return send_file(
+        ticket.attachment_path,
+        as_attachment=False,
+        download_name=ticket.attachment_name or "attachment"
+    )
+
+
 @app.route("/api/admin/tickets/<int:ticket_id>/close", methods=["POST"])
 @admin_required
 def api_admin_ticket_close(ticket_id):
