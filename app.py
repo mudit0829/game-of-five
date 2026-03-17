@@ -334,14 +334,15 @@ def migrate_ticket_schema():
     existing = {row[1] for row in cur.fetchall()}
 
     add_columns = [
-        ("category", "TEXT DEFAULT 'General'"),
-        ("priority", "TEXT DEFAULT 'NORMAL'"),
-        ("attachment_path", "TEXT"),
-        ("last_reply_at", "DATETIME"),
-        ("closed_at", "DATETIME"),
-        ("closed_by_role", "TEXT"),
-        ("closed_by_name", "TEXT"),
-    ]
+    ("category", "TEXT DEFAULT 'General'"),
+    ("priority", "TEXT DEFAULT 'NORMAL'"),
+    ("attachment_name", "TEXT"),
+    ("attachment_path", "TEXT"),
+    ("last_reply_at", "DATETIME"),
+    ("closed_at", "DATETIME"),
+    ("closed_by_role", "TEXT"),
+    ("closed_by_name", "TEXT"),
+  ]
 
     for col, ddl in add_columns:
         if col not in existing:
@@ -1783,27 +1784,24 @@ def api_agent_users():
 
         db.session.add(u)
         db.session.commit()
-
-        ensure_wallet_for_user(u, starting_balance=0)   # starts with 10000 for non-admin
+        ensure_wallet_for_user(u, starting_balance=0)
 
         return jsonify(success=True, message="User created", userid=u.id)
 
-    # GET: list users under agent with stats
     users = User.query.filter_by(agentid=aid).order_by(User.created_at.desc()).all()
     user_ids = [u.id for u in users]
 
     played_map = {}
     if user_ids:
-                # ✅ FIXED: use Transaction.user_id (matches your model)
         rows = db.session.query(
-            Transaction.user_id,  # ✅ CORRECT column name
+            Transaction.user_id,
             func.coalesce(func.sum(Transaction.amount), 0)
         ).filter(
-            Transaction.user_id.in_(user_ids),  # ✅ CORRECT column name
+            Transaction.user_id.in_(user_ids),
             func.lower(Transaction.kind) == 'bet'
         ).group_by(Transaction.user_id).all()
 
-    playedmap = {int(uid): int(total) or 0 for uid, total in rows}  # ✅ int(uid) to handle user_id as int
+        played_map = {int(uid): int(total or 0) for uid, total in rows}
 
     out = []
     for u in users:
