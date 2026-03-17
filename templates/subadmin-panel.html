@@ -1212,7 +1212,7 @@
 function queryBadgeClass(status) {
   const s = String(status || '').toUpperCase();
   if (s === 'CLOSED') return 'badge-blocked';
-  if (s === 'RESOLVED' || s === 'INPROGRESS' || s === 'WAITINGUSER') return 'badge-pending';
+  if (s === 'RESOLVED' || s === 'IN_PROGRESS' || s === 'WAITING_USER') return 'badge-pending';
   return 'badge-active';
 }
 
@@ -1395,11 +1395,16 @@ async function showTicketDetails(ticketId) {
 }
 
 async function submitTicketUpdate(ticketId) {
-  const status = document.getElementById('ticketStatusSelect').value;
-  const message = document.getElementById('ticketReplyText').value.trim();
+  const status = (document.getElementById('ticketStatusSelect')?.value || '').trim();
+  const message = (document.getElementById('ticketReplyText')?.value || '').trim();
 
   if (!message && !status) {
     alert('Reply or status required');
+    return;
+  }
+
+  if (status === 'CLOSED') {
+    alert('Only admin can close ticket');
     return;
   }
 
