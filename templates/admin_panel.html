@@ -509,6 +509,7 @@
         <li><a class="menu-link" data-section="transactions">💰 Transactions</a></li>
         <li><a class="menu-link" data-section="wallet">💸 Wallet</a></li>
         <li><a class="menu-link" data-section="referrals">👨‍👩‍👧‍👦 Referrals</a></li>
+        <li><a class="menu-link" data-section="queries">❓ Queries</a></li>
         <li><a class="menu-link" data-section="promos">🎫 Promos</a></li>
         <li><a class="menu-link" data-section="announcements">📢 Announcements</a></li>
         <li><a class="menu-link" data-section="reports">📈 Reports</a></li>
@@ -876,6 +877,45 @@
           </div>
         </div>
 
+
+        <!-- QUERY -->
+
+        <div id="queries" class="section">
+  <div class="section-header">
+    <h2 class="section-title">User Queries</h2>
+  </div>
+
+  <div class="controls">
+    <div class="search-box">
+      <input type="text" id="searchQueries" placeholder="Search by ticket id, user id, username, subject..." />
+      <button onclick="displayQueries()">🔍 Search</button>
+    </div>
+  </div>
+
+  <div id="queriesLoading" class="loading">Loading queries...</div>
+
+  <div id="queriesTableContainer" style="display:none;">
+    <div class="table-container">
+      <table class="data-table">
+        <thead>
+          <tr>
+            <th>ID</th>
+            <th>User ID</th>
+            <th>Username</th>
+            <th>Subject</th>
+            <th>Status</th>
+            <th>Created</th>
+            <th>Last Reply</th>
+            <th>Action</th>
+          </tr>
+        </thead>
+        <tbody id="queriesTableBody"></tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+        
         <!-- PROMOS -->
         <div id="promos" class="section">
           <div class="section-header">
@@ -1232,6 +1272,7 @@
     let allGames = [];
     let allTxns = [];
     let allWalletUsers = [];
+    let allTickets = [];
 
     // ------------------------
     // Helpers
@@ -1346,6 +1387,8 @@
         announcements: 'Announcements',
         reports: 'Reports & Analytics',
         security: 'Security Settings',
+        subadmins: 'Sub-Admin Management',
+        queries: 'User Queries',
       };
       document.getElementById('pageTitle').textContent = titles[section] || 'Admin Panel';
 
@@ -1359,6 +1402,9 @@
       if (section === 'promos') loadPromos();
       if (section === 'announcements') loadAnnouncements();
       if (section === 'reports') loadReports();
+      if (section === 'subadmins') loadSubAdmins();
+      if (section === 'queries') loadQueries();
+
     }
 
     function wireForms() {
@@ -1374,6 +1420,7 @@
       document.getElementById('searchTransactions')?.addEventListener('keyup', displayTransactions);
       document.getElementById('searchWallet')?.addEventListener('keyup', displayWalletUsers);
       document.getElementById('searchUserGames')?.addEventListener('keyup', displayUserGames);
+      document.getElementById('searchQueries')?.addEventListener('keyup', displayQueries);
     }
 
     // ------------------------
@@ -2387,6 +2434,199 @@ async function viewGameDetails(roundCode) {
       document.getElementById('deductFundsModal').classList.remove('active');
       document.getElementById('deductFundsForm')?.reset();
     }
+
+
+    // ---------------------------------
+    // Queries
+    // ---------------------------------
+
+    function queryBadgeClass(status) {
+  const s = String(status || '').toUpperCase();
+  if (s === 'CLOSED') return 'badge-blocked';
+  if (s === 'RESOLVED' || s === 'IN_PROGRESS' || s === 'WAITING_USER') return 'badge-pending';
+  return 'badge-active';
+}
+
+async function loadQueries() {
+  document.getElementById('queriesLoading').style.display = 'block';
+  document.getElementById('queriesTableContainer').style.display = 'none';
+
+  try {
+    const data = await apiGet('/api/admin/tickets');
+    allTickets = Array.isArray(data) ? data : [];
+    displayQueries();
+    document.getElementById('queriesLoading').style.display = 'none';
+    document.getElementById('queriesTableContainer').style.display = 'block';
+  } catch (err) {
+    document.getElementById('queriesLoading').innerHTML =
+      `<div style="color:#ef4444;">Error: ${err.message}</div>`;
+  }
+}
+
+function displayQueries() {
+  const q = safeLower(document.getElementById('searchQueries')?.value || '');
+  const tbody = document.getElementById('queriesTableBody');
+  tbody.innerHTML = '';
+
+  const filtered = allTickets.filter(t => {
+    const hay = [
+      t.id,
+      t.user_id,
+      t.username,
+      t.subject,
+      t.status
+    ].join(' ').toLowerCase();
+    return hay.includes(q);
+  });
+
+  if (!filtered.length) {
+    tbody.innerHTML = `<tr><td colspan="8" class="no-data">No queries found</td></tr>`;
+    return;
+  }
+
+  filtered.forEach(t => {
+    const row = document.createElement('tr');
+    row.innerHTML = `
+      <td>${t.id}</td>
+      <td>${t.user_id}</td>
+      <td>${t.username || '-'}</td>
+      <td>${t.subject || '-'}</td>
+      <td><span class="badge ${queryBadgeClass(t.status)}">${String(t.status || '').toUpperCase()}</span></td>
+      <td>${t.created_at || '-'}</td>
+      <td>${t.last_reply_at || '-'}</td>
+      <td>
+        <button class="btn-small btn-view" onclick="showTicketDetails(${t.id})">View</button>
+      </td>
+    `;
+    tbody.appendChild(row);
+  });
+}
+
+async function showTicketDetails(ticketId) {
+  try {
+    const t = await apiGet(`/api/admin/tickets/${ticketId}`);
+    const isClosed = (t.status || '').toUpperCase() === 'CLOSED';
+
+    const updatesHtml = (t.updates || []).map(u => `
+      <div class="detail-item" style="margin-bottom:10px;">
+        <div class="detail-label">${u.actor_role} • ${u.update_type} • ${u.time}</div>
+        <div style="color:#e2e8f0; font-size:14px;">${u.message || '-'}</div>
+        ${u.old_status || u.new_status ? `<div style="color:#94a3b8; font-size:12px; margin-top:6px;">${u.old_status || '-'} → ${u.new_status || '-'}</div>` : ''}
+      </div>
+    `).join('');
+
+    document.getElementById('detailsTitle').textContent = `Ticket #${t.id}`;
+    document.getElementById('detailsSubtitle').textContent = `${t.username || '-'} • ${t.subject || '-'}`;
+
+    document.getElementById('detailsContent').innerHTML = `
+      <div class="details-grid">
+        <div class="detail-item">
+          <div class="detail-label">User ID</div>
+          <div class="detail-value">${t.user_id}</div>
+        </div>
+        <div class="detail-item">
+          <div class="detail-label">Status</div>
+          <div class="detail-value">${t.status || '-'}</div>
+        </div>
+        <div class="detail-item">
+          <div class="detail-label">Created</div>
+          <div class="detail-value">${t.created_at || '-'}</div>
+        </div>
+        <div class="detail-item">
+          <div class="detail-label">Last Reply</div>
+          <div class="detail-value">${t.last_reply_at || '-'}</div>
+        </div>
+      </div>
+
+      <div class="detail-item" style="margin-bottom:15px;">
+        <div class="detail-label">Original Message</div>
+        <div style="color:#e2e8f0; white-space:pre-wrap;">${t.message || '-'}</div>
+      </div>
+
+      <div class="detail-item" style="margin-bottom:15px;">
+        <div class="detail-label">Update Status</div>
+        <select id="ticketStatusSelect" ${isClosed ? 'disabled' : ''} style="width:100%;padding:12px;border-radius:8px;border:2px solid #334155;background:#0f172a;color:#e2e8f0;">
+          <option value="OPEN" ${t.status === 'OPEN' ? 'selected' : ''}>OPEN</option>
+          <option value="IN_PROGRESS" ${t.status === 'IN_PROGRESS' ? 'selected' : ''}>IN PROGRESS</option>
+          <option value="WAITING_USER" ${t.status === 'WAITING_USER' ? 'selected' : ''}>WAITING USER</option>
+          <option value="RESOLVED" ${t.status === 'RESOLVED' ? 'selected' : ''}>RESOLVED</option>
+        </select>
+      </div>
+
+      <div class="detail-item" style="margin-bottom:15px;">
+        <div class="detail-label">Reply / Action Note</div>
+        <textarea id="ticketReplyText" ${isClosed ? 'disabled' : ''} style="width:100%;min-height:120px;padding:12px;border-radius:8px;border:2px solid #334155;background:#0f172a;color:#e2e8f0;" placeholder="${isClosed ? 'Closed ticket - view only' : 'Write update for user...'}"></textarea>
+      </div>
+
+      <div class="detail-item" style="margin-bottom:15px;">
+        <div class="detail-label">Timeline</div>
+        ${updatesHtml || '<div class="no-data">No updates found</div>'}
+      </div>
+
+      <div class="modal-footer" style="padding:0;margin-top:16px;justify-content:flex-start;">
+        ${isClosed
+          ? `<button class="btn-modal" onclick="reopenTicket(${t.id})">Reopen Ticket</button>`
+          : `
+            <button class="btn-modal btn-save" onclick="submitTicketUpdate(${t.id})">Save Update</button>
+            <button class="btn-modal btn-cancel" onclick="closeTicket(${t.id})">Close Ticket</button>
+          `
+        }
+      </div>
+    `;
+
+    document.getElementById('detailsModal').classList.add('active');
+  } catch (err) {
+    alert('Error: ' + err.message);
+  }
+}
+
+async function submitTicketUpdate(ticketId) {
+  const status = (document.getElementById('ticketStatusSelect')?.value || '').trim();
+  const message = (document.getElementById('ticketReplyText')?.value || '').trim();
+
+  if (!message && !status) {
+    alert('Reply or status required');
+    return;
+  }
+
+  try {
+    await apiSend(`/api/admin/tickets/${ticketId}/reply`, 'POST', {
+      status: status,
+      message: message,
+      is_internal: false
+    });
+
+    alert('Ticket updated successfully');
+    await loadQueries();
+    await showTicketDetails(ticketId);
+  } catch (err) {
+    alert('Error: ' + err.message);
+  }
+}
+
+async function closeTicket(ticketId) {
+  const message = (document.getElementById('ticketReplyText')?.value || 'Closed by admin').trim();
+
+  try {
+    await apiSend(`/api/admin/tickets/${ticketId}/close`, 'POST', { message });
+    alert('Ticket closed successfully');
+    await loadQueries();
+    await showTicketDetails(ticketId);
+  } catch (err) {
+    alert('Error: ' + err.message);
+  }
+}
+
+async function reopenTicket(ticketId) {
+  try {
+    await apiSend(`/api/admin/tickets/${ticketId}/reopen`, 'POST', { message: 'Reopened by admin' });
+    alert('Ticket reopened successfully');
+    await loadQueries();
+    await showTicketDetails(ticketId);
+  } catch (err) {
+    alert('Error: ' + err.message);
+  }
+}
 
     // ------------------------
     // Referrals / Promos / Announcements / Reports (placeholder-safe)
