@@ -20,23 +20,39 @@ body {
 
 /* Full page container */
 .diamond-page {
-  min-height: 100vh;
+  position: relative;
   width: 100%;
-  max-width: 480px;
-  margin: 0 auto;
-  padding: 10px 10px 14px;
+  min-height: 100vh;
+  min-height: 100dvh;
+  height: 100dvh;
+  margin: 0;
+  padding: 0;
   display: flex;
   flex-direction: column;
+  overflow: hidden;
 }
+
+.diamond-page::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: url("../img/diamond_bg.png") center center / cover no-repeat;
+  filter: brightness(0.88);
+  z-index: 0;
+}
+
 
 /* ===== TOP BAR ===== */
 
 .top-bar {
+  position: relative;
+  z-index: 2;
   display: flex;
   align-items: flex-start;
   justify-content: space-between;
   gap: 8px;
-  margin-bottom: 10px;
+  padding: 10px 10px 0;
+  margin-bottom: 8px;
 }
 
 .top-left {
@@ -135,32 +151,31 @@ body {
 /* ===== ARCHERY RANGE ===== */
 
 .range-wrapper {
+  position: relative;
+  z-index: 2;
   flex: 1 1 auto;
+  min-height: 0;
   display: flex;
-  align-items: center;
-  justify-content: center;
-  margin-bottom: 10px;
+  margin-bottom: 0;
 }
 
 .range {
   position: relative;
+  flex: 1 1 auto;
   width: 100%;
-  min-height: 260px;
-  border-radius: 28px;
+  min-height: 0;
+  height: auto;
+  border-radius: 0;
   overflow: hidden;
-  box-shadow: 0 18px 40px rgba(0, 0, 0, 0.9);
+  box-shadow: none;
+  background: transparent;
+  padding-bottom: 76px;
 }
 
-/* background image */
 .range-bg {
-  position: absolute;
-  inset: 0;
-  background-image: url("../img/diamond_bg.png");
-  background-size: cover;
-  background-position: center;
-  filter: brightness(0.9);
-  z-index: 0;
+  display: none;
 }
+
 
 /* Targets */
 
@@ -283,11 +298,19 @@ body {
 /* ===== BOTTOM CONTROLS ===== */
 
 .controls-sheet {
-  padding: 10px 12px 4px;
+  position: relative;
+  z-index: 2;
+  flex: 0 0 auto;
+  margin: 0 10px 10px;
+  padding: 10px 12px calc(10px + env(safe-area-inset-bottom));
   border-radius: 18px;
-  background: radial-gradient(circle at top, #020617, #020617 70%, #000 100%);
-  box-shadow: 0 -8px 24px rgba(0, 0, 0, 0.8);
+  background: rgba(2, 6, 23, 0.72);
+  backdrop-filter: blur(8px);
+  box-shadow: 0 -8px 24px rgba(0, 0, 0, 0.55);
+  max-height: none;
+  overflow: visible;
 }
+
 
 .numbers-title {
   text-align: center;
@@ -521,12 +544,6 @@ body {
 .range-wrapper{
   min-height: 0;   /* IMPORTANT: allows shrink so controls don't go off-screen */
   margin-bottom: 8px;
-}
-
-/* Make the range height responsive instead of forcing big min-height */
-.range{
-  min-height: 0;
-  height: clamp(210px, 34vh, 320px);
 }
 
 /* Controls become a scrollable bottom sheet */
