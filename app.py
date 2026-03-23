@@ -1203,9 +1203,11 @@ def start_all_game_tables():
 def api_subadmin_agents():
     if request.method == 'POST':
         data = request.get_json() or {}
-        name = (data.get('name') or data.get('agentName') or '').strip()
-        username = (data.get('username') or data.get('agentUsername') or '').strip()
-        password = (data.get('password') or data.get('agentPassword') or '').strip()
+
+        name = (data.get('name') or '').strip()
+        email = (data.get('email') or '').strip()   # optional, not stored in Agent model
+        username = (data.get('username') or '').strip()
+        password = data.get('password') or ''
 
         sp = data.get('salarypercent')
         if sp is None:
@@ -1219,33 +1221,43 @@ def api_subadmin_agents():
             salarypercent = 0
 
         if not name or not username or not password:
-            return jsonify({'success': False, 'message': 'name, username, password required'}), 400
+            return jsonify({'success': False, 'message': 'Name, username, password required'}), 400
 
         if salarypercent < 0 or salarypercent > 100:
-            return jsonify({'success': False, 'message': 'salarypercent must be 0-100'}), 400
+            return jsonify({'success': False, 'message': 'Salary percent must be 0-100'}), 400
 
         if Agent.query.filter_by(username=username).first():
             return jsonify({'success': False, 'message': 'Agent username already exists'}), 400
 
-        a = Agent(name=name, username=username, salarypercent=salarypercent)
+        a = Agent(
+            name=name,
+            username=username,
+            salarypercent=salarypercent,
+            isblocked=False
+        )
         a.setpassword(password)
         db.session.add(a)
         db.session.commit()
+
         return jsonify({'success': True, 'message': 'Agent created', 'id': a.id})
 
+    agents = Agent.query.order_by(Agent.createdat.desc()).all()
     out = []
-    rows = Agent.query.order_by(Agent.createdat.desc()).all()
 
-    for a in rows:
-        userids = [r[0] for r in User.query.with_entities(User.id).filter_by(agentid=a.id).all()]
-        usercount = len(userids)
+    for a in agents:
+        rows = User.query.with_entities(User.id).filter_by(agentid=a.id).all()
+        user_ids = [r[0] for r in rows]
+        usercount = len(user_ids)
 
         totalplayed = 0
-        if userids:
-            totalplayed = db.session.query(func.coalesce(func.sum(Transaction.amount), 0)) \
-                .filter(Transaction.userid.in_(userids)) \
-                .filter(func.lower(Transaction.kind) == 'bet') \
-                .scalar() or 0
+        if user_ids:
+            totalplayed = db.session.query(
+                func.coalesce(func.sum(Transaction.amount), 0)
+            ).filter(
+                Transaction.user_id.in_(user_ids)
+            ).filter(
+                func.lower(Transaction.kind) == 'bet'
+            ).scalar() or 0
 
         totalsalary = float(totalplayed) * float(a.salarypercent or 0) / 100.0
 
@@ -1259,7 +1271,7 @@ def api_subadmin_agents():
             'usercount': usercount,
             'totalplayed': int(totalplayed),
             'totalsalary': round(totalsalary, 2),
-            'createdat': fmtist(a.createdat, '%Y-%m-%d %H:%M') if a.createdat else ''
+            'createdat': fmt_ist(a.createdat, '%Y-%m-%d %H:%M') if a.createdat else ''
         })
 
     return jsonify(out)
@@ -1273,25 +1285,30 @@ def api_subadmin_agent_users(agentid):
         if not a:
             return jsonify({'success': False, 'message': 'Agent not found'}), 404
 
-        users = User.query.filter_by(agentid=a.id).order_by(User.createdat.desc()).all()
+        users = User.query.filter_by(agentid=a.id).order_by(User.created_at.desc()).all()
         items = []
 
         for u in users:
-            amountplayed = db.session.query(func.coalesce(func.sum(Transaction.amount), 0)) \
-                .filter(Transaction.userid == u.id) \
-                .filter(func.lower(Transaction.kind) == 'bet') \
-                .scalar() or 0
+            amountplayed = db.session.query(
+                func.coalesce(func.sum(Transaction.amount), 0)
+            ).filter(
+                Transaction.user_id == u.id
+            ).filter(
+                func.lower(Transaction.kind) == 'bet'
+            ).scalar() or 0
 
-            salarygenerated = amountplayed * float(a.salarypercent or 0) / 100.0
+            salarygenerated = float(amountplayed) * float(a.salarypercent or 0) / 100.0
 
             items.append({
                 'userid': u.id,
-                'joining': fmtist(u.createdat, '%Y-%m-%d %H:%M') if u.createdat else '',
+                'username': u.username,
+                'joining': fmt_ist(u.created_at, '%Y-%m-%d %H:%M') if u.created_at else '',
                 'amountplayed': int(amountplayed),
                 'salarygenerated': round(salarygenerated, 2)
             })
 
         return jsonify({'agentid': a.id, 'items': items})
+
     except Exception as e:
         return jsonify({'success': False, 'message': f'agent users api error: {str(e)}'}), 500
 
@@ -1326,10 +1343,12 @@ def subadmin_unblock_agent(agentid):
         a.isblocked = False
         a.blockreason = None
 
-        openp = AgentBlockPeriod.query \
-            .filter_by(agentid=a.id, endat=None) \
-            .order_by(AgentBlockPeriod.startat.desc()) \
-            .first()
+        openp = AgentBlockPeriod.query.filter_by(
+            agentid=a.id,
+            endat=None
+        ).order_by(
+            AgentBlockPeriod.startat.desc()
+        ).first()
 
         if openp:
             openp.endat = datetime.utcnow()
