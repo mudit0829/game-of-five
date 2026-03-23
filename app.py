@@ -544,24 +544,32 @@ def subadmin_required(f):
     @wraps(f)
     def decorated(*args, **kwargs):
         sid = get_session_subadmin_id()
+
         if not sid:
-            return redirect(url_for('subadmin_login'))
-        
+            if request.path.startswith('/api/subadmin/'):
+                return jsonify({'success': False, 'message': 'Sub-admin login required'}), 401
+            return redirect(url_for('subadmin_login_page'))
+
         try:
             sid_int = int(sid)
         except Exception:
             for k in ('subadmin_id', 'subadminid', 'subAdminId'):
                 session.pop(k, None)
-            return redirect(url_for('subadmin_login'))
-        
+            if request.path.startswith('/api/subadmin/'):
+                return jsonify({'success': False, 'message': 'Invalid sub-admin session'}), 401
+            return redirect(url_for('subadmin_login_page'))
+
         sa = SubAdmin.query.get(sid_int)
         if not sa:
             for k in ('subadmin_id', 'subadminid', 'subAdminId'):
                 session.pop(k, None)
-            return redirect(url_for('subadmin_login'))
-        
+            if request.path.startswith('/api/subadmin/'):
+                return jsonify({'success': False, 'message': 'Sub-admin not found'}), 401
+            return redirect(url_for('subadmin_login_page'))
+
         return f(*args, **kwargs)
     return decorated
+
 
         
 def superadmin_required(f):
