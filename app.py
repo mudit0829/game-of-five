@@ -1198,6 +1198,145 @@ def start_all_game_tables():
             threading.Thread(target=manage_game_table, args=(table,), daemon=True).start()
     print("All game table threads started!")
 
+@app.route('/api/subadmin/agents', methods=['GET', 'POST'])
+@subadmin_required
+def api_subadmin_agents():
+    if request.method == 'POST':
+        data = request.get_json() or {}
+        name = (data.get('name') or data.get('agentName') or '').strip()
+        username = (data.get('username') or data.get('agentUsername') or '').strip()
+        password = (data.get('password') or data.get('agentPassword') or '').strip()
+
+        sp = data.get('salarypercent')
+        if sp is None:
+            sp = data.get('salaryPercent')
+        if sp is None:
+            sp = data.get('agentSalaryPercent')
+
+        try:
+            salarypercent = float(sp or 0)
+        except Exception:
+            salarypercent = 0
+
+        if not name or not username or not password:
+            return jsonify({'success': False, 'message': 'name, username, password required'}), 400
+
+        if salarypercent < 0 or salarypercent > 100:
+            return jsonify({'success': False, 'message': 'salarypercent must be 0-100'}), 400
+
+        if Agent.query.filter_by(username=username).first():
+            return jsonify({'success': False, 'message': 'Agent username already exists'}), 400
+
+        a = Agent(name=name, username=username, salarypercent=salarypercent)
+        a.setpassword(password)
+        db.session.add(a)
+        db.session.commit()
+        return jsonify({'success': True, 'message': 'Agent created', 'id': a.id})
+
+    out = []
+    rows = Agent.query.order_by(Agent.createdat.desc()).all()
+
+    for a in rows:
+        userids = [r[0] for r in User.query.with_entities(User.id).filter_by(agentid=a.id).all()]
+        usercount = len(userids)
+
+        totalplayed = 0
+        if userids:
+            totalplayed = db.session.query(func.coalesce(func.sum(Transaction.amount), 0)) \
+                .filter(Transaction.userid.in_(userids)) \
+                .filter(func.lower(Transaction.kind) == 'bet') \
+                .scalar() or 0
+
+        totalsalary = float(totalplayed) * float(a.salarypercent or 0) / 100.0
+
+        out.append({
+            'id': a.id,
+            'name': a.name,
+            'username': a.username,
+            'salarypercent': float(a.salarypercent or 0),
+            'isblocked': bool(a.isblocked),
+            'blockreason': a.blockreason or '',
+            'usercount': usercount,
+            'totalplayed': int(totalplayed),
+            'totalsalary': round(totalsalary, 2),
+            'createdat': fmtist(a.createdat, '%Y-%m-%d %H:%M') if a.createdat else ''
+        })
+
+    return jsonify(out)
+
+
+@app.route('/api/subadmin/agents/<int:agentid>/users', methods=['GET'])
+@subadmin_required
+def api_subadmin_agent_users(agentid):
+    try:
+        a = Agent.query.get(agentid)
+        if not a:
+            return jsonify({'success': False, 'message': 'Agent not found'}), 404
+
+        users = User.query.filter_by(agentid=a.id).order_by(User.createdat.desc()).all()
+        items = []
+
+        for u in users:
+            amountplayed = db.session.query(func.coalesce(func.sum(Transaction.amount), 0)) \
+                .filter(Transaction.userid == u.id) \
+                .filter(func.lower(Transaction.kind) == 'bet') \
+                .scalar() or 0
+
+            salarygenerated = amountplayed * float(a.salarypercent or 0) / 100.0
+
+            items.append({
+                'userid': u.id,
+                'joining': fmtist(u.createdat, '%Y-%m-%d %H:%M') if u.createdat else '',
+                'amountplayed': int(amountplayed),
+                'salarygenerated': round(salarygenerated, 2)
+            })
+
+        return jsonify({'agentid': a.id, 'items': items})
+    except Exception as e:
+        return jsonify({'success': False, 'message': f'agent users api error: {str(e)}'}), 500
+
+
+@app.route('/api/subadmin/agents/<int:agentid>/block', methods=['POST'])
+@subadmin_required
+def subadmin_block_agent(agentid):
+    a = Agent.query.get(agentid)
+    if not a:
+        return jsonify({'success': False, 'message': 'Agent not found'}), 404
+
+    data = request.get_json() or {}
+    reason = (data.get('reason') or 'Blocked by subadmin').strip()
+
+    if not a.isblocked:
+        a.isblocked = True
+        a.blockreason = reason
+        db.session.add(AgentBlockPeriod(agentid=a.id, startat=datetime.utcnow(), endat=None))
+        db.session.commit()
+
+    return jsonify({'success': True, 'message': 'Agent blocked'})
+
+
+@app.route('/api/subadmin/agents/<int:agentid>/unblock', methods=['POST'])
+@subadmin_required
+def subadmin_unblock_agent(agentid):
+    a = Agent.query.get(agentid)
+    if not a:
+        return jsonify({'success': False, 'message': 'Agent not found'}), 404
+
+    if a.isblocked:
+        a.isblocked = False
+        a.blockreason = None
+
+        openp = AgentBlockPeriod.query \
+            .filter_by(agentid=a.id, endat=None) \
+            .order_by(AgentBlockPeriod.startat.desc()) \
+            .first()
+
+        if openp:
+            openp.endat = datetime.utcnow()
+
+        db.session.commit()
+
+    return jsonify({'success': True, 'message': 'Agent unblocked'})
 
 # ---------------------------------------------------
 # Super Admin routes (login-based with history)
