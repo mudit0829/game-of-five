@@ -598,7 +598,13 @@ def ensure_wallet_for_user(user: User, starting_balance: int = 10000) -> Wallet:
 
 
 def generate_bot_name():
-    prefixes = ["Amit", "Sanjay", "Riya", "Kunal", "Anita", "Rohit", "Meera", "Neeraj"]
+    prefixes = ["Rahul","Amit","Ankit","Rohit","Vikas","Sandeep","Deepak","Ajay","Pankaj","Manoj","Vivek","Arun","Sunil","Rakesh","Rajesh","Sanjay","Kunal","Varun","Nitin","Mohit",
+                "Saurabh","Abhishek","Prashant","Shubham","Yogesh","Priya","Pooja","Neha","Kavita","Sunita","Anjali","Ritu","Sneha","Preeti","Swati","Aarti","Nidhi","Kiran","Meena","Rekha","Suman","Divya","Shalini","Komal","Rashmi",
+                "Payal","Riya","Sonia","Simran","Monika","John","Michael","David","James","Robert","William","Richard","Thomas","Daniel","Matthew","Anthony","Mark","Paul","Steven","Andrew","Joshua","Kevin","Brian","George",
+                "Edward","Ryan","Jason","Justin","Nicholas","Mary","Jennifer","Linda","Elizabeth","Patricia","Barbara","Susan","Jessica","Sarah","Karen","Nancy","Lisa","Betty","Sandra","Ashley","Kimberly","Donna","Emily","Michelle","Amanda",
+                "Melissa","Stephanie","Rebecca","Laura","Anna","Shadow","Killer","Sniper","Dragon","Hunter","Warrior","Ghost","Legend","Demon","Ninja","Phantom","Predator","Assassin","Viper","Titan","Rogue","Blaze","Thunder","Storm","Reaper",
+                "Gladiator","Falcon","Spartan","Wolf","Cyclone","DarkKnight","IronFist","FireStorm","SilentKiller","DeathDealer","AlphaWolf","NightHunter","VenomX","BloodRider","SteelHeart","BlackShadow","FrostBite","LoneWarrior","MadSniper",
+                "ThunderX","GhostRider","DragonSlayer","ShadowStrike","SkullCrusher","StormBreaker","WildBeast","NovaX","OmegaWarrior","InfernoX","ZeroCool"]
     suffix = random.randint(100, 999)
     return f"{random.choice(prefixes)}{suffix}"
 
