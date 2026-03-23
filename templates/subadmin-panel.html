@@ -867,13 +867,14 @@
     async function loadStats() {
   try {
     const data = await apiGet('/api/subadmin/stats');
-    document.getElementById('totalUsers').textContent = data.totalusers ?? 0;
-    document.getElementById('totalAgents').textContent = data.totalagents ?? 0;
-    document.getElementById('activeGames').textContent = data.activegames ?? 0;
+    document.getElementById('totalUsers').textContent = data.total_users ?? data.totalusers ?? 0;
+    document.getElementById('totalAgents').textContent = data.total_agents ?? data.totalagents ?? 0;
+    document.getElementById('activeGames').textContent = data.active_games ?? data.activegames ?? 0;
   } catch (err) {
     console.error('Stats error', err);
   }
 }
+
 
 
     async function loadUsers() {
