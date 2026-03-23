@@ -267,12 +267,13 @@ class SubAdmin(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     name = db.Column(db.String(120), nullable=False)
     username = db.Column(db.String(80), unique=True, nullable=False, index=True)
+    phone = db.Column(db.String(20))  # NEW
     password_hash = db.Column(db.String(128), nullable=False)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
-    
+
     def set_password(self, password: str):
         self.password_hash = hashlib.sha256(password.encode()).hexdigest()
-    
+
     def check_password(self, password: str) -> bool:
         return self.password_hash == hashlib.sha256(password.encode()).hexdigest()
 
@@ -370,6 +371,34 @@ def migrate_ticket_schema():
     existing_after = {row[1] for row in cur.fetchall()}
     if "last_reply_at" in existing_after:
         cur.execute("UPDATE ticket SET last_reply_at=COALESCE(last_reply_at, updated_at, created_at)")
+
+    conn.commit()
+    conn.close()
+
+def migrate_subadmin_phone_column():
+    conn = sqlite3.connect(db_path)
+    cur = conn.cursor()
+
+    cur.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='sub_admin'")
+    row = cur.fetchone()
+
+    if row:
+        table_name = 'sub_admin'
+    else:
+        cur.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='subadmin'")
+        row = cur.fetchone()
+        table_name = 'subadmin' if row else None
+
+    if not table_name:
+        conn.commit()
+        conn.close()
+        return
+
+    cur.execute(f"PRAGMA table_info({table_name})")
+    existing = {r[1] for r in cur.fetchall()}
+
+    if "phone" not in existing:
+        cur.execute(f"ALTER TABLE {table_name} ADD COLUMN phone TEXT")
 
     conn.commit()
     conn.close()
@@ -3064,24 +3093,44 @@ def adminupdateagent(agentid):
 
     data = request.get_json() or {}
 
-    # allow editing name + salary%
     if 'name' in data or 'agentName' in data:
         a.name = (data.get('name') or data.get('agentName') or a.name).strip()
+
+    if 'username' in data or 'agentUsername' in data:
+        new_username = (data.get('username') or data.get('agentUsername') or a.username).strip()
+        if not new_username:
+            return jsonify(success=False, message="Username required"), 400
+
+        existing = Agent.query.filter(Agent.username == new_username, Agent.id != a.id).first()
+        if existing:
+            return jsonify(success=False, message="Agent username already exists"), 400
+
+        a.username = new_username
 
     sp = data.get('salarypercent')
     if sp is None:
         sp = data.get('salaryPercent')
+    if sp is None:
+        sp = data.get('agentSalaryPercent')
+
     if sp is not None:
         try:
             sp = float(sp)
         except Exception:
             return jsonify(success=False, message="salarypercent must be a number"), 400
+
         if sp < 0 or sp > 100:
             return jsonify(success=False, message="salarypercent must be 0-100"), 400
+
         a.salarypercent = sp
+
+    new_password = (data.get('password') or data.get('agentPassword') or '').strip()
+    if new_password:
+        a.setpassword(new_password)
 
     db.session.commit()
     return jsonify(success=True, message="Agent updated")
+
 
 
 # ----------------------------
@@ -3324,24 +3373,23 @@ def admin_get_transactions():
 def api_admin_subadmins():
     if request.method == 'POST':
         data = request.get_json() or {}
-        name = data.get('name', '').strip()
-        username = data.get('username', '').strip()
-        password = data.get('password', '')
-        
+        name = (data.get('name') or '').strip()
+        username = (data.get('username') or '').strip()
+        password = (data.get('password') or '').strip()
+        phone = (data.get('phone') or data.get('mobile') or '').strip()
+
         if not name or not username or not password:
             return jsonify({'success': False, 'message': 'All fields required'}), 400
-        
+
         if SubAdmin.query.filter_by(username=username).first():
             return jsonify({'success': False, 'message': 'Username exists'}), 400
-        
-        sa = SubAdmin(name=name, username=username)
+
+        sa = SubAdmin(name=name, username=username, phone=phone)
         sa.set_password(password)
         db.session.add(sa)
         db.session.commit()
-        
         return jsonify({'success': True, 'message': 'Sub-admin created', 'id': sa.id})
-    
-    # GET list
+
     subadmins = SubAdmin.query.order_by(SubAdmin.created_at.desc()).all()
     out = []
     for sa in subadmins:
@@ -3349,9 +3397,43 @@ def api_admin_subadmins():
             'id': sa.id,
             'name': sa.name,
             'username': sa.username,
-            'created_at': fmt_ist(sa.created_at, '%Y-%m-%d %H:%M')
+            'phone': sa.phone or '',
+            'mobile': sa.phone or '',
+            'created_at': fmt_ist(sa.created_at, '%Y-%m-%d %H:%M') if sa.created_at else '',
+            'createdat': fmt_ist(sa.created_at, '%Y-%m-%d %H:%M') if sa.created_at else '',
         })
     return jsonify(out)
+
+@app.route('/api/admin/subadmins/<int:subadmin_id>', methods=['PUT'])
+@admin_required
+def api_admin_update_subadmin(subadmin_id):
+    sa = SubAdmin.query.get(subadmin_id)
+    if not sa:
+        return jsonify({'success': False, 'message': 'Sub-admin not found'}), 404
+
+    data = request.get_json() or {}
+    name = (data.get('name') or sa.name).strip()
+    username = (data.get('username') or sa.username).strip()
+    phone = (data.get('phone') or data.get('mobile') or sa.phone or '').strip()
+    password = (data.get('password') or '').strip()
+
+    existing = SubAdmin.query.filter(
+        SubAdmin.username == username,
+        SubAdmin.id != sa.id
+    ).first()
+    if existing:
+        return jsonify({'success': False, 'message': 'Username already exists'}), 400
+
+    sa.name = name
+    sa.username = username
+    sa.phone = phone
+
+    if password:
+        sa.set_password(password)
+
+    db.session.commit()
+    return jsonify({'success': True, 'message': 'Sub-admin updated'})
+
 
 
 from flask import render_template, request, redirect, url_for, session
@@ -3665,9 +3747,10 @@ def seed_demo_users():
 # ---------------------------------------------------
 
 with app.app_context():
-    print("🔧 Creating database tables...")
+    print("Creating database tables...")
     db.create_all()
     migrate_ticket_schema()
+    migrate_subadmin_phone_column()
     print("✅ Database tables created (including ForcedWinnerHistory)")
 
     print("👥 Seeding demo users...")
