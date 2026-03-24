@@ -2192,16 +2192,17 @@ def api_agent_users():
         country = (data.get('country') or '').strip()
 
         if not username or not password:
-             return jsonify(success=False, message="Username and password required"), 400
+            return jsonify(success=False, message="Username and password required"), 400
 
         if not is_valid_username(username):
-             return jsonify(success=False, message="Username cannot contain spaces. Use only letters, numbers, and underscore."), 400
+            return jsonify(success=False, message="Username cannot contain spaces. Use only letters, numbers, and underscore."), 400
 
         if User.query.filter_by(username=username).first():
-             return jsonify(success=False, message="Username already exists"), 400
+            return jsonify(success=False, message="Username already exists"), 400
 
         u = User(username=username, agentid=aid, is_admin=False, is_blocked=False)
         u.set_password(password)
+
         if display_name:
             u.display_name = display_name
         if phone:
@@ -2217,7 +2218,7 @@ def api_agent_users():
 
         return jsonify(success=True, message="User created", userid=u.id)
 
-        users = User.query.filter_by(agentid=aid).order_by(User.created_at.desc()).all()
+    users = User.query.filter_by(agentid=aid).order_by(User.created_at.desc()).all()
 
     from_dt = _parse_from_date(request.args.get('from'))
     to_dt = _parse_to_date(request.args.get('to'))
@@ -3655,72 +3656,25 @@ def admin_agent_users(agentid):
         return jsonify(success=False, message='Agent not found'), 404
 
     summary = _build_agent_commission_data(a)
+    items = summary['items'][:]
+
+    created_map = {}
+    for u in User.query.filter_by(agentid=a.id).all():
+        u_created = (
+            getattr(u, "createdat", None)
+            or getattr(u, "createdAt", None)
+            or getattr(u, "created_at", None)
+        )
+        created_map[int(u.id)] = u_created or datetime.min
+
+    items.sort(key=lambda row: created_map.get(int(row.get('userid') or 0), datetime.min))
 
     return jsonify({
         'agentid': a.id,
         'agentname': a.name,
         'salarypercent': float(a.salarypercent or 0),
-        'items': summary['items']
+        'items': items
     })
-
-        # Find which "created" column exists on User model
-        created_col = None
-          for colname in ("createdat", "createdAt", "created_at"):
-            if hasattr(User, colname):
-                created_col = getattr(User, colname)
-                break
-
-        q = User.query.filter_by(agentid=a.id)
-        if created_col is not None:
-            q = q.order_by(created_col.asc())
-        else:
-            q = q.order_by(User.id.asc())
-
-        users = q.all()
-        user_ids = [int(u.id) for u in users]
-
-        played_map = {}
-        if user_ids:
-            # ✅ Works with both schemas: Transaction.user_id OR Transaction.userid
-            tx_user_col = getattr(Transaction, "user_id", None) or getattr(Transaction, "userid", None)
-            if tx_user_col is None:
-                raise Exception("Transaction model has no user_id or userid column")
-
-            rows = (
-                db.session.query(
-                    tx_user_col,
-                    func.coalesce(func.sum(Transaction.amount), 0)
-                )
-                .filter(tx_user_col.in_(user_ids))
-                .filter(func.lower(Transaction.kind) == 'bet')
-                .group_by(tx_user_col)
-                .all()
-            )
-            played_map = {int(uid): int(total or 0) for uid, total in rows}
-
-        items = []
-        for u in users:
-            # Read created date safely
-            u_created = (
-                getattr(u, "createdat", None)
-                or getattr(u, "createdAt", None)
-                or getattr(u, "created_at", None)
-            )
-
-            amount_played = played_map.get(int(u.id), 0)
-            salary_generated = (amount_played * float(a.salarypercent or 0)) / 100.0
-
-            items.append({
-                "userid": u.id,
-                "joining": fmt_ist(u_created, "%Y-%m-%d %H:%M") if u_created else "",
-                "amountplayed": int(amount_played),
-                "salarygenerated": round(salary_generated, 2)
-            })
-
-        return jsonify({"agentid": a.id, "items": items})
-
-    except Exception as e:
-        return jsonify(success=False, message=f"agent users api error: {str(e)}"), 500
 
 @app.route('/api/admin/agents/<int:agentid>/commission-history', methods=['GET'])
 @admin_required
