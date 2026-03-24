@@ -21,6 +21,7 @@ import time
 import os
 import hashlib
 import secrets
+import re
 
 # ---------------------------------------------------
 # Flask / DB / Socket setup
@@ -456,6 +457,13 @@ def _is_admin_user(user):
         getattr(user, "isadmin", False) or
         getattr(user, "isAdmin", False)
     )
+def is_valid_username(username: str) -> bool:
+    username = (username or "").strip()
+    if not username:
+        return False
+    if " " in username:
+        return False
+    return re.fullmatch(r"[A-Za-z0-9_]+", username) is not None
 
 def login_required(f):
     @wraps(f)
@@ -827,17 +835,20 @@ def subadmin_panel():
 @subadmin_required
 def api_subadmin_users():
     sid = get_session_subadmin_id()
-    if request.method == 'POST':
-        data = request.get_json() or {}
-        username = data.get('username', '').strip()
-        password = data.get('password', '')
-        displayname = data.get('displayname', '').strip()
-        
-        if not username or not password:
-            return jsonify({'success': False, 'message': 'Username and password required'}), 400
-        
-        if User.query.filter_by(username=username).first():
-            return jsonify({'success': False, 'message': 'Username already exists'}), 400
+    data = request.get_json() or {}
+         username = data.get('username', '').strip()
+         password = data.get('password', '')
+         displayname = data.get('displayname', '').strip()
+
+         if not username or not password:
+         return jsonify({'success': False, 'message': 'Username and password required'}), 400
+
+         if not is_valid_username(username):
+         return jsonify({'success': False, 'message': 'Username cannot contain spaces. Use only letters, numbers, and underscore.'}), 400
+
+         if User.query.filter_by(username=username).first():
+         return jsonify({'success': False, 'message': 'Username already exists'}), 400
+
         
         u = User(username=username, display_name=displayname, is_admin=False, is_blocked=False)
         u.set_password(password)
@@ -1817,8 +1828,13 @@ def register_page():
 
     if not username or not password:
         return jsonify({"success": False, "message": "Username and password required"}), 400
+
+    if not is_valid_username(username):
+        return jsonify({"success": False,"message": "Username cannot contain spaces. Use only letters, numbers, and underscore."}), 400
+
     if len(password) < 6:
         return jsonify({"success": False, "message": "Password must be at least 6 characters"}), 400
+
 
     existing = User.query.filter_by(username=username).first()
     if existing:
@@ -1968,10 +1984,13 @@ def api_agent_users():
         country = (data.get('country') or '').strip()
 
         if not username or not password:
-            return jsonify(success=False, message="Username and password required"), 400
+        return jsonify(success=False, message="Username and password required"), 400
+
+        if not is_valid_username(username):
+        return jsonify(success=False, message="Username cannot contain spaces. Use only letters, numbers, and underscore."), 400
 
         if User.query.filter_by(username=username).first():
-            return jsonify(success=False, message="Username already exists"), 400
+        return jsonify(success=False, message="Username already exists"), 400
 
         u = User(username=username, agentid=aid, is_admin=False, is_blocked=False)
         u.set_password(password)
