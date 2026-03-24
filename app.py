@@ -836,18 +836,18 @@ def subadmin_panel():
 def api_subadmin_users():
     sid = get_session_subadmin_id()
     data = request.get_json() or {}
-         username = data.get('username', '').strip()
-         password = data.get('password', '')
-         displayname = data.get('displayname', '').strip()
+    username = data.get('username', '').strip()
+    password = data.get('password', '')
+    displayname = data.get('displayname', '').strip()
 
-         if not username or not password:
-         return jsonify({'success': False, 'message': 'Username and password required'}), 400
+    if not username or not password:
+    return jsonify({'success': False, 'message': 'Username and password required'}), 400
 
-         if not is_valid_username(username):
-         return jsonify({'success': False, 'message': 'Username cannot contain spaces. Use only letters, numbers, and underscore.'}), 400
+    if not is_valid_username(username):
+    return jsonify({'success': False, 'message': 'Username cannot contain spaces. Use only letters, numbers, and underscore.'}), 400
 
-         if User.query.filter_by(username=username).first():
-         return jsonify({'success': False, 'message': 'Username already exists'}), 400
+    if User.query.filter_by(username=username).first():
+    return jsonify({'success': False, 'message': 'Username already exists'}), 400
 
         
         u = User(username=username, display_name=displayname, is_admin=False, is_blocked=False)
