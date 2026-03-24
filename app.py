@@ -1146,6 +1146,55 @@ def api_subadmin_transactions():
         })
     return jsonify(out)
 
+@app.route('/api/subadmin/games-history', methods=['GET'])
+@subadmin_required
+def api_subadmin_games_history():
+    page = request.args.get('page', 1, type=int)
+    limit = request.args.get('limit', 100, type=int)
+    q = (request.args.get('q') or '').strip().lower()
+
+    query = GameRoundHistory.query
+
+    if q:
+        query = query.filter(
+            db.or_(
+                func.lower(GameRoundHistory.roundcode).like(f'%{q}%'),
+                func.lower(GameRoundHistory.gametype).like(f'%{q}%')
+            )
+        )
+
+    total = query.count()
+    rows = (
+        query
+        .order_by(GameRoundHistory.endedat.desc())
+        .offset((page - 1) * limit)
+        .limit(limit)
+        .all()
+    )
+
+    items = []
+    for r in rows:
+        items.append({
+            'roundcode': r.roundcode,
+            'gametype': r.gametype,
+            'tablenumber': r.tablenumber,
+            'players': int(r.players or 0),
+            'maxplayers': int(r.maxplayers or 0),
+            'result': r.result,
+            'totalbets': int(r.totalbets or 0),
+            'startedat': fmt_ist(r.startedat, '%Y-%m-%d %H:%M') if r.startedat else '',
+            'endedat': fmt_ist(r.endedat, '%Y-%m-%d %H:%M') if r.endedat else '',
+            'status': r.status or 'finished',
+        })
+
+    return jsonify({
+        'items': items,
+        'page': page,
+        'limit': limit,
+        'total': total
+    })
+
+
 # Sub-admin referrals (same as admin, placeholder)
 @app.route('/api/subadmin/referrals')
 @subadmin_required
@@ -1919,70 +1968,106 @@ def get_all_tables():
 
 
 @app.route("/api/user-games")
+@login_required
 def user_games_history_api():
-    user_id = request.args.get("user_id", type=int)
-    if not user_id:
+    user_id = request.args.get("user_id", type=int) or _get_session_user_id()
+    try:
+        user_id = int(user_id)
+    except Exception:
         return jsonify({"current_games": [], "game_history": []})
 
-    user_bets = user_game_history.get(user_id, [])
+    rows = (
+        db.session.query(GameRoundBet, GameRoundHistory)
+        .join(GameRoundHistory, GameRoundHistory.roundcode == GameRoundBet.roundcode)
+        .filter(GameRoundBet.userid == str(user_id))
+        .order_by(GameRoundHistory.endedat.desc(), GameRoundBet.bettime.asc())
+        .all()
+    )
 
     grouped = {}
-    for b in user_bets:
-        key = (b["game_type"], b["round_code"])
-        cfg = GAME_CONFIGS[b["game_type"]]
-        bet_amt = int(cfg["bet_amount"])
-        payout_amt = int(cfg["payout"])
+
+    for bet, hist in rows:
+        key = (hist.gametype, hist.roundcode, hist.tablenumber)
 
         if key not in grouped:
             grouped[key] = {
-                "game_type": b["game_type"],
-                "round_code": b["round_code"],
-                "bet_amount": bet_amt,
+                "game_type": hist.gametype,
+                "round_code": hist.roundcode,
+                "bet_amount": int(getattr(bet, "betamount", 0) or 0),
                 "user_bets": [],
-                "winning_number": None,
-                "date_time": "",
+                "winning_number": hist.result,
+                "date_time": fmt_ist(hist.endedat, "%Y-%m-%d %H:%M") if hist.endedat else "",
                 "status": None,
-                "amount": 0,          # show in UI
-                "win_amount": 0,      # payout only (no subtraction)
-                "loss_amount": 0,     # total bet lost (only losing picks)
+                "amount": 0,
+                "win_amount": 0,
+                "loss_amount": 0,
                 "time_remaining": None,
-                "table_number": b.get("table_number"),
+                "table_number": hist.tablenumber,
             }
 
-        grouped[key]["user_bets"].append(b["number"])
+        try:
+            grouped[key]["user_bets"].append(int(bet.number))
+        except Exception:
+            pass
 
-        if b.get("winning_number") is not None:
-            grouped[key]["winning_number"] = b["winning_number"]
-
-            if b.get("date_time"):
-                grouped[key]["date_time"] = b["date_time"]
-
-            if b.get("status") == "win":
-                grouped[key]["win_amount"] += payout_amt
-            elif b.get("status") == "lose":
-                grouped[key]["loss_amount"] += bet_amt
-
-    # finalize round-level status + display amount
     for g in grouped.values():
-        if g["winning_number"] is not None:
-            g["status"] = "win" if g["win_amount"] > 0 else "lose"
-            g["amount"] = g["win_amount"] if g["win_amount"] > 0 else g["loss_amount"]
+        g["user_bets"] = sorted(set(g["user_bets"]))
+        cfg = GAME_CONFIGS.get(g["game_type"], {})
+        payout_amt = int(cfg.get("payout", 0) or 0)
+        total_loss = int(g["bet_amount"] or 0) * len(g["user_bets"])
 
-    all_games = list(grouped.values())
+        if g["winning_number"] in g["user_bets"]:
+            g["status"] = "win"
+            g["win_amount"] = payout_amt
+            g["loss_amount"] = 0
+            g["amount"] = payout_amt
+        else:
+            g["status"] = "lose"
+            g["win_amount"] = 0
+            g["loss_amount"] = total_loss
+            g["amount"] = total_loss
 
-    # attach time_remaining for current games
-    for g in all_games:
-        if not g.get("status"):
-            tables = game_tables.get(g["game_type"], [])
-            for table in tables:
-                if table.round_code == g["round_code"]:
-                    g["time_remaining"] = table.get_time_remaining()
-                    break
+    game_history = list(grouped.values())
+    game_history.sort(key=lambda x: x.get("date_time", ""), reverse=True)
 
-    game_history = [g for g in all_games if g.get("status")]
-    current_games = [g for g in all_games if not g.get("status")]
+    current_games = []
+    for game_type, tables in game_tables.items():
+        for table in tables:
+            if getattr(table, "is_finished", False):
+                continue
 
-    return jsonify({"current_games": current_games, "game_history": game_history})
+            user_bets = []
+            for bet in (table.bets or []):
+                try:
+                    bet_uid = int(bet.get("user_id"))
+                except Exception:
+                    continue
+                if bet_uid == user_id:
+                    try:
+                        user_bets.append(int(bet.get("number")))
+                    except Exception:
+                        pass
+
+            if user_bets:
+                current_games.append({
+                    "game_type": table.game_type,
+                    "round_code": table.round_code,
+                    "bet_amount": int(table.config.get("bet_amount", 0) or 0),
+                    "user_bets": sorted(set(user_bets)),
+                    "winning_number": None,
+                    "date_time": fmt_ist(table.start_time, "%Y-%m-%d %H:%M") if table.start_time else "",
+                    "status": None,
+                    "amount": 0,
+                    "win_amount": 0,
+                    "loss_amount": 0,
+                    "time_remaining": table.get_time_remaining(),
+                    "table_number": table.table_number,
+                })
+
+    return jsonify({
+        "current_games": current_games,
+        "game_history": game_history
+    })
 
 
 # ---------------------------------------------------
@@ -2172,6 +2257,41 @@ def api_agent_salary():
         "items": items,
     })
 
+
+    
+@app.route('/api/agent/commission-history', methods=['GET'])
+@agent_required
+def api_agent_commission_history():
+    aid = int(get_session_agent_id())
+    agent = Agent.query.get(aid)
+    if not agent:
+        return jsonify(success=False, message="Agent not found"), 404
+
+    from_dt = _parse_from_date(request.args.get('from'))
+    to_dt = _parse_to_date(request.args.get('to'))
+    limit = request.args.get('limit', 200, type=int)
+
+    summary = _build_agent_commission_data(
+        agent,
+        from_dt=from_dt,
+        to_dt=to_dt,
+        include_history=True,
+        limit=limit
+    )
+
+    return jsonify({
+        "agentid": agent.id,
+        "agentname": agent.name,
+        "salarypercent": float(agent.salarypercent or 0),
+        "summary": {
+            "rawplayed": int(summary["rawplayed"]),
+            "eligibleplayed": int(summary["eligibleplayed"]),
+            "blockedplayed": int(summary["blockedplayed"]),
+            "totalsalary": round(summary["totalsalary"], 2),
+            "blockedsalary": round(summary["blockedsalary"], 2),
+        },
+        "items": summary["history"]
+    })
 
 
 @app.route('/api/agent/users', methods=['GET', 'POST'])
