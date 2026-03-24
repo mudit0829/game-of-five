@@ -2058,18 +2058,40 @@ function displayAgents() {
       <td>${fmtINR(totalPlayed)}</td>
       <td>${fmtINR(totalSalary)}</td>
       <td>
-        <div class="action-buttons">
-          <button class="btn-small btn-edit" onclick="openEditAgent(${agentId})">Edit</button>
-          <button class="btn-small btn-block" onclick="toggleAgentBlock(${agentId})">
-            ${String(statusRaw).toLowerCase() === "blocked" || String(statusRaw).toLowerCase() === "true" ? "Unblock" : "Block"}
-          </button>
-        </div>
+         <div class="action-buttons">
+             <button class="btn-small btn-edit" onclick="openEditAgent(${agentId})">Edit</button>
+             <button
+                class="btn-small ${String(statusRaw).toLowerCase() === 'blocked' || String(statusRaw).toLowerCase() === 'true' || String(statusRaw).toLowerCase() === '1' ? 'btn-unblock' : 'btn-block'}"
+                onclick="toggleAgentBlock(${agentId}, ${String(statusRaw).toLowerCase() === 'blocked' || String(statusRaw).toLowerCase() === 'true' || String(statusRaw).toLowerCase() === '1' ? 'false' : 'true'})">
+                ${String(statusRaw).toLowerCase() === "blocked" || String(statusRaw).toLowerCase() === "true" || String(statusRaw).toLowerCase() === "1" ? "Unblock" : "Block"}
+             </button>
+         </div>
       </td>
+
     `;
     tbody.appendChild(row);
   });
 }
 
+
+async function toggleAgentBlock(agentId, shouldBlock) {
+  try {
+    if (shouldBlock) {
+      const reason = prompt('Block reason (optional):', 'Blocked by admin') || 'Blocked by admin';
+      const res = await apiSend(`/api/admin/agents/${agentId}/block`, 'POST', { reason });
+      alert(res.message || 'Agent blocked');
+    } else {
+      const res = await apiSend(`/api/admin/agents/${agentId}/unblock`, 'POST', {});
+      alert(res.message || 'Agent unblocked');
+    }
+
+    await loadAgents();
+    await loadStats();
+  } catch (err) {
+    alert('Error: ' + err.message);
+  }
+}
+    
 async function submitAddAgent(e) {
   e.preventDefault();
 
