@@ -726,9 +726,9 @@
     }
 
     function logout() {
-      // If your agent logout URL is different, change it here
-      window.location.href = '/agent/logout';
+      window.location.href = "{{ url_for('agentlogout') }}";
     }
+
 
     // ------------------------
     // Menu (same behavior as admin_panel.html)
