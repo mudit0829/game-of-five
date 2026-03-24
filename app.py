@@ -841,13 +841,13 @@ def api_subadmin_users():
     displayname = data.get('displayname', '').strip()
 
     if not username or not password:
-    return jsonify({'success': False, 'message': 'Username and password required'}), 400
+        return jsonify({'success': False, 'message': 'Username and password required'}), 400
 
     if not is_valid_username(username):
-    return jsonify({'success': False, 'message': 'Username cannot contain spaces. Use only letters, numbers, and underscore.'}), 400
+        return jsonify({'success': False, 'message': 'Username cannot contain spaces. Use only letters, numbers, and underscore.'}), 400
 
     if User.query.filter_by(username=username).first():
-    return jsonify({'success': False, 'message': 'Username already exists'}), 400
+        return jsonify({'success': False, 'message': 'Username already exists'}), 400
 
         
         u = User(username=username, display_name=displayname, is_admin=False, is_blocked=False)
