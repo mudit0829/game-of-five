@@ -404,6 +404,228 @@ def migrate_subadmin_phone_column():
     conn.commit()
     conn.close()
 
+# =========================================================
+# AGENT COMMISSION HELPERS
+# Commission is counted ONLY when the agent is not blocked.
+# =========================================================
+
+def _safe_int(v, default=0):
+    try:
+        return int(v or 0)
+    except Exception:
+        return default
+
+
+def _parse_from_date(date_str):
+    if not date_str:
+        return None
+    try:
+        return datetime.strptime(date_str, "%Y-%m-%d")
+    except ValueError:
+        return None
+
+
+def _parse_to_date(date_str):
+    if not date_str:
+        return None
+    try:
+        return datetime.strptime(date_str, "%Y-%m-%d") + timedelta(days=1)
+    except ValueError:
+        return None
+
+
+def _merge_time_ranges(ranges):
+    cleaned = []
+    for start, end in ranges:
+        if not start or not end or end <= start:
+            continue
+        cleaned.append((start, end))
+
+    cleaned.sort(key=lambda x: x[0])
+    merged = []
+
+    for start, end in cleaned:
+        if not merged or start > merged[-1][1]:
+            merged.append([start, end])
+        else:
+            if end > merged[-1][1]:
+                merged[-1][1] = end
+
+    return [(s, e) for s, e in merged]
+
+
+def _get_agent_block_ranges(agent_id, from_dt=None, to_dt=None):
+    now = datetime.utcnow()
+    periods = (
+        AgentBlockPeriod.query
+        .filter_by(agentid=agent_id)
+        .order_by(AgentBlockPeriod.startat.asc())
+        .all()
+    )
+
+    ranges = []
+    for p in periods:
+        start = p.startat or now
+        end = p.endat or now
+
+        if from_dt and end <= from_dt:
+            continue
+        if to_dt and start >= to_dt:
+            continue
+
+        if from_dt and start < from_dt:
+            start = from_dt
+        if to_dt and end > to_dt:
+            end = to_dt
+
+        if end > start:
+            ranges.append((start, end))
+
+    return _merge_time_ranges(ranges)
+
+
+def _dt_in_ranges(dt_value, ranges):
+    if not dt_value:
+        return False
+    for start, end in ranges:
+        if start <= dt_value < end:
+            return True
+    return False
+
+
+def _tx_user_col():
+    return getattr(Transaction, "user_id", None) or getattr(Transaction, "userid", None)
+
+
+def _tx_datetime_col():
+    return getattr(Transaction, "datetime", None) or getattr(Transaction, "created_at", None)
+
+
+def _get_agent_users(agent_id):
+    return User.query.filter_by(agentid=agent_id).all()
+
+
+def _build_agent_commission_data(agent, from_dt=None, to_dt=None, include_history=False, limit=200):
+    users = _get_agent_users(agent.id)
+    user_ids = [int(u.id) for u in users]
+    user_map = {int(u.id): u for u in users}
+
+    percent = float(agent.salarypercent or 0)
+    out = {
+        "usercount": len(users),
+        "rawplayed": 0,
+        "eligibleplayed": 0,
+        "blockedplayed": 0,
+        "totalsalary": 0.0,
+        "blockedsalary": 0.0,
+        "items": [],
+        "history": []
+    }
+
+    if not user_ids:
+        return out
+
+    tx_user_col = _tx_user_col()
+    tx_dt_col = _tx_datetime_col()
+    if tx_user_col is None or tx_dt_col is None:
+        return out
+
+    blocked_ranges = _get_agent_block_ranges(agent.id, from_dt, to_dt)
+
+    q = (
+        db.session.query(Transaction)
+        .filter(tx_user_col.in_(user_ids))
+        .filter(func.lower(Transaction.kind) == "bet")
+    )
+
+    if from_dt:
+        q = q.filter(tx_dt_col >= from_dt)
+    if to_dt:
+        q = q.filter(tx_dt_col < to_dt)
+
+    txs = q.order_by(tx_dt_col.asc()).all()
+
+    per_user = {}
+    for u in users:
+        uid = int(u.id)
+        per_user[uid] = {
+            "userid": uid,
+            "username": u.username,
+            "joining": fmt_ist(_get_created_at(u), "%Y-%m-%d %H:%M") if _get_created_at(u) else "",
+            "rawplayed": 0,
+            "eligibleplayed": 0,
+            "blockedplayed": 0,
+            "salarygenerated": 0.0,
+            "blockedsalary": 0.0,
+        }
+
+    history_rows = []
+
+    for tx in txs:
+        uid_raw = getattr(tx, "user_id", None)
+        if uid_raw is None:
+            uid_raw = getattr(tx, "userid", None)
+
+        try:
+            uid = int(uid_raw)
+        except Exception:
+            continue
+
+        amount = _safe_int(getattr(tx, "amount", 0), 0)
+        tx_dt = getattr(tx, "datetime", None) or getattr(tx, "created_at", None) or datetime.utcnow()
+        is_blocked_tx = _dt_in_ranges(tx_dt, blocked_ranges)
+        commission_amount = round((amount * percent) / 100.0, 2)
+
+        out["rawplayed"] += amount
+        per_user[uid]["rawplayed"] += amount
+
+        if is_blocked_tx:
+            out["blockedplayed"] += amount
+            out["blockedsalary"] += commission_amount
+            per_user[uid]["blockedplayed"] += amount
+            per_user[uid]["blockedsalary"] += commission_amount
+            status = "BLOCKED_NO_COMMISSION"
+        else:
+            out["eligibleplayed"] += amount
+            out["totalsalary"] += commission_amount
+            per_user[uid]["eligibleplayed"] += amount
+            per_user[uid]["salarygenerated"] += commission_amount
+            status = "COUNTED"
+
+        if include_history:
+            history_rows.append({
+                "txnid": tx.id,
+                "userid": uid,
+                "username": user_map.get(uid).username if user_map.get(uid) else f"user_{uid}",
+                "amountplayed": amount,
+                "commissionamount": commission_amount,
+                "status": status,
+                "datetime": fmt_ist(tx_dt, "%Y-%m-%d %H:%M:%S") if tx_dt else "",
+                "label": tx.label or "",
+                "game_title": tx.game_title or "",
+                "note": tx.note or "",
+                "_raw_dt": tx_dt,
+            })
+
+    items = []
+    for row in per_user.values():
+        row["salarygenerated"] = round(row["salarygenerated"], 2)
+        row["blockedsalary"] = round(row["blockedsalary"], 2)
+        items.append(row)
+
+    items.sort(key=lambda x: (x.get("username") or "").lower())
+
+    out["totalsalary"] = round(out["totalsalary"], 2)
+    out["blockedsalary"] = round(out["blockedsalary"], 2)
+    out["items"] = items
+
+    if include_history:
+        history_rows.sort(key=lambda x: x["_raw_dt"], reverse=True)
+        for row in history_rows[:limit]:
+            row.pop("_raw_dt", None)
+        out["history"] = history_rows[:limit]
+
+    return out
 
 
 
@@ -499,27 +721,38 @@ def agent_required(f):
     @wraps(f)
     def decorated(*args, **kwargs):
         aid = get_session_agent_id()
+        is_api = request.path.startswith('/api/agent/')
+
         if not aid:
-            return redirect(url_for('agent_login'))  # <-- FIXED
+            if is_api:
+                return jsonify(success=False, message="Agent login required"), 401
+            return redirect(url_for('agentloginpage'))
 
         try:
             aid_int = int(aid)
         except Exception:
             for k in ('agent_id', 'agentid', 'agentId', 'agentID'):
                 session.pop(k, None)
-            return redirect(url_for('agent_login'))  # <-- FIXED
+            if is_api:
+                return jsonify(success=False, message="Invalid agent session"), 401
+            return redirect(url_for('agentloginpage'))
 
         a = Agent.query.get(aid_int)
         if not a:
             for k in ('agent_id', 'agentid', 'agentId', 'agentID'):
                 session.pop(k, None)
-            return redirect(url_for('agent_login'))  # <-- FIXED
+            if is_api:
+                return jsonify(success=False, message="Agent not found"), 401
+            return redirect(url_for('agentloginpage'))
 
         if getattr(a, 'isblocked', False):
+            if is_api:
+                return jsonify(success=False, message="Agent is blocked. Contact admin."), 403
             return "Agent is blocked. Contact admin.", 403
 
         return f(*args, **kwargs)
     return decorated
+
 
 
 def admin_required(f):
@@ -834,31 +1067,37 @@ def subadmin_panel():
 @app.route('/api/subadmin/users', methods=['GET', 'POST'])
 @subadmin_required
 def api_subadmin_users():
-    sid = get_session_subadmin_id()
-    data = request.get_json() or {}
-    username = data.get('username', '').strip()
-    password = data.get('password', '')
-    displayname = data.get('displayname', '').strip()
+    if request.method == 'POST':
+        data = request.get_json() or {}
+        username = data.get('username', '').strip()
+        password = data.get('password', '')
+        displayname = data.get('displayname', '').strip()
 
-    if not username or not password:
-        return jsonify({'success': False, 'message': 'Username and password required'}), 400
+        if not username or not password:
+            return jsonify({'success': False, 'message': 'Username and password required'}), 400
 
-    if not is_valid_username(username):
-        return jsonify({'success': False, 'message': 'Username cannot contain spaces. Use only letters, numbers, and underscore.'}), 400
+        if not is_valid_username(username):
+            return jsonify({
+                'success': False,
+                'message': 'Username cannot contain spaces. Use only letters, numbers, and underscore.'
+            }), 400
 
-    if User.query.filter_by(username=username).first():
-        return jsonify({'success': False, 'message': 'Username already exists'}), 400
+        if User.query.filter_by(username=username).first():
+            return jsonify({'success': False, 'message': 'Username already exists'}), 400
 
-        
-        u = User(username=username, display_name=displayname, is_admin=False, is_blocked=False)
+        u = User(
+            username=username,
+            display_name=displayname,
+            is_admin=False,
+            is_blocked=False
+        )
         u.set_password(password)
         db.session.add(u)
         db.session.commit()
-        ensure_wallet_for_user(u, starting_balance=0)  # 0 balance for subadmin-created users
-        
+        ensure_wallet_for_user(u, starting_balance=0)
+
         return jsonify({'success': True, 'message': 'User created', 'userid': u.id})
-    
-    # GET: list all users (no filtering, subadmin sees everyone)
+
     users = User.query.filter_by(is_admin=False).order_by(User.created_at.desc()).all()
     out = []
     for u in users:
@@ -1230,9 +1469,8 @@ def api_subadmin_agents():
         data = request.get_json() or {}
 
         name = (data.get('name') or '').strip()
-        email = (data.get('email') or '').strip()   # optional, not stored in Agent model
         username = (data.get('username') or '').strip()
-        password = data.get('password') or ''
+        password = (data.get('password') or '').strip()
 
         sp = data.get('salarypercent')
         if sp is None:
@@ -1243,7 +1481,7 @@ def api_subadmin_agents():
         try:
             salarypercent = float(sp or 0)
         except Exception:
-            salarypercent = 0
+            salarypercent = 0.0
 
         if not name or not username or not password:
             return jsonify({'success': False, 'message': 'Name, username, password required'}), 400
@@ -1270,21 +1508,7 @@ def api_subadmin_agents():
     out = []
 
     for a in agents:
-        rows = User.query.with_entities(User.id).filter_by(agentid=a.id).all()
-        user_ids = [r[0] for r in rows]
-        usercount = len(user_ids)
-
-        totalplayed = 0
-        if user_ids:
-            totalplayed = db.session.query(
-                func.coalesce(func.sum(Transaction.amount), 0)
-            ).filter(
-                Transaction.user_id.in_(user_ids)
-            ).filter(
-                func.lower(Transaction.kind) == 'bet'
-            ).scalar() or 0
-
-        totalsalary = float(totalplayed) * float(a.salarypercent or 0) / 100.0
+        summary = _build_agent_commission_data(a)
 
         out.append({
             'id': a.id,
@@ -1293,14 +1517,17 @@ def api_subadmin_agents():
             'salarypercent': float(a.salarypercent or 0),
             'isblocked': bool(a.isblocked),
             'blockreason': a.blockreason or '',
-            'usercount': usercount,
-            'totalplayed': int(totalplayed),
-            'totalsalary': round(totalsalary, 2),
+            'usercount': int(summary['usercount']),
+            'rawplayed': int(summary['rawplayed']),
+            'eligibleplayed': int(summary['eligibleplayed']),
+            'blockedplayed': int(summary['blockedplayed']),
+            'totalplayed': int(summary['eligibleplayed']),
+            'totalsalary': round(summary['totalsalary'], 2),
+            'blockedsalary': round(summary['blockedsalary'], 2),
             'createdat': fmt_ist(a.createdat, '%Y-%m-%d %H:%M') if a.createdat else ''
         })
 
     return jsonify(out)
-
 
 @app.route('/api/subadmin/agents/<int:agentid>/users', methods=['GET'])
 @subadmin_required
@@ -1885,7 +2112,7 @@ def agentloginpost():
 def agent_logout():
     for k in ('agent_id', 'agentid', 'agentId', 'agentID'):
         session.pop(k, None)
-    return redirect('/agent/login')
+    return redirect(url_for('agentloginpage'))
 
 @app.route('/agent')
 @agent_required
@@ -1917,50 +2144,31 @@ def api_agent_salary():
     from_str = request.args.get('from')  # 'YYYY-MM-DD'
     to_str = request.args.get('to')      # 'YYYY-MM-DD'
 
-    # users under this agent
-    users = User.query.filter_by(agentid=aid).all()
-    user_ids = [u.id for u in users]
+    from_dt = _parse_from_date(from_str)
+    to_dt = _parse_to_date(to_str)
 
-    base_query = db.session.query(Transaction).filter(
-        Transaction.user_id.in_(user_ids),
-        func.lower(Transaction.kind) == 'bet'
+    summary = _build_agent_commission_data(
+        agent,
+        from_dt=from_dt,
+        to_dt=to_dt,
+        include_history=False
     )
 
-    if from_str:
-        try:
-            dt_from = datetime.strptime(from_str, "%Y-%m-%d")
-            base_query = base_query.filter(Transaction.datetime >= dt_from)
-        except ValueError:
-            pass
-
-    if to_str:
-        try:
-            dt_to = datetime.strptime(to_str, "%Y-%m-%d") + timedelta(days=1)
-            base_query = base_query.filter(Transaction.datetime < dt_to)
-        except ValueError:
-            pass
-
-    # total played in range
-    total_played = (base_query.with_entities(func.coalesce(func.sum(Transaction.amount), 0)).scalar()) or 0
-    total_salary = (float(total_played) * float(agent.salarypercent or 0)) / 100.0
-
-    # per-user breakdown
     items = []
-    for u in users:
-        q_u = base_query.filter(Transaction.user_id == u.id)
-        amount_played = (q_u.with_entities(func.coalesce(func.sum(Transaction.amount), 0)).scalar()) or 0
-        salary_generated = (amount_played * float(agent.salarypercent or 0)) / 100.0
-
+    for row in summary["items"]:
+        amount_played = int(row["eligibleplayed"] + row["blockedplayed"])
         items.append({
-            "userid": u.id,
-            "joining": fmt_ist(u.created_at, "%Y-%m-%d %H:%M") if u.created_at else "",
-            "amountplayed": int(amount_played),
-            "salarygenerated": round(salary_generated, 0),
+            "userid": row["userid"],
+            "joining": row["joining"],
+            "amountplayed": amount_played,
+            "salarygenerated": round(row["salarygenerated"], 0),
         })
 
+    total_played = int(summary["eligibleplayed"] + summary["blockedplayed"])
+
     return jsonify({
-        "totalplayed": int(total_played),
-        "totalsalary": round(total_salary, 0),
+        "totalplayed": total_played,
+        "totalsalary": round(summary["totalsalary"], 0),
         "items": items,
     })
 
@@ -2009,32 +2217,31 @@ def api_agent_users():
 
         return jsonify(success=True, message="User created", userid=u.id)
 
-    users = User.query.filter_by(agentid=aid).order_by(User.created_at.desc()).all()
-    user_ids = [u.id for u in users]
+        users = User.query.filter_by(agentid=aid).order_by(User.created_at.desc()).all()
 
-    played_map = {}
-    if user_ids:
-        rows = db.session.query(
-            Transaction.user_id,
-            func.coalesce(func.sum(Transaction.amount), 0)
-        ).filter(
-            Transaction.user_id.in_(user_ids),
-            func.lower(Transaction.kind) == 'bet'
-        ).group_by(Transaction.user_id).all()
+    from_dt = _parse_from_date(request.args.get('from'))
+    to_dt = _parse_to_date(request.args.get('to'))
 
-        played_map = {int(uid): int(total or 0) for uid, total in rows}
+    summary = _build_agent_commission_data(
+        agent,
+        from_dt=from_dt,
+        to_dt=to_dt,
+        include_history=False
+    )
+    summary_map = {int(row["userid"]): row for row in summary["items"]}
 
     out = []
     for u in users:
-        amount_played = played_map.get(u.id, 0)
-        salary_generated = (amount_played * float(agent.salarypercent or 0)) / 100.0
+        row = summary_map.get(int(u.id), {})
+        amount_played = int((row.get("eligibleplayed") or 0) + (row.get("blockedplayed") or 0))
+        salary_generated = float(row.get("salarygenerated") or 0)
 
         out.append({
             "userid": u.id,
             "username": u.username,
             "status": "blocked" if u.is_blocked else "active",
             "joining": fmt_ist(u.created_at, "%Y-%m-%d %H:%M") if u.created_at else "",
-            "amountplayed": int(amount_played),
+            "amountplayed": amount_played,
             "salarygenerated": round(salary_generated, 0),
         })
 
@@ -2629,9 +2836,24 @@ def redeem_coins():
         return jsonify({"success": False, "message": "Insufficient balance"}), 400
 
     wallet.balance -= amount
+
+    tx = Transaction(
+        user_id=user.id,
+        kind="redeem",
+        amount=int(amount),
+        balance_after=int(wallet.balance),
+        label="Redeem Coins",
+        game_title="",
+        note="User redeemed coins",
+    )
+    db.session.add(tx)
     db.session.commit()
 
-    return jsonify({"success": True, "message": f"Successfully redeemed {amount} coins!", "new_balance": wallet.balance})
+    return jsonify({
+        "success": True,
+        "message": f"Successfully redeemed {amount} coins!",
+        "new_balance": wallet.balance
+    })
 
 
 
@@ -2669,14 +2891,15 @@ def _ensure_wallet(user):
     fn = globals().get("ensure_wallet_for_user") or globals().get("ensurewalletforuser")
     return fn(user) if fn else None
 
-def _create_wallet_for_user(userid: int, starting_balance: int = 0):
-    w = Wallet.query.filter_by(userid=userid).first()
+def _create_wallet_for_user(user_id: int, starting_balance: int = 0):
+    w = Wallet.query.filter_by(user_id=user_id).first()
     if w:
         return w
-    w = Wallet(userid=userid, balance=int(starting_balance or 0))
+    w = Wallet(user_id=user_id, balance=int(starting_balance or 0))
     db.session.add(w)
     db.session.commit()
     return w
+
 
 
 def _is_admin_user(user):
@@ -2713,15 +2936,20 @@ def _get_created_at(user):
 
 def _parse_round_start_from_roundcode(roundcode: str):
     """
-    roundcode format used in your project: Initial + YYYYMMDD + HHMM + TableNo
-    Example: G2026021722001 -> '202602172200' is IST time.
-    Returns timezone-aware IST datetime if IST/global exists, else naive dt.
+    Current format: G_YYYYMMDD_HHMM_TABLE
+    Example: G_20260217_2200_1
+    Returns timezone-aware IST datetime if IST exists, else naive datetime.
     """
     try:
-        s = str(roundcode or "")
-        if len(s) < 13:
+        s = str(roundcode or "").strip()
+        parts = s.split("_")
+        if len(parts) != 4:
             return None
-        dt = datetime.strptime(s[1:13], "%Y%m%d%H%M")
+
+        date_part = parts[1]
+        time_part = parts[2]
+        dt = datetime.strptime(f"{date_part}{time_part}", "%Y%m%d%H%M")
+
         ist = globals().get("IST", None)
         return dt.replace(tzinfo=ist) if ist else dt
     except Exception:
@@ -2903,9 +3131,24 @@ def admin_update_user(user_id):
 
     data = request.get_json() or {}
 
-    # Keep username editable only if you truly want it; otherwise comment this out
     if "username" in data and data["username"]:
-        user.username = str(data["username"]).strip()
+        new_username = str(data["username"]).strip()
+
+        if new_username != user.username:
+            if not is_valid_username(new_username):
+                return jsonify({
+                    "success": False,
+                    "message": "Username cannot contain spaces. Use only letters, numbers, and underscore."
+                }), 400
+
+            existing = User.query.filter(
+                User.username == new_username,
+                User.id != user.id
+            ).first()
+            if existing:
+                return jsonify({"success": False, "message": "Username already exists"}), 400
+
+            user.username = new_username
 
     if "email" in data:
         user.email = (data.get("email") or "").strip()
@@ -2913,17 +3156,15 @@ def admin_update_user(user_id):
     if ("password" in data) and data.get("password"):
         user.set_password(data["password"])
 
-    # status may come as "active"/"blocked"
     if "status" in data:
         _set_blocked(user, str(data.get("status", "")).lower() == "blocked")
 
-    # accept both block_reason and blockReason
     if "block_reason" in data or "blockReason" in data:
         _set_block_reason(user, (data.get("block_reason") or data.get("blockReason") or "").strip())
 
-    # NOTE: Do not update wallet balance here; use /balance endpoint only.
     db.session.commit()
     return jsonify({"success": True, "message": "User updated successfully"})
+
 
 
 @app.route("/api/admin/users/<int:user_id>/block", methods=["POST"])
@@ -2972,13 +3213,29 @@ def admin_credit_debit(user_id):
     if amount < 0:
         amount = abs(amount)
 
+    amount_int = int(amount)
+
     if transaction_type == "add":
-        wallet.balance = int(wallet.balance + amount)
+        wallet.balance = int(wallet.balance + amount_int)
+        tx_kind = "added"
+        tx_label = "Admin Add Balance"
     else:
-        wallet.balance = int(wallet.balance - amount)
+        wallet.balance = int(wallet.balance - amount_int)
         if wallet.balance < 0:
             wallet.balance = 0
+        tx_kind = "redeem"
+        tx_label = "Admin Deduct Balance"
 
+    tx = Transaction(
+        user_id=user.id,
+        kind=tx_kind,
+        amount=amount_int,
+        balance_after=int(wallet.balance),
+        label=tx_label,
+        game_title="",
+        note=reason,
+    )
+    db.session.add(tx)
     db.session.commit()
 
     return jsonify({
@@ -3203,13 +3460,13 @@ from flask import request, jsonify
 
 @app.route('/api/admin/agents', methods=['GET', 'POST'])
 @admin_required
-def adminagents():
+def admin_agents():
     if request.method == 'POST':
         data = request.get_json() or {}
 
-        name = (data.get('name') or data.get('agentName') or '').strip()
-        username = (data.get('username') or data.get('agentUsername') or '').strip()
-        password = (data.get('password') or data.get('agentPassword') or '').strip()
+        name = (data.get('name') or '').strip()
+        username = (data.get('username') or '').strip()
+        password = (data.get('password') or '').strip()
 
         sp = data.get('salarypercent')
         if sp is None:
@@ -3220,57 +3477,53 @@ def adminagents():
         try:
             salarypercent = float(sp or 0)
         except Exception:
-            salarypercent = 0
+            salarypercent = 0.0
 
         if not name or not username or not password:
-            return jsonify(success=False, message="name, username, password required"), 400
-        if salarypercent < 0 or salarypercent > 100:
-            return jsonify(success=False, message="salarypercent must be 0-100"), 400
-        if Agent.query.filter_by(username=username).first():
-            return jsonify(success=False, message="Agent username already exists"), 400
+            return jsonify(success=False, message='Name, username and password are required'), 400
 
-        a = Agent(name=name, username=username, salarypercent=salarypercent)
+        if salarypercent < 0 or salarypercent > 100:
+            return jsonify(success=False, message='Salary percent must be between 0 and 100'), 400
+
+        if Agent.query.filter_by(username=username).first():
+            return jsonify(success=False, message='Agent username already exists'), 400
+
+        a = Agent(
+            name=name,
+            username=username,
+            salarypercent=salarypercent,
+            isblocked=False
+        )
         a.setpassword(password)
         db.session.add(a)
         db.session.commit()
-        return jsonify(success=True, message="Agent created", id=a.id)
 
-    # GET: list agents + computed totals
+        return jsonify(success=True, message='Agent created', id=a.id)
+
     agents = Agent.query.order_by(Agent.createdat.desc()).all()
     out = []
 
     for a in agents:
-        # Get user ids under this agent (User.agentid must exist)
-        rows = User.query.with_entities(User.id).filter_by(agentid=a.id).all()
-        user_ids = [r[0] for r in rows]
-        usercount = len(user_ids)
-
-        totalplayed = 0
-        if user_ids:
-            totalplayed = (
-                db.session.query(func.coalesce(func.sum(Transaction.amount), 0))
-                .filter(Transaction.user_id.in_(user_ids))
-                .filter(func.lower(Transaction.kind) == 'bet')
-                .scalar()
-            ) or 0
-
-        totalsalary = (float(totalplayed) * float(a.salarypercent or 0)) / 100.0
+        summary = _build_agent_commission_data(a)
 
         out.append({
-            "id": a.id,
-            "name": a.name,
-            "username": a.username,
-            "salarypercent": float(a.salarypercent or 0),
-            "isblocked": bool(a.isblocked),
-            "blockreason": a.blockreason or "",
-            "usercount": usercount,
-            "totalplayed": int(totalplayed),
-            "totalsalary": round(totalsalary, 2),
-            "createdat": fmt_ist(a.createdat, "%Y-%m-%d %H:%M") if a.createdat else ""
+            'id': a.id,
+            'name': a.name,
+            'username': a.username,
+            'salarypercent': float(a.salarypercent or 0),
+            'isblocked': bool(a.isblocked),
+            'blockreason': a.blockreason or '',
+            'usercount': int(summary['usercount']),
+            'rawplayed': int(summary['rawplayed']),
+            'eligibleplayed': int(summary['eligibleplayed']),
+            'blockedplayed': int(summary['blockedplayed']),
+            'totalplayed': int(summary['eligibleplayed']),   # compatibility for old frontend
+            'totalsalary': round(summary['totalsalary'], 2),
+            'blockedsalary': round(summary['blockedsalary'], 2),
+            'createdat': fmt_ist(a.createdat, '%Y-%m-%d %H:%M') if a.createdat else ''
         })
 
     return jsonify(out)
-
 
 # ----------------------------
 # Agents: Update (Edit button)
@@ -3332,7 +3585,7 @@ def adminupdateagent(agentid):
 def adminblockagent(agentid):
     a = Agent.query.get(agentid)
     if not a:
-        return jsonify(success=False, message="Agent not found"), 404
+        return jsonify(success=False, message='Agent not found'), 404
 
     data = request.get_json() or {}
     reason = (data.get('reason') or 'Blocked by admin').strip()
@@ -3340,10 +3593,26 @@ def adminblockagent(agentid):
     if not a.isblocked:
         a.isblocked = True
         a.blockreason = reason
-        db.session.add(AgentBlockPeriod(agentid=a.id, startat=datetime.utcnow(), endat=None))
+
+        open_period = (
+            AgentBlockPeriod.query
+            .filter_by(agentid=a.id, endat=None)
+            .order_by(AgentBlockPeriod.startat.desc())
+            .first()
+        )
+
+        if not open_period:
+            db.session.add(
+                AgentBlockPeriod(
+                    agentid=a.id,
+                    startat=datetime.utcnow(),
+                    endat=None
+                )
+            )
+
         db.session.commit()
 
-    return jsonify(success=True, message="Agent blocked")
+    return jsonify(success=True, message='Agent blocked')
 
 
 @app.route('/api/admin/agents/<int:agentid>/unblock', methods=['POST'])
@@ -3351,23 +3620,25 @@ def adminblockagent(agentid):
 def adminunblockagent(agentid):
     a = Agent.query.get(agentid)
     if not a:
-        return jsonify(success=False, message="Agent not found"), 404
+        return jsonify(success=False, message='Agent not found'), 404
 
     if a.isblocked:
         a.isblocked = False
         a.blockreason = None
 
-        openp = (AgentBlockPeriod.query
-                 .filter_by(agentid=a.id, endat=None)
-                 .order_by(AgentBlockPeriod.startat.desc())
-                 .first())
-        if openp:
-            openp.endat = datetime.utcnow()
+        open_period = (
+            AgentBlockPeriod.query
+            .filter_by(agentid=a.id, endat=None)
+            .order_by(AgentBlockPeriod.startat.desc())
+            .first()
+        )
+
+        if open_period:
+            open_period.endat = datetime.utcnow()
 
         db.session.commit()
 
-    return jsonify(success=True, message="Agent unblocked")
-
+    return jsonify(success=True, message='Agent unblocked')
 
 # ----------------------------
 # Agents: Users list (click Users count)
@@ -3379,10 +3650,18 @@ from sqlalchemy import func
 @app.route('/api/admin/agents/<int:agentid>/users', methods=['GET'])
 @admin_required
 def admin_agent_users(agentid):
-    try:
-        a = Agent.query.get(agentid)
-        if not a:
-            return jsonify(success=False, message="Agent not found"), 404
+    a = Agent.query.get(agentid)
+    if not a:
+        return jsonify(success=False, message='Agent not found'), 404
+
+    summary = _build_agent_commission_data(a)
+
+    return jsonify({
+        'agentid': a.id,
+        'agentname': a.name,
+        'salarypercent': float(a.salarypercent or 0),
+        'items': summary['items']
+    })
 
         # Find which "created" column exists on User model
         created_col = None
@@ -3443,7 +3722,38 @@ def admin_agent_users(agentid):
     except Exception as e:
         return jsonify(success=False, message=f"agent users api error: {str(e)}"), 500
 
+@app.route('/api/admin/agents/<int:agentid>/commission-history', methods=['GET'])
+@admin_required
+def admin_agent_commission_history(agentid):
+    a = Agent.query.get(agentid)
+    if not a:
+        return jsonify(success=False, message='Agent not found'), 404
 
+    from_dt = _parse_from_date(request.args.get('from'))
+    to_dt = _parse_to_date(request.args.get('to'))
+    limit = request.args.get('limit', 200, type=int)
+
+    summary = _build_agent_commission_data(
+        a,
+        from_dt=from_dt,
+        to_dt=to_dt,
+        include_history=True,
+        limit=limit
+    )
+
+    return jsonify({
+        'agentid': a.id,
+        'agentname': a.name,
+        'salarypercent': float(a.salarypercent or 0),
+        'summary': {
+            'rawplayed': int(summary['rawplayed']),
+            'eligibleplayed': int(summary['eligibleplayed']),
+            'blockedplayed': int(summary['blockedplayed']),
+            'totalsalary': round(summary['totalsalary'], 2),
+            'blockedsalary': round(summary['blockedsalary'], 2),
+        },
+        'items': summary['history']
+    })
 
 
 
