@@ -3665,7 +3665,7 @@ def admin_agent_users(agentid):
 
         # Find which "created" column exists on User model
         created_col = None
-        for colname in ("createdat", "createdAt", "created_at"):
+          for colname in ("createdat", "createdAt", "created_at"):
             if hasattr(User, colname):
                 created_col = getattr(User, colname)
                 break
