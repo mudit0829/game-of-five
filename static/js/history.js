@@ -159,9 +159,8 @@ function renderGameCard(game, isCurrent) {
 
 
 async function loadHistory() {
-    const currentGames = data.current_games || data.currentgames || [];
-    const historyGames = data.game_history || data.gamehistory || [];
-
+  const currentWrap = document.getElementById("currentGames");
+  const historyWrap = document.getElementById("historyGames");
 
   currentWrap.innerHTML =
     '<div class="empty-message">Loading your games…</div>';
@@ -171,18 +170,15 @@ async function loadHistory() {
   try {
     const res = await fetch(`/api/user-games`);
     const data = await res.json();
-
+    
     console.log("RAW /api/user-games response:", data);
-    console.log("currentGames:", data.current_games || data.currentgames || []);
-    console.log("historyGames:", data.game_history || data.gamehistory || []);
+    const currentGames = data.current_games || data.currentgames || [];
+    const historyGames = data.game_history || data.gamehistory || [];
 
 
-    const currentGames = data.current_games || [];
-    const historyGames = data.game_history || [];
+    console.log("currentGames:", currentGames);
+    console.log("historyGames:", historyGames);
 
-    console.log('✅ Loaded games:', { currentGames, historyGames });
-
-    // CURRENT
     currentWrap.innerHTML = "";
     if (!currentGames.length) {
       currentWrap.innerHTML =
@@ -193,7 +189,6 @@ async function loadHistory() {
       });
     }
 
-    // HISTORY
     historyWrap.innerHTML = "";
     if (!historyGames.length) {
       historyWrap.innerHTML =
