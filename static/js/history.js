@@ -1,4 +1,3 @@
-// ✅ FINAL FIXED History page logic
 function formatTime(sec) {
   const s = Math.max(0, parseInt(sec || 0, 10));
   const m = Math.floor(s / 60);
@@ -6,27 +5,26 @@ function formatTime(sec) {
   return `${String(m).padStart(2, "0")}:${String(r).padStart(2, "0")}`;
 }
 
-// ✅ Format datetime for display
 function formatDateTime(dateTimeStr) {
-  if (!dateTimeStr) return 'N/A';
-  
+  if (!dateTimeStr) return "N/A";
+
   try {
     const date = new Date(dateTimeStr);
-    if (isNaN(date.getTime())) return 'N/A';
-    
+    if (isNaN(date.getTime())) return "N/A";
+
     const options = {
-      day: '2-digit',
-      month: 'short',
-      year: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit',
+      day: "2-digit",
+      month: "short",
+      year: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
       hour12: true
     };
-    
-    return date.toLocaleString('en-IN', options);
+
+    return date.toLocaleString("en-IN", options);
   } catch (e) {
-    console.error('Date formatting error:', e);
-    return 'N/A';
+    console.error("Date formatting error:", e);
+    return "N/A";
   }
 }
 
@@ -84,9 +82,7 @@ function renderGameCard(game, isCurrent) {
   const statusClass = isCurrent ? "status-pending" : "status-completed";
   const statusLabel = isCurrent ? "Pending" : "Completed";
 
-  const betNumbersDisplay = userBets.length > 0
-    ? userBets.join(", ")
-    : "N/A";
+  const betNumbersDisplay = userBets.length > 0 ? userBets.join(", ") : "N/A";
 
   card.innerHTML = `
     <div class="game-card-header">
@@ -128,7 +124,7 @@ function renderGameCard(game, isCurrent) {
   const btn = document.createElement("button");
   btn.className = "open-game-btn";
 
-    if (isCurrent) {
+  if (isCurrent) {
     btn.textContent = "Go to game";
     btn.disabled = false;
 
@@ -157,80 +153,76 @@ function renderGameCard(game, isCurrent) {
   return card;
 }
 
-
 async function loadHistory() {
   const currentWrap = document.getElementById("currentGames");
   const historyWrap = document.getElementById("historyGames");
 
-  currentWrap.innerHTML =
-    '<div class="empty-message">Loading your games…</div>';
-  historyWrap.innerHTML =
-    '<div class="empty-message">Loading your games…</div>';
+  currentWrap.innerHTML = '<div class="empty-message">Loading your games…</div>';
+  historyWrap.innerHTML = '<div class="empty-message">Loading your games…</div>';
 
   try {
-  const res = await fetch(`/api/user-games`, {
-    headers: {
-      "Accept": "application/json"
+    const res = await fetch("/api/user-games", {
+      headers: {
+        Accept: "application/json"
+      }
+    });
+
+    const contentType = res.headers.get("content-type") || "";
+    const rawText = await res.text();
+
+    console.log("HTTP status:", res.status);
+    console.log("Content-Type:", contentType);
+    console.log("RAW response text:", rawText);
+
+    if (!res.ok) {
+      throw new Error(`HTTP ${res.status}: ${rawText.slice(0, 300)}`);
     }
-  });
 
-  const contentType = res.headers.get("content-type") || "";
-  const rawText = await res.text();
+    if (!contentType.includes("application/json")) {
+      throw new Error(`Expected JSON but got: ${contentType}. Response: ${rawText.slice(0, 300)}`);
+    }
 
-  console.log("HTTP status:", res.status);
-  console.log("Content-Type:", contentType);
-  console.log("RAW response text:", rawText);
+    const data = JSON.parse(rawText);
 
-  if (!res.ok) {
-    throw new Error(`HTTP ${res.status}: ${rawText.slice(0, 300)}`);
+    console.log("RAW /api/user-games response:", data);
+
+    const currentGames = data.current_games || data.currentgames || [];
+    const historyGames = data.game_history || data.gamehistory || [];
+
+    console.log("currentGames:", currentGames);
+    console.log("historyGames:", historyGames);
+
+    currentWrap.innerHTML = "";
+    if (!currentGames.length) {
+      currentWrap.innerHTML = '<div class="empty-message">No current games. Place a bet to start playing!</div>';
+    } else {
+      currentGames.forEach((g) => {
+        currentWrap.appendChild(renderGameCard(g, true));
+      });
+    }
+
+    historyWrap.innerHTML = "";
+    if (!historyGames.length) {
+      historyWrap.innerHTML = '<div class="empty-message">No completed games yet.</div>';
+    } else {
+      historyGames.forEach((g) => {
+        historyWrap.appendChild(renderGameCard(g, false));
+      });
+    }
+  } catch (err) {
+    console.error("Error loading history:", err);
+    currentWrap.innerHTML = '<div class="empty-message">Could not load history.</div>';
+    historyWrap.innerHTML = '<div class="empty-message">Could not load history.</div>';
   }
-
-  if (!contentType.includes("application/json")) {
-    throw new Error(`Expected JSON but got: ${contentType}. Response: ${rawText.slice(0, 300)}`);
-  }
-
-  const data = JSON.parse(rawText);
-
-  console.log("RAW /api/user-games response:", data);
-
-  const currentGames = data.current_games || data.currentgames || [];
-  const historyGames = data.game_history || data.gamehistory || [];
-
-  console.log("currentGames:", currentGames);
-  console.log("historyGames:", historyGames);
-
-  currentWrap.innerHTML = "";
-  if (!currentGames.length) {
-    currentWrap.innerHTML =
-      '<div class="empty-message">No current games. Place a bet to start playing!</div>';
-  } else {
-    currentGames.forEach((g) => currentWrap.appendChild(renderGameCard(g, true)));
-  }
-
-  historyWrap.innerHTML = "";
-  if (!historyGames.length) {
-    historyWrap.innerHTML =
-      '<div class="empty-message">No completed games yet.</div>';
-  } else {
-    historyGames.forEach((g) => historyWrap.appendChild(renderGameCard(g, false)));
-  }
-} catch (err) {
-  console.error("Error loading history:", err);
-  currentWrap.innerHTML =
-    '<div class="empty-message">Could not load history.</div>';
-  historyWrap.innerHTML =
-    '<div class="empty-message">Could not load history.</div>';
 }
-
 
 document.addEventListener("DOMContentLoaded", () => {
   setupTabs();
   loadHistory();
-  
-  // ✅ Auto-refresh current games every 10 seconds to update time
+
   setInterval(() => {
     const currentTab = document.querySelector('.tab[data-tab="current"]');
-    if (currentTab && currentTab.classList.contains('active')) {
+    if (currentTab && currentTab.classList.contains("active")) {
       loadHistory();
     }
   }, 10000);
