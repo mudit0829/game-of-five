@@ -2398,8 +2398,19 @@ def game_lobby(game_type):
 def play_game(game_type):
     if game_type not in GAME_CONFIGS:
         return "Game not found", 404
+
     game = GAME_CONFIGS[game_type]
-    return render_template(f"{game_type}-game.html", game_type=game_type, game=game)
+    round_code = (request.args.get("round_code") or "").strip()
+    table_number = request.args.get("table_number", type=int)
+
+    return render_template(
+        f"{game_type}-game.html",
+        game_type=game_type,
+        game=game,
+        round_code=round_code if round_code else None,
+        table_number=table_number
+    )
+
 
 
 @app.route("/history")
