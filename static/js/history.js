@@ -168,44 +168,60 @@ async function loadHistory() {
     '<div class="empty-message">Loading your games…</div>';
 
   try {
-    const res = await fetch(`/api/user-games`);
-    const data = await res.json();
-    
-    console.log("RAW /api/user-games response:", data);
-    const currentGames = data.current_games || data.currentgames || [];
-    const historyGames = data.game_history || data.gamehistory || [];
-
-
-    console.log("currentGames:", currentGames);
-    console.log("historyGames:", historyGames);
-
-    currentWrap.innerHTML = "";
-    if (!currentGames.length) {
-      currentWrap.innerHTML =
-        '<div class="empty-message">No current games. Place a bet to start playing!</div>';
-    } else {
-      currentGames.forEach((g) => {
-        currentWrap.appendChild(renderGameCard(g, true));
-      });
+  const res = await fetch(`/api/user-games`, {
+    headers: {
+      "Accept": "application/json"
     }
+  });
 
-    historyWrap.innerHTML = "";
-    if (!historyGames.length) {
-      historyWrap.innerHTML =
-        '<div class="empty-message">No completed games yet.</div>';
-    } else {
-      historyGames.forEach((g) => {
-        historyWrap.appendChild(renderGameCard(g, false));
-      });
-    }
-  } catch (err) {
-    console.error("Error loading history:", err);
-    currentWrap.innerHTML =
-      '<div class="empty-message">Could not load history.</div>';
-    historyWrap.innerHTML =
-      '<div class="empty-message">Could not load history.</div>';
+  const contentType = res.headers.get("content-type") || "";
+  const rawText = await res.text();
+
+  console.log("HTTP status:", res.status);
+  console.log("Content-Type:", contentType);
+  console.log("RAW response text:", rawText);
+
+  if (!res.ok) {
+    throw new Error(`HTTP ${res.status}: ${rawText.slice(0, 300)}`);
   }
+
+  if (!contentType.includes("application/json")) {
+    throw new Error(`Expected JSON but got: ${contentType}. Response: ${rawText.slice(0, 300)}`);
+  }
+
+  const data = JSON.parse(rawText);
+
+  console.log("RAW /api/user-games response:", data);
+
+  const currentGames = data.current_games || data.currentgames || [];
+  const historyGames = data.game_history || data.gamehistory || [];
+
+  console.log("currentGames:", currentGames);
+  console.log("historyGames:", historyGames);
+
+  currentWrap.innerHTML = "";
+  if (!currentGames.length) {
+    currentWrap.innerHTML =
+      '<div class="empty-message">No current games. Place a bet to start playing!</div>';
+  } else {
+    currentGames.forEach((g) => currentWrap.appendChild(renderGameCard(g, true)));
+  }
+
+  historyWrap.innerHTML = "";
+  if (!historyGames.length) {
+    historyWrap.innerHTML =
+      '<div class="empty-message">No completed games yet.</div>';
+  } else {
+    historyGames.forEach((g) => historyWrap.appendChild(renderGameCard(g, false)));
+  }
+} catch (err) {
+  console.error("Error loading history:", err);
+  currentWrap.innerHTML =
+    '<div class="empty-message">Could not load history.</div>';
+  historyWrap.innerHTML =
+    '<div class="empty-message">Could not load history.</div>';
 }
+
 
 document.addEventListener("DOMContentLoaded", () => {
   setupTabs();
