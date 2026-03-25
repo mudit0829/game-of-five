@@ -4250,6 +4250,36 @@ def handle_place_bet(data):
             emit("bet_error", {"message": "No open game table"})
             return
 
+            # If user already has bets in this exact round, do not try to place again.
+        existing_user_bets = []
+        for b in (table.bets or []):
+            try:
+                if int(b.get("user_id")) == int(user_id):
+                    existing_user_bets.append(int(b.get("number")))
+            except Exception:
+                pass
+
+        if round_code and existing_user_bets:
+            players_data = []
+            for bet in table.bets:
+                players_data.append({
+                    "user_id": str(bet["user_id"]),
+                    "username": bet["username"],
+                    "number": bet["number"],
+                })
+
+            emit("bet_success", {
+                "message": "Opened existing game round",
+                "new_balance": wallet.balance,
+                "round_code": table.round_code,
+                "table_number": table.table_number,
+                "players": players_data,
+                "slots_available": table.get_slots_available(),
+                "existing_user_bets": sorted(set(existing_user_bets)),
+                "resume_only": True,
+            })
+            return
+
     if table.is_finished or table.is_betting_closed:
         emit("bet_error", {"message": "Betting is closed for this game"})
         return
