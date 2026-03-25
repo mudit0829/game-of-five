@@ -128,13 +128,13 @@ function renderGameCard(game, isCurrent) {
   const btn = document.createElement("button");
   btn.className = "open-game-btn";
 
-  if (isCurrent) {
+    if (isCurrent) {
     btn.textContent = "Go to game";
     btn.disabled = false;
 
     btn.addEventListener("click", () => {
       if (!gameType || !targetRoundCode) {
-        console.error("Missing game_type/gametype or round_code/roundcode", game);
+        console.error("Missing game_type or round_code", game);
         return;
       }
 
