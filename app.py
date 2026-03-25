@@ -1254,17 +1254,22 @@ def manage_game_table(table: GameTable):
         )
 
     def _history_exists_for_round(GameRoundHistory, round_code_value):
-         if hasattr(GameRoundHistory, "roundcode"):
-            return GameRoundHistory.query.filter(
-               GameRoundHistory.roundcode == round_code_value
-            ).first() is not None
+        try:
+            if hasattr(GameRoundHistory, "roundcode"):
+                return GameRoundHistory.query.filter(
+                    GameRoundHistory.roundcode == round_code_value
+                ).first() is not None
 
-         if hasattr(GameRoundHistory, "round_code"):
-            return GameRoundHistory.query.filter(
-               GameRoundHistory.round_code == round_code_value
-           ).first() is not None
+            if hasattr(GameRoundHistory, "round_code"):
+                return GameRoundHistory.query.filter(
+                    GameRoundHistory.round_code == round_code_value
+                ).first() is not None
 
-         return False
+            return False
+        except Exception as e:
+            print("history exists check error:", e)
+            return False
+
 
 
     def _save_round_history(table, result, now_utc):
