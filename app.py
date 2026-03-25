@@ -942,46 +942,46 @@ class GameTable:
         return True, "Bet placed successfully"
 
     def add_bot_bet(self):
-    if len(self.bets) >= self.max_players:
-        return False
+       if len(self.bets) >= self.max_players:
+          return False
 
-    real_bets = [b for b in self.bets if not b.get("is_bot")]
+       real_bets = [b for b in self.bets if not b.get("is_bot")]
 
-    max_bets_per_user = 20 if self.game_type == "roulette" else 3
+       max_bets_per_user = 20 if self.game_type == "roulette" else 3
 
-    per_user_counts = {}
-    for b in real_bets:
-        uid = b.get("user_id")
-        per_user_counts[uid] = per_user_counts.get(uid, 0) + 1
+       per_user_counts = {}
+       for b in real_bets:
+           uid = b.get("user_id")
+           per_user_counts[uid] = per_user_counts.get(uid, 0) + 1
 
-    reserve_slots = sum(
-        max(0, max_bets_per_user - count)
-        for count in per_user_counts.values()
-    )
+       reserve_slots = sum(
+           max(0, max_bets_per_user - count)
+           for count in per_user_counts.values()
+       )
 
-    available_capacity = self.max_players - len(self.bets)
-    reserve_slots = min(reserve_slots, available_capacity)
+       available_capacity = self.max_players - len(self.bets)
+       reserve_slots = min(reserve_slots, available_capacity)
 
-    if available_capacity <= reserve_slots:
-        return False
+       if available_capacity <= reserve_slots:
+           return False
 
-    taken_numbers = {b["number"] for b in self.bets}
-    all_numbers = self.get_number_range()
-    available_numbers = [n for n in all_numbers if n not in taken_numbers]
+       taken_numbers = {b["number"] for b in self.bets}
+       all_numbers = self.get_number_range()
+       available_numbers = [n for n in all_numbers if n not in taken_numbers]
 
-    if len(available_numbers) <= reserve_slots:
-        return False
+       if len(available_numbers) <= reserve_slots:
+           return False
 
-    bot_name = generate_bot_name()
-    bot_number = random.choice(available_numbers)
+       bot_name = generate_bot_name()
+       bot_number = random.choice(available_numbers)
 
-    success, _ = self.add_bet(
-        user_id=f"bot_{bot_name}",
-        username=bot_name,
-        number=bot_number,
-        is_bot=True,
-    )
-    return success
+       success, _ = self.add_bet(
+       user_id=f"bot_{bot_name}",
+       username=bot_name,
+       number=bot_number,
+       is_bot=True,
+      )
+      return success
 
     
     
