@@ -56,14 +56,17 @@ function renderGameCard(game, isCurrent) {
   const card = document.createElement("div");
   card.className = "game-card";
 
-  const gameType = game.game_type || "silver";
-  const roundCode = game.round_code || "-";
+    const gameType = game.game_type || "";
+  const targetRoundCode = game.round_code || "";
+  const displayRoundCode = targetRoundCode || "-";
+  const tableNumber = game.table_number ?? "";
   const userBets = game.user_bets || [];
   const status = game.status || (isCurrent ? "pending" : "completed");
   const winningNumber =
     typeof game.winning_number === "number" ? game.winning_number : null;
   const amount = Number(game.amount ?? 0);
-  const betTime = game.bet_time || game.date_time || null;
+  const betTime = game.datetime || null;
+
 
   const isWin = status === "win";
   const isLose = status === "lose";
@@ -82,7 +85,7 @@ function renderGameCard(game, isCurrent) {
 
   card.innerHTML = `
     <div class="game-card-header">
-      <span class="game-id">${roundCode}</span>
+      <span class="game-id">${displayRoundCode}</span>
       <span class="status-pill ${statusClass}">${statusLabel}</span>
     </div>
 
@@ -120,18 +123,27 @@ function renderGameCard(game, isCurrent) {
       const btn = document.createElement("button");
   btn.className = "open-game-btn";
 
-  if (isCurrent) {
+    if (isCurrent) {
     btn.textContent = "Go to game";
     btn.disabled = false;
-    btn.addEventListener("click", () => {
-      const tableNumber = game.table_number ?? game.tablenumber ?? "";
-      const qs = new URLSearchParams({
-         round_code: roundCode
-      });
-      if (tableNumber !== "") qs.set("table_number", tableNumber);
 
-      window.location.href = `/play/${gameType}?${qs.toString()}`;
-   });
+    btn.addEventListener("click", () => {
+      if (!gameType || !targetRoundCode) {
+        console.error("Missing game_type or round_code", game);
+        return;
+      }
+
+      const qs = new URLSearchParams();
+      qs.set("round_code", targetRoundCode);
+
+      if (tableNumber !== "" && tableNumber !== null && tableNumber !== undefined) {
+        qs.set("table_number", String(tableNumber));
+      }
+
+      window.location.href = `/play/${encodeURIComponent(gameType)}?${qs.toString()}`;
+    });
+  }
+
 
   } else {
     const label = isWin ? "Total Win" : isLose ? "Total Loss" : "Total";
@@ -155,7 +167,7 @@ async function loadHistory() {
     '<div class="empty-message">Loading your games…</div>';
 
   try {
-    const res = await fetch(`/api/user-games?user_id=${CURRENT_USER_ID}`);
+    const res = await fetch(`/api/user-games`);
     const data = await res.json();
 
     const currentGames = data.current_games || [];
