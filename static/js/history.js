@@ -56,17 +56,22 @@ function renderGameCard(game, isCurrent) {
   const card = document.createElement("div");
   card.className = "game-card";
 
-    const gameType = game.game_type || "";
-  const targetRoundCode = game.round_code || "";
+  const gameType = game.game_type || game.gametype || "";
+  const targetRoundCode = game.round_code || game.roundcode || "";
   const displayRoundCode = targetRoundCode || "-";
-  const tableNumber = game.table_number ?? "";
-  const userBets = game.user_bets || [];
+  const tableNumber = game.table_number ?? game.tablenumber ?? "";
+  const userBets = game.user_bets || game.userbets || [];
   const status = game.status || (isCurrent ? "pending" : "completed");
-  const winningNumber =
-    typeof game.winning_number === "number" ? game.winning_number : null;
-  const amount = Number(game.amount ?? 0);
-  const betTime = game.datetime || null;
 
+  const winningNumber =
+    typeof game.winning_number === "number"
+      ? game.winning_number
+      : typeof game.winningnumber === "number"
+      ? game.winningnumber
+      : null;
+
+  const amount = Number(game.amount ?? 0);
+  const betTime = game.datetime || game.bet_time || game.date_time || null;
 
   const isWin = status === "win";
   const isLose = status === "lose";
@@ -79,9 +84,9 @@ function renderGameCard(game, isCurrent) {
   const statusClass = isCurrent ? "status-pending" : "status-completed";
   const statusLabel = isCurrent ? "Pending" : "Completed";
 
-  const betNumbersDisplay = userBets.length > 0 
-    ? userBets.join(', ') 
-    : 'N/A';
+  const betNumbersDisplay = userBets.length > 0
+    ? userBets.join(", ")
+    : "N/A";
 
   card.innerHTML = `
     <div class="game-card-header">
@@ -90,13 +95,13 @@ function renderGameCard(game, isCurrent) {
     </div>
 
     <div class="game-info">
-      <div class="game-name">${gameType.charAt(0).toUpperCase() + gameType.slice(1)}</div>
-      
+      <div class="game-name">${gameType ? gameType.charAt(0).toUpperCase() + gameType.slice(1) : "Game"}</div>
+
       <div class="game-bets">
-        <span>Your bet${userBets.length > 1 ? 's' : ''} on:</span>
+        <span>Your bet${userBets.length > 1 ? "s" : ""} on:</span>
         <span class="bet-numbers">${betNumbersDisplay}</span>
       </div>
-      
+
       <div class="game-result-text">
         ${
           isCurrent
@@ -108,9 +113,9 @@ function renderGameCard(game, isCurrent) {
             : `Result: ${winningNumber ?? "--"}`
         }
       </div>
-      
+
       <div class="timer-row">
-        <span class="timer-label">${isCurrent ? 'Time remaining:' : 'Bet placed:'}</span>
+        <span class="timer-label">${isCurrent ? "Time remaining:" : "Bet placed:"}</span>
         <span class="timer-value">${
           isCurrent
             ? (game.time_remaining != null ? formatTime(game.time_remaining) : "--:--")
@@ -120,16 +125,16 @@ function renderGameCard(game, isCurrent) {
     </div>
   `;
 
-      const btn = document.createElement("button");
+  const btn = document.createElement("button");
   btn.className = "open-game-btn";
 
-    if (isCurrent) {
+  if (isCurrent) {
     btn.textContent = "Go to game";
     btn.disabled = false;
 
     btn.addEventListener("click", () => {
       if (!gameType || !targetRoundCode) {
-        console.error("Missing game_type or round_code", game);
+        console.error("Missing game_type/gametype or round_code/roundcode", game);
         return;
       }
 
@@ -142,24 +147,21 @@ function renderGameCard(game, isCurrent) {
 
       window.location.href = `/play/${encodeURIComponent(gameType)}?${qs.toString()}`;
     });
-  }
-
-
   } else {
     const label = isWin ? "Total Win" : isLose ? "Total Loss" : "Total";
     btn.textContent = `View result • ${label}: ${amount.toLocaleString("en-IN")}`;
-    btn.disabled = true; // keep same behavior
+    btn.disabled = true;
   }
-
-
 
   card.appendChild(btn);
   return card;
 }
 
+
 async function loadHistory() {
-  const currentWrap = document.getElementById("currentGames");
-  const historyWrap = document.getElementById("historyGames");
+    const currentGames = data.current_games || data.currentgames || [];
+    const historyGames = data.game_history || data.gamehistory || [];
+
 
   currentWrap.innerHTML =
     '<div class="empty-message">Loading your games…</div>';
@@ -169,6 +171,11 @@ async function loadHistory() {
   try {
     const res = await fetch(`/api/user-games`);
     const data = await res.json();
+
+    console.log("RAW /api/user-games response:", data);
+    console.log("currentGames:", data.current_games || data.currentgames || []);
+    console.log("historyGames:", data.game_history || data.gamehistory || []);
+
 
     const currentGames = data.current_games || [];
     const historyGames = data.game_history || [];
