@@ -124,9 +124,15 @@ function renderGameCard(game, isCurrent) {
     btn.textContent = "Go to game";
     btn.disabled = false;
     btn.addEventListener("click", () => {
-      // Navigate to game page WITH round_code as URL parameter
-      window.location.href = `/play/${gameType}?round_code=${encodeURIComponent(roundCode)}`;
-    });
+      const tableNumber = game.table_number ?? game.tablenumber ?? "";
+      const qs = new URLSearchParams({
+         round_code: roundCode
+      });
+      if (tableNumber !== "") qs.set("table_number", tableNumber);
+
+      window.location.href = `/play/${gameType}?${qs.toString()}`;
+   });
+
   } else {
     const label = isWin ? "Total Win" : isLose ? "Total Loss" : "Total";
     btn.textContent = `View result • ${label}: ${amount.toLocaleString("en-IN")}`;
