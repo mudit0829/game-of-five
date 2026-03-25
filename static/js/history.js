@@ -135,11 +135,12 @@ function renderGameCard(game, isCurrent) {
       }
 
       const qs = new URLSearchParams();
-      qs.set("round_code", targetRoundCode);
+      qs.set("roundcode", targetRoundCode);
 
       if (tableNumber !== "" && tableNumber !== null && tableNumber !== undefined) {
-        qs.set("table_number", String(tableNumber));
+         qs.set("tablenumber", String(tableNumber));
       }
+
 
       window.location.href = `/play/${encodeURIComponent(gameType)}?${qs.toString()}`;
     });
