@@ -1967,26 +1967,32 @@ def get_all_tables():
     return jsonify(all_tables)
 
 
+import traceback
+
 @app.route("/api/user-games")
 @login_required
-def usergameshistoryapi():
-    userid = request.args.get("user_id", type=int) or getsessionuserid()
+def user_games_history_api():
+    user_id = request.args.get("user_id", type=int) or _get_session_user_id()
+
     try:
-        userid = int(userid)
+        user_id = int(user_id)
     except Exception:
-        return jsonify(current_games=[], game_history=[])
+        return jsonify({"current_games": [], "game_history": [], "error": "invalid user_id"})
 
-    rows = (
-        db.session.query(GameRoundBet, GameRoundHistory)
-        .join(GameRoundHistory, GameRoundHistory.roundcode == GameRoundBet.roundcode)
-        .filter(GameRoundBet.userid == str(userid))
-        .order_by(GameRoundHistory.endedat.desc(), GameRoundBet.bettime.asc())
-        .all()
-    )
+    game_history = []
+    current_games = []
 
-    grouped = {}
+    try:
+        rows = (
+            db.session.query(GameRoundBet, GameRoundHistory)
+            .join(GameRoundHistory, GameRoundHistory.roundcode == GameRoundBet.roundcode)
+            .filter(GameRoundBet.userid == str(user_id))
+            .order_by(GameRoundHistory.endedat.desc(), GameRoundBet.bettime.asc())
+            .all()
+        )
 
-    if rows:
+        grouped = {}
+
         for bet, hist in rows:
             key = (hist.gametype, hist.roundcode, hist.tablenumber)
 
@@ -1994,11 +2000,14 @@ def usergameshistoryapi():
                 grouped[key] = {
                     "game_type": hist.gametype,
                     "round_code": hist.roundcode,
-                    "amount": int(getattr(bet, "betamount", 0) or 0),
+                    "bet_amount": int(getattr(bet, "betamount", 0) or 0),
                     "user_bets": [],
                     "winning_number": hist.result,
-                    "datetime": fmtist(hist.endedat, "%Y-%m-%d %H:%M") if hist.endedat else "",
+                    "date_time": fmt_ist(hist.endedat, "%Y-%m-%d %H:%M") if hist.endedat else "",
                     "status": None,
+                    "amount": 0,
+                    "win_amount": 0,
+                    "loss_amount": 0,
                     "time_remaining": None,
                     "table_number": hist.tablenumber,
                 }
@@ -2007,84 +2016,75 @@ def usergameshistoryapi():
                 grouped[key]["user_bets"].append(int(bet.number))
             except Exception:
                 pass
-    else:
-        for rec in usergamehistory.get(userid, []) or []:
-            if not rec.get("isresolved"):
-                continue
 
-            gametype = rec.get("gametype") or "-"
-            roundcode = rec.get("roundcode") or "-"
-            tablenumber = rec.get("tablenumber") or 0
-            key = (gametype, roundcode, tablenumber)
+        for g in grouped.values():
+            g["user_bets"] = sorted(set(g["user_bets"]))
+            cfg = GAME_CONFIGS.get(g["game_type"], {})
+            payout_amt = int(cfg.get("payout", 0) or 0)
+            total_loss = int(g["bet_amount"] or 0) * len(g["user_bets"])
 
-            if key not in grouped:
-                grouped[key] = {
-                    "game_type": gametype,
-                    "round_code": roundcode,
-                    "amount": int(rec.get("betamount") or 0),
-                    "user_bets": [],
-                    "winning_number": rec.get("winningnumber"),
-                    "datetime": rec.get("datetime") or "",
-                    "status": rec.get("status"),
-                    "time_remaining": None,
-                    "table_number": tablenumber,
-                }
+            if g["winning_number"] in g["user_bets"]:
+                g["status"] = "win"
+                g["win_amount"] = payout_amt
+                g["loss_amount"] = 0
+                g["amount"] = payout_amt
+            else:
+                g["status"] = "lose"
+                g["win_amount"] = 0
+                g["loss_amount"] = total_loss
+                g["amount"] = total_loss
 
-            try:
-                grouped[key]["user_bets"].append(int(rec.get("number")))
-            except Exception:
-                pass
+        game_history = list(grouped.values())
+        game_history.sort(key=lambda x: x.get("date_time", ""), reverse=True)
 
-    game_history = []
-    for g in grouped.values():
-        g["user_bets"] = sorted(set(g["user_bets"]))
-        cfg = GAMECONFIGS.get(g["game_type"], {})
-        payoutamt = int(cfg.get("payout", 0) or 0)
-        total_loss = int(g["amount"] or 0) * len(g["user_bets"])
+    except Exception as e:
+        print("user_games_history_api history query error:", str(e))
+        traceback.print_exc()
 
-        if g["winning_number"] in g["user_bets"]:
-            g["status"] = "win"
-            g["amount"] = payoutamt
-        else:
-            g["status"] = g["status"] or "lose"
-            g["amount"] = total_loss
-
-        game_history.append(g)
-
-    game_history.sort(key=lambda x: x.get("datetime", ""), reverse=True)
-
-    current_games = []
-    for gametype, tables in gametables.items():
-        for table in tables:
-            if getattr(table, "isfinished", False):
-                continue
-
-            userbets = []
-            for bet in table.bets or []:
-                try:
-                    betuid = int(bet.get("userid"))
-                except Exception:
+    try:
+        for game_type, tables in game_tables.items():
+            for table in tables:
+                if getattr(table, "is_finished", False):
                     continue
-                if betuid == userid:
+
+                user_bets = []
+                for bet in (table.bets or []):
                     try:
-                        userbets.append(int(bet.get("number")))
+                        bet_uid = int(bet.get("user_id"))
                     except Exception:
-                        pass
+                        continue
 
-            if userbets:
-                current_games.append({
-                    "game_type": table.gametype,
-                    "round_code": table.roundcode,
-                    "amount": int(table.config.get("betamount", 0) or 0),
-                    "user_bets": sorted(set(userbets)),
-                    "winning_number": None,
-                    "datetime": fmtist(table.starttime, "%Y-%m-%d %H:%M") if table.starttime else "",
-                    "status": None,
-                    "time_remaining": table.gettimeremaining(),
-                    "table_number": table.tablenumber,
-                })
+                    if bet_uid == user_id:
+                        try:
+                            user_bets.append(int(bet.get("number")))
+                        except Exception:
+                            pass
 
-    return jsonify(current_games=current_games, game_history=game_history)
+                if user_bets:
+                    current_games.append({
+                        "game_type": table.game_type,
+                        "round_code": table.round_code,
+                        "bet_amount": int(table.config.get("bet_amount", 0) or 0),
+                        "user_bets": sorted(set(user_bets)),
+                        "winning_number": None,
+                        "date_time": fmt_ist(table.start_time, "%Y-%m-%d %H:%M") if table.start_time else "",
+                        "status": None,
+                        "amount": 0,
+                        "win_amount": 0,
+                        "loss_amount": 0,
+                        "time_remaining": table.get_time_remaining(),
+                        "table_number": table.table_number,
+                    })
+
+    except Exception as e:
+        print("user_games_history_api current games error:", str(e))
+        traceback.print_exc()
+
+    return jsonify({
+        "current_games": current_games,
+        "game_history": game_history
+    })
+
 
 
 # ---------------------------------------------------
