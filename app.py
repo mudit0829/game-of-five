@@ -2426,15 +2426,23 @@ def play_game(game_type):
         return "Game not found", 404
 
     game = GAME_CONFIGS[game_type]
-    round_code = (request.args.get("round_code") or "").strip()
-    table_number = request.args.get("table_number", type=int)
+
+    roundcode = (
+        request.args.get("round_code")
+        or request.args.get("roundcode")
+        or ""
+    ).strip()
+
+    tablenumber = request.args.get("table_number", type=int)
+    if tablenumber is None:
+        tablenumber = request.args.get("tablenumber", type=int)
 
     return render_template(
         f"{game_type}-game.html",
-        game_type=game_type,
+        gametype=game_type,
         game=game,
-        round_code=round_code if round_code else None,
-        table_number=table_number
+        roundcode=roundcode if roundcode else None,
+        tablenumber=tablenumber,
     )
 
 
