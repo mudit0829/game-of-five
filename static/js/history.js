@@ -135,11 +135,17 @@ function renderGameCard(game, isCurrent) {
       }
 
       const qs = new URLSearchParams();
-      qs.set("round_code", targetRoundCode);
 
-      if (tableNumber !== "" && tableNumber !== null && tableNumber !== undefined) {
-         qs.set("table_number", String(tableNumber));
-      }
+// important: current game pages read "table"
+qs.set("table", targetRoundCode);
+
+// keep these too for compatibility / future fixes
+qs.set("round_code", targetRoundCode);
+
+if (tableNumber !== "" && tableNumber !== null && tableNumber !== undefined) {
+  qs.set("table_number", String(tableNumber));
+  qs.set("tablenumber", String(tableNumber));
+}
 
 
 
