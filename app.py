@@ -1254,17 +1254,18 @@ def manage_game_table(table: GameTable):
         )
 
     def _history_exists_for_round(GameRoundHistory, round_code_value):
-        # Try both common column names: round_code or roundcode
-        try:
-            return GameRoundHistory.query.filter_by(round_code=round_code_value).first() is not None
-        except TypeError:
-            pass
-        try:
-            return GameRoundHistory.query.filter_by(roundcode=round_code_value).first() is not None
-        except TypeError:
-            pass
-        # Fallback: no safe way to query without knowing column name
-        return False
+         if hasattr(GameRoundHistory, "roundcode"):
+            return GameRoundHistory.query.filter(
+               GameRoundHistory.roundcode == round_code_value
+            ).first() is not None
+
+         if hasattr(GameRoundHistory, "round_code"):
+            return GameRoundHistory.query.filter(
+               GameRoundHistory.round_code == round_code_value
+           ).first() is not None
+
+         return False
+
 
     def _save_round_history(table, result, now_utc):
         """
