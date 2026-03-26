@@ -726,8 +726,9 @@
     }
 
     function logout() {
-      window.location.href = '/agent/logout';
+      window.location.href = '/agent-logout';
     }
+
 
 
 
@@ -770,7 +771,7 @@
 
       if (section === 'dashboard') refreshDashboard();
       if (section === 'users') loadUsers();
-      if (section === 'salary') {loadSalary();loadSalaryLedger();}
+      if (section === 'salary') loadSalary();
       if (section === 'profile') loadProfile();
     }
 
