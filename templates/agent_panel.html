@@ -550,53 +550,91 @@
         </div>
 
         <!-- SALARY -->
-        <div id="salary" class="section">
-          <div class="section-header">
-            <h2 class="section-title">Salary</h2>
-            <button class="btn-primary" onclick="loadSalary()">Apply</button>
-          </div>
+<div id="salary" class="section">
+  <div class="section-header">
+    <h2 class="section-title">Salary</h2>
+    <button class="btn-primary" onclick="loadSalary(); loadCommissionHistory();">Apply</button>
+  </div>
 
-          <div class="controls">
-            <div class="search-box" style="min-width: 320px;">
-              <input type="date" id="salaryFrom" />
-              <input type="date" id="salaryTo" />
-            </div>
-            <button class="btn-primary" onclick="setThisMonth()">This Month</button>
-            <button class="btn-primary" onclick="setToday()">Today</button>
-          </div>
+  <div class="controls">
+    <div class="search-box" style="min-width: 320px;">
+      <input type="date" id="salaryFrom" />
+      <input type="date" id="salaryTo" />
+    </div>
+    <button class="btn-primary" onclick="setThisMonth()">This Month</button>
+    <button class="btn-primary" onclick="setToday()">Today</button>
+  </div>
 
-          <div class="dashboard-grid">
-            <div class="stat-card">
-              <div class="stat-icon">🎮</div>
-              <div class="stat-label">Total Played (range)</div>
-              <p class="stat-value" id="rangePlayed">₹0</p>
-            </div>
-            <div class="stat-card">
-              <div class="stat-icon">💸</div>
-              <div class="stat-label">Total Salary (range)</div>
-              <p class="stat-value" id="rangeSalary">₹0</p>
-            </div>
-          </div>
+  <div class="dashboard-grid">
+    <div class="stat-card">
+      <div class="stat-icon">🎮</div>
+      <div class="stat-label">Total Played (range)</div>
+      <p class="stat-value" id="rangePlayed">₹0</p>
+    </div>
 
-          <div id="salaryLoading" class="loading" style="display:none;">Loading salary...</div>
+    <div class="stat-card">
+      <div class="stat-icon">💸</div>
+      <div class="stat-label">Total Salary (range)</div>
+      <p class="stat-value" id="rangeSalary">₹0</p>
+    </div>
 
-          <div class="table-container">
-            <table class="data-table">
-              <thead>
-                <tr>
-                  <th>S.No.</th>
-                  <th>User ID</th>
-                  <th>Joining</th>
-                  <th>Amount Played</th>
-                  <th>Salary Generated</th>
-                </tr>
-              </thead>
-              <tbody id="salaryTableBody">
-                <tr><td colspan="5" class="no-data">Select date range and click Apply.</td></tr>
-              </tbody>
-            </table>
-          </div>
-        </div>
+    <div class="stat-card">
+      <div class="stat-icon">✅</div>
+      <div class="stat-label">Eligible Played</div>
+      <p class="stat-value" id="eligiblePlayed">₹0</p>
+    </div>
+
+    <div class="stat-card">
+      <div class="stat-icon">⛔</div>
+      <div class="stat-label">Blocked Salary</div>
+      <p class="stat-value" id="blockedSalary">₹0</p>
+    </div>
+  </div>
+
+  <div id="salaryLoading" class="loading" style="display:none;">Loading salary...</div>
+
+  <div class="table-container">
+    <table class="data-table">
+      <thead>
+        <tr>
+          <th>S.No.</th>
+          <th>User ID</th>
+          <th>Joining</th>
+          <th>Amount Played</th>
+          <th>Salary Generated</th>
+        </tr>
+      </thead>
+      <tbody id="salaryTableBody">
+        <tr><td colspan="5" class="no-data">Select date range and click Apply.</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="section-header" style="margin-top:30px;">
+    <h2 class="section-title">Commission History</h2>
+    <button class="btn-primary" onclick="loadCommissionHistory()">⟳ Reload</button>
+  </div>
+
+  <div class="table-container">
+    <table class="data-table">
+      <thead>
+        <tr>
+          <th>S.No.</th>
+          <th>Date Time</th>
+          <th>User</th>
+          <th>Amount Played</th>
+          <th>Commission</th>
+          <th>Status</th>
+          <th>Game</th>
+          <th>Note</th>
+        </tr>
+      </thead>
+      <tbody id="commissionHistoryBody">
+        <tr><td colspan="8" class="no-data">No commission history loaded.</td></tr>
+      </tbody>
+    </table>
+  </div>
+</div>
 
         <!-- PROFILE -->
         <div id="profile" class="section">
@@ -771,7 +809,8 @@
 
       if (section === 'dashboard') refreshDashboard();
       if (section === 'users') loadUsers();
-      if (section === 'salary') loadSalary();
+      if (section === 'salary') {loadSalary();loadCommissionHistory();}
+
       if (section === 'profile') loadProfile();
     }
 
@@ -889,6 +928,8 @@
       document.getElementById('salaryFrom').value = s;
       document.getElementById('salaryTo').value = s;
       loadSalary();
+      loadCommissionHistory();
+
     }
 
     function setThisMonth() {
@@ -900,6 +941,7 @@
       document.getElementById('salaryFrom').value = from;
       document.getElementById('salaryTo').value = to;
       loadSalary();
+      loadCommissionHistory();
     }
 
     async function loadSalary() {
@@ -944,6 +986,55 @@
         document.getElementById('salaryLoading').style.display = 'none';
       }
     }
+
+    async function loadCommissionHistory() {
+  try {
+    const from = document.getElementById('salaryFrom')?.value || '';
+    const to = document.getElementById('salaryTo')?.value || '';
+
+    const qs = new URLSearchParams();
+    if (from) qs.set('from', from);
+    if (to) qs.set('to', to);
+
+    const data = await apiGet('/api/agent/commission-history?' + qs.toString());
+
+    const summary = data.summary || {};
+    document.getElementById('eligiblePlayed').textContent = fmtINR(summary.eligibleplayed ?? 0);
+    document.getElementById('blockedSalary').textContent = fmtINR(summary.blockedsalary ?? 0);
+
+    const items = Array.isArray(data.items) ? data.items : [];
+    const tbody = document.getElementById('commissionHistoryBody');
+    tbody.innerHTML = '';
+
+    if (!items.length) {
+      tbody.innerHTML = `<tr><td colspan="8" class="no-data">No commission history found.</td></tr>`;
+      return;
+    }
+
+    items.forEach((row, idx) => {
+      const status = String(row.status || '').replaceAll('_', ' ').toUpperCase();
+      const badgeClass = String(row.status || '') === 'BLOCKED_NO_COMMISSION' ? 'badge-blocked' : 'badge-active';
+
+      const tr = document.createElement('tr');
+      tr.innerHTML = `
+        <td>${idx + 1}</td>
+        <td>${row.datetime || '-'}</td>
+        <td>
+          <strong>${row.username || '-'}</strong>
+          <div class="muted" style="margin-top:4px;">User ID: ${row.userid || '-'}</div>
+        </td>
+        <td>${fmtINR(row.amountplayed || 0)}</td>
+        <td>${fmtINR(row.commissionamount || 0)}</td>
+        <td><span class="badge ${badgeClass}">${status || 'COUNTED'}</span></td>
+        <td>${row.game_title || row.label || '-'}</td>
+        <td>${row.note || '-'}</td>
+      `;
+      tbody.appendChild(tr);
+    });
+  } catch (err) {
+    showMsg('Commission History Error', err.message);
+  }
+}
 
 
     // ------------------------
