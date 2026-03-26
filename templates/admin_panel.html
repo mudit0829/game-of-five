@@ -506,6 +506,7 @@
         <li><a class="menu-link" data-section="subadmins">👨‍💼 Sub-Admins</a></li>
         <li><a class="menu-link" data-section="users">👥 Users</a></li>
         <li><a class="menu-link" data-section="agents">👨‍💼 Agents</a></li>
+        <li><a class="menu-link" data-section="payroll">💼 Payroll</a></li>
         <li><a class="menu-link" data-section="games">🎮 Games</a></li>
         <li><a class="menu-link" data-section="transactions">💰 Transactions</a></li>
         <li><a class="menu-link" data-section="wallet">💸 Wallet</a></li>
@@ -1429,6 +1430,7 @@ function queryBadgeClass(status) {
         users: 'Users Management',
         userGames: 'User Games',
         agents: 'Agents Management',
+        payroll: 'Agent Payroll',
         games: 'Game Statistics',
         transactions: 'Transactions Log',
         wallet: 'Wallet Management',
@@ -1445,6 +1447,7 @@ function queryBadgeClass(status) {
       if (section === 'dashboard') loadStats();
       if (section === 'users') loadUsers();
       if (section === 'agents') loadAgents();
+      if (section === 'payroll') loadPayroll();
       if (section === 'games') loadGames();
       if (section === 'transactions') loadTransactions();
       if (section === 'wallet') loadWalletUsers();
@@ -1464,6 +1467,7 @@ function queryBadgeClass(status) {
       document.getElementById('addPromoForm')?.addEventListener('submit', submitAddPromo);
       document.getElementById('announceForm')?.addEventListener('submit', submitAnnounce);
       document.getElementById('editUserForm')?.addEventListener('submit', submitEditUser);
+      document.getElementById('paySalaryForm')?.addEventListener('submit', submitSalaryPayment);
 
       document.getElementById('searchUsers')?.addEventListener('keyup', filterAndDisplayUsers);
       document.getElementById('searchGames')?.addEventListener('keyup', () => { gamesPage = 1; loadGames();});
