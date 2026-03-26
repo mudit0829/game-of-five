@@ -10,7 +10,7 @@ from flask import (
 from flask_sqlalchemy import SQLAlchemy
 from flask_socketio import SocketIO, emit, join_room
 from flask_cors import CORS
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timedelta, timezone, date
 from zoneinfo import ZoneInfo
 from functools import wraps
 from sqlalchemy import func
@@ -312,6 +312,18 @@ class Agent(db.Model):
     def checkpassword(self, password: str) -> bool:
         return self.passwordhash == hashlib.sha256(password.encode()).hexdigest()
 
+class AgentSalaryPayment(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    agentid = db.Column(db.Integer, db.ForeignKey('agent.id'), nullable=False, index=True)
+    amountpaid = db.Column(db.Float, nullable=False, default=0)
+    periodfrom = db.Column(db.Date, nullable=True)
+    periodto = db.Column(db.Date, nullable=True)
+    note = db.Column(db.Text, nullable=True)
+    referenceno = db.Column(db.String(120), nullable=True)
+    paidby = db.Column(db.String(120), nullable=True)
+    paidat = db.Column(db.DateTime, default=datetime.utcnow, index=True)
+
+
 
 class AgentBlockPeriod(db.Model):
     id = db.Column(db.Integer, primary_key=True)
@@ -423,6 +435,34 @@ def _parse_from_date(date_str):
         return datetime.strptime(date_str, "%Y-%m-%d")
     except ValueError:
         return None
+
+def _to_date(v):
+    if not v:
+        return None
+    if isinstance(v, date):
+        return v
+    if isinstance(v, datetime):
+        return v.date()
+    return None
+
+
+def _safe_float(v):
+    try:
+        return float(v or 0)
+    except Exception:
+        return 0.0
+
+
+def _payment_total(agent_id, from_dt=None, to_dt=None):
+    q = AgentSalaryPayment.query.filter_by(agentid=agent_id)
+
+    if from_dt:
+        q = q.filter(AgentSalaryPayment.paidat >= from_dt)
+    if to_dt:
+        q = q.filter(AgentSalaryPayment.paidat < to_dt)
+
+    return round(sum(_safe_float(r.amountpaid) for r in q.all()), 2)
+
 
 
 def _parse_to_date(date_str):
@@ -3874,6 +3914,166 @@ def admin_agent_commission_history(agentid):
         'items': summary['history']
     })
 
+@app.route('/api/admin/payroll', methods=['GET'])
+@admin_required
+def api_admin_payroll():
+    from_dt = _parse_from_date(request.args.get('from'))
+    to_dt = _parse_to_date(request.args.get('to'))
+
+    agents = Agent.query.order_by(Agent.createdat.desc()).all()
+    items = []
+    totalearned = 0.0
+    totalpaid = 0.0
+    totalpending = 0.0
+
+    for a in agents:
+        summary = _build_agent_commission_data(
+            a,
+            from_dt=from_dt,
+            to_dt=to_dt,
+            include_history=False
+        )
+
+        earned = round(float(summary.get('totalsalary', 0) or 0), 2)
+        paid = _payment_total(a.id, from_dt=from_dt, to_dt=to_dt)
+        pending = round(max(earned - paid, 0), 2)
+
+        last_payment = (
+            AgentSalaryPayment.query
+            .filter_by(agentid=a.id)
+            .order_by(AgentSalaryPayment.paidat.desc())
+            .first()
+        )
+
+        items.append({
+            'agentid': a.id,
+            'agentname': a.name or '-',
+            'username': a.username or '-',
+            'status': 'BLOCKED' if a.isblocked else 'ACTIVE',
+            'salarypercent': float(a.salarypercent or 0),
+            'totalplayed': int(summary.get('eligibleplayed', 0) or 0),
+            'earnedsalary': earned,
+            'paidsalary': paid,
+            'pendingsalary': pending,
+            'lastpaidat': fmt_ist(last_payment.paidat, '%Y-%m-%d %H:%M') if last_payment and last_payment.paidat else ''
+        })
+
+        totalearned += earned
+        totalpaid += paid
+        totalpending += pending
+
+    return jsonify({
+        'summary': {
+            'totalearned': round(totalearned, 2),
+            'totalpaid': round(totalpaid, 2),
+            'totalpending': round(totalpending, 2),
+            'agentcount': len(items)
+        },
+        'items': items
+    })
+
+
+@app.route('/api/admin/payroll/payments', methods=['GET'])
+@admin_required
+def api_admin_payroll_payments():
+    from_dt = _parse_from_date(request.args.get('from'))
+    to_dt = _parse_to_date(request.args.get('to'))
+    agentid = request.args.get('agentid', type=int)
+
+    q = AgentSalaryPayment.query
+
+    if agentid:
+        q = q.filter_by(agentid=agentid)
+    if from_dt:
+        q = q.filter(AgentSalaryPayment.paidat >= from_dt)
+    if to_dt:
+        q = q.filter(AgentSalaryPayment.paidat < to_dt)
+
+    rows = q.order_by(AgentSalaryPayment.paidat.desc()).all()
+    items = []
+
+    for p in rows:
+        a = Agent.query.get(p.agentid)
+        items.append({
+            'id': p.id,
+            'agentid': p.agentid,
+            'agentname': a.name if a else '-',
+            'amountpaid': round(_safe_float(p.amountpaid), 2),
+            'periodfrom': p.periodfrom.strftime('%Y-%m-%d') if p.periodfrom else '',
+            'periodto': p.periodto.strftime('%Y-%m-%d') if p.periodto else '',
+            'paidat': fmt_ist(p.paidat, '%Y-%m-%d %H:%M') if p.paidat else '',
+            'paidby': p.paidby or 'admin',
+            'referenceno': p.referenceno or '',
+            'note': p.note or ''
+        })
+
+    return jsonify({
+        'items': items,
+        'totalpaid': round(sum(_safe_float(x['amountpaid']) for x in items), 2)
+    })
+
+
+@app.route('/api/admin/agents/<int:agentid>/salary-payments', methods=['GET', 'POST'])
+@admin_required
+def api_admin_agent_salary_payments(agentid):
+    agent = Agent.query.get(agentid)
+    if not agent:
+        return jsonify({'success': False, 'message': 'Agent not found'}), 404
+
+    if request.method == 'GET':
+        rows = (
+            AgentSalaryPayment.query
+            .filter_by(agentid=agentid)
+            .order_by(AgentSalaryPayment.paidat.desc())
+            .all()
+        )
+
+        return jsonify({
+            'items': [{
+                'id': p.id,
+                'agentid': p.agentid,
+                'agentname': agent.name,
+                'amountpaid': round(_safe_float(p.amountpaid), 2),
+                'periodfrom': p.periodfrom.strftime('%Y-%m-%d') if p.periodfrom else '',
+                'periodto': p.periodto.strftime('%Y-%m-%d') if p.periodto else '',
+                'paidat': fmt_ist(p.paidat, '%Y-%m-%d %H:%M') if p.paidat else '',
+                'paidby': p.paidby or 'admin',
+                'referenceno': p.referenceno or '',
+                'note': p.note or ''
+            } for p in rows]
+        })
+
+    data = request.get_json() or {}
+    amountpaid = _safe_float(data.get('amountpaid'))
+
+    if amountpaid <= 0:
+        return jsonify({'success': False, 'message': 'Enter valid amount'}), 400
+
+    summary = _build_agent_commission_data(agent, include_history=False)
+    earned = round(float(summary.get('totalsalary', 0) or 0), 2)
+    already_paid = _payment_total(agent.id)
+    pending = round(max(earned - already_paid, 0), 2)
+
+    if amountpaid > pending:
+        return jsonify({'success': False, 'message': f'Amount exceeds pending salary ({pending})'}), 400
+
+    row = AgentSalaryPayment(
+        agentid=agent.id,
+        amountpaid=amountpaid,
+        periodfrom=_to_date(_parse_from_date(data.get('periodfrom'))),
+        periodto=_to_date(_parse_from_date(data.get('periodto'))),
+        note=(data.get('note') or '').strip(),
+        referenceno=(data.get('referenceno') or '').strip(),
+        paidby=session.get('username', 'admin'),
+        paidat=datetime.utcnow()
+    )
+    db.session.add(row)
+    db.session.commit()
+
+    return jsonify({
+        'success': True,
+        'message': 'Salary payment saved successfully'
+    })
 
 
 @app.route("/api/admin/wallet", methods=["GET"])
