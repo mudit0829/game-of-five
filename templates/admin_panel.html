@@ -783,6 +783,98 @@
           </div>
         </div>
 
+
+        <!-- PAYROLL -->
+<div id="payroll" class="section">
+  <div class="section-header">
+    <h2 class="section-title">Agent Payroll</h2>
+    <button class="btn-primary" onclick="loadPayroll()">⟳ Refresh</button>
+  </div>
+
+  <div class="controls">
+    <div class="search-box" style="min-width:320px;">
+      <input type="date" id="payrollFrom" />
+      <input type="date" id="payrollTo" />
+    </div>
+    <button class="btn-primary" onclick="setPayrollThisMonth()">This Month</button>
+    <button class="btn-primary" onclick="setPayrollToday()">Today</button>
+  </div>
+
+  <div class="dashboard-grid">
+    <div class="stat-card">
+      <div class="stat-icon">💰</div>
+      <div class="stat-label">Total Salary Earned</div>
+      <p class="stat-value" id="payrollTotalEarned">0</p>
+    </div>
+
+    <div class="stat-card">
+      <div class="stat-icon">✅</div>
+      <div class="stat-label">Total Salary Paid</div>
+      <p class="stat-value" id="payrollTotalPaid">0</p>
+    </div>
+
+    <div class="stat-card">
+      <div class="stat-icon">⏳</div>
+      <div class="stat-label">Pending Salary</div>
+      <p class="stat-value" id="payrollTotalPending">0</p>
+    </div>
+
+    <div class="stat-card">
+      <div class="stat-icon">👨‍💼</div>
+      <div class="stat-label">Agents</div>
+      <p class="stat-value" id="payrollAgentCount">0</p>
+    </div>
+  </div>
+
+  <div id="payrollLoading" class="loading">Loading payroll...</div>
+
+  <div id="payrollTableContainer" style="display:none;">
+    <div class="table-container">
+      <table class="data-table">
+        <thead>
+          <tr>
+            <th>S.No.</th>
+            <th>Agent</th>
+            <th>Status</th>
+            <th>Salary %</th>
+            <th>Total Played</th>
+            <th>Earned</th>
+            <th>Paid</th>
+            <th>Pending</th>
+            <th>Last Paid</th>
+            <th>Actions</th>
+          </tr>
+        </thead>
+        <tbody id="payrollTableBody"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="section-header" style="margin-top:30px;">
+    <h2 class="section-title">Payment History</h2>
+  </div>
+
+  <div class="table-container">
+    <table class="data-table">
+      <thead>
+        <tr>
+          <th>S.No.</th>
+          <th>Paid At</th>
+          <th>Agent</th>
+          <th>Amount</th>
+          <th>Period</th>
+          <th>Paid By</th>
+          <th>Reference</th>
+          <th>Note</th>
+        </tr>
+      </thead>
+      <tbody id="payrollPaymentsBody">
+        <tr><td colspan="8" class="no-data">No payment history loaded.</td></tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+
         <!-- TRANSACTIONS -->
         <div id="transactions" class="section">
           <div class="section-header">
@@ -1264,6 +1356,63 @@
       </form>
     </div>
   </div>
+
+  <!-- Pay Salary Modal -->
+<div id="paySalaryModal" class="modal">
+  <div class="modal-content">
+    <div class="modal-header">
+      <h2>Pay Agent Salary</h2>
+      <p>Record salary payment without changing your current agent logic.</p>
+    </div>
+
+    <form id="paySalaryForm">
+      <input type="hidden" id="paySalaryAgentId" />
+
+      <div class="details-grid" style="margin-bottom:20px;">
+        <div class="detail-item">
+          <div class="detail-label">Agent</div>
+          <div class="detail-value" id="paySalaryAgentName">-</div>
+        </div>
+        <div class="detail-item">
+          <div class="detail-label">Pending Salary</div>
+          <div class="detail-value" id="paySalaryPending">0</div>
+        </div>
+      </div>
+
+      <div class="form-row">
+        <div class="form-group">
+          <label>Amount Paid</label>
+          <input type="number" id="paySalaryAmount" min="0" step="0.01" required />
+        </div>
+        <div class="form-group">
+          <label>Reference No.</label>
+          <input type="text" id="paySalaryReference" placeholder="Bank / cash / txn ref" />
+        </div>
+      </div>
+
+      <div class="form-row">
+        <div class="form-group">
+          <label>Period From</label>
+          <input type="date" id="paySalaryPeriodFrom" />
+        </div>
+        <div class="form-group">
+          <label>Period To</label>
+          <input type="date" id="paySalaryPeriodTo" />
+        </div>
+      </div>
+
+      <div class="form-group">
+        <label>Note</label>
+        <textarea id="paySalaryNote" placeholder="Optional note"></textarea>
+      </div>
+
+      <div class="modal-footer">
+        <button type="submit" class="btn-modal btn-save">Save Payment</button>
+        <button type="button" class="btn-modal btn-cancel" onclick="closePaySalaryModal()">Cancel</button>
+      </div>
+    </form>
+  </div>
+</div>
 
   <!-- Details -->
   <div id="detailsModal" class="modal">
