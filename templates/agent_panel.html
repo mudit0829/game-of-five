@@ -770,7 +770,7 @@
 
       if (section === 'dashboard') refreshDashboard();
       if (section === 'users') loadUsers();
-      if (section === 'salary') loadSalary();
+      if (section === 'salary') {loadSalary();loadSalaryLedger();}
       if (section === 'profile') loadProfile();
     }
 
@@ -943,6 +943,8 @@
         document.getElementById('salaryLoading').style.display = 'none';
       }
     }
+    await loadSalaryLedger();
+
 
     // ------------------------
     // Profile
