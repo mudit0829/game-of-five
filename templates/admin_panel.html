@@ -1286,6 +1286,10 @@
     let allTxns = [];
     let allWalletUsers = [];
     let allTickets = [];
+    let allPayrollAgents = [];
+    let allPayrollPayments = [];
+    let payrollHistoryAgentId = null;
+
 
     // ------------------------
     // Helpers
@@ -2238,6 +2242,209 @@ window.viewAgentUsers = async function (agentId) {
   }
 };
 
+
+    // ------------------------ Payroll ------------------------
+function setPayrollToday() {
+  const d = new Date();
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  const s = `${y}-${m}-${day}`;
+  document.getElementById('payrollFrom').value = s;
+  document.getElementById('payrollTo').value = s;
+  loadPayroll();
+}
+
+function setPayrollThisMonth() {
+  const d = new Date();
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const from = `${y}-${m}-01`;
+  const to = `${y}-${m}-${String(new Date(y, d.getMonth() + 1, 0).getDate()).padStart(2, '0')}`;
+  document.getElementById('payrollFrom').value = from;
+  document.getElementById('payrollTo').value = to;
+  loadPayroll();
+}
+
+async function loadPayroll() {
+  const loading = document.getElementById('payrollLoading');
+  const container = document.getElementById('payrollTableContainer');
+  const tbody = document.getElementById('payrollTableBody');
+
+  if (!loading || !container || !tbody) {
+    console.error('Payroll section HTML is missing');
+    return;
+  }
+
+  loading.style.display = 'block';
+  container.style.display = 'none';
+  tbody.innerHTML = '';
+
+  try {
+    const qs = new URLSearchParams();
+    const from = document.getElementById('payrollFrom')?.value || '';
+    const to = document.getElementById('payrollTo')?.value || '';
+
+    if (from) qs.set('from', from);
+    if (to) qs.set('to', to);
+
+    const url = qs.toString() ? `/api/admin/payroll?${qs.toString()}` : '/api/admin/payroll';
+    const data = await apiGet(url);
+
+    const summary = data.summary || {};
+    allPayrollAgents = Array.isArray(data.items) ? data.items : [];
+
+    document.getElementById('payrollTotalEarned').textContent = fmtINR(Number(summary.totalearned || 0));
+    document.getElementById('payrollTotalPaid').textContent = fmtINR(Number(summary.totalpaid || 0));
+    document.getElementById('payrollTotalPending').textContent = fmtINR(Number(summary.totalpending || 0));
+    document.getElementById('payrollAgentCount').textContent = Number(summary.agentcount || 0);
+
+    displayPayrollAgents();
+
+    loading.style.display = 'none';
+    container.style.display = 'block';
+
+    await loadPayrollPayments(payrollHistoryAgentId);
+  } catch (err) {
+    console.error('loadPayroll error', err);
+    loading.innerHTML = `<div style="color:#ef4444;">Error: ${err.message}</div>`;
+  }
+}
+
+function displayPayrollAgents() {
+  const tbody = document.getElementById('payrollTableBody');
+  if (!tbody) return;
+
+  tbody.innerHTML = '';
+
+  if (!allPayrollAgents.length) {
+    tbody.innerHTML = `<tr><td colspan="10" class="no-data">No payroll data found.</td></tr>`;
+    return;
+  }
+
+  allPayrollAgents.forEach((a, idx) => {
+    const status = String(a.status || 'ACTIVE').toUpperCase();
+    const badge = status === 'BLOCKED' ? 'badge-blocked' : 'badge-active';
+
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+      <td>${idx + 1}</td>
+      <td>
+        <strong>${a.agentname || '-'}</strong>
+        <div class="muted" style="margin-top:4px;">${a.username || '-'}</div>
+      </td>
+      <td><span class="badge ${badge}">${status}</span></td>
+      <td>${Number(a.salarypercent || 0)}%</td>
+      <td>${fmtINR(Number(a.totalplayed || 0))}</td>
+      <td>${fmtINR(Number(a.earnedsalary || 0))}</td>
+      <td>${fmtINR(Number(a.paidsalary || 0))}</td>
+      <td>${fmtINR(Number(a.pendingsalary || 0))}</td>
+      <td>${a.lastpaidat || '-'}</td>
+      <td>
+        <div class="action-buttons">
+          <button class="btn-small btn-edit" onclick="openPaySalaryModal(${Number(a.agentid)})">Pay Now</button>
+          <button class="btn-small btn-view" onclick="loadPayrollPayments(${Number(a.agentid)})">View History</button>
+        </div>
+      </td>
+    `;
+    tbody.appendChild(tr);
+  });
+}
+
+async function loadPayrollPayments(agentId = null) {
+  payrollHistoryAgentId = agentId || null;
+  const tbody = document.getElementById('payrollPaymentsBody');
+  if (!tbody) return;
+
+  try {
+    const qs = new URLSearchParams();
+    const from = document.getElementById('payrollFrom')?.value || '';
+    const to = document.getElementById('payrollTo')?.value || '';
+
+    if (from) qs.set('from', from);
+    if (to) qs.set('to', to);
+    if (agentId) qs.set('agentid', agentId);
+
+    const url = qs.toString() ? `/api/admin/payroll/payments?${qs.toString()}` : '/api/admin/payroll/payments';
+    const data = await apiGet(url);
+
+    allPayrollPayments = Array.isArray(data.items) ? data.items : [];
+    tbody.innerHTML = '';
+
+    if (!allPayrollPayments.length) {
+      tbody.innerHTML = `<tr><td colspan="8" class="no-data">No payment history found.</td></tr>`;
+      return;
+    }
+
+    allPayrollPayments.forEach((p, idx) => {
+      const period = (p.periodfrom || p.periodto)
+        ? `${p.periodfrom || '-'} to ${p.periodto || '-'}`
+        : '-';
+
+      const tr = document.createElement('tr');
+      tr.innerHTML = `
+        <td>${idx + 1}</td>
+        <td>${p.paidat || '-'}</td>
+        <td>${p.agentname || '-'}</td>
+        <td>${fmtINR(Number(p.amountpaid || 0))}</td>
+        <td>${period}</td>
+        <td>${p.paidby || '-'}</td>
+        <td>${p.referenceno || '-'}</td>
+        <td>${p.note || '-'}</td>
+      `;
+      tbody.appendChild(tr);
+    });
+  } catch (err) {
+    console.error('loadPayrollPayments error', err);
+    tbody.innerHTML = `<tr><td colspan="8" class="no-data" style="color:#ef4444;">${err.message}</td></tr>`;
+  }
+}
+
+function openPaySalaryModal(agentId) {
+  const a = allPayrollAgents.find(x => Number(x.agentid) === Number(agentId));
+  if (!a) return alert('Agent not found');
+
+  document.getElementById('paySalaryAgentId').value = a.agentid;
+  document.getElementById('paySalaryAgentName').textContent = a.agentname || '-';
+  document.getElementById('paySalaryPending').textContent = fmtINR(Number(a.pendingsalary || 0));
+  document.getElementById('paySalaryAmount').value = Number(a.pendingsalary || 0) > 0 ? Number(a.pendingsalary || 0) : '';
+  document.getElementById('paySalaryReference').value = '';
+  document.getElementById('paySalaryNote').value = '';
+  document.getElementById('paySalaryPeriodFrom').value = document.getElementById('payrollFrom')?.value || '';
+  document.getElementById('paySalaryPeriodTo').value = document.getElementById('payrollTo')?.value || '';
+  document.getElementById('paySalaryModal').classList.add('active');
+}
+
+function closePaySalaryModal() {
+  document.getElementById('paySalaryModal')?.classList.remove('active');
+  document.getElementById('paySalaryForm')?.reset();
+}
+
+async function submitSalaryPayment(e) {
+  e.preventDefault();
+
+  const agentId = document.getElementById('paySalaryAgentId')?.value;
+  const payload = {
+    amountpaid: Number(document.getElementById('paySalaryAmount')?.value || 0),
+    referenceno: (document.getElementById('paySalaryReference')?.value || '').trim(),
+    note: (document.getElementById('paySalaryNote')?.value || '').trim(),
+    periodfrom: document.getElementById('paySalaryPeriodFrom')?.value || '',
+    periodto: document.getElementById('paySalaryPeriodTo')?.value || ''
+  };
+
+  if (!agentId) return alert('Agent not selected');
+  if (!payload.amountpaid || payload.amountpaid <= 0) return alert('Enter valid amount');
+
+  try {
+    const res = await apiSend(`/api/admin/agents/${agentId}/salary-payments`, 'POST', payload);
+    alert(res.message || 'Salary payment saved successfully');
+    closePaySalaryModal();
+    await loadPayroll();
+    await loadAgents();
+  } catch (err) {
+    alert('Error: ' + err.message);
+  }
+}
 
     
     // ------------------------
