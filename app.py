@@ -766,7 +766,7 @@ def agent_required(f):
         if not aid:
             if is_api:
                 return jsonify(success=False, message="Agent login required"), 401
-            return redirect(url_for('agent_login'))
+            return redirect(url_for('agentloginpage'))
 
         try:
             aid_int = int(aid)
@@ -775,7 +775,7 @@ def agent_required(f):
                 session.pop(k, None)
             if is_api:
                 return jsonify(success=False, message="Invalid agent session"), 401
-            return redirect(url_for('agent_login'))
+            return redirect(url_for('agentloginpage'))
 
         a = Agent.query.get(aid_int)
         if not a:
@@ -783,7 +783,7 @@ def agent_required(f):
                 session.pop(k, None)
             if is_api:
                 return jsonify(success=False, message="Agent not found"), 401
-            return redirect(url_for('agent_login'))
+            return redirect(url_for('agentloginpage'))
 
         if getattr(a, 'isblocked', False):
             if is_api:
