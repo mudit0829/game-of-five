@@ -2238,10 +2238,12 @@ def logout():
     return redirect(url_for("login_page"))
 
 @app.route('/agent-login')
+@app.route('/agent/login')
 def agentloginpage():
     return render_template('agent-login.html')
 
 @app.route('/agent-login', methods=['POST'])
+@app.route('/agent/login', methods=['POST'])
 def agentloginpost():
     data = request.get_json() or {}
     username = (data.get('username') or '').strip()
@@ -2254,17 +2256,19 @@ def agentloginpost():
         return jsonify(success=False, message=f"Agent blocked: {a.blockreason or 'Contact admin'}"), 403
 
     session['agentid'] = a.id
-    session['agentId'] = a.id  # compatibility
+    session['agentId'] = a.id
     session['agentusername'] = a.username
     session.permanent = True
     return jsonify(success=True, redirect=url_for('agent_panel'))
 
 @app.route('/agent/logout')
+@app.route('/agent-logout')
+@app.route('/agentlogout')
 def agent_logout():
-    for k in ('agent_id', 'agentid', 'agentId', 'agentID'):
+    for k in ('agent_id', 'agentid', 'agentId', 'agentID', 'agentusername'):
         session.pop(k, None)
-    return redirect(url_for('agentloginpage'))
-
+    session.permanent = False
+    return redirect('/agent/login')
 @app.route('/agent')
 @agent_required
 def agent_panel():
@@ -2292,8 +2296,8 @@ def api_agent_salary():
     if not agent:
         return jsonify(success=False, message="Agent not found"), 404
 
-    from_str = request.args.get('from')  # 'YYYY-MM-DD'
-    to_str = request.args.get('to')      # 'YYYY-MM-DD'
+    from_str = request.args.get('from')
+    to_str = request.args.get('to')
 
     from_dt = _parse_from_date(from_str)
     to_dt = _parse_to_date(to_str)
@@ -2305,24 +2309,79 @@ def api_agent_salary():
         include_history=False
     )
 
+    paid_salary = _payment_total(aid, from_dt=from_dt, to_dt=to_dt)
+    total_salary = round(summary["totalsalary"], 2)
+    pending_salary = round(max(total_salary - paid_salary, 0), 2)
+
+    last_payment = (
+        AgentSalaryPayment.query
+        .filter_by(agentid=aid)
+        .order_by(AgentSalaryPayment.paidat.desc())
+        .first()
+    )
+
     items = []
     for row in summary["items"]:
-        amount_played = int(row["eligibleplayed"] + row["blockedplayed"])
+        amount_played = int((row.get("eligibleplayed") or 0) + (row.get("blockedplayed") or 0))
         items.append({
             "userid": row["userid"],
+            "username": row.get("username", ""),
             "joining": row["joining"],
             "amountplayed": amount_played,
-            "salarygenerated": round(row["salarygenerated"], 0),
+            "salarygenerated": round(row["salarygenerated"], 2),
         })
 
-    total_played = int(summary["eligibleplayed"] + summary["blockedplayed"])
+    total_played = int((summary.get("eligibleplayed") or 0) + (summary.get("blockedplayed") or 0))
 
     return jsonify({
         "totalplayed": total_played,
-        "totalsalary": round(summary["totalsalary"], 0),
+        "totalsalary": total_salary,
+        "totalpaid": paid_salary,
+        "pendingsalary": pending_salary,
+        "lastpaidat": fmt_ist(last_payment.paidat, '%Y-%m-%d %H:%M') if last_payment and last_payment.paidat else "",
         "items": items,
     })
 
+
+@app.route('/api/agent/salary-payments', methods=['GET'])
+@agent_required
+def api_agent_salary_payments():
+    aid = int(get_session_agent_id())
+    agent = Agent.query.get(aid)
+    if not agent:
+        return jsonify(success=False, message="Agent not found"), 404
+
+    from_dt = _parse_from_date(request.args.get('from'))
+    to_dt = _parse_to_date(request.args.get('to'))
+
+    q = AgentSalaryPayment.query.filter_by(agentid=aid)
+
+    if from_dt:
+        q = q.filter(AgentSalaryPayment.paidat >= from_dt)
+    if to_dt:
+        q = q.filter(AgentSalaryPayment.paidat < to_dt)
+
+    rows = q.order_by(AgentSalaryPayment.paidat.desc()).all()
+
+    items = []
+    for p in rows:
+        items.append({
+            'id': p.id,
+            'agentid': p.agentid,
+            'agentname': agent.name or '-',
+            'amountpaid': round(_safe_float(p.amountpaid), 2),
+            'periodfrom': p.periodfrom.strftime('%Y-%m-%d') if p.periodfrom else '',
+            'periodto': p.periodto.strftime('%Y-%m-%d') if p.periodto else '',
+            'paidat': fmt_ist(p.paidat, '%Y-%m-%d %H:%M') if p.paidat else '',
+            'paidby': p.paidby or 'admin',
+            'referenceno': p.referenceno or '',
+            'note': p.note or ''
+        })
+
+    return jsonify({
+        'items': items,
+        'totalpaid': round(sum(_safe_float(x['amountpaid']) for x in items), 2)
+    })
 
     
 @app.route('/api/agent/commission-history', methods=['GET'])
