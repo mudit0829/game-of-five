@@ -4400,9 +4400,22 @@ def handle_place_bet(data):
     raw_user_id = data.get("user_id")
     username = data.get("username")
     number = data.get("number")
-    round_code = data.get("round_code")
+    round_code = (
+        data.get("round_code")
+        or data.get("roundcode")
+        or data.get("roundCode")
+        or ""
+    ).strip()
 
-    print(f"Ã°Å¸Å½Â¯ Bet attempt: user={raw_user_id}, game={game_type}, number={number}, round={round_code}")
+    table_number = data.get("table_number")
+    if table_number is None:
+        table_number = data.get("tablenumber")
+    try:
+        table_number = int(table_number) if table_number not in (None, "") else None
+    except (TypeError, ValueError):
+        table_number = None
+
+    print(f"🎯 Bet attempt: user={raw_user_id}, game={game_type}, number={number}, round={round_code}, table={table_number}")
 
     if game_type not in GAME_CONFIGS:
         emit("bet_error", {"message": "Invalid game type"})
@@ -4427,30 +4440,74 @@ def handle_place_bet(data):
         emit("bet_error", {"message": "Admin cannot place bets"})
         return
 
+    if not username:
+        username = user.username
+
     tables = game_tables.get(game_type)
     if not tables:
         emit("bet_error", {"message": "No tables for this game"})
         return
 
     table = None
+
+    # 1) Strongest selector: exact round_code from payload
     if round_code:
         for t in tables:
             if t.round_code == round_code:
                 table = t
                 break
+
         if not table:
             emit("bet_error", {"message": "This game round is no longer available. Please join a new game."})
             return
-    else:
+
+    # 2) Next safest: exact table_number from payload
+    elif table_number is not None:
         for t in tables:
-            if (not t.is_betting_closed) and (not t.is_finished) and (len(t.bets) < t.max_players):
+            if t.table_number == table_number:
                 table = t
                 break
+
         if not table:
-            emit("bet_error", {"message": "No open game table"})
+            emit("bet_error", {"message": "Selected table missing. Please re-open the table and try again."})
             return
 
-    if table.is_finished or table.is_betting_closed:
+    # 3) Resume only when unambiguous for same user; never guess first open table
+    else:
+        existing_user_tables = []
+        open_tables = []
+
+        for t in tables:
+            if t.is_finished or t.is_betting_closed:
+                continue
+
+            open_tables.append(t)
+
+            for bet in t.bets:
+                bet_user_id = bet.get("user_id")
+                try:
+                    bet_user_id = int(bet_user_id)
+                except (TypeError, ValueError):
+                    pass
+
+                if bet_user_id == user_id:
+                    existing_user_tables.append(t)
+                    break
+
+        if len(existing_user_tables) == 1:
+            table = existing_user_tables[0]
+        elif len(open_tables) == 1:
+            table = open_tables[0]
+        else:
+            emit("bet_error", {"message": "Selected table missing. Please re-open the table and try again."})
+            return
+
+    # Never shift to another table after selection
+    if table.is_finished:
+        emit("bet_error", {"message": "This game round is no longer available. Please join a new game."})
+        return
+
+    if table.is_betting_closed:
         emit("bet_error", {"message": "Betting is closed for this game"})
         return
 
@@ -4463,10 +4520,10 @@ def handle_place_bet(data):
         emit("bet_error", {"message": "Insufficient balance"})
         return
 
-    # Ã¢Å“â€¦ CRITICAL: Add bet to table (forced winners don't interfere here)
+    # CRITICAL: Add bet to table (forced winners don't interfere here)
     success, message = table.add_bet(user_id, username, number)
     if not success:
-        print(f"Ã¢ÂÅ’ Bet rejected: {message}")
+        print(f"❌ Bet rejected: {message}")
         emit("bet_error", {"message": message})
         return
 
@@ -4486,7 +4543,7 @@ def handle_place_bet(data):
     db.session.add(bet_tx)
     db.session.commit()
 
-    print(f"Ã¢Å“â€¦ Bet placed successfully: user={user_id}, number={number}, round={table.round_code}")
+    print(f"✅ Bet placed successfully: user={user_id}, number={number}, round={table.round_code}")
 
     # Prepare players list for broadcast
     players_data = []
