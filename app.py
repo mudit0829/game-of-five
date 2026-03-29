@@ -4395,23 +4395,30 @@ def handle_join_game(data):
 
 @socketio.on("place_bet")
 def handle_place_bet(data):
-    """Handle user bet placement - FORCED WINNERS DON'T BLOCK USER BETS"""
-    game_type = data.get("game_type")
-    raw_user_id = data.get("user_id")
-    username = data.get("username")
-    number = data.get("number")
-    round_code = data.get("round_code")
+    """Handle user bet placement on the exact selected round only."""
+    data = data or {}
 
-    print(f"ðŸŽ¯ Bet attempt: user={raw_user_id}, game={game_type}, number={number}, round={round_code}")
+    game_type = (data.get("game_type") or "").strip().lower()
+    raw_user_id = data.get("user_id")
+    username = (data.get("username") or "").strip()
+    number = data.get("number")
+    round_code = (data.get("round_code") or "").strip()
+
+    print(f"🎯 Bet attempt: user={raw_user_id}, game={game_type}, number={number}, round={round_code}")
 
     if game_type not in GAME_CONFIGS:
         emit("bet_error", {"message": "Invalid game type"})
         return
 
+    if not round_code:
+        emit("bet_error", {"message": "Selected table missing. Please re-open the table and try again."})
+        return
+
     try:
         user_id = int(raw_user_id)
     except (TypeError, ValueError):
-        user_id = raw_user_id
+        emit("bet_error", {"message": "Invalid user"})
+        return
 
     user = User.query.get(user_id)
     if not user:
@@ -4419,113 +4426,128 @@ def handle_place_bet(data):
         return
 
     if user.is_blocked:
-        emit("bet_error", {"message": f"Your account is blocked. Reason: {user.block_reason or 'No reason provided'}"})
+        emit("bet_error", {
+            "message": f"Your account is blocked. Reason: {user.block_reason or 'No reason provided'}"
+        })
         return
+
+    if not username:
+        username = user.username
 
     wallet = ensure_wallet_for_user(user)
     if not wallet:
         emit("bet_error", {"message": "Admin cannot place bets"})
         return
 
-    tables = game_tables.get(game_type)
+    try:
+        number = int(number)
+    except (TypeError, ValueError):
+        emit("bet_error", {"message": "Invalid number"})
+        return
+
+    if game_type == "roulette":
+        if number < 0 or number > 36:
+            emit("bet_error", {"message": "Roulette number must be 0 to 36"})
+            return
+    else:
+        if number < 0 or number > 9:
+            emit("bet_error", {"message": "Number must be 0 to 9"})
+            return
+
+    tables = game_tables.get(game_type) or []
     if not tables:
         emit("bet_error", {"message": "No tables for this game"})
         return
 
     table = None
-    if round_code:
-        for t in tables:
-            if t.round_code == round_code:
-                table = t
-                break
-        if not table:
-            emit("bet_error", {"message": "This game round is no longer available. Please join a new game."})
-            return
-    else:
-        for t in tables:
-            if (not t.is_betting_closed) and (not t.is_finished) and (len(t.bets) < t.max_players):
-                table = t
-                break
-        if not table:
-            emit("bet_error", {"message": "No open game table"})
-            return
+    for t in tables:
+        if t.round_code == round_code:
+            table = t
+            break
 
-            # If user already has bets in this exact round, do not try to place again.
-        existing_user_bets = []
-        for b in (table.bets or []):
-            try:
-                if int(b.get("user_id")) == int(user_id):
-                    existing_user_bets.append(int(b.get("number")))
-            except Exception:
-                pass
+    if not table:
+        emit("bet_error", {"message": "This game round is no longer available. Please join a new game."})
+        return
 
-        if round_code and existing_user_bets:
-            players_data = []
-            for bet in table.bets:
-                players_data.append({
-                    "user_id": str(bet["user_id"]),
-                    "username": bet["username"],
-                    "number": bet["number"],
-                })
+    if table.is_finished:
+        emit("bet_error", {"message": "This game round is already finished."})
+        return
 
-            emit("bet_success", {
-                "message": "Opened existing game round",
-                "new_balance": wallet.balance,
-                "round_code": table.round_code,
-                "table_number": table.table_number,
-                "players": players_data,
-                "slots_available": table.get_slots_available(),
-                "existing_user_bets": sorted(set(existing_user_bets)),
-                "resume_only": True,
-            })
-            return
-
-    if table.is_finished or table.is_betting_closed:
-        emit("bet_error", {"message": "Betting is closed for this game"})
+    if table.is_betting_closed:
+        emit("bet_error", {"message": "Betting is closed for this selected table."})
         return
 
     if len(table.bets) >= table.max_players:
-        emit("bet_error", {"message": "All slots are full"})
+        emit("bet_error", {"message": "Selected table is full. Please wait for the next round."})
         return
 
-    bet_amount = table.config["bet_amount"]
+    bet_amount = int(table.config.get("bet_amount", 0) or 0)
+    if bet_amount <= 0:
+        emit("bet_error", {"message": "Invalid bet amount configuration"})
+        return
+
     if wallet.balance < bet_amount:
         emit("bet_error", {"message": "Insufficient balance"})
         return
 
-    # âœ… CRITICAL: Add bet to table (forced winners don't interfere here)
+    previous_balance = int(wallet.balance or 0)
+    previous_bets_len = len(table.bets)
+    previous_history_len = len(user_game_history.get(user_id, []))
+
     success, message = table.add_bet(user_id, username, number)
     if not success:
-        print(f"âŒ Bet rejected: {message}")
+        print(f"❌ Bet rejected: {message}")
         emit("bet_error", {"message": message})
         return
 
-    # Deduct balance
-    wallet.balance -= bet_amount
+    try:
+        wallet.balance = previous_balance - bet_amount
 
-    # Log transaction
-    bet_tx = Transaction(
-        user_id=user_id,
-        kind="bet",
-        amount=bet_amount,
-        balance_after=wallet.balance,
-        label="Bet Placed",
-        game_title=table.config["name"],
-        note=f"Number {number}",
-    )
-    db.session.add(bet_tx)
-    db.session.commit()
+        bet_tx = Transaction(
+            user_id=user_id,
+            kind="bet",
+            amount=bet_amount,
+            balance_after=wallet.balance,
+            label="Bet Placed",
+            game_title=table.config["name"],
+            note=f"Number {number}",
+        )
+        db.session.add(bet_tx)
+        db.session.commit()
 
-    print(f"âœ… Bet placed successfully: user={user_id}, number={number}, round={table.round_code}")
+    except Exception as e:
+        db.session.rollback()
+        wallet.balance = previous_balance
 
-    # Prepare players list for broadcast
+        if len(table.bets) > previous_bets_len:
+            for i in range(len(table.bets) - 1, previous_bets_len - 1, -1):
+                b = table.bets[i]
+                if (
+                    b.get("user_id") == user_id
+                    and b.get("number") == number
+                    and not b.get("is_bot", False)
+                ):
+                    del table.bets[i]
+                    break
+
+        history_list = user_game_history.get(user_id, [])
+        while len(history_list) > previous_history_len:
+            history_list.pop()
+
+        print(f"❌ Bet DB error: {e}")
+        emit("bet_error", {"message": "Could not save bet. Please try again."})
+        return
+
+    print(f"✅ Bet placed successfully: user={user_id}, number={number}, round={table.round_code}")
+
     players_data = []
     for bet in table.bets:
-        players_data.append(
-            {"user_id": str(bet["user_id"]), "username": bet["username"], "number": bet["number"]}
-        )
+        players_data.append({
+            "user_id": str(bet["user_id"]),
+            "username": bet["username"],
+            "number": bet["number"],
+        })
 
-    # Emit success to the user
     emit(
         "bet_success",
         {
@@ -4538,7 +4560,6 @@ def handle_place_bet(data):
         },
     )
 
-    # Broadcast table update to all clients
     emit(
         "update_table",
         {
