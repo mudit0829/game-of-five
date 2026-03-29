@@ -2237,30 +2237,6 @@ def logout():
     session.clear()
     return redirect(url_for("login_page"))
 
-@app.route('/agent-login')
-@app.route('/agent/login')
-def agentloginpage():
-    return render_template('agent_login.html')
-
-@app.route('/agent-login', methods=['POST'])
-@app.route('/agent/login', methods=['POST'])
-def agentloginpost():
-    data = request.get_json() or {}
-    username = (data.get('username') or '').strip()
-    password = (data.get('password') or '').strip()
-
-    a = Agent.query.filter_by(username=username).first()
-    if not a or not a.checkpassword(password):
-        return jsonify(success=False, message="Invalid credentials"), 401
-    if a.isblocked:
-        return jsonify(success=False, message=f"Agent blocked: {a.blockreason or 'Contact admin'}"), 403
-
-    session['agentid'] = a.id
-    session['agentId'] = a.id
-    session['agentusername'] = a.username
-    session.permanent = True
-    return jsonify(success=True, redirect=url_for('agent_panel'))
-
 @app.route('/agent/logout')
 @app.route('/agent-logout')
 @app.route('/agentlogout')
