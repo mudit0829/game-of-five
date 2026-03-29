@@ -2489,7 +2489,7 @@ def play_game(game_type):
         roundcode=roundcode if roundcode else None,
         tablenumber=tablenumber,
     )
-
+    
 
 @app.route("/history")
 @login_required
@@ -4422,6 +4422,7 @@ def handle_place_bet(data):
         table_number = int(table_number) if table_number not in (None, "") else None
     except (TypeError, ValueError):
         table_number = None
+        
     print(f"🎯 Bet attempt: user={raw_user_id}, game={game_type}, number={number}, round={round_code}, table={table_number}")
 
     if game_type not in GAME_CONFIGS:
