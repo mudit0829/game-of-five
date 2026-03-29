@@ -2237,42 +2237,29 @@ def logout():
     session.clear()
     return redirect(url_for("login_page"))
 
-@app.route('/agent/login', methods=['GET', 'POST'])
-@app.route('/agent-login', methods=['GET', 'POST'])
-def agent_login():
-    if session.get('agent_id') or session.get('agentid') or session.get('agentId') or session.get('agentID'):
-        return redirect(url_for('agent_panel'))
+@app.route('/agent-login')
+@app.route('/agent/login')
+def agentloginpage():
+    return render_template('agent_login.html')
 
-    error = None
+@app.route('/agent-login', methods=['POST'])
+@app.route('/agent/login', methods=['POST'])
+def agentloginpost():
+    data = request.get_json() or {}
+    username = (data.get('username') or '').strip()
+    password = (data.get('password') or '').strip()
 
-    if request.method == 'POST':
-        username = (request.form.get('username') or '').strip()
-        password = (request.form.get('password') or '').strip()
+    a = Agent.query.filter_by(username=username).first()
+    if not a or not a.checkpassword(password):
+        return jsonify(success=False, message="Invalid credentials"), 401
+    if a.isblocked:
+        return jsonify(success=False, message=f"Agent blocked: {a.blockreason or 'Contact admin'}"), 403
 
-        if not username or not password:
-            return render_template('agent_login.html', error="Username and password required.")
-
-        agent = Agent.query.filter(func.lower(Agent.username) == username.lower()).first()
-        if not agent:
-            return render_template('agent_login.html', error="Invalid credentials.")
-
-        if agent.isblocked:
-            return render_template('agent_login.html', error="Your account is blocked. Contact admin.")
-
-        if not agent.checkpassword(password):
-            return render_template('agent_login.html', error="Invalid credentials.")
-
-        session['agent_id'] = int(agent.id)
-        session['agentid'] = int(agent.id)
-        session.pop('agentId', None)
-        session.pop('agentID', None)
-        session['agentusername'] = agent.username
-        session.permanent = True
-
-        return redirect(url_for('agent_panel'))
-
-    return render_template('agent_login.html', error=error)
-
+    session['agentid'] = a.id
+    session['agentId'] = a.id
+    session['agentusername'] = a.username
+    session.permanent = True
+    return jsonify(success=True, redirect=url_for('agent_panel'))
 
 @app.route('/agent/logout')
 @app.route('/agent-logout')
