@@ -553,7 +553,7 @@
 <div id="salary" class="section">
   <div class="section-header">
     <h2 class="section-title">Salary</h2>
-    <button class="btn-primary" onclick="loadSalary(); loadCommissionHistory();">Apply</button>
+    <button class="btn-primary" onclick="loadSalary(); loadSalaryPayments(); loadCommissionHistory();">Apply</button>
   </div>
 
   <div class="controls">
@@ -566,31 +566,42 @@
   </div>
 
   <div class="dashboard-grid">
-    <div class="stat-card">
-      <div class="stat-icon">🎮</div>
-      <div class="stat-label">Total Played (range)</div>
-      <p class="stat-value" id="rangePlayed">₹0</p>
-    </div>
-
-    <div class="stat-card">
-      <div class="stat-icon">💸</div>
-      <div class="stat-label">Total Salary (range)</div>
-      <p class="stat-value" id="rangeSalary">₹0</p>
-    </div>
-
-    <div class="stat-card">
-      <div class="stat-icon">✅</div>
-      <div class="stat-label">Eligible Played</div>
-      <p class="stat-value" id="eligiblePlayed">₹0</p>
-    </div>
-
-    <div class="stat-card">
-      <div class="stat-icon">⛔</div>
-      <div class="stat-label">Blocked Salary</div>
-      <p class="stat-value" id="blockedSalary">₹0</p>
-    </div>
+  <div class="stat-card">
+    <div class="stat-icon">🎮</div>
+    <div class="stat-label">Total Played (range)</div>
+    <p class="stat-value" id="rangePlayed">₹0</p>
   </div>
 
+  <div class="stat-card">
+    <div class="stat-icon">💸</div>
+    <div class="stat-label">Total Salary (range)</div>
+    <p class="stat-value" id="rangeSalary">₹0</p>
+  </div>
+
+  <div class="stat-card">
+    <div class="stat-icon">🏦</div>
+    <div class="stat-label">Total Paid</div>
+    <p class="stat-value" id="totalPaid">₹0</p>
+  </div>
+
+  <div class="stat-card">
+    <div class="stat-icon">📌</div>
+    <div class="stat-label">Pending Salary</div>
+    <p class="stat-value" id="pendingSalary">₹0</p>
+  </div>
+
+  <div class="stat-card">
+    <div class="stat-icon">✅</div>
+    <div class="stat-label">Eligible Played</div>
+    <p class="stat-value" id="eligiblePlayed">₹0</p>
+  </div>
+
+  <div class="stat-card">
+    <div class="stat-icon">⛔</div>
+    <div class="stat-label">Blocked Salary</div>
+    <p class="stat-value" id="blockedSalary">₹0</p>
+  </div>
+</div>
   <div id="salaryLoading" class="loading" style="display:none;">Loading salary...</div>
 
   <div class="table-container">
@@ -611,29 +622,54 @@
   </div>
 
   <div class="section-header" style="margin-top:30px;">
-    <h2 class="section-title">Commission History</h2>
-    <button class="btn-primary" onclick="loadCommissionHistory()">⟳ Reload</button>
-  </div>
+  <h2 class="section-title">Payment History</h2>
+  <button class="btn-primary" onclick="loadSalaryPayments()">⟳ Reload</button>
+</div>
 
-  <div class="table-container">
-    <table class="data-table">
-      <thead>
-        <tr>
-          <th>S.No.</th>
-          <th>Date Time</th>
-          <th>User</th>
-          <th>Amount Played</th>
-          <th>Commission</th>
-          <th>Status</th>
-          <th>Game</th>
-          <th>Note</th>
-        </tr>
-      </thead>
-      <tbody id="commissionHistoryBody">
-        <tr><td colspan="8" class="no-data">No commission history loaded.</td></tr>
-      </tbody>
-    </table>
-  </div>
+<div class="table-container">
+  <table class="data-table">
+    <thead>
+      <tr>
+        <th>S.No.</th>
+        <th>Paid At</th>
+        <th>Amount Paid</th>
+        <th>Period From</th>
+        <th>Period To</th>
+        <th>Paid By</th>
+        <th>Reference No.</th>
+        <th>Note</th>
+      </tr>
+    </thead>
+    <tbody id="salaryPaymentsBody">
+      <tr><td colspan="8" class="no-data">No payment history loaded.</td></tr>
+    </tbody>
+  </table>
+</div>
+
+<div class="section-header" style="margin-top:30px;">
+  <h2 class="section-title">Commission History</h2>
+  <button class="btn-primary" onclick="loadCommissionHistory()">⟳ Reload</button>
+</div>
+
+<div class="table-container">
+  <table class="data-table">
+    <thead>
+      <tr>
+        <th>S.No.</th>
+        <th>Date Time</th>
+        <th>User</th>
+        <th>Amount Played</th>
+        <th>Commission</th>
+        <th>Status</th>
+        <th>Game</th>
+        <th>Note</th>
+      </tr>
+    </thead>
+    <tbody id="commissionHistoryBody">
+      <tr><td colspan="8" class="no-data">No commission history loaded.</td></tr>
+    </tbody>
+  </table>
+</div>
 </div>
 
         <!-- PROFILE -->
@@ -764,7 +800,7 @@
     }
 
     function logout() {
-      window.location.href = '/agent-logout';
+      window.location.href = '/agent/logout';
     }
 
 
@@ -809,7 +845,7 @@
 
       if (section === 'dashboard') refreshDashboard();
       if (section === 'users') loadUsers();
-      if (section === 'salary') {loadSalary();loadCommissionHistory();}
+      if (section === 'salary') {loadSalary();loadSalaryPayments();loadCommissionHistory();}
 
       if (section === 'profile') loadProfile();
     }
@@ -928,10 +964,10 @@
       document.getElementById('salaryFrom').value = s;
       document.getElementById('salaryTo').value = s;
       loadSalary();
+      loadSalaryPayments();
       loadCommissionHistory();
-
     }
-
+    
     function setThisMonth() {
       const d = new Date();
       const y = d.getFullYear();
@@ -941,52 +977,94 @@
       document.getElementById('salaryFrom').value = from;
       document.getElementById('salaryTo').value = to;
       loadSalary();
+      loadSalaryPayments();
       loadCommissionHistory();
-    }
+   }
 
     async function loadSalary() {
-      const from = document.getElementById('salaryFrom').value;
-      const to = document.getElementById('salaryTo').value;
+  const from = document.getElementById('salaryFrom').value;
+  const to = document.getElementById('salaryTo').value;
 
-      document.getElementById('salaryLoading').style.display = 'block';
+  document.getElementById('salaryLoading').style.display = 'block';
 
-      try {
-        const qs = new URLSearchParams();
-        if (from) qs.set('from', from);
-        if (to) qs.set('to', to);
+  try {
+    const qs = new URLSearchParams();
+    if (from) qs.set('from', from);
+    if (to) qs.set('to', to);
 
-        const data = await apiGet('/api/agent/salary?' + qs.toString());
+    const data = await apiGet('/api/agent/salary?' + qs.toString());
 
-        document.getElementById('rangePlayed').textContent = fmtINR(data.totalplayed ?? 0);
-        document.getElementById('rangeSalary').textContent = fmtINR(data.totalsalary ?? 0);
+    document.getElementById('rangePlayed').textContent = fmtINR(data.totalplayed ?? 0);
+    document.getElementById('rangeSalary').textContent = fmtINR(data.totalsalary ?? 0);
+    document.getElementById('totalPaid').textContent = fmtINR(data.totalpaid ?? 0);
+    document.getElementById('pendingSalary').textContent = fmtINR(data.pendingsalary ?? 0);
 
-        const items = Array.isArray(data?.items) ? data.items : [];
-        const tbody = document.getElementById('salaryTableBody');
-        tbody.innerHTML = '';
+    const items = Array.isArray(data?.items) ? data.items : [];
+    const tbody = document.getElementById('salaryTableBody');
+    tbody.innerHTML = '';
 
-        if (!items.length) {
-          tbody.innerHTML = `<tr><td colspan="5" class="no-data">No data for selected range.</td></tr>`;
-          return;
-        }
-
-        items.forEach((u, idx) => {
-          const row = document.createElement('tr');
-          row.innerHTML = `
-            <td>${idx + 1}</td>
-            <td>${u.userid ?? '-'}</td>
-            <td>${u.joining ?? '-'}</td>
-            <td>${fmtINR(Number(u.amountplayed ?? 0))}</td>
-            <td>${fmtINR(Number(u.salarygenerated ?? 0))}</td>
-          `;
-          tbody.appendChild(row);
-        });
-      } catch (err) {
-        showMsg('Salary Error', err.message);
-      } finally {
-        document.getElementById('salaryLoading').style.display = 'none';
-      }
+    if (!items.length) {
+      tbody.innerHTML = `<tr><td colspan="5" class="no-data">No data for selected range.</td></tr>`;
+      return;
     }
 
+    items.forEach((u, idx) => {
+      const row = document.createElement('tr');
+      row.innerHTML = `
+        <td>${idx + 1}</td>
+        <td>${u.userid ?? '-'}</td>
+        <td>${u.joining ?? '-'}</td>
+        <td>${fmtINR(Number(u.amountplayed ?? 0))}</td>
+        <td>${fmtINR(Number(u.salarygenerated ?? 0))}</td>
+      `;
+      tbody.appendChild(row);
+    });
+  } catch (err) {
+    showMsg('Salary Error', err.message);
+  } finally {
+    document.getElementById('salaryLoading').style.display = 'none';
+  }
+}
+
+    async function loadSalaryPayments() {
+  try {
+    const from = document.getElementById('salaryFrom')?.value || '';
+    const to = document.getElementById('salaryTo')?.value || '';
+
+    const qs = new URLSearchParams();
+    if (from) qs.set('from', from);
+    if (to) qs.set('to', to);
+
+    const data = await apiGet('/api/agent/salary-payments?' + qs.toString());
+
+    const items = Array.isArray(data?.items) ? data.items : [];
+    const tbody = document.getElementById('salaryPaymentsBody');
+    tbody.innerHTML = '';
+
+    if (!items.length) {
+      tbody.innerHTML = `<tr><td colspan="8" class="no-data">No payment history found.</td></tr>`;
+      return;
+    }
+
+    items.forEach((row, idx) => {
+      const tr = document.createElement('tr');
+      tr.innerHTML = `
+        <td>${idx + 1}</td>
+        <td>${row.paidat || '-'}</td>
+        <td>${fmtINR(row.amountpaid || 0)}</td>
+        <td>${row.periodfrom || '-'}</td>
+        <td>${row.periodto || '-'}</td>
+        <td>${row.paidby || '-'}</td>
+        <td>${row.referenceno || '-'}</td>
+        <td>${row.note || '-'}</td>
+      `;
+      tbody.appendChild(tr);
+    });
+  } catch (err) {
+    showMsg('Payment History Error', err.message);
+  }
+}
+    
     async function loadCommissionHistory() {
   try {
     const from = document.getElementById('salaryFrom')?.value || '';
