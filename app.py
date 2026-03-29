@@ -766,7 +766,7 @@ def agent_required(f):
         if not aid:
             if is_api:
                 return jsonify(success=False, message="Agent login required"), 401
-            return redirect(url_for('agentloginpage'))
+            return redirect(url_for('agent_login'))
 
         try:
             aid_int = int(aid)
@@ -775,7 +775,7 @@ def agent_required(f):
                 session.pop(k, None)
             if is_api:
                 return jsonify(success=False, message="Invalid agent session"), 401
-            return redirect(url_for('agentloginpage'))
+            return redirect(url_for('agent_login'))
 
         a = Agent.query.get(aid_int)
         if not a:
@@ -783,7 +783,7 @@ def agent_required(f):
                 session.pop(k, None)
             if is_api:
                 return jsonify(success=False, message="Agent not found"), 401
-            return redirect(url_for('agentloginpage'))
+            return redirect(url_for('agent_login'))
 
         if getattr(a, 'isblocked', False):
             if is_api:
@@ -2237,29 +2237,42 @@ def logout():
     session.clear()
     return redirect(url_for("login_page"))
 
-@app.route('/agent-login')
-@app.route('/agent/login')
-def agentloginpage():
-    return render_template('agent_login.html')
+@app.route('/agent/login', methods=['GET', 'POST'])
+@app.route('/agent-login', methods=['GET', 'POST'])
+def agent_login():
+    if session.get('agent_id') or session.get('agentid') or session.get('agentId') or session.get('agentID'):
+        return redirect(url_for('agent_panel'))
 
-@app.route('/agent-login', methods=['POST'])
-@app.route('/agent/login', methods=['POST'])
-def agentloginpost():
-    data = request.get_json() or {}
-    username = (data.get('username') or '').strip()
-    password = (data.get('password') or '').strip()
+    error = None
 
-    a = Agent.query.filter_by(username=username).first()
-    if not a or not a.checkpassword(password):
-        return jsonify(success=False, message="Invalid credentials"), 401
-    if a.isblocked:
-        return jsonify(success=False, message=f"Agent blocked: {a.blockreason or 'Contact admin'}"), 403
+    if request.method == 'POST':
+        username = (request.form.get('username') or '').strip()
+        password = (request.form.get('password') or '').strip()
 
-    session['agentid'] = a.id
-    session['agentId'] = a.id
-    session['agentusername'] = a.username
-    session.permanent = True
-    return jsonify(success=True, redirect=url_for('agent_panel'))
+        if not username or not password:
+            return render_template('agent_login.html', error="Username and password required.")
+
+        agent = Agent.query.filter(func.lower(Agent.username) == username.lower()).first()
+        if not agent:
+            return render_template('agent_login.html', error="Invalid credentials.")
+
+        if agent.isblocked:
+            return render_template('agent_login.html', error="Your account is blocked. Contact admin.")
+
+        if not agent.checkpassword(password):
+            return render_template('agent_login.html', error="Invalid credentials.")
+
+        session['agent_id'] = int(agent.id)
+        session['agentid'] = int(agent.id)
+        session.pop('agentId', None)
+        session.pop('agentID', None)
+        session['agentusername'] = agent.username
+        session.permanent = True
+
+        return redirect(url_for('agent_panel'))
+
+    return render_template('agent_login.html', error=error)
+
 
 @app.route('/agent/logout')
 @app.route('/agent-logout')
@@ -2268,7 +2281,7 @@ def agent_logout():
     for k in ('agent_id', 'agentid', 'agentId', 'agentID', 'agentusername'):
         session.pop(k, None)
     session.permanent = False
-    return redirect('/agent/login')
+    return redirect('/agent_login')
 @app.route('/agent')
 @agent_required
 def agent_panel():
