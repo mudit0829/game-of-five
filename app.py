@@ -4395,14 +4395,21 @@ def handle_join_game(data):
 
 @socketio.on("place_bet")
 def handle_place_bet(data):
-    """Handle user bet placement on the exact selected round only."""
+    """Handle user bet placement - backward compatible with old frontend."""
     data = data or {}
 
-    game_type = (data.get("game_type") or "").strip().lower()
+    game_type = data.get("game_type")
     raw_user_id = data.get("user_id")
-    username = (data.get("username") or "").strip()
+    username = data.get("username")
     number = data.get("number")
-    round_code = (data.get("round_code") or "").strip()
+
+    # Backward-compatible support
+    round_code = (
+        data.get("round_code")
+        or data.get("roundcode")
+        or data.get("roundCode")
+        or ""
+    ).strip()
 
     print(f"🎯 Bet attempt: user={raw_user_id}, game={game_type}, number={number}, round={round_code}")
 
@@ -4410,15 +4417,10 @@ def handle_place_bet(data):
         emit("bet_error", {"message": "Invalid game type"})
         return
 
-    if not round_code:
-        emit("bet_error", {"message": "Selected table missing. Please re-open the table and try again."})
-        return
-
     try:
         user_id = int(raw_user_id)
     except (TypeError, ValueError):
-        emit("bet_error", {"message": "Invalid user"})
-        return
+        user_id = raw_user_id
 
     user = User.query.get(user_id)
     if not user:
@@ -4439,53 +4441,100 @@ def handle_place_bet(data):
         emit("bet_error", {"message": "Admin cannot place bets"})
         return
 
-    try:
-        number = int(number)
-    except (TypeError, ValueError):
-        emit("bet_error", {"message": "Invalid number"})
-        return
-
-    if game_type == "roulette":
-        if number < 0 or number > 36:
-            emit("bet_error", {"message": "Roulette number must be 0 to 36"})
-            return
-    else:
-        if number < 0 or number > 9:
-            emit("bet_error", {"message": "Number must be 0 to 9"})
-            return
-
-    tables = game_tables.get(game_type) or []
+    tables = game_tables.get(game_type)
     if not tables:
         emit("bet_error", {"message": "No tables for this game"})
         return
 
     table = None
-    for t in tables:
-        if t.round_code == round_code:
-            table = t
-            break
 
-    if not table:
-        emit("bet_error", {"message": "This game round is no longer available. Please join a new game."})
+    # 1) Best case: exact round sent from frontend
+    if round_code:
+        for t in tables:
+            if t.round_code == round_code:
+                table = t
+                break
+
+        if not table:
+            emit("bet_error", {"message": "This game round is no longer available. Please join a new game."})
+            return
+
+    else:
+        # 2) No round sent: first try to find if this user already has bets in any active table
+        for t in tables:
+            if t.is_finished or t.is_betting_closed:
+                continue
+
+            found_user_in_table = False
+            for b in (t.bets or []):
+                try:
+                    if int(b.get("user_id")) == int(user_id):
+                        found_user_in_table = True
+                        break
+                except Exception:
+                    pass
+
+            if found_user_in_table:
+                table = t
+                break
+
+        # 3) If user not found in any active table, allow auto-pick only when exactly one open table exists
+        if not table:
+            open_tables = []
+            for t in tables:
+                if (not t.is_betting_closed) and (not t.is_finished) and (len(t.bets) < t.max_players):
+                    open_tables.append(t)
+
+            if len(open_tables) == 1:
+                table = open_tables[0]
+            elif len(open_tables) == 0:
+                emit("bet_error", {"message": "No open game table"})
+                return
+            else:
+                emit("bet_error", {
+                    "message": "Multiple tables are open. Please re-open the table and try again."
+                })
+                return
+
+    # If user already has bets in this exact table, just reopen/resume that round
+    existing_user_bets = []
+    for b in (table.bets or []):
+        try:
+            if int(b.get("user_id")) == int(user_id):
+                existing_user_bets.append(int(b.get("number")))
+        except Exception:
+            pass
+
+    if existing_user_bets:
+        players_data = []
+        for bet in table.bets:
+            players_data.append({
+                "user_id": str(bet["user_id"]),
+                "username": bet["username"],
+                "number": bet["number"],
+            })
+
+        emit("bet_success", {
+            "message": "Opened existing game round",
+            "new_balance": wallet.balance,
+            "round_code": table.round_code,
+            "table_number": table.table_number,
+            "players": players_data,
+            "slots_available": table.get_slots_available(),
+            "existing_user_bets": sorted(set(existing_user_bets)),
+            "resume_only": True,
+        })
         return
 
-    if table.is_finished:
-        emit("bet_error", {"message": "This game round is already finished."})
-        return
-
-    if table.is_betting_closed:
-        emit("bet_error", {"message": "Betting is closed for this selected table."})
+    if table.is_finished or table.is_betting_closed:
+        emit("bet_error", {"message": "Betting is closed for this game"})
         return
 
     if len(table.bets) >= table.max_players:
-        emit("bet_error", {"message": "Selected table is full. Please wait for the next round."})
+        emit("bet_error", {"message": "All slots are full"})
         return
 
-    bet_amount = int(table.config.get("bet_amount", 0) or 0)
-    if bet_amount <= 0:
-        emit("bet_error", {"message": "Invalid bet amount configuration"})
-        return
-
+    bet_amount = table.config["bet_amount"]
     if wallet.balance < bet_amount:
         emit("bet_error", {"message": "Insufficient balance"})
         return
@@ -4548,33 +4597,24 @@ def handle_place_bet(data):
             "number": bet["number"],
         })
 
-    emit(
-        "bet_success",
-        {
-            "message": message,
-            "new_balance": wallet.balance,
-            "round_code": table.round_code,
-            "table_number": table.table_number,
-            "players": players_data,
-            "slots_available": table.get_slots_available(),
-        },
-    )
+    emit("bet_success", {
+        "message": message,
+        "new_balance": wallet.balance,
+        "round_code": table.round_code,
+        "table_number": table.table_number,
+        "players": players_data,
+        "slots_available": table.get_slots_available(),
+    })
 
-    emit(
-        "update_table",
-        {
-            "game_type": game_type,
-            "table_number": table.table_number,
-            "round_code": table.round_code,
-            "players": players_data,
-            "slots_available": table.get_slots_available(),
-            "time_remaining": table.get_time_remaining(),
-            "is_betting_closed": table.is_betting_closed,
-        },
-        broadcast=True,
-        include_self=True,
-    )
-
+    emit("update_table", {
+        "game_type": game_type,
+        "table_number": table.table_number,
+        "round_code": table.round_code,
+        "players": players_data,
+        "slots_available": table.get_slots_available(),
+        "time_remaining": table.get_time_remaining(),
+        "is_betting_closed": table.is_betting_closed,
+    }, broadcast=True, include_self=True)
 
 # ---------------------------------------------------
 # Demo user seeding
