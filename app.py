@@ -4402,7 +4402,7 @@ def handle_place_bet(data):
     number = data.get("number")
     round_code = data.get("round_code")
 
-    print(f"ðŸŽ¯ Bet attempt: user={raw_user_id}, game={game_type}, number={number}, round={round_code}")
+    print(f"Ã°Å¸Å½Â¯ Bet attempt: user={raw_user_id}, game={game_type}, number={number}, round={round_code}")
 
     if game_type not in GAME_CONFIGS:
         emit("bet_error", {"message": "Invalid game type"})
@@ -4463,10 +4463,10 @@ def handle_place_bet(data):
         emit("bet_error", {"message": "Insufficient balance"})
         return
 
-    # âœ… CRITICAL: Add bet to table (forced winners don't interfere here)
+    # Ã¢Å“â€¦ CRITICAL: Add bet to table (forced winners don't interfere here)
     success, message = table.add_bet(user_id, username, number)
     if not success:
-        print(f"âŒ Bet rejected: {message}")
+        print(f"Ã¢ÂÅ’ Bet rejected: {message}")
         emit("bet_error", {"message": message})
         return
 
@@ -4486,7 +4486,7 @@ def handle_place_bet(data):
     db.session.add(bet_tx)
     db.session.commit()
 
-    print(f"âœ… Bet placed successfully: user={user_id}, number={number}, round={table.round_code}")
+    print(f"Ã¢Å“â€¦ Bet placed successfully: user={user_id}, number={number}, round={table.round_code}")
 
     # Prepare players list for broadcast
     players_data = []
