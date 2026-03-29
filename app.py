@@ -2240,7 +2240,7 @@ def logout():
 @app.route('/agent-login')
 @app.route('/agent/login')
 def agentloginpage():
-    return render_template('agent-login.html')
+    return render_template('agent_login.html')
 
 @app.route('/agent-login', methods=['POST'])
 @app.route('/agent/login', methods=['POST'])
