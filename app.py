@@ -2459,7 +2459,7 @@ def game_lobby(game_type):
     return render_template("game-lobby.html", game_type=game_type, game=game)
 
 
-@app.route("/play/<game_type>")
+@app.route('/play/<game_type>')
 @login_required
 def play_game(game_type):
     if game_type not in GAME_CONFIGS:
@@ -2468,23 +2468,27 @@ def play_game(game_type):
     game = GAME_CONFIGS[game_type]
 
     roundcode = (
-        request.args.get("round_code")
-        or request.args.get("roundcode")
+        request.args.get("roundcode")
+        or request.args.get("round_code")
         or ""
     ).strip()
 
-    tablenumber = request.args.get("table_number", type=int)
+    tablenumber = request.args.get("tablenumber", type=int)
     if tablenumber is None:
-        tablenumber = request.args.get("tablenumber", type=int)
+        tablenumber = request.args.get("table_number", type=int)
+
+    if roundcode:
+        session[f"selected_round_code_{game_type}"] = roundcode
+    if tablenumber is not None:
+        session[f"selected_table_number_{game_type}"] = tablenumber
 
     return render_template(
         f"{game_type}-game.html",
-        gametype=game_type,
+        game_type=game_type,
         game=game,
         roundcode=roundcode if roundcode else None,
         tablenumber=tablenumber,
     )
-
 
 
 @app.route("/history")
@@ -4404,17 +4408,20 @@ def handle_place_bet(data):
         data.get("round_code")
         or data.get("roundcode")
         or data.get("roundCode")
+        or session.get(f"selected_round_code_{game_type}")
         or ""
     ).strip()
 
     table_number = data.get("table_number")
     if table_number is None:
         table_number = data.get("tablenumber")
+    if table_number in (None, ""):
+        table_number = session.get(f"selected_table_number_{game_type}")
+
     try:
         table_number = int(table_number) if table_number not in (None, "") else None
     except (TypeError, ValueError):
         table_number = None
-
     print(f"🎯 Bet attempt: user={raw_user_id}, game={game_type}, number={number}, round={round_code}, table={table_number}")
 
     if game_type not in GAME_CONFIGS:
