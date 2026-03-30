@@ -35,9 +35,18 @@ app.config["SESSION_COOKIE_SAMESITE"] = "Lax"
 app.config["PERMANENT_SESSION_LIFETIME"] = timedelta(days=7)
 
 # DB config - uses sqlite in current directory
-db_path = os.path.join(os.path.dirname(__file__), "game.db")
-app.config["SQLALCHEMY_DATABASE_URI"] = f"sqlite:///{db_path}"
+database_url = os.environ.get("DATABASE_URL", "").strip()
+
+if database_url:
+    if database_url.startswith("mysql://"):
+        database_url = database_url.replace("mysql://", "mysql+pymysql://", 1)
+    app.config["SQLALCHEMY_DATABASE_URI"] = database_url
+else:
+    db_path = os.path.join(os.path.dirname(__file__), "game.db")
+    app.config["SQLALCHEMY_DATABASE_URI"] = f"sqlite:///{db_path}"
+
 app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
+
 
 db = SQLAlchemy(app)
 
@@ -985,6 +994,42 @@ def ensure_wallet_for_user(user: User, starting_balance: int = 10000) -> Wallet:
     return user.wallet
 
 
+def ensure_store_wallet_for_user(user, starting_balance=0):
+    if not user:
+        return None
+
+    if getattr(user, "is_admin", False):
+        return None
+
+    wallet = StoreWallet.query.filter_by(user_id=user.id).first()
+    if not wallet:
+        wallet = StoreWallet(
+            user_id=user.id,
+            balance=int(starting_balance or 0)
+        )
+        db.session.add(wallet)
+        db.session.commit()
+    return wallet
+
+
+def get_current_logged_in_user():
+    uid = _get_session_user_id()
+    if not uid:
+        return None
+
+    try:
+        if str(uid).isdigit():
+            return User.query.get(int(uid))
+        return User.query.get(uid)
+    except Exception:
+        return None
+
+
+def make_order_code(user_id):
+    stamp = as_ist(datetime.utcnow()).strftime("%Y%m%d%H%M%S")
+    return f"ORD{stamp}{int(user_id)}{secrets.token_hex(2).upper()}"
+
+
 
 def generate_bot_name():
     prefixes = ["Rahul","Amit","Ankit","Rohit","Vikas","Sandeep","Deepak","Ajay","Pankaj","Manoj","Vivek","Arun","Sunil","Rakesh","Rajesh","Sanjay","Kunal","Varun","Nitin","Mohit",
@@ -1243,6 +1288,7 @@ def api_subadmin_users():
         db.session.add(u)
         db.session.commit()
         ensure_wallet_for_user(u, starting_balance=0)
+        ensure_store_wallet_for_user(u, starting_balance=0)
 
         return jsonify({'success': True, 'message': 'User created', 'userid': u.id})
 
@@ -2288,6 +2334,7 @@ def login_post():
 
     if not user.is_admin:
         ensure_wallet_for_user(user)
+        ensure_store_wallet_for_user(user)
 
     session["user_id"] = user.id
     session["userid"] = user.id  # alias for older templates/JS
@@ -2332,12 +2379,413 @@ def register_page():
     db.session.commit()
 
     ensure_wallet_for_user(user)
+    ensure_store_wallet_for_user(user)
 
     session["user_id"] = user.id
     session["userid"] = user.id
     session["username"] = user.username
 
     return jsonify({"success": True, "user_id": user.id, "username": user.username, "redirect": url_for("home")})
+
+
+@app.route("/api/store/wallet", methods=["GET"])
+@login_required
+def api_store_wallet():
+    user = get_current_logged_in_user()
+    if not user:
+        return jsonify(success=False, message="User not found"), 404
+
+    game_wallet = ensure_wallet_for_user(user, starting_balance=0)
+    store_wallet = ensure_store_wallet_for_user(user, starting_balance=0)
+
+    return jsonify(
+        success=True,
+        game_balance=int(game_wallet.balance or 0) if game_wallet else 0,
+        store_balance=int(store_wallet.balance or 0) if store_wallet else 0,
+    )
+
+
+@app.route("/api/store/buy-card", methods=["POST"])
+@login_required
+def buy_card():
+    user = get_current_logged_in_user()
+    if not user:
+        return jsonify(success=False, message="User not found"), 404
+
+    data = request.get_json(silent=True) or {}
+    card_value = _safe_int(data.get("card_value") or data.get("cardvalue"), 0)
+    quantity = _safe_int(data.get("quantity"), 1)
+
+    if card_value not in ALLOWED_CARD_VALUES:
+        return jsonify(success=False, message="Invalid card value"), 400
+
+    if quantity <= 0:
+        return jsonify(success=False, message="Invalid quantity"), 400
+
+    total_coins = card_value * quantity
+    reference = f"CARD{int(time.time())}{user.id}"
+
+    try:
+        game_wallet = ensure_wallet_for_user(user, starting_balance=0)
+        ensure_store_wallet_for_user(user, starting_balance=0)
+
+        game_wallet.balance = int(game_wallet.balance or 0) + total_coins
+
+        game_tx = Transaction(
+            user_id=user.id,
+            kind="added",
+            amount=total_coins,
+            balance_after=int(game_wallet.balance or 0),
+            label="Point Card Added",
+            game_title="Store Card",
+            note=f"Bought {quantity} card(s) of {card_value}"
+        )
+
+        purchase = PointCardPurchase(
+            user_id=user.id,
+            card_value=card_value,
+            quantity=quantity,
+            total_coins=total_coins,
+            payment_status="PAID"
+        )
+
+        transfer = WalletTransfer(
+            user_id=user.id,
+            direction="STORE_TO_GAME",
+            amount=total_coins,
+            status="SUCCESS",
+            note=f"Card purchase reference {reference}"
+        )
+
+        db.session.add(game_tx)
+        db.session.add(purchase)
+        db.session.add(transfer)
+        db.session.commit()
+
+        return jsonify(
+            success=True,
+            message="Coins added successfully",
+            added=total_coins,
+            game_balance=int(game_wallet.balance or 0),
+            reference=reference
+        )
+    except Exception as e:
+        db.session.rollback()
+        return jsonify(success=False, message=f"Buy card failed: {str(e)}"), 500
+
+
+@app.route("/api/store/redeem-from-game", methods=["POST"])
+@login_required
+def redeem_from_game():
+    user = get_current_logged_in_user()
+    if not user:
+        return jsonify(success=False, message="User not found"), 404
+
+    data = request.get_json(silent=True) or {}
+    amount = _safe_int(data.get("amount"), 0)
+
+    if amount <= 0:
+        return jsonify(success=False, message="Enter valid amount"), 400
+
+    try:
+        game_wallet = ensure_wallet_for_user(user, starting_balance=0)
+        store_wallet = ensure_store_wallet_for_user(user, starting_balance=0)
+
+        if int(game_wallet.balance or 0) < amount:
+            return jsonify(success=False, message="Insufficient game balance"), 400
+
+        game_wallet.balance = int(game_wallet.balance or 0) - amount
+        store_wallet.balance = int(store_wallet.balance or 0) + amount
+
+        game_tx = Transaction(
+            user_id=user.id,
+            kind="redeem",
+            amount=amount,
+            balance_after=int(game_wallet.balance or 0),
+            label="Moved To Store Wallet",
+            game_title="Store Transfer",
+            note=f"Game to store transfer of {amount}"
+        )
+
+        store_tx = StoreTransaction(
+            user_id=user.id,
+            kind="game_to_store",
+            amount=amount,
+            balance_after=int(store_wallet.balance or 0),
+            label="Received From Game Wallet",
+            note=f"Game to store transfer of {amount}"
+        )
+
+        transfer = WalletTransfer(
+            user_id=user.id,
+            direction="GAME_TO_STORE",
+            amount=amount,
+            status="SUCCESS",
+            note="Redeemed back to store wallet"
+        )
+
+        db.session.add(game_tx)
+        db.session.add(store_tx)
+        db.session.add(transfer)
+        db.session.commit()
+
+        return jsonify(
+            success=True,
+            message="Amount moved to store wallet",
+            game_balance=int(game_wallet.balance or 0),
+            store_balance=int(store_wallet.balance or 0)
+        )
+    except Exception as e:
+        db.session.rollback()
+        return jsonify(success=False, message=f"Redeem failed: {str(e)}"), 500
+
+
+@app.route("/api/store/checkout", methods=["POST"])
+@login_required
+def store_checkout():
+    user = get_current_logged_in_user()
+    if not user:
+        return jsonify(success=False, message="User not found"), 404
+
+    data = request.get_json(silent=True) or {}
+    items = data.get("items") or []
+    address_id = data.get("address_id") or data.get("addressid")
+    note = (data.get("note") or "").strip()
+
+    if not isinstance(items, list) or not items:
+        return jsonify(success=False, message="Cart is empty"), 400
+
+    try:
+        store_wallet = ensure_store_wallet_for_user(user, starting_balance=0)
+
+        address = None
+        if address_id not in (None, "", 0, "0"):
+            address = UserAddress.query.filter_by(
+                id=_safe_int(address_id, 0),
+                user_id=user.id
+            ).first()
+            if not address:
+                return jsonify(success=False, message="Address not found"), 404
+
+        subtotal = 0
+        product_rows = []
+
+        for item in items:
+            product_id = _safe_int(item.get("product_id") or item.get("productid"), 0)
+            qty = _safe_int(item.get("qty") or item.get("quantity"), 1)
+
+            if product_id <= 0 or qty <= 0:
+                return jsonify(success=False, message="Invalid cart item"), 400
+
+            product = Product.query.get(product_id)
+            if not product or not product.is_active:
+                return jsonify(success=False, message="Product not available"), 404
+
+            if int(product.stock or 0) < qty:
+                return jsonify(success=False, message=f"Insufficient stock for {product.title}"), 400
+
+            line_total = int(product.price or 0) * qty
+            subtotal += line_total
+            product_rows.append((product, qty, line_total))
+
+        total = subtotal
+
+        if int(store_wallet.balance or 0) < total:
+            return jsonify(success=False, message="Insufficient store wallet balance"), 400
+
+        store_wallet.balance = int(store_wallet.balance or 0) - total
+
+        order = StoreOrder(
+            user_id=user.id,
+            address_id=address.id if address else None,
+            order_code=make_order_code(user.id),
+            subtotal=subtotal,
+            total=total,
+            status="PLACED",
+            payment_mode="STORE_WALLET",
+            note=note or None
+        )
+        db.session.add(order)
+        db.session.flush()
+
+        for product, qty, line_total in product_rows:
+            product.stock = int(product.stock or 0) - qty
+            db.session.add(StoreOrderItem(
+                order_id=order.id,
+                product_id=product.id,
+                product_title=product.title,
+                unit_price=int(product.price or 0),
+                qty=qty,
+                line_total=line_total
+            ))
+
+        store_tx = StoreTransaction(
+            user_id=user.id,
+            kind="product_purchase",
+            amount=total,
+            balance_after=int(store_wallet.balance or 0),
+            label="Order placed",
+            note=f"Order {order.order_code}",
+            reference=order.order_code
+        )
+        db.session.add(store_tx)
+
+        db.session.commit()
+
+        return jsonify(
+            success=True,
+            message="Order placed successfully",
+            order_code=order.order_code,
+            total=total,
+            store_balance=int(store_wallet.balance or 0)
+        )
+    except Exception as e:
+        db.session.rollback()
+        return jsonify(success=False, message=f"Checkout failed: {str(e)}"), 500
+
+
+@app.route("/api/store/products", methods=["GET"])
+@login_required
+def api_store_products():
+    products = Product.query.filter_by(is_active=True).order_by(Product.created_at.desc()).all()
+
+    return jsonify([
+        {
+            "id": p.id,
+            "title": p.title,
+            "slug": p.slug,
+            "description": p.description or "",
+            "price": int(p.price or 0),
+            "stock": int(p.stock or 0),
+            "image_url": p.image_url or "",
+            "is_active": bool(p.is_active),
+        }
+        for p in products
+    ])
+
+
+@app.route("/api/admin/store/products", methods=["GET", "POST"])
+@admin_required
+def api_admin_store_products():
+    if request.method == "POST":
+        data = request.get_json(silent=True) or {}
+
+        title = (data.get("title") or "").strip()
+        slug = (data.get("slug") or "").strip().lower()
+        description = (data.get("description") or "").strip()
+        price = _safe_int(data.get("price"), 0)
+        stock = _safe_int(data.get("stock"), 0)
+        image_url = (data.get("image_url") or data.get("imageurl") or "").strip()
+
+        if not title or not slug:
+            return jsonify(success=False, message="Title and slug are required"), 400
+
+        if price <= 0:
+            return jsonify(success=False, message="Price must be greater than 0"), 400
+
+        if stock < 0:
+            return jsonify(success=False, message="Stock cannot be negative"), 400
+
+        if Product.query.filter_by(slug=slug).first():
+            return jsonify(success=False, message="Slug already exists"), 400
+
+        try:
+            product = Product(
+                title=title,
+                slug=slug,
+                description=description or None,
+                price=price,
+                stock=stock,
+                image_url=image_url or None,
+                is_active=True
+            )
+            db.session.add(product)
+            db.session.commit()
+
+            return jsonify(success=True, message="Product created", product_id=product.id)
+        except Exception as e:
+            db.session.rollback()
+            return jsonify(success=False, message=f"Product create failed: {str(e)}"), 500
+
+    products = Product.query.order_by(Product.created_at.desc()).all()
+    return jsonify([
+        {
+            "id": p.id,
+            "title": p.title,
+            "slug": p.slug,
+            "price": int(p.price or 0),
+            "stock": int(p.stock or 0),
+            "is_active": bool(p.is_active),
+            "created_at": fmt_ist(p.created_at, "%Y-%m-%d %H:%M") if p.created_at else ""
+        }
+        for p in products
+    ])
+
+@app.route("/api/store/addresses", methods=["GET", "POST"])
+@login_required
+def api_store_addresses():
+    user = get_current_logged_in_user()
+    if not user:
+        return jsonify(success=False, message="User not found"), 404
+
+    if request.method == "POST":
+        data = request.get_json(silent=True) or {}
+
+        full_name = (data.get("full_name") or data.get("fullname") or "").strip()
+        phone = (data.get("phone") or "").strip()
+        line1 = (data.get("line1") or "").strip()
+        line2 = (data.get("line2") or "").strip()
+        city = (data.get("city") or "").strip()
+        state = (data.get("state") or "").strip()
+        pincode = (data.get("pincode") or "").strip()
+        country = (data.get("country") or "India").strip()
+        is_default = bool(data.get("is_default") or data.get("isdefault"))
+
+        if not full_name or not phone or not line1 or not city or not state or not pincode:
+            return jsonify(success=False, message="Missing address fields"), 400
+
+        try:
+            if is_default:
+                UserAddress.query.filter_by(user_id=user.id, is_default=True).update({"is_default": False})
+
+            address = UserAddress(
+                user_id=user.id,
+                full_name=full_name,
+                phone=phone,
+                line1=line1,
+                line2=line2 or None,
+                city=city,
+                state=state,
+                pincode=pincode,
+                country=country,
+                is_default=is_default
+            )
+            db.session.add(address)
+            db.session.commit()
+
+            return jsonify(success=True, message="Address saved", address_id=address.id)
+        except Exception as e:
+            db.session.rollback()
+            return jsonify(success=False, message=f"Address save failed: {str(e)}"), 500
+
+    addresses = UserAddress.query.filter_by(user_id=user.id).order_by(UserAddress.created_at.desc()).all()
+    return jsonify([
+        {
+            "id": a.id,
+            "full_name": a.full_name,
+            "phone": a.phone,
+            "line1": a.line1,
+            "line2": a.line2 or "",
+            "city": a.city,
+            "state": a.state,
+            "pincode": a.pincode,
+            "country": a.country,
+            "is_default": bool(a.is_default),
+        }
+        for a in addresses
+    ])
+
+
 
 
 @app.route("/logout")
@@ -2544,6 +2992,7 @@ def api_agent_users():
         db.session.add(u)
         db.session.commit()
         ensure_wallet_for_user(u, starting_balance=0)
+        ensure_store_wallet_for_user(u, starting_balance=0)
 
         return jsonify(success=True, message="User created", userid=u.id)
 
@@ -4689,6 +5138,7 @@ def seed_demo_users():
             db.session.commit()
             print(f"âœ… Created user: {uname}")
         ensure_wallet_for_user(user)
+        ensure_store_wallet_for_user(user)
 
     admin = User.query.filter_by(username="admin").first()
     if not admin:
