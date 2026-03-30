@@ -138,7 +138,7 @@ GAME_CONFIGS = {
         "emoji": "ðŸŽ¡",
     },
 }
-
+ALLOWED_CARD_VALUES = {10, 50, 100, 200}
 # ---------------------------------------------------
 # SQLAlchemy Models
 # ---------------------------------------------------
@@ -330,6 +330,114 @@ class AgentBlockPeriod(db.Model):
     agentid = db.Column(db.Integer, db.ForeignKey('agent.id'), nullable=False, index=True)
     startat = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
     endat = db.Column(db.DateTime, nullable=True)  # null => still blocked
+
+
+class StoreWallet(db.Model):
+    __tablename__ = "store_wallet"
+
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey("user.id"), nullable=False, unique=True, index=True)
+    balance = db.Column(db.Integer, default=0, nullable=False)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
+
+
+class StoreTransaction(db.Model):
+    __tablename__ = "store_transaction"
+
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey("user.id"), nullable=False, index=True)
+    kind = db.Column(db.String(50), nullable=False, index=True)
+    amount = db.Column(db.Integer, nullable=False)
+    balance_after = db.Column(db.Integer, nullable=False)
+    label = db.Column(db.String(120))
+    note = db.Column(db.Text)
+    reference = db.Column(db.String(120), index=True)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False, index=True)
+
+
+class Product(db.Model):
+    __tablename__ = "product"
+
+    id = db.Column(db.Integer, primary_key=True)
+    title = db.Column(db.String(200), nullable=False)
+    slug = db.Column(db.String(220), unique=True, nullable=False, index=True)
+    description = db.Column(db.Text)
+    price = db.Column(db.Integer, nullable=False)
+    stock = db.Column(db.Integer, default=0, nullable=False)
+    image_url = db.Column(db.String(500))
+    is_active = db.Column(db.Boolean, default=True, nullable=False)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
+
+
+class UserAddress(db.Model):
+    __tablename__ = "user_address"
+
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey("user.id"), nullable=False, index=True)
+    full_name = db.Column(db.String(150), nullable=False)
+    phone = db.Column(db.String(30), nullable=False)
+    line1 = db.Column(db.String(250), nullable=False)
+    line2 = db.Column(db.String(250))
+    city = db.Column(db.String(120), nullable=False)
+    state = db.Column(db.String(120), nullable=False)
+    pincode = db.Column(db.String(20), nullable=False)
+    country = db.Column(db.String(100), default="India", nullable=False)
+    is_default = db.Column(db.Boolean, default=False, nullable=False)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
+
+
+class StoreOrder(db.Model):
+    __tablename__ = "store_order"
+
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey("user.id"), nullable=False, index=True)
+    address_id = db.Column(db.Integer, db.ForeignKey("user_address.id"), nullable=True, index=True)
+    order_code = db.Column(db.String(60), unique=True, nullable=False, index=True)
+    subtotal = db.Column(db.Integer, nullable=False, default=0)
+    total = db.Column(db.Integer, nullable=False, default=0)
+    status = db.Column(db.String(30), default="PLACED", nullable=False, index=True)
+    payment_mode = db.Column(db.String(30), default="STORE_WALLET", nullable=False)
+    note = db.Column(db.Text)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False, index=True)
+
+
+class StoreOrderItem(db.Model):
+    __tablename__ = "store_order_item"
+
+    id = db.Column(db.Integer, primary_key=True)
+    order_id = db.Column(db.Integer, db.ForeignKey("store_order.id"), nullable=False, index=True)
+    product_id = db.Column(db.Integer, db.ForeignKey("product.id"), nullable=False, index=True)
+    product_title = db.Column(db.String(200), nullable=False)
+    unit_price = db.Column(db.Integer, nullable=False)
+    qty = db.Column(db.Integer, nullable=False, default=1)
+    line_total = db.Column(db.Integer, nullable=False)
+
+
+class PointCardPurchase(db.Model):
+    __tablename__ = "point_card_purchase"
+
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey("user.id"), nullable=False, index=True)
+    card_value = db.Column(db.Integer, nullable=False)
+    quantity = db.Column(db.Integer, nullable=False, default=1)
+    total_coins = db.Column(db.Integer, nullable=False)
+    payment_status = db.Column(db.String(30), default="PAID", nullable=False, index=True)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False, index=True)
+
+
+class WalletTransfer(db.Model):
+    __tablename__ = "wallet_transfer"
+
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey("user.id"), nullable=False, index=True)
+    direction = db.Column(db.String(30), nullable=False, index=True)
+    amount = db.Column(db.Integer, nullable=False)
+    status = db.Column(db.String(30), default="SUCCESS", nullable=False, index=True)
+    note = db.Column(db.Text)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False, index=True)
+
+
 
 import sqlite3
 
