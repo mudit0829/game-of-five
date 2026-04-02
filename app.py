@@ -1786,33 +1786,37 @@ def api_subadmin_agent_users(agentid):
         if not a:
             return jsonify({'success': False, 'message': 'Agent not found'}), 404
 
-        users = User.query.filter_by(agentid=a.id).order_by(User.created_at.desc()).all()
+        summary = _build_agent_commission_data(a)
+
+        created_map = {}
+        for u in User.query.filter_by(agentid=a.id).all():
+            created_map[int(u.id)] = u.created_at or datetime.min
+
         items = []
-
-        for u in users:
-            amountplayed = db.session.query(
-                func.coalesce(func.sum(Transaction.amount), 0)
-            ).filter(
-                Transaction.user_id == u.id
-            ).filter(
-                func.lower(Transaction.kind) == 'bet'
-            ).scalar() or 0
-
-            salarygenerated = float(amountplayed) * float(a.salarypercent or 0) / 100.0
-
+        for row in summary.get('items', []):
             items.append({
-                'userid': u.id,
-                'username': u.username,
-                'joining': fmt_ist(u.created_at, '%Y-%m-%d %H:%M') if u.created_at else '',
-                'amountplayed': int(amountplayed),
-                'salarygenerated': round(salarygenerated, 2)
+                'userid': row.get('userid'),
+                'username': row.get('username', ''),
+                'joining': row.get('joining', ''),
+                'amountplayed': int(row.get('rawplayed') or 0),
+                'salarygenerated': round(float(row.get('salarygenerated') or 0), 2),
+                'rawplayed': int(row.get('rawplayed') or 0),
+                'eligibleplayed': int(row.get('eligibleplayed') or 0),
+                'blockedplayed': int(row.get('blockedplayed') or 0),
+                'blockedsalary': round(float(row.get('blockedsalary') or 0), 2),
             })
 
-        return jsonify({'agentid': a.id, 'items': items})
+        items.sort(key=lambda row: created_map.get(int(row.get('userid') or 0), datetime.min), reverse=True)
+
+        return jsonify({
+            'agentid': a.id,
+            'agentname': a.name,
+            'salarypercent': float(a.salarypercent or 0),
+            'items': items
+        })
 
     except Exception as e:
         return jsonify({'success': False, 'message': f'agent users api error: {str(e)}'}), 500
-
 
 @app.route('/api/subadmin/agents/<int:agentid>/block', methods=['POST'])
 @subadmin_required
