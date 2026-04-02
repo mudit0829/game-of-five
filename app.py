@@ -4382,6 +4382,38 @@ def adminupdateagent(agentid):
     return jsonify(success=True, message="Agent updated")
 
 
+@app.route('/api/admin/agents/<int:agentid>/users', methods=['GET'])
+@admin_required
+def api_admin_agent_users(agentid):
+    try:
+        a = Agent.query.get(agentid)
+        if not a:
+            return jsonify({'success': False, 'message': 'Agent not found'}), 404
+
+        summary = _build_agent_commission_data(a, include_history=False)
+
+        items = []
+        for row in summary.get("items", []):
+            amountplayed = int((row.get("eligibleplayed") or 0) + (row.get("blockedplayed") or 0))
+            items.append({
+                'userid': row.get('userid'),
+                'username': row.get('username', ''),
+                'joining': row.get('joining', ''),
+                'amountplayed': amountplayed,
+                'salarygenerated': round(float(row.get('salarygenerated') or 0), 2)
+            })
+
+        return jsonify({
+            'success': True,
+            'agentid': a.id,
+            'items': items
+        })
+
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'message': f'admin agent users api error: {str(e)}'
+        }), 500
 
 # ----------------------------
 # Agents: Block / Unblock
