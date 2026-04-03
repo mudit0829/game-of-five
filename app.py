@@ -4251,8 +4251,99 @@ def admin_get_stats():
 @app.route("/api/admin/users/<int:user_id>/games", methods=["GET"])
 @admin_required
 def admin_user_games(user_id):
-    # ONE ROW PER ROUND (your requirement)
-    return jsonify(_group_user_rounds(user_id))
+    try:
+        rows = (
+            db.session.query(GameRoundBet, GameRoundHistory)
+            .join(GameRoundHistory, GameRoundHistory.roundcode == GameRoundBet.roundcode)
+            .filter(GameRoundBet.userid == str(user_id))
+            .order_by(GameRoundHistory.endedat.desc(), GameRoundBet.bettime.asc())
+            .all()
+        )
+
+        grouped = {}
+
+        for bet, hist in rows:
+            gametype = getattr(hist, "gametype", None) or getattr(bet, "gametype", None) or "-"
+            roundcode = getattr(hist, "roundcode", None) or getattr(bet, "roundcode", None) or "-"
+            tablenumber = (
+                getattr(hist, "tablenumber", None)
+                or getattr(bet, "tablenumber", None)
+                or 0
+            )
+
+            key = (gametype, roundcode, tablenumber)
+
+            ended_at = getattr(hist, "endedat", None) or getattr(hist, "endtime", None)
+            winning_number = getattr(hist, "result", None)
+            payout_amt = int((GAMECONFIGS.get(gametype, {}) or {}).get("payout", 0) or 0)
+
+            if key not in grouped:
+                grouped[key] = {
+                    "roundid": roundcode,
+                    "roundcode": roundcode,
+                    "gametype": gametype,
+                    "game_type": gametype,
+                    "tablenumber": tablenumber,
+                    "table_number": tablenumber,
+                    "bettingnumbers": [],
+                    "numbers": [],
+                    "totalbet": 0,
+                    "winningnumber": winning_number,
+                    "winning_number": winning_number,
+                    "netamount": 0,
+                    "result": "pending",
+                    "datetime": fmt_ist(ended_at, "%Y-%m-%d %H:%M") if ended_at else "",
+                    "date_time": fmt_ist(ended_at, "%Y-%m-%d %H:%M") if ended_at else "",
+                    "_sort_dt": ended_at,
+                }
+
+            try:
+                num = int(getattr(bet, "number", 0))
+                grouped[key]["bettingnumbers"].append(num)
+                grouped[key]["numbers"].append(num)
+            except Exception:
+                num = None
+
+            try:
+                bet_amt = int(getattr(bet, "betamount", 0) or 0)
+            except Exception:
+                bet_amt = 0
+
+            grouped[key]["totalbet"] += bet_amt
+
+            if winning_number is not None and num is not None:
+                if num == winning_number:
+                    grouped[key]["netamount"] += payout_amt
+                else:
+                    grouped[key]["netamount"] -= bet_amt
+
+        out = []
+        for row in grouped.values():
+            nums = []
+            for n in row["bettingnumbers"]:
+                try:
+                    nums.append(int(n))
+                except Exception:
+                    pass
+
+            nums = sorted(set(nums))
+            row["bettingnumbers"] = nums
+            row["numbers"] = nums
+
+            if row["winningnumber"] is None:
+                row["result"] = "pending"
+            else:
+                row["result"] = "win" if int(row["netamount"] or 0) > 0 else "lose"
+
+            row.pop("_sort_dt", None)
+            out.append(row)
+
+        out.sort(key=lambda x: x.get("datetime", ""), reverse=True)
+        return jsonify(out)
+
+    except Exception as e:
+        print("admin_user_games DB fallback error:", str(e))
+        return jsonify(_group_user_rounds(user_id))
 
 
 from datetime import datetime
