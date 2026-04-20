@@ -1,7 +1,7 @@
-// ================== Roulette Wheel (Backend-aligned: snake_case API + socket events) ==================
+// ================== Roulette Wheel (Backend-driven, multi-bet, snake_case API + socket events) ==================
 
 const WHEEL_ORDER = [
-  0,32,15,19,4,21,2,25,17,34,6,27,13,36,11,30,8,23,10,5,24,16,33,1,20,14,31,9,22,18,29,7,28,12,35,3,26
+  0, 32, 15, 19, 4, 21, 2, 25, 17, 34, 6, 27, 13, 36, 11, 30, 8, 23, 10, 5, 24, 16, 33, 1, 20, 14, 31, 9, 22, 18, 29, 7, 28, 12, 35, 3, 26
 ];
 
 const TOTAL_SLOTS = WHEEL_ORDER.length;
@@ -11,8 +11,9 @@ const POINTER_OFFSET_DEG = 0;
 const SPIN_DURATION_MS = 4200;
 const EXTRA_FULL_SPINS = 5;
 
+// ================= STATE =================
 let walletBalance = 0;
-let selectedNumber = null;
+let selectedNumbers = new Set();
 let isSpinning = false;
 let lastRotationDeg = 0;
 
@@ -20,12 +21,19 @@ let wheelRotateEl = null;
 
 let currentRoundCode = null;
 let currentTableNumber = null;
+let currentPhase = "betting_open";
+let currentPlayerCount = 0;
+let currentTotalBets = 0;
+let maxBetsPerUser = 19;
+let lastDeclaredResult = null;
 
 let lockedNumbers = new Set();
 let currentPlayers = [];
 
-// ================= AUDIO + VIBRATION (NEW) =================
-// Browsers often block audio until user interacts once. [web:392]
+let freeSpinFrame = null;
+let freeSpinActive = false;
+
+// ================= AUDIO + VIBRATION =================
 const BG_AUDIO_SRC = "/static/audio/roulette.mp3";
 const RESULT_AUDIO_SRC = "/static/audio/result.mp3";
 
@@ -45,7 +53,6 @@ function unlockAudioOnce() {
   if (audioUnlocked) return;
   audioUnlocked = true;
 
-  // Prime both audio elements (best effort)
   try {
     spinLoopAudio.play().then(() => {
       spinLoopAudio.pause();
@@ -90,7 +97,6 @@ function playResultOnce() {
   } catch (e) {}
 }
 
-// Vibrate works only on supported devices/browsers; requires user activation. [web:384]
 function vibrateOnResult() {
   try {
     if ("vibrate" in navigator) navigator.vibrate([120, 60, 120]);
@@ -98,9 +104,13 @@ function vibrateOnResult() {
 }
 
 document.addEventListener("visibilitychange", () => {
-  if (document.hidden) stopSpinLoop();
+  if (document.hidden) {
+    stopSpinLoop();
+    stopFreeSpin();
+  }
 });
 
+// ================= DOM =================
 const wheelImg = document.getElementById("rouletteWheel");
 const spinBtn = document.getElementById("spinBtn");
 const placeBetBtn = document.getElementById("placeBetBtn");
@@ -117,11 +127,11 @@ const statusEl = document.getElementById("statusMessage");
 const lastResultEl = document.getElementById("lastResult");
 const timerTextEl = document.getElementById("timerText");
 
-const USER_ID = window.__USER_ID__;          // should be from template
-const USERNAME = window.__USERNAME__ || "";  // should be from template
+const USER_ID = window.__USER_ID__;
+const USERNAME = window.__USERNAME__ || "";
 const GAMETYPE = window.__GAMETYPE__ || "roulette";
 
-const preferredRoundCode = new URLSearchParams(window.location.search).get("table"); // your ?table=R...
+const preferredRoundCode = new URLSearchParams(window.location.search).get("table");
 
 console.log("[Roulette] JS loaded", { USER_ID, USERNAME, GAMETYPE, preferredRoundCode });
 
@@ -134,6 +144,7 @@ window.addEventListener("unhandledrejection", (e) => {
 
 if (headerUsername) headerUsername.textContent = USERNAME || "Player";
 
+// ================= UI HELPERS =================
 function setStatus(msg, type = "") {
   if (!statusEl) return;
   statusEl.textContent = msg || "";
@@ -152,41 +163,71 @@ function formatMMSS(totalSeconds) {
   return `${mm}:${ss}`;
 }
 
-function setSelectedNumber(n) {
-  selectedNumber = n;
+function getMyBetNumbers() {
+  return currentPlayers
+    .filter((p) => String(p.user_id) === String(USER_ID))
+    .map((p) => parseInt(p.number, 10))
+    .filter((n) => Number.isFinite(n))
+    .sort((a, b) => a - b);
+}
+
+function getUniquePlayerCountFromPlayers(players) {
+  return new Set(
+    (players || [])
+      .map((p) => p?.user_id)
+      .filter((v) => v !== null && v !== undefined)
+      .map(String)
+  ).size;
+}
+
+function clearSelectedNumbers() {
+  selectedNumbers.clear();
+  document.querySelectorAll(".num-chip").forEach((chip) => {
+    chip.classList.remove("selected");
+  });
+}
+
+function toggleSelectedNumber(n) {
+  if (selectedNumbers.has(n)) {
+    selectedNumbers.delete(n);
+  } else {
+    selectedNumbers.add(n);
+  }
+
   document.querySelectorAll(".num-chip").forEach((chip) => {
     const v = parseInt(chip.dataset.number, 10);
-    chip.classList.toggle("selected", v === n);
+    chip.classList.toggle("selected", selectedNumbers.has(v));
   });
 }
 
 function applyLockedStateToChips() {
+  const myBetNumbers = new Set(getMyBetNumbers());
+
   document.querySelectorAll(".num-chip").forEach((chip) => {
     const n = parseInt(chip.dataset.number, 10);
     const isLocked = lockedNumbers.has(n);
-    chip.classList.toggle("bet-locked", isLocked);
-    chip.disabled = isLocked || isSpinning;
-  });
+    const alreadyMine = myBetNumbers.has(n);
 
-  if (selectedNumber !== null && lockedNumbers.has(selectedNumber)) {
-    setSelectedNumber(null);
-  }
+    chip.classList.toggle("bet-locked", isLocked);
+    chip.disabled = isSpinning || alreadyMine;
+
+    if (isLocked && !alreadyMine && selectedNumbers.has(n)) {
+      selectedNumbers.delete(n);
+      chip.classList.remove("selected");
+    }
+  });
 }
 
 function updateHeaderPlayersCount() {
   if (!headerTotalPlayers) return;
-  headerTotalPlayers.textContent = `${currentPlayers.length} PLAYERS`;
+  headerTotalPlayers.textContent = `${currentPlayerCount} PLAYERS`;
 }
 
 function updateMyBetsUIFromPlayers() {
   if (!myBetsRow) return;
   myBetsRow.innerHTML = "";
 
-  const myNums = currentPlayers
-    .filter(p => String(p.user_id) === String(USER_ID))
-    .map(p => parseInt(p.number, 10))
-    .filter(n => Number.isFinite(n))
-    .sort((a,b)=>a-b);
+  const myNums = getMyBetNumbers();
 
   if (headerUserBetsCount) headerUserBetsCount.textContent = String(myNums.length);
 
@@ -207,17 +248,22 @@ function updateMyBetsUIFromPlayers() {
 }
 
 function refreshControls(socketConnected) {
+  const myBetCount = getMyBetNumbers().length;
+  const canSelectMore = (myBetCount + selectedNumbers.size) <= maxBetsPerUser;
+  const bettingOpen = currentPhase === "betting_open";
+
   if (placeBetBtn) {
     placeBetBtn.disabled =
       isSpinning ||
       !socketConnected ||
-      selectedNumber === null ||
-      lockedNumbers.has(selectedNumber);
+      !bettingOpen ||
+      selectedNumbers.size === 0 ||
+      !canSelectMore;
   }
 
   if (spinBtn) {
-    const myBetCount = currentPlayers.filter(p => String(p.user_id) === String(USER_ID)).length;
-    spinBtn.disabled = isSpinning || myBetCount === 0;
+    spinBtn.disabled = true;
+    spinBtn.title = "Wheel spins automatically in the last 15 seconds";
   }
 }
 
@@ -225,6 +271,7 @@ function createNumberGrid() {
   if (!numbersGrid) return;
 
   numbersGrid.innerHTML = "";
+
   for (let n = 0; n <= 36; n++) {
     const btn = document.createElement("button");
     btn.type = "button";
@@ -233,17 +280,31 @@ function createNumberGrid() {
     btn.dataset.number = String(n);
 
     btn.addEventListener("click", () => {
-      unlockAudioOnce(); // NEW (helps on mobile)
+      unlockAudioOnce();
       if (isSpinning) return;
 
-      if (lockedNumbers.has(n)) {
-        setStatus("This number is already bet by another player.", "error");
-        setSelectedNumber(null);
+      const myBetNumbers = new Set(getMyBetNumbers());
+
+      if (myBetNumbers.has(n)) {
+        setStatus("You already placed this number in this round.", "error");
         refreshControls(socketConnected);
         return;
       }
 
-      setSelectedNumber(n);
+      if (lockedNumbers.has(n)) {
+        setStatus("This number is already bet by another player.", "error");
+        refreshControls(socketConnected);
+        return;
+      }
+
+      const myCurrentCount = getMyBetNumbers().length;
+      if (!selectedNumbers.has(n) && (myCurrentCount + selectedNumbers.size) >= maxBetsPerUser) {
+        setStatus(`Maximum ${maxBetsPerUser} bets allowed in this round.`, "error");
+        refreshControls(socketConnected);
+        return;
+      }
+
+      toggleSelectedNumber(n);
       setStatus("");
       refreshControls(socketConnected);
     });
@@ -252,7 +313,7 @@ function createNumberGrid() {
   }
 }
 
-// ------------------ Wheel wrapper ------------------
+// ================= WHEEL WRAPPER =================
 function injectWheelStylesOnce() {
   if (document.getElementById("wheelHiddenLabelStyles")) return;
   const style = document.createElement("style");
@@ -295,7 +356,7 @@ function setupWheelWrapperAndLabels() {
   wheelRotateEl = wrap;
 }
 
-// ------------------ Rotation math ------------------
+// ================= ROTATION =================
 function mod(n, m) {
   return ((n % m) + m) % m;
 }
@@ -321,21 +382,57 @@ function numberAtPointer(rotationDeg) {
   return WHEEL_ORDER[idx];
 }
 
-function spinToNumber(targetNumber) {
+function stopFreeSpin() {
+  if (freeSpinFrame) {
+    cancelAnimationFrame(freeSpinFrame);
+    freeSpinFrame = null;
+  }
+  freeSpinActive = false;
+}
+
+function startFreeSpin() {
+  if (!wheelRotateEl || freeSpinActive) return;
+
+  stopFreeSpin();
+  freeSpinActive = true;
+
+  const step = () => {
+    if (!freeSpinActive) return;
+    lastRotationDeg += 8;
+    wheelRotateEl.style.transition = "none";
+    wheelRotateEl.style.transform = `rotate(${lastRotationDeg}deg)`;
+    freeSpinFrame = requestAnimationFrame(step);
+  };
+
+  freeSpinFrame = requestAnimationFrame(step);
+}
+
+function spinToServerResult(targetNumber) {
+  if (!wheelRotateEl) return;
+
+  stopFreeSpin();
+
+  const liveDeg = getRotationDeg(wheelRotateEl);
+  lastRotationDeg = liveDeg;
+
   const idx = WHEEL_ORDER.indexOf(targetNumber);
-  if (idx === -1) throw new Error("Target not found in wheel order: " + targetNumber);
+  if (idx === -1) {
+    console.error("Target not found in wheel order:", targetNumber);
+    return;
+  }
 
   const targetAngle = -(idx * DEG_PER_SLOT) - POINTER_OFFSET_DEG;
-  const extra = EXTRA_FULL_SPINS * 360;
+  const baseNormalized = ((liveDeg % 360) + 360) % 360;
+  const targetNormalized = ((targetAngle % 360) + 360) % 360;
+  const forwardDelta = (360 + targetNormalized - baseNormalized) % 360;
+  const finalRotation = liveDeg + (EXTRA_FULL_SPINS * 360) + forwardDelta;
 
-  const finalRotation = lastRotationDeg + extra + targetAngle;
   lastRotationDeg = finalRotation;
-
   wheelRotateEl.style.transition = `transform ${SPIN_DURATION_MS}ms cubic-bezier(0.15, 0.8, 0.25, 1)`;
   wheelRotateEl.style.transform = `rotate(${finalRotation}deg)`;
 }
 
-// ------------------ Backend (HTTP) ------------------
+// ================= HTTP =================
 async function fetchBalance() {
   try {
     const res = await fetch("/api/balance", { cache: "no-store" });
@@ -354,13 +451,13 @@ function chooseTable(tables) {
   if (!Array.isArray(tables) || tables.length === 0) return null;
 
   if (preferredRoundCode) {
-    const exact = tables.find(t => t && t.round_code === preferredRoundCode);
+    const exact = tables.find((t) => t && t.round_code === preferredRoundCode);
     if (exact) return exact;
   }
 
   return (
-    tables.find(t => t && t.is_started && !t.is_finished && !t.is_betting_closed) ||
-    tables.find(t => t && t.is_started && !t.is_finished) ||
+    tables.find((t) => t && t.is_started && !t.is_finished && !t.is_betting_closed) ||
+    tables.find((t) => t && t.is_started && !t.is_finished) ||
     tables[0]
   );
 }
@@ -382,31 +479,65 @@ async function fetchRouletteTableState() {
 
     const data = await res.json();
     const t = chooseTable(data.tables);
-
     if (!t) return;
+
+    const previousRoundCode = currentRoundCode;
 
     currentRoundCode = t.round_code || currentRoundCode;
     currentTableNumber = t.table_number ?? currentTableNumber;
+    currentPhase = t.phase || "betting_open";
+    currentPlayerCount = Number.isFinite(t.player_count) ? t.player_count : (Number.isFinite(t.players) ? t.players : 0);
+    currentTotalBets = Number.isFinite(t.total_bets) ? t.total_bets : 0;
+    maxBetsPerUser = Number.isFinite(t.max_bets_per_user) ? t.max_bets_per_user : 19;
 
-    if (gameIdTextEl) gameIdTextEl.textContent = currentRoundCode ? String(currentRoundCode) : "--";
+    if (gameIdTextEl) {
+      gameIdTextEl.textContent = currentRoundCode ? String(currentRoundCode) : "--";
+    }
 
     currentPlayers = Array.isArray(t.bets) ? t.bets : [];
+
+    if (!currentPlayerCount) {
+      currentPlayerCount = getUniquePlayerCountFromPlayers(currentPlayers);
+    }
+
     lockedNumbers = new Set(
-      currentPlayers.map(p => parseInt(p.number, 10)).filter(n => Number.isFinite(n))
+      currentPlayers.map((p) => parseInt(p.number, 10)).filter((n) => Number.isFinite(n))
     );
+
+    if (previousRoundCode && currentRoundCode !== previousRoundCode) {
+      clearSelectedNumbers();
+      lastDeclaredResult = null;
+      stopSpinLoop();
+      stopFreeSpin();
+      isSpinning = false;
+      if (lastResultEl) lastResultEl.textContent = "Result: --";
+    }
 
     updateHeaderPlayersCount();
     updateMyBetsUIFromPlayers();
     applyLockedStateToChips();
 
-    if (timerTextEl) timerTextEl.textContent = formatMMSS(t.time_remaining);
+    if (typeof t.time_remaining === "number" && timerTextEl) {
+      timerTextEl.textContent = formatMMSS(t.time_remaining);
+    }
+
+    if (currentPhase === "betting_closed") {
+      setStatus("Betting closed. Wheel will spin automatically.", "ok");
+    } else if (currentPhase === "spinning") {
+      setStatus("Wheel spinning...", "ok");
+    } else if (currentPhase === "result" && lastDeclaredResult !== null) {
+      setStatus(`Result declared: ${lastDeclaredResult}`, "ok");
+    } else if (currentPhase === "betting_open") {
+      setStatus("");
+    }
+
     refreshControls(socketConnected);
   } catch (e) {
     console.error("[Roulette] fetchRouletteTableState failed:", e);
   }
 }
 
-// ------------------ Socket.IO (backend-aligned names) ------------------
+// ================= SOCKET =================
 let socket = null;
 let socketConnected = false;
 
@@ -457,15 +588,27 @@ function initSocket() {
     }
 
     if (data?.round_code) currentRoundCode = data.round_code;
-    if (gameIdTextEl) gameIdTextEl.textContent = currentRoundCode ? String(currentRoundCode) : "--";
+    if (gameIdTextEl) {
+      gameIdTextEl.textContent = currentRoundCode ? String(currentRoundCode) : "--";
+    }
 
     setStatus(data?.message || "Bet placed.", "ok");
 
     if (Array.isArray(data?.players)) {
       currentPlayers = data.players;
+      currentPlayerCount = Number.isFinite(data?.player_count)
+        ? data.player_count
+        : getUniquePlayerCountFromPlayers(currentPlayers);
+      currentTotalBets = Number.isFinite(data?.total_bets)
+        ? data.total_bets
+        : currentPlayers.length;
+
+      if (data?.phase) currentPhase = data.phase;
+
       lockedNumbers = new Set(
-        currentPlayers.map(p => parseInt(p.number, 10)).filter(n => Number.isFinite(n))
+        currentPlayers.map((p) => parseInt(p.number, 10)).filter((n) => Number.isFinite(n))
       );
+
       updateHeaderPlayersCount();
       updateMyBetsUIFromPlayers();
       applyLockedStateToChips();
@@ -480,17 +623,29 @@ function initSocket() {
     if (!payload || payload.game_type !== GAMETYPE) return;
 
     if (payload.round_code) currentRoundCode = payload.round_code;
-    if (gameIdTextEl) gameIdTextEl.textContent = currentRoundCode ? String(currentRoundCode) : "--";
+    if (gameIdTextEl) {
+      gameIdTextEl.textContent = currentRoundCode ? String(currentRoundCode) : "--";
+    }
 
     if (Array.isArray(payload.players)) {
       currentPlayers = payload.players;
+      currentPlayerCount = Number.isFinite(payload?.player_count)
+        ? payload.player_count
+        : getUniquePlayerCountFromPlayers(currentPlayers);
+      currentTotalBets = Number.isFinite(payload?.total_bets)
+        ? payload.total_bets
+        : currentPlayers.length;
+
       lockedNumbers = new Set(
-        currentPlayers.map(p => parseInt(p.number, 10)).filter(n => Number.isFinite(n))
+        currentPlayers.map((p) => parseInt(p.number, 10)).filter((n) => Number.isFinite(n))
       );
+
       updateHeaderPlayersCount();
       updateMyBetsUIFromPlayers();
       applyLockedStateToChips();
     }
+
+    if (payload?.phase) currentPhase = payload.phase;
 
     if (typeof payload.time_remaining === "number" && timerTextEl) {
       timerTextEl.textContent = formatMMSS(payload.time_remaining);
@@ -498,11 +653,74 @@ function initSocket() {
 
     refreshControls(socketConnected);
   });
+
+  socket.on("spin_started", (payload) => {
+    if (!payload || payload.game_type !== GAMETYPE) return;
+    if (payload.round_code !== currentRoundCode) return;
+
+    currentPhase = payload.phase || "spinning";
+    isSpinning = true;
+    setStatus("Wheel spinning...", "ok");
+    startSpinLoop();
+    startFreeSpin();
+    applyLockedStateToChips();
+    refreshControls(socketConnected);
+  });
+
+  socket.on("result_declared", (payload) => {
+    if (!payload || payload.game_type !== GAMETYPE) return;
+    if (payload.round_code !== currentRoundCode) return;
+    if (!Number.isFinite(payload.result)) return;
+
+    currentPhase = payload.phase || "result";
+    lastDeclaredResult = payload.result;
+    isSpinning = true;
+
+    spinToServerResult(payload.result);
+
+    window.setTimeout(() => {
+      stopSpinLoop();
+      playResultOnce();
+      vibrateOnResult();
+
+      const finalDeg = wheelRotateEl ? getRotationDeg(wheelRotateEl) : 0;
+      const shownNumber = numberAtPointer(finalDeg);
+
+      if (lastResultEl) {
+        lastResultEl.textContent = `Result: ${Number.isFinite(shownNumber) ? shownNumber : payload.result}`;
+      }
+
+      isSpinning = false;
+      applyLockedStateToChips();
+      refreshControls(socketConnected);
+    }, SPIN_DURATION_MS + 80);
+  });
+
+  socket.on("round_finished", (payload) => {
+    if (!payload || payload.game_type !== GAMETYPE) return;
+    if (payload.round_code !== currentRoundCode) return;
+
+    currentPhase = "finished";
+    stopSpinLoop();
+    stopFreeSpin();
+    isSpinning = false;
+
+    if (Number.isFinite(payload.result)) {
+      lastDeclaredResult = payload.result;
+      if (lastResultEl) lastResultEl.textContent = `Result: ${payload.result}`;
+    }
+
+    applyLockedStateToChips();
+    refreshControls(socketConnected);
+
+    fetchBalance();
+    fetchRouletteTableState();
+  });
 }
 
-// ------------------ Actions ------------------
+// ================= ACTIONS =================
 function handlePlaceBet() {
-  unlockAudioOnce(); // NEW
+  unlockAudioOnce();
   if (isSpinning) return;
 
   if (!USER_ID) {
@@ -510,13 +728,20 @@ function handlePlaceBet() {
     return;
   }
 
-  if (selectedNumber === null) {
-    setStatus("Select a number first.", "error");
+  if (currentPhase !== "betting_open") {
+    setStatus("Betting is closed for this round.", "error");
     return;
   }
 
-  if (lockedNumbers.has(selectedNumber)) {
-    setStatus("This number is already bet by another player.", "error");
+  const numbers = Array.from(selectedNumbers).sort((a, b) => a - b);
+  if (numbers.length === 0) {
+    setStatus("Select at least one number first.", "error");
+    return;
+  }
+
+  const myBetCount = getMyBetNumbers().length;
+  if ((myBetCount + numbers.length) > maxBetsPerUser) {
+    setStatus(`Maximum ${maxBetsPerUser} bets allowed in this round.`, "error");
     return;
   }
 
@@ -529,73 +754,23 @@ function handlePlaceBet() {
     game_type: GAMETYPE,
     user_id: USER_ID,
     username: USERNAME,
-    number: selectedNumber,
+    numbers,
     round_code: currentRoundCode
   });
 
-  setSelectedNumber(null);
+  clearSelectedNumbers();
   refreshControls(socketConnected);
 }
 
 function handleSpin() {
-  unlockAudioOnce(); // NEW
-  if (isSpinning) return;
-  if (!wheelRotateEl) {
-    setStatus("Wheel not ready.", "error");
-    return;
-  }
-
-  const myBetCount = currentPlayers.filter(p => String(p.user_id) === String(USER_ID)).length;
-  if (myBetCount === 0) {
-    setStatus("Place at least one bet before spinning.", "error");
-    return;
-  }
-
-  const targetNumber = WHEEL_ORDER[Math.floor(Math.random() * TOTAL_SLOTS)];
-
-  isSpinning = true;
-  setStatus("Spinning...", "ok");
-  applyLockedStateToChips();
-  refreshControls(socketConnected);
-
-  // NEW: start roulette loop while spinning
-  startSpinLoop();
-
-  try {
-    spinToNumber(targetNumber);
-  } catch (e) {
-    console.error(e);
-    isSpinning = false;
-    stopSpinLoop(); // NEW
-    setStatus("Spin failed. Check console.", "error");
-    applyLockedStateToChips();
-    refreshControls(socketConnected);
-    return;
-  }
-
-  window.setTimeout(() => {
-    const finalDeg = getRotationDeg(wheelRotateEl);
-    const shownNumber = numberAtPointer(finalDeg);
-
-    // NEW: stop loop, play result sound, vibrate
-    stopSpinLoop();
-    playResultOnce();
-    vibrateOnResult();
-
-    if (lastResultEl) lastResultEl.textContent = `Result: ${shownNumber}`;
-
-    isSpinning = false;
-    setStatus("");
-    applyLockedStateToChips();
-    refreshControls(socketConnected);
-  }, SPIN_DURATION_MS + 80);
+  setStatus("Wheel spins automatically in the last 15 seconds.", "ok");
 }
 
-// ------------------ Init ------------------
+// ================= INIT =================
 setupWheelWrapperAndLabels();
 createNumberGrid();
 
-setSelectedNumber(null);
+clearSelectedNumbers();
 setStatus("");
 
 fetchBalance();
@@ -608,4 +783,7 @@ setInterval(fetchBalance, 5000);
 initSocket();
 
 if (placeBetBtn) placeBetBtn.addEventListener("click", handlePlaceBet);
-if (spinBtn) spinBtn.addEventListener("click", handleSpin);
+if (spinBtn) {
+  spinBtn.addEventListener("click", handleSpin);
+  spinBtn.disabled = true;
+}
