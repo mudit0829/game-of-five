@@ -53,8 +53,8 @@
           </div>
         </div>
 
-        <button id="spinBtn" class="spin-button" type="button">
-          SPIN WHEEL
+        <button id="spinBtn" class="spin-button" type="button" disabled>
+          AUTO SPIN IN LAST 15 SECONDS
         </button>
 
         <div id="lastResult" class="last-result">Result: --</div>
@@ -73,7 +73,7 @@
         <div class="my-bets-card">
           <div class="my-bets-header">
             <span>Your bets in this round</span>
-            <span class="small">(max 20 numbers, one bet per number)</span>
+            <span class="small">(max 19 numbers, one bet per number)</span>
           </div>
 
           <div id="myBetsRow" class="my-bets-row">
@@ -82,7 +82,7 @@
         </div>
 
         <button id="placeBetBtn" class="bet-main-button" type="button">
-          PLACE BET (200 COINS)
+          PLACE SELECTED BETS
         </button>
 
         <div id="statusMessage" class="status"></div>
@@ -96,9 +96,10 @@
     window.__GAMETYPE__ = "roulette";
   </script>
 
-  <script src="https://cdn.socket.io/4.8.3/socket.io.min.js"
-          integrity="sha384-kzavj5fiMwLKzzD1f8S7TeoVIEi7uKHvbTA3ueZkrzYq75pNQUiUi6Dy98Q3fxb0"
-          crossorigin="anonymous"></script>
+  <script
+    src="https://cdn.socket.io/4.8.3/socket.io.min.js"
+    integrity="sha384-kzavj5fiMwLKzzD1f8S7TeoVIEi7uKHvbTA3ueZkrzYq75pNQUiUi6Dy98Q3fxb0"
+    crossorigin="anonymous"></script>
 
   <script src="{{ url_for('static', filename='js/roulette-game.js') }}"></script>
 </body>
