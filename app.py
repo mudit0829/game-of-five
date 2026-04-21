@@ -1531,35 +1531,35 @@ def manage_game_table(table: GameTable):
 
                 # bots only for non-roulette games
                # ---------------- BOT FILL LOGIC ----------------
-if not table.is_finished and not table.is_betting_closed:
-    remaining = table.get_time_remaining()
+    if not table.is_finished and not table.is_betting_closed:
+        remaining = table.get_time_remaining()
 
-    if table.game_type == "roulette":
+        if table.game_type == "roulette":
         # Add 1 bot bet every 90 seconds while betting is open
         # Stop automatically when all 37 numbers are filled
-        if table.get_bet_count() < 37 and remaining > get_bet_close_seconds(table.game_type):
-            if table.last_bot_added_at is None or (now - table.last_bot_added_at).total_seconds() >= 90:
-                if table.add_bot_bet():
-                    table.last_bot_added_at = now
-                    emit_table_state()
+            if table.get_bet_count() < 37 and remaining > get_bet_close_seconds(table.game_type):
+                if table.last_bot_added_at is None or (now - table.last_bot_added_at).total_seconds() >= 90:
+                    if table.add_bot_bet():
+                        table.last_bot_added_at = now
+                        emit_table_state()
 
         # Safety fill: just before last minute, fill all remaining empty numbers
-        if 61 <= remaining <= 70 and table.get_bet_count() < 37:
-            changed = False
-            while table.get_bet_count() < 37:
-                if not table.add_bot_bet():
-                    break
-                changed = True
-            if changed:
-                emit_table_state()
-
-    else:
-        # keep your old behavior for non-roulette games
-        if len(table.bets) < table.max_players and remaining > 30:
-            if table.last_bot_added_at is None or (now - table.last_bot_added_at).total_seconds() >= 15:
-                if table.add_bot_bet():
-                    table.last_bot_added_at = now
+            if 61 <= remaining <= 70 and table.get_bet_count() < 37:
+                changed = False
+                while table.get_bet_count() < 37:
+                    if not table.add_bot_bet():
+                        break
+                    changed = True
+                if changed:
                     emit_table_state()
+
+        else:
+            # keep your old behavior for non-roulette games
+            if len(table.bets) < table.max_players and remaining > 30:
+                if table.last_bot_added_at is None or (now - table.last_bot_added_at).total_seconds() >= 15:
+                    if table.add_bot_bet():
+                        table.last_bot_added_at = now
+                        emit_table_state()
                 # close betting
                 if now >= table.betting_close_time and not table.is_betting_closed:
                     table.is_betting_closed = True
