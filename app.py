@@ -1234,27 +1234,33 @@ class GameTable:
         return True, "Bet placed successfully."
 
     def add_bot_bet(self):
-        if self.game_type == "roulette":
-            return False
+    if self.is_finished or self.is_betting_closed:
+        return False
 
-        if len(self.bets) >= self.max_players:
-            return False
+    taken_numbers = {
+        int(b.get("number"))
+        for b in self.bets
+        if b.get("number") is not None
+    }
 
-        taken_numbers = {int(b["number"]) for b in self.bets}
-        available_numbers = [n for n in self.get_number_range() if n not in taken_numbers]
-        if not available_numbers:
-            return False
+    available_numbers = [
+        n for n in self.get_number_range()
+        if n not in taken_numbers
+    ]
 
-        bot_name = generate_bot_name()
-        bot_number = random.choice(available_numbers)
-        success, _ = self.add_bet(
-            user_id=f"bot_{bot_name}",
-            username=bot_name,
-            number=bot_number,
-            is_bot=True,
-        )
-        return success
+    if not available_numbers:
+        return False
 
+    bot_name = generate_bot_name()
+    bot_number = random.choice(available_numbers)
+
+    success, _msg = self.add_bet(
+        user_id=f"bot_{bot_name}",
+        username=bot_name,
+        number=bot_number,
+        is_bot=True
+    )
+    return success
     def calculate_result(self):
         bet_numbers = [b.get("number") for b in self.bets or [] if b.get("number") is not None]
 
@@ -1524,17 +1530,36 @@ def manage_game_table(table: GameTable):
                     continue
 
                 # bots only for non-roulette games
-                if (
-                    table.game_type != "roulette"
-                    and not table.is_betting_closed
-                    and len(table.bets) < table.max_players
-                    and table.get_time_remaining() > 30
-                ):
-                    if table.last_bot_added_at is None or (now - table.last_bot_added_at).total_seconds() >= 15:
-                        if table.add_bot_bet():
-                            table.last_bot_added_at = now
-                            emit_table_state()
+               # ---------------- BOT FILL LOGIC ----------------
+if not table.is_finished and not table.is_betting_closed:
+    remaining = table.get_time_remaining()
 
+    if table.game_type == "roulette":
+        # Add 1 bot bet every 90 seconds while betting is open
+        # Stop automatically when all 37 numbers are filled
+        if table.get_bet_count() < 37 and remaining > get_bet_close_seconds(table.game_type):
+            if table.last_bot_added_at is None or (now - table.last_bot_added_at).total_seconds() >= 90:
+                if table.add_bot_bet():
+                    table.last_bot_added_at = now
+                    emit_table_state()
+
+        # Safety fill: just before last minute, fill all remaining empty numbers
+        if 61 <= remaining <= 70 and table.get_bet_count() < 37:
+            changed = False
+            while table.get_bet_count() < 37:
+                if not table.add_bot_bet():
+                    break
+                changed = True
+            if changed:
+                emit_table_state()
+
+    else:
+        # keep your old behavior for non-roulette games
+        if len(table.bets) < table.max_players and remaining > 30:
+            if table.last_bot_added_at is None or (now - table.last_bot_added_at).total_seconds() >= 15:
+                if table.add_bot_bet():
+                    table.last_bot_added_at = now
+                    emit_table_state()
                 # close betting
                 if now >= table.betting_close_time and not table.is_betting_closed:
                     table.is_betting_closed = True
