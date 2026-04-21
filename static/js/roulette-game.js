@@ -247,6 +247,27 @@ function updateMyBetsUIFromPlayers() {
   });
 }
 
+function showRoundResultPopup(resultNumber) {
+  const myBetNumbers = getMyBetNumbers();
+  const isWin = myBetNumbers.includes(Number(resultNumber));
+
+  const title = isWin ? "Congratulations!" : "Hard Luck!";
+  const text = isWin
+    ? `Winning number is ${resultNumber}. You won this round.`
+    : `Winning number is ${resultNumber}. Better luck next round.`;
+
+  if (window.Swal && typeof window.Swal.fire === "function") {
+    window.Swal.fire({
+      title,
+      text,
+      icon: isWin ? "success" : "error",
+      confirmButtonText: "OK"
+    });
+  } else {
+    alert(`${title}\n${text}`);
+  }
+}
+
 function refreshControls(socketConnected) {
   const myBetCount = getMyBetNumbers().length;
   const canSelectMore = (myBetCount + selectedNumbers.size) <= maxBetsPerUser;
@@ -708,8 +729,12 @@ function initSocket() {
     if (Number.isFinite(payload.result)) {
       lastDeclaredResult = payload.result;
       if (lastResultEl) lastResultEl.textContent = `Result: ${payload.result}`;
+      playResultOnce();
+      vibrateOnResult();
+      showRoundResultPopup(payload.result);
     }
 
+    clearSelectedNumbers();
     applyLockedStateToChips();
     refreshControls(socketConnected);
 
