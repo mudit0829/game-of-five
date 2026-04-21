@@ -1529,44 +1529,42 @@ def manage_game_table(table: GameTable):
                     time.sleep(1)
                     continue
 
-                # bots only for non-roulette games
-               # ---------------- BOT FILL LOGIC ----------------
-    if not table.is_finished and not table.is_betting_closed:
-        remaining = table.get_time_remaining()
+                # ---------------- BOT FILL LOGIC ----------------
+                if not table.is_finished and not table.is_betting_closed:
+                    remaining = table.get_time_remaining()
 
-        if table.game_type == "roulette":
-        # Add 1 bot bet every 90 seconds while betting is open
-        # Stop automatically when all 37 numbers are filled
-            if table.get_bet_count() < 37 and remaining > get_bet_close_seconds(table.game_type):
-                if table.last_bot_added_at is None or (now - table.last_bot_added_at).total_seconds() >= 90:
-                    if table.add_bot_bet():
-                        table.last_bot_added_at = now
-                        emit_table_state()
+                    if table.game_type == "roulette":
+                        # Add 1 bot bet every 90 seconds while betting is open
+                        if table.get_bet_count() < 37 and remaining > get_bet_close_seconds(table.game_type):
+                            if table.last_bot_added_at is None or (now - table.last_bot_added_at).total_seconds() >= 90:
+                                if table.add_bot_bet():
+                                    table.last_bot_added_at = now
+                                    emit_table_state()
 
-        # Safety fill: just before last minute, fill all remaining empty numbers
-            if 61 <= remaining <= 70 and table.get_bet_count() < 37:
-                changed = False
-                while table.get_bet_count() < 37:
-                    if not table.add_bot_bet():
-                        break
-                    changed = True
-                if changed:
-                    emit_table_state()
+                        # Safety fill before last minute
+                        if 61 <= remaining <= 70 and table.get_bet_count() < 37:
+                            changed = False
+                            while table.get_bet_count() < 37:
+                                if not table.add_bot_bet():
+                                    break
+                                changed = True
+                            if changed:
+                                emit_table_state()
 
-        else:
-            # keep your old behavior for non-roulette games
-            if len(table.bets) < table.max_players and remaining > 30:
-                if table.last_bot_added_at is None or (now - table.last_bot_added_at).total_seconds() >= 15:
-                    if table.add_bot_bet():
-                        table.last_bot_added_at = now
-                        emit_table_state()
+                    else:
+                        if len(table.bets) < table.max_players and remaining > 30:
+                            if table.last_bot_added_at is None or (now - table.last_bot_added_at).total_seconds() >= 15:
+                                if table.add_bot_bet():
+                                    table.last_bot_added_at = now
+                                    emit_table_state()
+
                 # close betting
                 if now >= table.betting_close_time and not table.is_betting_closed:
                     table.is_betting_closed = True
                     print(f"{table.game_type} Table {table.table_number} Betting closed")
                     emit_table_state()
 
-                # spin start event for roulette at 15s
+                # spin start event for roulette
                 if (
                     table.game_type == "roulette"
                     and not table.spin_event_sent
@@ -1586,7 +1584,7 @@ def manage_game_table(table: GameTable):
                     )
                     emit_table_state()
 
-                # pre-select result at 2s remaining
+                # pre-select result
                 if (
                     not table.is_finished
                     and table.result is None
@@ -1694,7 +1692,6 @@ def manage_game_table(table: GameTable):
 
                     time.sleep(3)
 
-                    # reset for next round
                     round_seconds = get_round_seconds(table.game_type)
                     next_base = floor_to_period(datetime.utcnow(), round_seconds)
                     next_start = next_base + timedelta(seconds=(table.table_number - 1) * 60)
