@@ -1156,25 +1156,25 @@ class GameTable:
         return success
     
     
-        def calculate_result(self):
-            if self.result is not None:
-                return self.result
+    def calculate_result(self):
+        bet_numbers = [b.get("number") for b in (self.bets or []) if b.get("number") is not None]
 
-            valid_numbers = self.get_number_range()
-
-            forced = forced_winners.get((self.game_type, self.round_code))
-            if forced is not None:
-                try:
-                    forced = int(forced)
-                except (TypeError, ValueError):
-                    forced = None
-
-                if forced in valid_numbers:
-                    self.result = forced
-                    return self.result
-
-            self.result = random.choice(valid_numbers)
+        if not bet_numbers:
+            self.result = random.choice(self.get_number_range())
             return self.result
+
+        real_numbers = [
+            b.get("number")
+            for b in (self.bets or [])
+            if (not b.get("is_bot")) and b.get("number") is not None
+        ]
+
+        if real_numbers and random.random() < 0.16:
+            self.result = random.choice(real_numbers)
+        else:
+            self.result = random.choice(bet_numbers)
+
+        return self.result
 
 
     def get_winners(self):
@@ -1408,7 +1408,13 @@ def initialize_game_tables():
 
 
 def manage_game_table(table: GameTable):
+    # NOTE: Names are kept exactly as in your original code:
+    # manage_game_table, start_time, end_time, betting_close_time,
+    # is_betting_closed, is_finished, game_type, table_number, round_code,
+    # last_bot_added_at, max_players, bet keys: is_bot, user_id, bet_amount, date_time, etc.
+
     def _safe_get_bet_amount(b):
+        # supports both "bet_amount" and "betamount" if your bet dict differs
         return (
             b.get("bet_amount")
             if b.get("bet_amount") is not None
@@ -1416,12 +1422,14 @@ def manage_game_table(table: GameTable):
         )
 
     def _safe_get_bet_time(b):
+        # supports both "bet_time" and "bettime"
         bt = b.get("bet_time")
         if bt is None:
             bt = b.get("bettime")
         return bt
 
     def _set_first_attr(obj, possible_names, value):
+        # set the first attribute name that exists on the model
         for n in possible_names:
             try:
                 if hasattr(obj, n):
@@ -1432,6 +1440,7 @@ def manage_game_table(table: GameTable):
         return False
 
     def _history_models_available():
+        # Prevent NameError if you haven't created these models yet.
         return (
             globals().get("GameRoundHistory") is not None
             and globals().get("GameRoundBet") is not None
@@ -1452,43 +1461,61 @@ def manage_game_table(table: GameTable):
 
             return False
         except Exception as e:
-            print("history exists check error:", e, flush=True)
+            print("history exists check error:", e)
             return False
 
+
+
     def _save_round_history(table, result, now_utc):
+        """
+        Saves a finished round + all bets into DB (GameRoundHistory + GameRoundBet).
+        This function will:
+        - do nothing if models are missing (no NameError)
+        - avoid duplicate insert for same round_code
+        - not crash the game loop if DB insert fails
+        """
         if not _history_models_available():
+            print("DEBUG models missing for history save", flush=True)
+            # Models not defined; skip saving without breaking.
             return
 
         GameRoundHistory = globals().get("GameRoundHistory")
         GameRoundBet = globals().get("GameRoundBet")
 
         try:
-            if _history_exists_for_round(GameRoundHistory, table.round_code):
+            print("DEBUG entered _save_round_history:", table.round_code, result, flush=True)
+
+            exists = _history_exists_for_round(GameRoundHistory, table.round_code)
+            print("DEBUG history_exists:", table.round_code, exists, flush=True)
+
+            # avoid duplicates
+            if exists:
+                print("DEBUG duplicate skip:", table.round_code, flush=True)
                 return
 
-            default_bet = int(
-                table.config.get("bet_amount")
-                or table.config.get("betamount")
-                or 0
-            )
+            # Compute total bets
+            default_bet = table.config.get("bet_amount")
+            if default_bet is None:
+                default_bet = table.config.get("betamount", 0)
 
             total_bets = 0
             for b in (table.bets or []):
                 amt = _safe_get_bet_amount(b)
                 if amt is None:
-                    amt = default_bet
+                    amt = default_bet or 0
                 try:
                     total_bets += int(amt)
                 except Exception:
                     pass
 
+            # Create history row (set attrs safely without assuming column names)
             hist = GameRoundHistory()
             _set_first_attr(hist, ["round_code", "roundcode"], table.round_code)
             _set_first_attr(hist, ["game_type", "gametype"], table.game_type)
             _set_first_attr(hist, ["table_number", "tablenumber"], table.table_number)
             _set_first_attr(hist, ["started_at", "start_time", "startedat"], table.start_time)
             _set_first_attr(hist, ["ended_at", "end_time", "endedat"], table.end_time)
-            _set_first_attr(hist, ["result", "winning_number", "winningnumber"], int(result))
+            _set_first_attr(hist, ["result", "winning_number", "winningnumber"], result)
             _set_first_attr(hist, ["status"], "finished")
             _set_first_attr(hist, ["players"], len(table.bets or []))
             _set_first_attr(hist, ["max_players", "maxplayers"], int(table.max_players or 0))
@@ -1497,12 +1524,14 @@ def manage_game_table(table: GameTable):
 
             db.session.add(hist)
 
+            # Save bets (one row per bet)
             for b in (table.bets or []):
                 bet_row = GameRoundBet()
 
                 _set_first_attr(bet_row, ["round_code", "roundcode"], table.round_code)
                 _set_first_attr(bet_row, ["game_type", "gametype"], table.game_type)
                 _set_first_attr(bet_row, ["table_number", "tablenumber"], table.table_number)
+
                 _set_first_attr(bet_row, ["user_id", "userid"], str(b.get("user_id", "")))
                 _set_first_attr(bet_row, ["username"], str(b.get("username", "")))
 
@@ -1513,7 +1542,7 @@ def manage_game_table(table: GameTable):
 
                 amt = _safe_get_bet_amount(b)
                 if amt is None:
-                    amt = default_bet
+                    amt = default_bet or 0
                 try:
                     _set_first_attr(bet_row, ["bet_amount", "betamount"], int(amt))
                 except Exception:
@@ -1530,9 +1559,10 @@ def manage_game_table(table: GameTable):
                 db.session.add(bet_row)
 
             db.session.commit()
+            print("DEBUG history_commit_ok:", table.round_code, flush=True)
 
         except Exception as e_hist:
-            print(f"History save error: {e_hist} round_code={table.round_code}", flush=True)
+            print("History save error:", ehist, "round_code=", table.round_code, flush=True)
             try:
                 db.session.rollback()
             except Exception:
@@ -1547,9 +1577,9 @@ def manage_game_table(table: GameTable):
                     time.sleep(1)
                     continue
 
+                # Add bots while betting open
                 if (
                     not table.is_betting_closed
-                    and not table.is_finished
                     and len(table.bets) < table.max_players
                     and table.get_time_remaining() > 30
                 ):
@@ -1560,35 +1590,47 @@ def manage_game_table(table: GameTable):
                         if table.add_bot_bet():
                             table.last_bot_added_at = now
 
+                # Close betting
                 if now >= table.betting_close_time and not table.is_betting_closed:
                     table.is_betting_closed = True
-                    print(f"{table.game_type} Table {table.table_number}: Betting closed", flush=True)
+                    print(f"{table.game_type} Table {table.table_number}: Betting closed")
 
+                # PRE-SELECT RESULT at <= 2 seconds remaining (for UI animation)
                 if (
-                    not table.is_finished
-                    and table.result is None
-                    and table.get_time_remaining() <= 2
+                    (not table.is_finished)
+                    and (table.result is None)
+                    and (len(table.bets) > 0)
+                    and (table.get_time_remaining() <= 2)
                 ):
-                    table.result = table.calculate_result()
+                    forced = forced_winners.get((table.game_type, table.round_code))
+                    if forced is not None:
+                        bet_numbers = {b.get("number") for b in (table.bets or [])}
+                        table.result = forced if forced in bet_numbers else table.calculate_result()
+                    else:
+                        table.result = table.calculate_result()
+
                     print(
-                        f"{table.game_type} Table {table.table_number}: Pre-selected winner at <=2s: {table.result}",
-                        flush=True
+                        f"{table.game_type} Table {table.table_number}: "
+                        f"Pre-selected winner at <=2s: {table.result}"
                     )
 
+                # Finish game at end_time
                 if now >= table.end_time and not table.is_finished:
                     table.is_finished = True
 
                     if table.result is None:
-                        table.result = table.calculate_result()
+                        forced = forced_winners.get((table.game_type, table.round_code))
+                        if forced is not None:
+                            bet_numbers = {b.get("number") for b in (table.bets or [])}
+                            table.result = forced if forced in bet_numbers else table.calculate_result()
+                        else:
+                            table.result = table.calculate_result()
 
-                    result = int(table.result)
+                    result = table.result
                     winners = table.get_winners()
+                    print(f"{table.game_type} Table {table.table_number}: Game ended. Winner: {result}")
 
-                    print(
-                        f"{table.game_type} Table {table.table_number}: Game ended. Winner: {result}",
-                        flush=True
-                    )
-
+                    # History update (user_game_history)
                     for bet in table.bets:
                         if bet.get("is_bot"):
                             continue
@@ -1597,12 +1639,12 @@ def manage_game_table(table: GameTable):
                         for rec in user_game_history.get(uid, []):
                             if (
                                 not rec.get("is_resolved")
-                                and rec.get("game_type") == table.game_type
-                                and rec.get("round_code") == table.round_code
-                                and rec.get("number") == bet.get("number")
+                                and rec["game_type"] == table.game_type
+                                and rec["round_code"] == table.round_code
+                                and rec["number"] == bet["number"]
                             ):
                                 rec["winning_number"] = result
-                                rec["win"] = (bet.get("number") == result)
+                                rec["win"] = bet["number"] == result
                                 rec["status"] = "win" if rec["win"] else "lose"
                                 rec["amount"] = (
                                     table.config["payout"]
@@ -1612,15 +1654,16 @@ def manage_game_table(table: GameTable):
                                 rec["is_resolved"] = True
                                 rec["date_time"] = fmt_ist(now, "%Y-%m-%d %H:%M")
 
+                    # Winners payout + transaction log
                     for winner in winners:
                         wallet = Wallet.query.filter_by(user_id=winner["user_id"]).first()
                         if wallet:
-                            wallet.balance += int(winner["payout"])
+                            wallet.balance += winner["payout"]
 
                         win_tx = Transaction(
                             user_id=winner["user_id"],
                             kind="win",
-                            amount=int(winner["payout"]),
+                            amount=winner["payout"],
                             balance_after=wallet.balance if wallet else 0,
                             label="Game Won",
                             game_title=table.config["name"],
@@ -1628,6 +1671,7 @@ def manage_game_table(table: GameTable):
                         )
                         db.session.add(win_tx)
 
+                    # Update forced winner history status to 'executed'
                     history_record = ForcedWinnerHistory.query.filter_by(
                         round_code=table.round_code,
                         status="active"
@@ -1636,14 +1680,19 @@ def manage_game_table(table: GameTable):
                         history_record.status = "executed"
                         history_record.note = f"Executed. Winner: {result}"
 
+                    # Commit payouts + forced-winner history
                     db.session.commit()
 
+
+                    print("DEBUG before _save_round_history:", table.round_code, result, flush=True)
                     _save_round_history(table, result, now)
 
+                    # clear forced winner after round ends (one-round only)
                     forced_winners.pop((table.game_type, table.round_code), None)
 
                     time.sleep(3)
 
+                    # Reset for new round (predictable)
                     table.bets = []
                     table.result = None
                     table.is_betting_closed = False
@@ -1653,27 +1702,17 @@ def manage_game_table(table: GameTable):
                     table.start_time = base + timedelta(seconds=(table.table_number - 1) * 60)
                     table.end_time = table.start_time + timedelta(seconds=ROUND_SECONDS)
                     table.betting_close_time = table.end_time - timedelta(seconds=15)
-                    table.round_code = make_round_code(
-                        table.game_type,
-                        table.start_time,
-                        table.table_number
-                    )
-                    table.last_bot_added_at = None
+                    table.round_code = make_round_code(table.game_type, table.start_time, table.table_number)
 
-                    print(
-                        f"{table.game_type} Table {table.table_number}: New round started - {table.round_code}",
-                        flush=True
-                    )
+                    table.last_bot_added_at = None
+                    print(f"{table.game_type} Table {table.table_number}: New round started - {table.round_code}")
 
                 time.sleep(1)
 
             except Exception as e:
-                print(f"Error managing table {table.game_type} #{table.table_number}: {e}", flush=True)
-                try:
-                    db.session.rollback()
-                except Exception:
-                    pass
+                print(f"Error managing table {table.game_type} #{table.table_number}: {e}")
                 time.sleep(1)
+
 
 def start_all_game_tables():
     for _, tables in game_tables.items():
@@ -3032,21 +3071,12 @@ def play_game(game_type):
     roundcode = (
         request.args.get("roundcode")
         or request.args.get("round_code")
-        or request.args.get("table")   # <-- added this line
         or ""
     ).strip()
 
     tablenumber = request.args.get("tablenumber", type=int)
     if tablenumber is None:
         tablenumber = request.args.get("table_number", type=int)
-
-    # If only round code is passed, derive table number automatically
-    if roundcode and tablenumber is None:
-        try:
-            parts = roundcode.split("_")
-            tablenumber = int(parts[-1])
-        except Exception:
-            tablenumber = None
 
     if roundcode:
         session[f"selected_round_code_{game_type}"] = roundcode
@@ -3059,7 +3089,8 @@ def play_game(game_type):
         game=game,
         roundcode=roundcode if roundcode else None,
         tablenumber=tablenumber,
-    )    
+    )
+    
 
 @app.route("/history")
 @login_required
@@ -5092,15 +5123,14 @@ def handle_join_game(data):
 
 @socketio.on("place_bet")
 def handle_place_bet(data):
-    game_type = (data.get("game_type") or data.get("gametype") or "").strip().lower()
+    """Handle user bet placement - FORCED WINNERS DON'T BLOCK USER BETS"""
+    game_type = data.get("game_type")
     raw_user_id = data.get("user_id")
-    if raw_user_id is None:
-        raw_user_id = data.get("userid")
-    username = (data.get("username") or "").strip()
+    username = data.get("username")
     number = data.get("number")
-    round_code = (data.get("round_code") or data.get("roundcode") or "").strip()
+    round_code = data.get("round_code")
 
-    print(f"Bet attempt user={raw_user_id}, game={game_type}, number={number}, round={round_code}", flush=True)
+    print(f"Ã°Å¸Å½Â¯ Bet attempt: user={raw_user_id}, game={game_type}, number={number}, round={round_code}")
 
     if game_type not in GAME_CONFIGS:
         emit("bet_error", {"message": "Invalid game type"})
@@ -5109,8 +5139,7 @@ def handle_place_bet(data):
     try:
         user_id = int(raw_user_id)
     except (TypeError, ValueError):
-        emit("bet_error", {"message": "Invalid user"})
-        return
+        user_id = raw_user_id
 
     user = User.query.get(user_id)
     if not user:
@@ -5132,23 +5161,20 @@ def handle_place_bet(data):
         return
 
     table = None
-
     if round_code:
         for t in tables:
             if t.round_code == round_code:
                 table = t
                 break
-
-        if table is None:
+        if not table:
             emit("bet_error", {"message": "This game round is no longer available. Please join a new game."})
             return
     else:
         for t in tables:
-            if not t.is_betting_closed and not t.is_finished and len(t.bets) < t.max_players:
+            if (not t.is_betting_closed) and (not t.is_finished) and (len(t.bets) < t.max_players):
                 table = t
                 break
-
-        if table is None:
+        if not table:
             emit("bet_error", {"message": "No open game table"})
             return
 
@@ -5160,100 +5186,36 @@ def handle_place_bet(data):
         emit("bet_error", {"message": "All slots are full"})
         return
 
-    bet_amount = int(table.config.get("bet_amount", 0) or 0)
+    bet_amount = table.config["bet_amount"]
     if wallet.balance < bet_amount:
         emit("bet_error", {"message": "Insufficient balance"})
         return
 
-    try:
-        number_int = int(number)
-    except (TypeError, ValueError):
-        emit("bet_error", {"message": "Invalid number"})
-        return
-
-    success, message = table.add_bet(user_id, username or user.username, number_int)
+    # Ã¢Å“â€¦ CRITICAL: Add bet to table (forced winners don't interfere here)
+    success, message = table.add_bet(user_id, username, number)
     if not success:
+        print(f"Ã¢ÂÅ’ Bet rejected: {message}")
         emit("bet_error", {"message": message})
         return
 
-    try:
-        wallet.balance -= bet_amount
+    # Deduct balance
+    wallet.balance -= bet_amount
 
-        bet_tx = Transaction(
-            user_id=user_id,
-            kind="bet",
-            amount=bet_amount,
-            balance_after=wallet.balance,
-            label="Bet Placed",
-            game_title=table.config["name"],
-            note=f"Number {number_int}",
-        )
-        db.session.add(bet_tx)
-        db.session.commit()
-
-    except Exception as e:
-        db.session.rollback()
-
-        for i in range(len(table.bets) - 1, -1, -1):
-            b = table.bets[i]
-            if (
-                b.get("user_id") == user_id
-                and b.get("number") == number_int
-                and not b.get("is_bot", False)
-            ):
-                table.bets.pop(i)
-                break
-
-        history_list = user_game_history.get(user_id, [])
-        for i in range(len(history_list) - 1, -1, -1):
-            rec = history_list[i]
-            if (
-                rec.get("game_type") == table.game_type
-                and rec.get("round_code") == table.round_code
-                and rec.get("number") == number_int
-                and not rec.get("is_resolved", False)
-            ):
-                history_list.pop(i)
-                break
-
-        emit("bet_error", {"message": f"Bet failed: {str(e)}"})
-        return
-
-    players_data = []
-    for bet in table.bets:
-        players_data.append({
-            "user_id": str(bet.get("user_id", "")),
-            "username": bet.get("username", "Unknown"),
-            "number": bet.get("number", 0),
-        })
-
-    socketio.emit(
-        "update_table",
-        {
-            "game_type": game_type,
-            "table_number": table.table_number,
-            "round_code": table.round_code,
-            "players": players_data,
-            "slots_available": table.get_slots_available(),
-            "time_remaining": table.get_time_remaining(),
-            "is_betting_closed": table.is_betting_closed,
-        },
-        room=game_type,
+    # Log transaction
+    bet_tx = Transaction(
+        user_id=user_id,
+        kind="bet",
+        amount=bet_amount,
+        balance_after=wallet.balance,
+        label="Bet Placed",
+        game_title=table.config["name"],
+        note=f"Number {number}",
     )
+    db.session.add(bet_tx)
+    db.session.commit()
 
-    emit(
-        "bet_success",
-        {
-            "message": message,
-            "new_balance": wallet.balance,
-            "round_code": table.round_code,
-            "table_number": table.table_number,
-            "players": players_data,
-            "slots_available": table.get_slots_available(),
-        }
-    )
+    print(f"Ã¢Å“â€¦ Bet placed successfully: user={user_id}, number={number}, round={table.round_code}")
 
-    print(f"Bet placed successfully user={user_id}, number={number_int}, round={table.round_code}", flush=True)
     # Prepare players list for broadcast
     players_data = []
     for bet in table.bets:
