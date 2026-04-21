@@ -3032,12 +3032,21 @@ def play_game(game_type):
     roundcode = (
         request.args.get("roundcode")
         or request.args.get("round_code")
+        or request.args.get("table")   # <-- added this line
         or ""
     ).strip()
 
     tablenumber = request.args.get("tablenumber", type=int)
     if tablenumber is None:
         tablenumber = request.args.get("table_number", type=int)
+
+    # If only round code is passed, derive table number automatically
+    if roundcode and tablenumber is None:
+        try:
+            parts = roundcode.split("_")
+            tablenumber = int(parts[-1])
+        except Exception:
+            tablenumber = None
 
     if roundcode:
         session[f"selected_round_code_{game_type}"] = roundcode
@@ -3050,8 +3059,7 @@ def play_game(game_type):
         game=game,
         roundcode=roundcode if roundcode else None,
         tablenumber=tablenumber,
-    )
-    
+    )    
 
 @app.route("/history")
 @login_required
