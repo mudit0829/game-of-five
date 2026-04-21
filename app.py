@@ -1950,8 +1950,8 @@ def sa_rounds():
     for game_type in GAME_CONFIGS.keys():
         for table_number in range(1, 7):
             table_offset = (table_number - 1) * 60
-            current_time = floor_to_period(slot_start, ROUND_SECONDS) + timedelta(seconds=table_offset)
-
+            current_time = floor_to_period(slot_start, get_round_seconds(game_type)) + timedelta(seconds=table_offset)
+            
             while current_time < slot_end:
                 if current_time > cutoff_time:
                     minutes_until = int((current_time - now).total_seconds() / 60)
@@ -1969,7 +1969,7 @@ def sa_rounds():
                         "can_force": True
                     })
 
-                current_time += timedelta(seconds=ROUND_SECONDS)
+                current_time += timedelta(seconds=get_round_seconds(game_type))
 
     out.sort(key=lambda x: x["start_time"])
     return jsonify({"rounds": out, "total": len(out)})
