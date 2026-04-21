@@ -1234,33 +1234,33 @@ class GameTable:
         return True, "Bet placed successfully."
 
     def add_bot_bet(self):
-    if self.is_finished or self.is_betting_closed:
-        return False
+        if self.is_finished or self.is_betting_closed:
+            return False
 
-    taken_numbers = {
-        int(b.get("number"))
-        for b in self.bets
-        if b.get("number") is not None
-    }
+        taken_numbers = {
+            int(b.get("number"))
+            for b in self.bets
+            if b.get("number") is not None
+        }
 
-    available_numbers = [
-        n for n in self.get_number_range()
-        if n not in taken_numbers
-    ]
+        available_numbers = [
+            n for n in self.get_number_range()
+            if n not in taken_numbers
+        ]
 
-    if not available_numbers:
-        return False
+        if not available_numbers:
+            return False
 
-    bot_name = generate_bot_name()
-    bot_number = random.choice(available_numbers)
+        bot_name = generate_bot_name()
+        bot_number = random.choice(available_numbers)
 
-    success, _msg = self.add_bet(
-        user_id=f"bot_{bot_name}",
-        username=bot_name,
-        number=bot_number,
-        is_bot=True
-    )
-    return success
+        success, _msg = self.add_bet(
+            user_id=f"bot_{bot_name}",
+            username=bot_name,
+            number=bot_number,
+            is_bot=True
+        )
+        return success
     def calculate_result(self):
         bet_numbers = [b.get("number") for b in self.bets or [] if b.get("number") is not None]
 
