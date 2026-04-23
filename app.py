@@ -1201,9 +1201,9 @@ class GameTable:
 
     return self.result
         bet_numbers = [b.get("number") for b in self.bets or [] if b.get("number") is not None]
-        if not bet_numbers:
-            self.result = random.choice(self.get_number_range())
-            return self.result
+            if not bet_numbers:
+                self.result = random.choice(self.get_number_range())
+                return self.result
 
         real_numbers = [b.get("number") for b in self.bets or [] if not b.get("is_bot") and b.get("number") is not None]
         if real_numbers and random.random() < 0.16:
