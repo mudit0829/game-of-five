@@ -1179,9 +1179,9 @@ class GameTable:
                 self.result = random.randint(0, 36)
             return self.result
 
-    if forced_number is not None and 0 <= forced_number <= 9:
-        self.result = forced_number
-        return self.result
+        if forced_number is not None and 0 <= forced_number <= 9:
+            self.result = forced_number
+            return self.result
 
     bet_numbers = [b.get("number") for b in (self.bets or []) if b.get("number") is not None]
     if not bet_numbers:
