@@ -144,7 +144,16 @@ GAME_CONFIGS = {
         "name": "Roulette Game",
         "type": "roulette",
         "title": "Roulette Spin",
-        "emoji": "ðŸŽ¡",
+        "emoji": "🎡",
+        "round_seconds": 3600,
+        "bet_close_buffer": 60,
+        "spin_start_buffer": 15,
+        "result_buffer": 2,
+        "max_players": 37,
+        "max_bets_per_user": 19,
+        "number_min": 0,
+        "number_max": 36,
+        "allow_bots": False,
     },
 }
 ALLOWED_CARD_VALUES = {10, 50, 100, 200}
@@ -1054,40 +1063,51 @@ class GameTable:
         self.table_number = table_number
         self.config = GAME_CONFIGS[game_type]
 
-        # predictable schedule:
-        base = floor_to_period(datetime.utcnow(), ROUND_SECONDS)
+        self.round_seconds = int(self.config.get("round_seconds", ROUND_SECONDS))
+        self.bet_close_buffer = int(self.config.get("bet_close_buffer", 15))
+        self.spin_start_buffer = int(self.config.get("spin_start_buffer", 15))
+        self.result_buffer = int(self.config.get("result_buffer", 2))
+
+        base = floor_to_period(datetime.utcnow(), self.round_seconds)
         self.start_time = base + timedelta(seconds=initial_delay)
-        self.end_time = self.start_time + timedelta(seconds=ROUND_SECONDS)
-        self.betting_close_time = self.end_time - timedelta(seconds=15)
+        self.end_time = self.start_time + timedelta(seconds=self.round_seconds)
+        self.betting_close_time = self.end_time - timedelta(seconds=self.bet_close_buffer)
+        self.spin_start_time = self.end_time - timedelta(seconds=self.spin_start_buffer)
+        self.result_time = self.end_time - timedelta(seconds=self.result_buffer)
 
         self.round_code = make_round_code(self.game_type, self.start_time, self.table_number)
 
         self.bets = []
         self.result = None
         self.is_betting_closed = False
+        self.is_spinning = False
+        self.is_result_declared = False
         self.is_finished = False
 
-        # roulette needs 37 unique numbers, other games keep 6
-        self.max_players = 37 if self.game_type == "roulette" else 6
-
+        self.max_players = int(self.config.get("max_players", 6))
         self.last_bot_added_at = None
-
+        self.lock = threading.Lock()
+    
     def get_number_range(self):
         if self.game_type == "roulette":
             return list(range(37))
         return list(range(10))
 
     def add_bet(self, user_id, username, number, is_bot=False):
-        try:
-            number_int = int(number)
-        except (TypeError, ValueError):
-            return False, "Invalid number"
-        number = number_int
+    try:
+        number = int(number)
+    except (TypeError, ValueError):
+        return False, "Invalid number"
 
-        # Unique number per round/table
-        for bet in self.bets:
-            if bet["number"] == number:
-                return False, "This number is already taken in this game. Please choose another."
+    with self.lock:
+        if self.is_betting_closed:
+            return False, "Betting is closed"
+
+        if self.game_type == "roulette":
+            nmin = int(self.config.get("number_min", 0))
+            nmax = int(self.config.get("number_max", 36))
+            if number < nmin or number > nmax:
+                return False, "Roulette number must be between 0 and 36"
 
         if not is_bot:
             try:
@@ -1097,15 +1117,21 @@ class GameTable:
         else:
             user_id_norm = user_id
 
-        user_bets = [b for b in self.bets if b["user_id"] == user_id_norm]
+        for bet in self.bets:
+            if bet["number"] == number:
+                return False, "This number is already taken in this game. Please choose another."
 
-        # roulette allows more picks, other games unchanged
-        max_bets_per_user = 20 if self.game_type == "roulette" else 3
+        user_bets = [b for b in self.bets if b["user_id"] == user_id_norm]
+        max_bets_per_user = int(self.config.get("max_bets_per_user", 3))
         if len(user_bets) >= max_bets_per_user:
             return False, f"Maximum {max_bets_per_user} bets per user"
 
-        if len(self.bets) >= self.max_players:
-            return False, "All slots are full"
+        real_players = {b["user_id"] for b in self.bets if not b.get("is_bot")}
+        if not is_bot and user_id_norm not in real_players and len(real_players) >= self.max_players:
+            return False, f"Maximum {self.max_players} players allowed"
+
+        if self.game_type == "roulette" and len(self.bets) >= 37:
+            return False, "All roulette numbers are already taken"
 
         bet_obj = {
             "user_id": user_id_norm,
@@ -1133,7 +1159,7 @@ class GameTable:
             )
 
         return True, "Bet placed successfully"
-
+    
     def add_bot_bet(self):
         if len(self.bets) >= self.max_players:
             return False
@@ -1157,25 +1183,31 @@ class GameTable:
     
     
     def calculate_result(self):
-        bet_numbers = [b.get("number") for b in (self.bets or []) if b.get("number") is not None]
+        if self.game_type == "roulette":
+            forced = forced_winners.get((self.game_type, self.round_code))
+            if forced is not None:
+                try:
+                    forced = int(forced)
+                    if 0 <= forced <= 36:
+                        self.result = forced
+                        return self.result
+                except Exception:
+                    pass
 
+            self.result = random.randint(0, 36)
+            return self.result
+
+        bet_numbers = [b.get("number") for b in self.bets or [] if b.get("number") is not None]
         if not bet_numbers:
             self.result = random.choice(self.get_number_range())
             return self.result
 
-        real_numbers = [
-            b.get("number")
-            for b in (self.bets or [])
-            if (not b.get("is_bot")) and b.get("number") is not None
-        ]
-
+        real_numbers = [b.get("number") for b in self.bets or [] if not b.get("is_bot") and b.get("number") is not None]
         if real_numbers and random.random() < 0.16:
             self.result = random.choice(real_numbers)
         else:
             self.result = random.choice(bet_numbers)
-
         return self.result
-
 
     def get_winners(self):
         if self.result is None:
@@ -1198,27 +1230,38 @@ class GameTable:
 
 
     def get_slots_available(self):
+        if self.game_type == "roulette":
+            taken_numbers = len({b["number"] for b in self.bets})
+            return 37 - taken_numbers
         return self.max_players - len(self.bets)
-
+    
     def is_started(self):
         return datetime.utcnow() >= self.start_time
 
+    def get_real_player_count(self):
+        return len({b["user_id"] for b in self.bets if not b.get("is_bot")})
+
+    def get_total_bet_count(self):
+        return len(self.bets)
+    
     def to_dict(self):
         return {
             "table_number": self.table_number,
             "round_code": self.round_code,
             "game_type": self.game_type,
-            "players": len(self.bets),
+            "players": self.get_real_player_count(),
+            "total_bets": self.get_total_bet_count(),
             "max_players": self.max_players,
             "slots_available": self.get_slots_available(),
             "time_remaining": self.get_time_remaining(),
             "is_betting_closed": self.is_betting_closed,
+            "is_spinning": self.is_spinning,
+            "is_result_declared": self.is_result_declared,
             "is_finished": self.is_finished,
             "is_started": self.is_started(),
             "bets": self.bets,
             "result": self.result,
         }
-
 
 # ---------------------------------------------------
 # Table initialization
@@ -1399,12 +1442,12 @@ def api_subadmin_referrals():
 
 def initialize_game_tables():
     for game_type in GAME_CONFIGS.keys():
-        game_tables[game_type] = []
+        gametables[game_type] = []
         for i in range(6):
-            initial_delay = i * 60  # stagger 1 minute each
+            initial_delay = i * 60
             table = GameTable(game_type, i + 1, initial_delay)
-            game_tables[game_type].append(table)
-        print(f"Initialized 6 tables for {game_type}")
+            gametables[game_type].append(table)
+            print(f"Initialized {game_type} table {i+1}")
 
 
 def manage_game_table(table: GameTable):
@@ -5123,23 +5166,22 @@ def handle_join_game(data):
 
 @socketio.on("place_bet")
 def handle_place_bet(data):
-    """Handle user bet placement - FORCED WINNERS DON'T BLOCK USER BETS"""
-    game_type = data.get("game_type")
-    raw_user_id = data.get("user_id")
-    username = data.get("username")
+    gametype = data.get("gametype")
+    raw_user_id = data.get("userid")
     number = data.get("number")
-    round_code = data.get("round_code")
+    roundcode = data.get("roundcode")
 
-    print(f"Ã°Å¸Å½Â¯ Bet attempt: user={raw_user_id}, game={game_type}, number={number}, round={round_code}")
+    print(f"Bet attempt user={raw_user_id}, game={gametype}, number={number}, round={roundcode}")
 
-    if game_type not in GAME_CONFIGS:
+    if gametype not in GAME_CONFIGS:
         emit("bet_error", {"message": "Invalid game type"})
         return
 
     try:
         user_id = int(raw_user_id)
     except (TypeError, ValueError):
-        user_id = raw_user_id
+        emit("bet_error", {"message": "Invalid user"})
+        return
 
     user = User.query.get(user_id)
     if not user:
@@ -5155,15 +5197,17 @@ def handle_place_bet(data):
         emit("bet_error", {"message": "Admin cannot place bets"})
         return
 
-    tables = game_tables.get(game_type)
+    username = user.username
+
+    tables = game_tables.get(gametype)
     if not tables:
         emit("bet_error", {"message": "No tables for this game"})
         return
 
     table = None
-    if round_code:
+    if roundcode:
         for t in tables:
-            if t.round_code == round_code:
+            if t.round_code == roundcode:
                 table = t
                 break
         if not table:
@@ -5171,7 +5215,7 @@ def handle_place_bet(data):
             return
     else:
         for t in tables:
-            if (not t.is_betting_closed) and (not t.is_finished) and (len(t.bets) < t.max_players):
+            if not t.is_betting_closed and not t.is_finished:
                 table = t
                 break
         if not table:
@@ -5182,75 +5226,46 @@ def handle_place_bet(data):
         emit("bet_error", {"message": "Betting is closed for this game"})
         return
 
-    if len(table.bets) >= table.max_players:
-        emit("bet_error", {"message": "All slots are full"})
-        return
+    if gametype == "roulette":
+        if table.is_spinning:
+            emit("bet_error", {"message": "Wheel already spinning. Betting closed."})
+            return
+        if table.get_time_remaining() <= 60:
+            emit("bet_error", {"message": "Last 1 minute betting is closed"})
+            return
 
-    bet_amount = table.config["bet_amount"]
+    bet_amount = int(table.config.get("bet_amount", 0))
     if wallet.balance < bet_amount:
         emit("bet_error", {"message": "Insufficient balance"})
         return
 
-    # Ã¢Å“â€¦ CRITICAL: Add bet to table (forced winners don't interfere here)
-    success, message = table.add_bet(user_id, username, number)
+    success, message = table.add_bet(user_id, username, number, is_bot=False)
     if not success:
-        print(f"Ã¢ÂÅ’ Bet rejected: {message}")
+        print("Bet rejected:", message)
         emit("bet_error", {"message": message})
         return
 
-    # Deduct balance
     wallet.balance -= bet_amount
-
-    # Log transaction
     bet_tx = Transaction(
         user_id=user_id,
         kind="bet",
         amount=bet_amount,
         balance_after=wallet.balance,
-        label="Bet Placed",
+        label="Game Bet",
         game_title=table.config["name"],
-        note=f"Number {number}",
+        note=f"Number {number} | round {table.round_code}",
     )
     db.session.add(bet_tx)
     db.session.commit()
 
-    print(f"Ã¢Å“â€¦ Bet placed successfully: user={user_id}, number={number}, round={table.round_code}")
+    emit("bet_success", {
+        "message": "Bet placed successfully",
+        "number": int(number),
+        "roundcode": table.round_code,
+        "wallet_balance": wallet.balance,
+    })
 
-    # Prepare players list for broadcast
-    players_data = []
-    for bet in table.bets:
-        players_data.append(
-            {"user_id": str(bet["user_id"]), "username": bet["username"], "number": bet["number"]}
-        )
-
-    # Emit success to the user
-    emit(
-        "bet_success",
-        {
-            "message": message,
-            "new_balance": wallet.balance,
-            "round_code": table.round_code,
-            "table_number": table.table_number,
-            "players": players_data,
-            "slots_available": table.get_slots_available(),
-        },
-    )
-
-    # Broadcast table update to all clients
-    emit(
-        "update_table",
-        {
-            "game_type": game_type,
-            "table_number": table.table_number,
-            "round_code": table.round_code,
-            "players": players_data,
-            "slots_available": table.get_slots_available(),
-            "time_remaining": table.get_time_remaining(),
-            "is_betting_closed": table.is_betting_closed,
-        },
-        broadcast=True,
-        include_self=True,
-    )
+    socketio.emit("table_update", table.to_dict(), room=gametype)
     
 # ---------------------------------------------------
 # Demo user seeding
