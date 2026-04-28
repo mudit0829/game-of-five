@@ -1166,44 +1166,44 @@ class GameTable:
 
 
     def calculate_result(self, forced_number=None):
-    if forced_number is not None:
-        try:
-            forced_number = int(forced_number)
-        except (TypeError, ValueError):
-            forced_number = None
+        if forced_number is not None:
+            try:
+                forced_number = int(forced_number)
+            except (TypeError, ValueError):
+                forced_number = None
 
-    if self.game_type == "roulette":
-        if forced_number is not None and 0 <= forced_number <= 36:
+        if self.game_type == "roulette":
+            if forced_number is not None and 0 <= forced_number <= 36:
+                self.result = forced_number
+            else:
+                self.result = random.randint(0, 36)
+            return self.result
+
+        if forced_number is not None and 0 <= forced_number <= 9:
             self.result = forced_number
+            return self.result
+
+        bet_numbers = [
+            b.get("number")
+            for b in (self.bets or [])
+            if b.get("number") is not None
+        ]
+        if not bet_numbers:
+            self.result = random.choice(self.get_number_range())
+            return self.result
+
+        real_numbers = [
+            b.get("number")
+            for b in (self.bets or [])
+            if not b.get("is_bot") and b.get("number") is not None
+        ]
+
+        if real_numbers and random.random() < 0.16:
+            self.result = random.choice(real_numbers)
         else:
-            self.result = random.randint(0, 36)
+            self.result = random.choice(bet_numbers)
+
         return self.result
-
-    if forced_number is not None and 0 <= forced_number <= 9:
-        self.result = forced_number
-        return self.result
-
-    bet_numbers = [
-        b.get("number")
-        for b in (self.bets or [])
-        if b.get("number") is not None
-    ]
-    if not bet_numbers:
-        self.result = random.choice(self.get_number_range())
-        return self.result
-
-    real_numbers = [
-        b.get("number")
-        for b in (self.bets or [])
-        if not b.get("is_bot") and b.get("number") is not None
-    ]
-
-    if real_numbers and random.random() < 0.16:
-        self.result = random.choice(real_numbers)
-    else:
-        self.result = random.choice(bet_numbers)
-
-    return self.result
     def get_winners(self):
         if self.result is None:
             return []
