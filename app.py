@@ -5128,6 +5128,39 @@ def api_agent_stats():
         totalsalary=round(total_salary, 0),
     )
 
+def normalize_game_type(value):
+    raw = str(value or "").strip().lower()
+
+    aliases = {
+        "silver": "silver",
+        "frog": "silver",
+        "frog leap": "silver",
+        "silver game": "silver",
+
+        "gold": "gold",
+        "football": "gold",
+        "football goal": "gold",
+        "gold game": "gold",
+
+        "diamond": "diamond",
+        "archer": "diamond",
+        "archer hit": "diamond",
+        "diamond game": "diamond",
+
+        "platinum": "platinum",
+        "parachute": "platinum",
+        "parachute drop": "platinum",
+        "platinum game": "platinum",
+
+        "roulette": "roulette",
+        "roulette game": "roulette",
+        "roulette spin": "roulette",
+        "r": "roulette",
+    }
+
+    return aliases.get(raw)
+
+
 
 
 # ---------------------------------------------------
@@ -5148,32 +5181,36 @@ def handle_disconnect():
 
 @socketio.on("join_game")
 def handle_join_game(data):
-    game_type = data.get("game_type")
-    user_id = data.get("user_id")
-    print(f"User {user_id} joined game {game_type}")
-    join_room(game_type)
+    gametype = normalize_game_type(data.get("gametype"))
+    userid = data.get("userid")
 
+    if not gametype or gametype not in GAME_CONFIGS:
+        emit("bet_error", {"message": "Invalid game type"})
+        return
+
+    print(f"User {userid} joined game {gametype}")
+    join_room(gametype)
 
 @socketio.on("place_bet")
 def handle_place_bet(data):
-    gametype = data.get("gametype")
-    raw_user_id = data.get("userid")
+    gametype = normalize_game_type(data.get("gametype"))
+    raw_userid = data.get("userid")
+    username = data.get("username")
     number = data.get("number")
     roundcode = data.get("roundcode")
 
-    print(f"Bet attempt user={raw_user_id}, game={gametype}, number={number}, round={roundcode}")
+    print(f"Bet attempt - user {raw_userid}, game {gametype}, number {number}, round {roundcode}")
 
-    if gametype not in GAME_CONFIGS:
+    if not gametype or gametype not in GAME_CONFIGS:
         emit("bet_error", {"message": "Invalid game type"})
         return
 
     try:
-        user_id = int(raw_user_id)
+        userid = int(raw_userid)
     except (TypeError, ValueError):
-        emit("bet_error", {"message": "Invalid user"})
-        return
+        userid = raw_userid
 
-    user = User.query.get(user_id)
+    user = User.query.get(userid)
     if not user:
         emit("bet_error", {"message": "User not found"})
         return
@@ -5186,8 +5223,6 @@ def handle_place_bet(data):
     if not wallet:
         emit("bet_error", {"message": "Admin cannot place bets"})
         return
-
-    username = user.username
 
     tables = game_tables.get(gametype)
     if not tables:
@@ -5205,7 +5240,7 @@ def handle_place_bet(data):
             return
     else:
         for t in tables:
-            if not t.is_betting_closed and not t.is_finished:
+            if not t.is_betting_closed and not t.is_finished and len(t.bets) < t.max_players:
                 table = t
                 break
         if not table:
@@ -5216,45 +5251,45 @@ def handle_place_bet(data):
         emit("bet_error", {"message": "Betting is closed for this game"})
         return
 
-    if gametype == "roulette":
-        if table.is_spinning:
-            emit("bet_error", {"message": "Wheel already spinning. Betting closed."})
-            return
-        if table.get_time_remaining() <= 60:
-            emit("bet_error", {"message": "Last 1 minute betting is closed"})
-            return
+    if len(table.bets) >= table.max_players:
+        emit("bet_error", {"message": "All slots are full"})
+        return
 
-    bet_amount = int(table.config.get("bet_amount", 0))
-    if wallet.balance < bet_amount:
+    betamount = table.config["bet_amount"]
+    if wallet.balance < betamount:
         emit("bet_error", {"message": "Insufficient balance"})
         return
 
-    success, message = table.add_bet(user_id, username, number, is_bot=False)
+    success, message = table.add_bet(userid, username, number)
     if not success:
-        print("Bet rejected:", message)
+        print(f"Bet rejected: {message}")
         emit("bet_error", {"message": message})
         return
 
-    wallet.balance -= bet_amount
-    bet_tx = Transaction(
-        user_id=user_id,
+    wallet.balance -= betamount
+    tx = Transaction(
+        user_id=user.id,
         kind="bet",
-        amount=bet_amount,
+        amount=betamount,
         balance_after=wallet.balance,
         label="Game Bet",
         game_title=table.config["name"],
-        note=f"Number {number} | round {table.round_code}",
+        note=f"Bet on number {number} in round {table.round_code}",
+        datetime=datetime.utcnow(),
     )
-    db.session.add(bet_tx)
+    db.session.add(tx)
     db.session.commit()
 
     emit("bet_success", {
         "message": "Bet placed successfully",
-        "number": int(number),
-        "roundcode": table.round_code,
         "wallet_balance": wallet.balance,
+        "table_number": table.table_number,
+        "round_code": table.round_code,
+        "game_type": gametype,
+        "number": int(number),
     })
 
+    
     socketio.emit("table_update", table.to_dict(), room=gametype)
     
 # ---------------------------------------------------
