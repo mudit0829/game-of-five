@@ -131,7 +131,11 @@ const USER_ID = window.__USER_ID__;
 const USERNAME = window.__USERNAME__ || "";
 const GAMETYPE = window.__GAMETYPE__ || "roulette";
 
-const preferredRoundCode = new URLSearchParams(window.location.search).get("table");
+const preferredRoundCode =
+  window.__ROUND_CODE__ ||
+  new URLSearchParams(window.location.search).get("roundcode") ||
+  new URLSearchParams(window.location.search).get("round_code") ||
+  null;
 
 console.log("[Roulette] JS loaded", { USER_ID, USERNAME, GAMETYPE, preferredRoundCode });
 
@@ -775,18 +779,23 @@ function handlePlaceBet() {
     return;
   }
 
-  socket.emit("place_bet", {
-    game_type: GAMETYPE,
-    user_id: USER_ID,
-    username: USERNAME,
-    numbers,
-    round_code: currentRoundCode
+  setStatus(`Placing ${numbers.length} bet(s)...`, "ok");
+
+  numbers.forEach((number, index) => {
+    setTimeout(() => {
+      socket.emit("place_bet", {
+        game_type: GAMETYPE,
+        user_id: USER_ID,
+        username: USERNAME,
+        number: number,
+        round_code: currentRoundCode
+      });
+    }, index * 80);
   });
 
   clearSelectedNumbers();
   refreshControls(socketConnected);
 }
-
 function handleSpin() {
   setStatus("Wheel spins automatically in the last 15 seconds.", "ok");
 }
@@ -800,6 +809,14 @@ setStatus("");
 
 fetchBalance();
 updateWalletUI();
+
+
+function derivePhaseFromTable(t) {
+  if (!t) return "betting_open";
+  if (t.is_finished) return "finished";
+  if (t.is_betting_closed) return "betting_closed";
+  return "betting_open";
+}
 
 fetchRouletteTableState();
 setInterval(fetchRouletteTableState, 1500);
