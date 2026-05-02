@@ -5285,16 +5285,15 @@ def handle_join_game(data):
 
 @socketio.on("place_bet")
 def handle_place_bet(data):
-    """Handle user bet placement - FORCED WINNERS DON'T BLOCK USER BETS"""
+    """Handle single or multiple user bets safely."""
     data = data or {}
 
-    game_type = data.get("game_type")
+    game_type = (data.get("game_type") or "").strip().lower()
     raw_user_id = data.get("user_id")
     username = (data.get("username") or "").strip()
-    number = data.get("number")
-    round_code = (data.get("round_code") or "").strip()
+    round_code = (data.get("round_code") or data.get("roundCode") or "").strip()
 
-    print(f"🎯 Bet attempt: user={raw_user_id}, game={game_type}, number={number}, round={round_code}")
+    print(f"🎯 Raw bet payload: {data}")
 
     if game_type not in GAME_CONFIGS:
         emit("bet_error", {"message": "Invalid game type"})
@@ -5307,7 +5306,8 @@ def handle_place_bet(data):
     try:
         user_id = int(raw_user_id)
     except (TypeError, ValueError):
-        user_id = raw_user_id
+        emit("bet_error", {"message": "Invalid user id"})
+        return
 
     user = User.query.get(user_id)
     if not user:
@@ -5324,34 +5324,18 @@ def handle_place_bet(data):
     if not username:
         username = user.username or str(user_id)
 
-    try:
-        number = int(number)
-    except (TypeError, ValueError):
-        emit("bet_error", {"message": "Invalid number"})
-        return
-
-    if game_type == "roulette":
-        nmin = int(GAME_CONFIGS[game_type].get("number_min", 0))
-        nmax = int(GAME_CONFIGS[game_type].get("number_max", 36))
-        if number < nmin or number > nmax:
-            emit("bet_error", {"message": f"Roulette number must be between {nmin} and {nmax}"})
-            return
-    else:
-        if number < 0 or number > 9:
-            emit("bet_error", {"message": "Number must be between 0 and 9"})
-            return
-
     wallet = ensure_wallet_for_user(user)
     if not wallet:
         emit("bet_error", {"message": "Admin cannot place bets"})
         return
 
-        tables = game_tables.get(game_type, [])
+    tables = game_tables.get(game_type)
     if not tables:
         emit("bet_error", {"message": "No tables for this game"})
         return
 
     table = None
+
     if round_code:
         for t in tables:
             if t.round_code == round_code:
@@ -5362,67 +5346,140 @@ def handle_place_bet(data):
             return
     else:
         for t in tables:
-            if not t.is_betting_closed and not t.is_finished and len(t.bets) < t.max_players:
+            if (
+                (not t.is_betting_closed)
+                and (not t.is_finished)
+                and (not getattr(t, "is_spinning", False))
+                and (len(t.bets) < t.max_players)
+            ):
                 table = t
                 break
-
         if not table:
             emit("bet_error", {"message": "No open game table"})
             return
 
-    if round_code and table.round_code != round_code:
-        emit("bet_error", {"message": "This game round has changed. Please join the latest round."})
-        return
-
-    if table.is_finished or table.is_betting_closed:
+    if getattr(table, "is_spinning", False) or table.is_finished or table.is_betting_closed:
         emit("bet_error", {"message": "Betting is closed for this game"})
         return
 
+    incoming_bets = []
+
+    if isinstance(data.get("bets"), list):
+        incoming_bets = data.get("bets", [])
+    elif isinstance(data.get("numbers"), list):
+        incoming_bets = data.get("numbers", [])
+    elif data.get("number") is not None:
+        incoming_bets = [data.get("number")]
+
+    cleaned_numbers = []
+    seen = set()
+
+    for val in incoming_bets:
+        try:
+            num = int(val)
+        except (TypeError, ValueError):
+            emit("bet_error", {"message": f"Invalid number: {val}"})
+            return
+
+        if game_type == "roulette":
+            nmin = int(GAME_CONFIGS[game_type].get("number_min", 0))
+            nmax = int(GAME_CONFIGS[game_type].get("number_max", 36))
+            if num < nmin or num > nmax:
+                emit("bet_error", {"message": f"Roulette number must be between {nmin} and {nmax}"})
+                return
+        else:
+            if num < 0 or num > 9:
+                emit("bet_error", {"message": "Number must be between 0 and 9"})
+                return
+
+        if num not in seen:
+            seen.add(num)
+            cleaned_numbers.append(num)
+
+    if not cleaned_numbers:
+        emit("bet_error", {"message": "No bet number received"})
+        return
+
     bet_amount = int(table.config.get("bet_amount", 0))
+    total_bet_amount = bet_amount * len(cleaned_numbers)
 
-    
-    if wallet.balance < bet_amount:
-        emit("bet_error", {"message": "Insufficient balance"})
+    if int(wallet.balance or 0) < total_bet_amount:
+        emit("bet_error", {"message": f"Insufficient balance for {len(cleaned_numbers)} bet(s)"})
         return
 
-    success, message = table.add_bet(user_id, username, number)
-    if not success:
-        print(f"❌ Bet rejected: {message}")
-        emit("bet_error", {"message": message})
-        return
+    placed_numbers = []
+    added_bets = []
+
+    for number in cleaned_numbers:
+        success, message = table.add_bet(user_id, username, number)
+        if not success:
+            for rollback_number in reversed(placed_numbers):
+                for i in range(len(table.bets) - 1, -1, -1):
+                    bet = table.bets[i]
+                    if (
+                        bet.get("user_id") == user_id
+                        and bet.get("number") == rollback_number
+                        and bet.get("username") == username
+                    ):
+                        table.bets.pop(i)
+                        break
+
+                history_rows = user_game_history.get(user_id, [])
+                for i in range(len(history_rows) - 1, -1, -1):
+                    rec = history_rows[i]
+                    if (
+                        rec.get("game_type") == table.game_type
+                        and rec.get("round_code") == table.round_code
+                        and rec.get("table_number") == table.table_number
+                        and rec.get("number") == rollback_number
+                        and not rec.get("is_resolved")
+                    ):
+                        history_rows.pop(i)
+                        break
+
+            emit("bet_error", {"message": message})
+            return
+
+        placed_numbers.append(number)
+        added_bets.append(
+            {
+                "user_id": user_id,
+                "username": username,
+                "number": number,
+            }
+        )
 
     try:
-        wallet.balance -= bet_amount
+        wallet.balance = int(wallet.balance or 0) - total_bet_amount
 
-        bet_tx = Transaction(
-            user_id=user_id,
-            kind="bet",
-            amount=bet_amount,
-            balance_after=wallet.balance,
-            label="Bet Placed",
-            game_title=table.config["name"],
-            note=f"Number {number}",
-        )
-        db.session.add(bet_tx)
+        for number in placed_numbers:
+            bet_tx = Transaction(
+                user_id=user_id,
+                kind="bet",
+                amount=bet_amount,
+                balance_after=wallet.balance,
+                label="Bet Placed",
+                game_title=table.config["name"],
+                note=f"Number {number} | Round {table.round_code}",
+            )
+            db.session.add(bet_tx)
+
         db.session.commit()
 
     except Exception as e:
         db.session.rollback()
 
-        try:
+        for rollback_number in reversed(placed_numbers):
             for i in range(len(table.bets) - 1, -1, -1):
                 bet = table.bets[i]
                 if (
                     bet.get("user_id") == user_id
-                    and bet.get("number") == number
+                    and bet.get("number") == rollback_number
                     and bet.get("username") == username
                 ):
                     table.bets.pop(i)
                     break
-        except Exception:
-            pass
 
-        try:
             history_rows = user_game_history.get(user_id, [])
             for i in range(len(history_rows) - 1, -1, -1):
                 rec = history_rows[i]
@@ -5430,19 +5487,17 @@ def handle_place_bet(data):
                     rec.get("game_type") == table.game_type
                     and rec.get("round_code") == table.round_code
                     and rec.get("table_number") == table.table_number
-                    and rec.get("number") == number
+                    and rec.get("number") == rollback_number
                     and not rec.get("is_resolved")
                 ):
                     history_rows.pop(i)
                     break
-        except Exception:
-            pass
 
         print(f"❌ Bet commit failed: {str(e)}")
-        emit("bet_error", {"message": "Could not place bet right now. Please try again."})
+        emit("bet_error", {"message": f"Could not place bet right now. {str(e)}"})
         return
 
-    print(f"✅ Bet placed successfully: user={user_id}, number={number}, round={table.round_code}")
+    print(f"✅ Bet(s) placed successfully: user={user_id}, numbers={placed_numbers}, round={table.round_code}")
 
     players_data = []
     for bet in table.bets:
@@ -5457,10 +5512,11 @@ def handle_place_bet(data):
     emit(
         "bet_success",
         {
-            "message": message,
-            "new_balance": wallet.balance,
+            "message": f"{len(placed_numbers)} bet(s) placed successfully",
+            "new_balance": int(wallet.balance or 0),
             "round_code": table.round_code,
             "table_number": table.table_number,
+            "placed_numbers": placed_numbers,
             "players": players_data,
             "slots_available": table.get_slots_available(),
         },
