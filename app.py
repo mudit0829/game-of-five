@@ -2376,6 +2376,7 @@ def user_games_history_api():
                     "winning_number": hist.result,
                     "date_time": fmt_ist(hist.endedat, "%Y-%m-%d %H:%M") if hist.endedat else "",
                     "status": None,
+                    "phase": "finished",
                     "amount": 0,
                     "win_amount": 0,
                     "loss_amount": 0,
@@ -2417,9 +2418,6 @@ def user_games_history_api():
             for table in tables:
                 if getattr(table, "is_finished", False):
                     continue
-                if getattr(table, "is_betting_closed", False):
-                    continue
-
 
                 user_bets = []
                 for bet in (table.bets or []):
@@ -2434,21 +2432,33 @@ def user_games_history_api():
                         except Exception:
                             pass
 
-                if user_bets:
-                    current_games.append({
-                        "game_type": table.game_type,
-                        "round_code": table.round_code,
-                        "bet_amount": int(table.config.get("bet_amount", 0) or 0),
-                        "user_bets": sorted(set(user_bets)),
-                        "winning_number": None,
-                        "date_time": fmt_ist(table.start_time, "%Y-%m-%d %H:%M") if table.start_time else "",
-                        "status": None,
-                        "amount": 0,
-                        "win_amount": 0,
-                        "loss_amount": 0,
-                        "time_remaining": table.get_time_remaining(),
-                        "table_number": table.table_number,
-                    })
+                if not user_bets:
+                    continue
+
+                phase = table.get_phase() if hasattr(table, "get_phase") else (
+                    "betting_closed" if getattr(table, "is_betting_closed", False) else "active"
+                )
+
+                current_games.append({
+                    "game_type": table.game_type,
+                    "round_code": table.round_code,
+                    "bet_amount": int(table.config.get("bet_amount", 0) or 0),
+                    "user_bets": sorted(set(user_bets)),
+                    "winning_number": table.result if getattr(table, "is_result_declared", False) else None,
+                    "date_time": fmt_ist(table.start_time, "%Y-%m-%d %H:%M") if table.start_time else "",
+                    "status": phase,
+                    "phase": phase,
+                    "amount": 0,
+                    "win_amount": 0,
+                    "loss_amount": 0,
+                    "time_remaining": table.get_time_remaining(),
+                    "table_number": table.table_number,
+                    "is_betting_closed": bool(getattr(table, "is_betting_closed", False)),
+                    "is_spinning": bool(getattr(table, "is_spinning", False)),
+                    "is_result_declared": bool(getattr(table, "is_result_declared", False)),
+                })
+
+        current_games.sort(key=lambda x: (x.get("game_type", ""), x.get("table_number", 0)))
 
     except Exception as e:
         print("user_games_history_api current games error:", str(e))
@@ -2458,7 +2468,6 @@ def user_games_history_api():
         "current_games": current_games,
         "game_history": game_history
     })
-
 
 
 # ---------------------------------------------------
