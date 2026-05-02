@@ -1708,29 +1708,62 @@ def manage_game_table(table: GameTable):
                         if table.add_bot_bet():
                             table.last_bot_added_at = now
 
-                # Close betting
+                                # Close betting
                 if now >= table.betting_close_time and not table.is_betting_closed:
                     table.is_betting_closed = True
                     print(f"{table.game_type} Table {table.table_number}: Betting closed")
 
-                # PRE-SELECT RESULT at <= 2 seconds remaining (for UI animation)
-                if (
-                    (not table.is_finished)
-                    and (table.result is None)
-                    and (len(table.bets) > 0)
-                    and (table.get_time_remaining() <= 2)
-                ):
-                    forced = forced_winners.get((table.game_type, table.round_code))
-                    if forced is not None:
-                        bet_numbers = {b.get("number") for b in (table.bets or [])}
-                        table.result = forced if forced in bet_numbers else table.calculate_result()
-                    else:
-                        table.result = table.calculate_result()
+                # Roulette-only spin/result timing
+                if table.game_type == "roulette":
+                    # Start spinning
+                    if (
+                        now >= table.spin_start_time
+                        and not table.is_spinning
+                        and not table.is_finished
+                    ):
+                        table.is_spinning = True
+                        print(f"{table.game_type} Table {table.table_number}: Spinning started")
 
-                    print(
-                        f"{table.game_type} Table {table.table_number}: "
-                        f"Pre-selected winner at <=2s: {table.result}"
-                    )
+                    # PRE-SELECT RESULT at configured result time (for UI animation)
+                    if (
+                        (not table.is_finished)
+                        and (table.result is None)
+                        and (len(table.bets) > 0)
+                        and (now >= table.result_time)
+                    ):
+                        forced = forced_winners.get((table.game_type, table.round_code))
+                        if forced is not None:
+                            bet_numbers = {b.get("number") for b in (table.bets or [])}
+                            table.result = forced if forced in bet_numbers else table.calculate_result()
+                        else:
+                            table.result = table.calculate_result()
+
+                        table.is_result_declared = True
+
+                        print(
+                            f"{table.game_type} Table {table.table_number}: "
+                            f"Pre-selected winner at result time: {table.result}"
+                        )
+
+                else:
+                    # PRE-SELECT RESULT at <= 2 seconds remaining (for UI animation)
+                    if (
+                        (not table.is_finished)
+                        and (table.result is None)
+                        and (len(table.bets) > 0)
+                        and (table.get_time_remaining() <= 2)
+                    ):
+                        forced = forced_winners.get((table.game_type, table.round_code))
+                        if forced is not None:
+                            bet_numbers = {b.get("number") for b in (table.bets or [])}
+                            table.result = forced if forced in bet_numbers else table.calculate_result()
+                        else:
+                            table.result = table.calculate_result()
+
+                        print(
+                            f"{table.game_type} Table {table.table_number}: "
+                            f"Pre-selected winner at <=2s: {table.result}"
+                        )
 
                 # Finish game at end_time
                 if now >= table.end_time and not table.is_finished:
@@ -1743,6 +1776,9 @@ def manage_game_table(table: GameTable):
                             table.result = forced if forced in bet_numbers else table.calculate_result()
                         else:
                             table.result = table.calculate_result()
+
+                    if table.game_type == "roulette":
+                        table.is_result_declared = True
 
                     result = table.result
                     winners = table.get_winners()
@@ -1801,7 +1837,6 @@ def manage_game_table(table: GameTable):
                     # Commit payouts + forced-winner history
                     db.session.commit()
 
-
                     print("DEBUG before _save_round_history:", table.round_code, result, flush=True)
                     _save_round_history(table, result, now)
 
@@ -1811,18 +1846,22 @@ def manage_game_table(table: GameTable):
                     time.sleep(3)
 
                     # Reset for new round (predictable)
-                    table.bets = []
-                    table.result = None
-                    table.is_betting_closed = False
-                    table.is_finished = False
+                    if table.game_type == "roulette":
+                        table.reset_round()
+                    else:
+                        table.bets = []
+                        table.result = None
+                        table.is_betting_closed = False
+                        table.is_finished = False
 
-                    base = floor_to_period(datetime.utcnow(), ROUND_SECONDS)
-                    table.start_time = base + timedelta(seconds=(table.table_number - 1) * 60)
-                    table.end_time = table.start_time + timedelta(seconds=ROUND_SECONDS)
-                    table.betting_close_time = table.end_time - timedelta(seconds=15)
-                    table.round_code = make_round_code(table.game_type, table.start_time, table.table_number)
+                        base = floor_to_period(datetime.utcnow(), ROUND_SECONDS)
+                        table.start_time = base + timedelta(seconds=(table.table_number - 1) * 60)
+                        table.end_time = table.start_time + timedelta(seconds=ROUND_SECONDS)
+                        table.betting_close_time = table.end_time - timedelta(seconds=15)
+                        table.round_code = make_round_code(table.game_type, table.start_time, table.table_number)
 
-                    table.last_bot_added_at = None
+                        table.last_bot_added_at = None
+
                     print(f"{table.game_type} Table {table.table_number}: New round started - {table.round_code}")
 
                 time.sleep(1)
