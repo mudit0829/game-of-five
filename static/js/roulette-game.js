@@ -510,7 +510,7 @@ async function fetchRouletteTableState() {
 
     currentRoundCode = t.round_code || currentRoundCode;
     currentTableNumber = t.table_number ?? currentTableNumber;
-    currentPhase = t.phase || "betting_open";
+    currentPhase = t.phase || derivePhaseFromTable(t);
     currentPlayerCount = Number.isFinite(t.player_count) ? t.player_count : (Number.isFinite(t.players) ? t.players : 0);
     currentTotalBets = Number.isFinite(t.total_bets) ? t.total_bets : 0;
     maxBetsPerUser = Number.isFinite(t.max_bets_per_user) ? t.max_bets_per_user : 19;
