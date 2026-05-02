@@ -1097,6 +1097,17 @@ class GameTable:
             return list(range(nmin, nmax + 1))
         return list(range(10))
 
+    def get_phase(self):
+        if self.is_finished:
+            return "finished"
+        if self.is_result_declared:
+            return "result"
+        if self.is_spinning:
+            return "spinning"
+        if self.is_betting_closed:
+            return "betting_closed"
+        return "active"
+
     def add_bot_bet(self):
         if not self.config.get("allow_bots", True):
             return False
@@ -1104,7 +1115,13 @@ class GameTable:
         if len(self.bets) >= self.max_players:
             return False
 
-        taken_numbers = {b["number"] for b in self.bets}
+        taken_numbers = set()
+        for b in self.bets:
+            try:
+                taken_numbers.add(int(b.get("number")))
+            except (TypeError, ValueError):
+                continue
+
         available_numbers = [n for n in self.get_number_range() if n not in taken_numbers]
         if not available_numbers:
             return False
@@ -1169,16 +1186,25 @@ class GameTable:
 
             if self.game_type == "roulette":
                 available_total = len(self.get_number_range())
-                if len({b.get("number") for b in self.bets}) >= available_total:
+                chosen_numbers = set()
+                for b in self.bets:
+                    try:
+                        chosen_numbers.add(int(b.get("number")))
+                    except (TypeError, ValueError):
+                        continue
+                if len(chosen_numbers) >= available_total:
                     return False, "All roulette numbers are already taken"
+
+            bet_time = datetime.utcnow()
+            bet_amount = int(self.config.get("bet_amount", 0))
 
             bet_obj = {
                 "user_id": user_id_norm,
                 "username": username,
                 "number": number,
                 "is_bot": is_bot,
-                "bet_amount": int(self.config.get("bet_amount", 0)),
-                "bet_time": datetime.utcnow(),
+                "bet_amount": bet_amount,
+                "bet_time": bet_time,
             }
             self.bets.append(bet_obj)
 
@@ -1190,9 +1216,9 @@ class GameTable:
                     {
                         "game_type": self.game_type,
                         "round_code": self.round_code,
-                        "bet_amount": int(self.config.get("bet_amount", 0)),
+                        "bet_amount": bet_amount,
                         "number": number,
-                        "bet_time": datetime.utcnow(),
+                        "bet_time": bet_time,
                         "table_number": self.table_number,
                         "is_resolved": False,
                     }
@@ -1222,21 +1248,20 @@ class GameTable:
             self.result = forced_number
             return self.result
 
-        bet_numbers = [
-            b.get("number")
-            for b in (self.bets or [])
-            if b.get("number") is not None
-        ]
+        bet_numbers = []
+        for b in (self.bets or []):
+            n = b.get("number")
+            if n is not None:
+                bet_numbers.append(n)
 
         if not bet_numbers:
             self.result = random.choice(self.get_number_range())
             return self.result
 
-        real_numbers = [
-            b.get("number")
-            for b in (self.bets or [])
-            if (not b.get("is_bot")) and b.get("number") is not None
-        ]
+        real_numbers = []
+        for b in (self.bets or []):
+            if (not b.get("is_bot")) and b.get("number") is not None:
+                real_numbers.append(b.get("number"))
 
         if real_numbers and random.random() < 0.16:
             self.result = random.choice(real_numbers)
@@ -1278,6 +1303,23 @@ class GameTable:
     def is_started(self):
         return datetime.utcnow() >= self.start_time
 
+    def reset_round(self):
+        base = floor_to_period(datetime.utcnow(), self.round_seconds)
+        self.start_time = base + timedelta(seconds=(self.table_number - 1) * 60)
+        self.end_time = self.start_time + timedelta(seconds=self.round_seconds)
+        self.betting_close_time = self.end_time - timedelta(seconds=self.bet_close_buffer)
+        self.spin_start_time = self.end_time - timedelta(seconds=self.spin_start_buffer)
+        self.result_time = self.end_time - timedelta(seconds=self.result_buffer)
+        self.round_code = make_round_code(self.game_type, self.start_time, self.table_number)
+
+        self.bets = []
+        self.result = None
+        self.is_betting_closed = False
+        self.is_spinning = False
+        self.is_result_declared = False
+        self.is_finished = False
+        self.last_bot_added_at = None
+
     def to_dict(self):
         return {
             "table_number": self.table_number,
@@ -1292,10 +1334,10 @@ class GameTable:
             "is_result_declared": self.is_result_declared,
             "is_finished": self.is_finished,
             "is_started": self.is_started(),
+            "phase": self.get_phase(),
             "bets": self.bets,
             "result": self.result,
         }
-
 # ---------------------------------------------------
 # Table initialization
 # ---------------------------------------------------
@@ -1638,7 +1680,7 @@ def manage_game_table(table: GameTable):
             print("DEBUG history_commit_ok:", table.round_code, flush=True)
 
         except Exception as e_hist:
-            print("History save error:", ehist, "round_code=", table.round_code, flush=True)
+            print("History save error:", e_hist, "round_code=", table.round_code, flush=True)
             try:
                 db.session.rollback()
             except Exception:
