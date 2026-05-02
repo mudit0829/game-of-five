@@ -153,7 +153,7 @@ GAME_CONFIGS = {
     "max_bets_per_user": 19,
     "number_min": 0,
     "number_max": 36,
-    "allow_bots": False,
+    "allow_bots": True,
     },
 }
 ALLOWED_CARD_VALUES = {10, 50, 100, 200}
