@@ -2319,7 +2319,6 @@ def get_game_tables_api(game_type):
                     table_data["is_spinning"] = table.is_spinning
                     table_data["is_result_declared"] = table.is_result_declared
                     table_data["phase"] = table.get_phase()
-                    table_data["status"] = table.get_phase()
 
                 serialized_tables.append(table_data)
 
@@ -2332,6 +2331,7 @@ def get_game_tables_api(game_type):
     except Exception as e:
         print(f"Error in get_game_tables_api: {str(e)}")
         return jsonify({"error": str(e), "game_type": game_type, "tables": []}), 500
+
 
 @app.route("/api/tables")
 def get_all_tables():
