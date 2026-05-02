@@ -2297,32 +2297,41 @@ def get_game_tables_api(game_type):
                             }
                         )
 
-                serialized_tables.append(
-                    {
-                        "table_number": table.table_number,
-                        "game_type": table.game_type,
-                        "round_code": table.round_code,
-                        "players": len(bets_list),
-                        "bets": bets_list,
-                        "result": table.result,
-                        "max_players": table.max_players,
-                        "slots_available": table.get_slots_available(),
-                        "time_remaining": table.get_time_remaining(),
-                        "is_betting_closed": table.is_betting_closed,
-                        "is_finished": table.is_finished,
-                        "is_started": table.is_started(),
-                        "min_bet": table.config.get("bet_amount", 0),
-                        "max_bet": table.config.get("payout", 0),
-                        "status": "betting_closed" if table.is_betting_closed else "active",
-                    }
-                )
+                table_data = {
+                    "table_number": table.table_number,
+                    "game_type": table.game_type,
+                    "round_code": table.round_code,
+                    "players": len(bets_list),
+                    "bets": bets_list,
+                    "result": table.result,
+                    "max_players": table.max_players,
+                    "slots_available": table.get_slots_available(),
+                    "time_remaining": table.get_time_remaining(),
+                    "is_betting_closed": table.is_betting_closed,
+                    "is_finished": table.is_finished,
+                    "is_started": table.is_started(),
+                    "min_bet": table.config.get("bet_amount", 0),
+                    "max_bet": table.config.get("payout", 0),
+                    "status": "betting_closed" if table.is_betting_closed else "active",
+                }
 
-        return jsonify({"game_type": game_type, "tables": serialized_tables, "total_tables": len(serialized_tables)}), 200
+                if game_type == "roulette":
+                    table_data["is_spinning"] = table.is_spinning
+                    table_data["is_result_declared"] = table.is_result_declared
+                    table_data["phase"] = table.get_phase()
+                    table_data["status"] = table.get_phase()
+
+                serialized_tables.append(table_data)
+
+        return jsonify({
+            "game_type": game_type,
+            "tables": serialized_tables,
+            "total_tables": len(serialized_tables)
+        }), 200
 
     except Exception as e:
         print(f"Error in get_game_tables_api: {str(e)}")
         return jsonify({"error": str(e), "game_type": game_type, "tables": []}), 500
-
 
 @app.route("/api/tables")
 def get_all_tables():
