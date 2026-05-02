@@ -1138,95 +1138,95 @@ class GameTable:
         return success
 
     def add_bet(self, user_id, username, number, is_bot=False):
-    try:
-        number = int(number)
-    except (TypeError, ValueError):
-        return False, "Invalid number"
+        try:
+            number = int(number)
+        except (TypeError, ValueError):
+            return False, "Invalid number"
 
-    with self.lock:
-        if self.is_betting_closed or self.is_finished:
-            return False, "Betting is closed"
+        with self.lock:
+            if self.is_betting_closed or self.is_finished:
+                return False, "Betting is closed"
 
-        if self.game_type != "roulette" and self.is_spinning:
-            return False, "Betting is closed"
+            if self.game_type != "roulette" and self.is_spinning:
+                return False, "Betting is closed"
 
-        if self.game_type == "roulette":
-            nmin = int(self.config.get("number_min", 0))
-            nmax = int(self.config.get("number_max", 36))
-            if number < nmin or number > nmax:
-                return False, f"Roulette number must be between {nmin} and {nmax}"
-        else:
-            if number < 0 or number > 9:
-                return False, "Number must be between 0 and 9"
+            if self.game_type == "roulette":
+                nmin = int(self.config.get("number_min", 0))
+                nmax = int(self.config.get("number_max", 36))
+                if number < nmin or number > nmax:
+                    return False, f"Roulette number must be between {nmin} and {nmax}"
+            else:
+                if number < 0 or number > 9:
+                    return False, "Number must be between 0 and 9"
 
-        if not is_bot:
-            try:
-                user_id_norm = int(user_id)
-            except (TypeError, ValueError):
-                user_id_norm = user_id
-        else:
-            user_id_norm = user_id
-
-        username = (username or "").strip()
-        if not username:
-            username = str(user_id_norm)
-
-        for bet in self.bets:
-            try:
-                bet_number = int(bet.get("number"))
-            except (TypeError, ValueError):
-                bet_number = bet.get("number")
-            if bet_number == number:
-                return False, "This number is already taken in this game. Please choose another."
-
-        user_bets = [b for b in self.bets if b.get("user_id") == user_id_norm]
-        max_bets_per_user = int(self.config.get("max_bets_per_user", 3))
-        if len(user_bets) >= max_bets_per_user:
-            return False, f"Maximum {max_bets_per_user} bets per user reached"
-
-        if len(self.bets) >= self.max_players:
-            return False, "All slots are full"
-
-        if self.game_type == "roulette":
-            available_total = len(self.get_number_range())
-            chosen_numbers = set()
-            for b in self.bets:
+            if not is_bot:
                 try:
-                    chosen_numbers.add(int(b.get("number")))
+                    user_id_norm = int(user_id)
                 except (TypeError, ValueError):
-                    continue
-            if len(chosen_numbers) >= available_total:
-                return False, "All roulette numbers are already taken"
+                    user_id_norm = user_id
+            else:
+                user_id_norm = user_id
 
-        bet_time = datetime.utcnow()
-        bet_amount = int(self.config.get("bet_amount", 0))
+            username = (username or "").strip()
+            if not username:
+                username = str(user_id_norm)
 
-        bet_obj = {
-            "user_id": user_id_norm,
-            "username": username,
-            "number": number,
-            "is_bot": is_bot,
-            "bet_amount": bet_amount,
-            "bet_time": bet_time,
-        }
-        self.bets.append(bet_obj)
+            for bet in self.bets:
+                try:
+                    bet_number = int(bet.get("number"))
+                except (TypeError, ValueError):
+                    bet_number = bet.get("number")
+                if bet_number == number:
+                    return False, "This number is already taken in this game. Please choose another."
 
-        if not is_bot:
-            if user_id_norm not in user_game_history:
-                user_game_history[user_id_norm] = []
-            user_game_history[user_id_norm].append(
-                {
-                    "game_type": self.game_type,
-                    "round_code": self.round_code,
-                    "bet_amount": bet_amount,
-                    "number": number,
-                    "bet_time": bet_time,
-                    "table_number": self.table_number,
-                    "is_resolved": False,
-                }
-            )
+            user_bets = [b for b in self.bets if b.get("user_id") == user_id_norm]
+            max_bets_per_user = int(self.config.get("max_bets_per_user", 3))
+            if len(user_bets) >= max_bets_per_user:
+                return False, f"Maximum {max_bets_per_user} bets per user reached"
 
-        return True, "Bet placed successfully"
+            if len(self.bets) >= self.max_players:
+                return False, "All slots are full"
+
+            if self.game_type == "roulette":
+                available_total = len(self.get_number_range())
+                chosen_numbers = set()
+                for b in self.bets:
+                    try:
+                        chosen_numbers.add(int(b.get("number")))
+                    except (TypeError, ValueError):
+                        continue
+                if len(chosen_numbers) >= available_total:
+                    return False, "All roulette numbers are already taken"
+
+            bet_time = datetime.utcnow()
+            bet_amount = int(self.config.get("bet_amount", 0))
+
+            bet_obj = {
+                "user_id": user_id_norm,
+                "username": username,
+                "number": number,
+                "is_bot": is_bot,
+                "bet_amount": bet_amount,
+                "bet_time": bet_time,
+            }
+            self.bets.append(bet_obj)
+
+            if not is_bot:
+                if user_id_norm not in user_game_history:
+                    user_game_history[user_id_norm] = []
+                user_game_history[user_id_norm].append(
+                    {
+                        "game_type": self.game_type,
+                        "round_code": self.round_code,
+                        "bet_amount": bet_amount,
+                        "number": number,
+                        "bet_time": bet_time,
+                        "table_number": self.table_number,
+                        "is_resolved": False,
+                    }
+                )
+
+            return True, "Bet placed successfully"
 
     def calculate_result(self, forced_number=None):
         if forced_number is not None:
