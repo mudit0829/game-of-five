@@ -1057,9 +1057,15 @@ def generate_bot_name():
 
 class GameTable:
     def __init__(self, game_type, table_number, initial_delay=0):
+        # main attributes
         self.game_type = game_type
         self.table_number = table_number
         self.config = GAME_CONFIGS[game_type]
+
+        # compatibility aliases for older code
+        self.gametype = game_type        # many places use table.gametype
+        self.tablenumber = table_number  # many places use table.tablenumber
+        self.maxplayers = None           # will be set after max_players is computed
 
         # predictable schedule:
                 # predictable schedule (roulette uses 60-minute rounds)
@@ -1081,6 +1087,7 @@ class GameTable:
 
         # roulette needs 37 unique numbers, other games keep 6
         self.max_players = 37 if self.game_type == "roulette" else 6
+        self.maxplayers = self.max_players
 
         self.last_bot_added_at = None
 
