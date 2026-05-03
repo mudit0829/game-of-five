@@ -139,20 +139,13 @@ GAME_CONFIGS = {
         "emoji": "ðŸª‚",
     },
     "roulette": {
-    "bet_amount": 250,
-    "payout": 5000,
-    "name": "Roulette Game",
-    "type": "roulette",
-    "title": "Roulette Spin",
-    "emoji": "🎡",
-    "round_seconds": 3600,
-    "bet_close_buffer": 60,
-    "spin_start_buffer": 15,
-    "result_buffer": 2,
-    "number_min": 0,
-    "number_max": 36,
-    "max_bets_per_user": 20,
-},
+        "bet_amount": 200,
+        "payout": 2000,
+        "name": "Roulette Game",
+        "type": "roulette",
+        "title": "Roulette Spin",
+        "emoji": "ðŸŽ¡",
+    },
 }
 ALLOWED_CARD_VALUES = {10, 50, 100, 200}
 # ---------------------------------------------------
@@ -1056,45 +1049,33 @@ def generate_bot_name():
 
 
 class GameTable:
-    def __init__(self, gametype, tablenumber, initialdelay=0):
-        self.gametype = gametype
-        self.tablenumber = tablenumber
-        self.config = GAME_CONFIGS[gametype]
+    def __init__(self, game_type, table_number, initial_delay=0):
+        self.game_type = game_type
+        self.table_number = table_number
+        self.config = GAME_CONFIGS[game_type]
 
-        # Roulette uses its own round_seconds; all other games use ROUNDSECONDS
-        if self.gametype == 'roulette':
-            self.roundseconds = int(self.config.get('round_seconds', 3600))
-            self.betclosebuffer = int(self.config.get('bet_close_buffer', 60))
-            self.spinstartbuffer = int(self.config.get('spin_start_buffer', 15))
-            self.resultbuffer = int(self.config.get('result_buffer', 2))
-        else:
-            self.roundseconds = ROUNDSECONDS
-            self.betclosebuffer = 15
-            self.spinstartbuffer = 15
-            self.resultbuffer = 2
+        # predictable schedule:
+                # predictable schedule (roulette uses 60-minute rounds)
+        round_duration = ROULETTE_ROUND_SECONDS if game_type == "roulette" else ROUND_SECONDS
+        # no bet allowed in last 60 sec for roulette, 15 sec for other games
+        no_bet_window = 60 if game_type == "roulette" else 15
 
-        base = floortoperiod(datetime.utcnow(), self.roundseconds)
-        self.starttime = base + timedelta(seconds=initialdelay)
-        self.endtime = self.starttime + timedelta(seconds=self.roundseconds)
-        self.bettingclosetime = self.endtime - timedelta(seconds=self.betclosebuffer)
+        base = floor_to_period(datetime.utcnow(), round_duration)
+        self.start_time = base + timedelta(seconds=initial_delay)
+        self.end_time = self.start_time + timedelta(seconds=round_duration)
+        self.betting_close_time = self.end_time - timedelta(seconds=no_bet_window)
 
-        # Roulette-only phase tracking
-        self.isspinning = False
-        self.isresultdeclared = False
-        if self.gametype == 'roulette':
-            self.spinstarttime = self.endtime - timedelta(seconds=self.spinstartbuffer)
-            self.resulttime = self.endtime - timedelta(seconds=self.resultbuffer)
-        else:
-            self.spinstarttime = None
-            self.resulttime = None
+        self.round_code = make_round_code(self.game_type, self.start_time, self.table_number)
 
-        self.roundcode = makeroundcode(self.gametype, self.starttime, self.tablenumber)
         self.bets = []
         self.result = None
-        self.isbettingclosed = False
-        self.isfinished = False
-        self.maxplayers = 37 if self.gametype == 'roulette' else 6
-        self.lastbotaddedat = None
+        self.is_betting_closed = False
+        self.is_finished = False
+
+        # roulette needs 37 unique numbers, other games keep 6
+        self.max_players = 37 if self.game_type == "roulette" else 6
+
+        self.last_bot_added_at = None
 
     def get_number_range(self):
         if self.game_type == "roulette":
@@ -1586,7 +1567,7 @@ def manage_game_table(table: GameTable):
             print("DEBUG history_commit_ok:", table.round_code, flush=True)
 
         except Exception as e_hist:
-            print("History save error:", e_hist, "round_code=", table.round_code, flush=True)
+            print("History save error:", ehist, "round_code=", table.round_code, flush=True)
             try:
                 db.session.rollback()
             except Exception:
@@ -1619,47 +1600,9 @@ def manage_game_table(table: GameTable):
                     table.is_betting_closed = True
                     print(f"{table.game_type} Table {table.table_number}: Betting closed")
 
-                # ---- ROULETTE ONLY: start spinning at spin_start_time ----
-                if table.game_type == 'roulette':
-                    if (
-                        hasattr(table, 'spin_start_time')
-                        and table.spin_start_time
-                        and now >= table.spin_start_time
-                        and not table.is_spinning
-                        and not table.is_finished
-                    ):
-                        table.is_spinning = True
-                        print(f"roulette Table {table.table_number}: Spinning started")
-
-                # ---- ROULETTE ONLY: declare result at result_time ----
-                if table.game_type == 'roulette':
-                    if (
-                        not table.is_finished
-                        and table.result is None
-                        and len(table.bets) > 0
-                        and hasattr(table, 'result_time')
-                        and table.result_time
-                        and now >= table.result_time
-                    ):
-                        forced = forced_winners.get((table.game_type, table.round_code))
-                        if forced is not None:
-                            bet_numbers = {b.get("number") for b in (table.bets or [])}
-                            table.result = forced if forced in bet_numbers else table.calculate_result()
-                        else:
-                            table.result = table.calculate_result()
-                        table.is_result_declared = True
-                        print(f"roulette Table {table.table_number}: Result declared: {table.result}")
-
-                # ---- ROULETTE ONLY: hold loop until end_time (don't finish early) ----
-                if table.game_type == 'roulette' and now < table.end_time:
-                    time.sleep(1)
-                    continue
-
                 # PRE-SELECT RESULT at <= 2 seconds remaining (for UI animation)
-                # (skipped for roulette since result is declared above at result_time)
                 if (
-                    table.game_type != 'roulette'
-                    and (not table.is_finished)
+                    (not table.is_finished)
                     and (table.result is None)
                     and (len(table.bets) > 0)
                     and (table.get_time_remaining() <= 2)
@@ -1687,10 +1630,6 @@ def manage_game_table(table: GameTable):
                             table.result = forced if forced in bet_numbers else table.calculate_result()
                         else:
                             table.result = table.calculate_result()
-
-                    # Mark roulette result declared at finish if not already done
-                    if table.game_type == 'roulette':
-                        table.is_result_declared = True
 
                     result = table.result
                     winners = table.get_winners()
@@ -1758,33 +1697,21 @@ def manage_game_table(table: GameTable):
 
                     time.sleep(3)
 
-                    # Reset for new round
+                    # Reset for new round (predictable)
+                                        # Reset for new round (predictable)
                     table.bets = []
                     table.result = None
                     table.is_betting_closed = False
                     table.is_finished = False
 
-                    # ---- ROULETTE ONLY: reset roulette-specific phase flags ----
-                    if table.game_type == 'roulette':
-                        table.is_spinning = False
-                        table.is_result_declared = False
-                        round_secs = int(table.config.get("round_seconds", 3600))
-                        bet_close_buf = int(table.config.get("bet_close_buffer", 60))
-                        spin_start_buf = int(table.config.get("spin_start_buffer", 15))
-                        result_buf = int(table.config.get("result_buffer", 2))
-                        base = floor_to_period(datetime.utcnow(), round_secs)
-                        table.start_time = base + timedelta(seconds=(table.table_number - 1) * 60)
-                        table.end_time = table.start_time + timedelta(seconds=round_secs)
-                        table.betting_close_time = table.end_time - timedelta(seconds=bet_close_buf)
-                        table.spin_start_time = table.end_time - timedelta(seconds=spin_start_buf)
-                        table.result_time = table.end_time - timedelta(seconds=result_buf)
-                        table.round_code = make_round_code(table.game_type, table.start_time, table.table_number)
-                    else:
-                        base = floor_to_period(datetime.utcnow(), ROUND_SECONDS)
-                        table.start_time = base + timedelta(seconds=(table.table_number - 1) * 60)
-                        table.end_time = table.start_time + timedelta(seconds=ROUND_SECONDS)
-                        table.betting_close_time = table.end_time - timedelta(seconds=15)
-                        table.round_code = make_round_code(table.game_type, table.start_time, table.table_number)
+                    _round_duration = ROULETTE_ROUND_SECONDS if table.game_type == "roulette" else ROUND_SECONDS
+                    _no_bet_window = 60 if table.game_type == "roulette" else 15
+
+                    base = floor_to_period(datetime.utcnow(), _round_duration)
+                    table.start_time = base + timedelta(seconds=(table.table_number - 1) * 60)
+                    table.end_time = table.start_time + timedelta(seconds=_round_duration)
+                    table.betting_close_time = table.end_time - timedelta(seconds=_no_bet_window)
+                    table.round_code = make_round_code(table.game_type, table.start_time, table.table_number)
 
                     table.last_bot_added_at = None
                     print(f"{table.game_type} Table {table.table_number}: New round started - {table.round_code}")
