@@ -1636,7 +1636,7 @@ def manage_game_table(table: GameTable):
                             "round_code": table.round_code,
                             "time_remaining": table.get_time_remaining(),
                         },
-                        broadcast=True,
+                        
                     )
                     print(
                         f"{table.game_type} Table {table.table_number}: "
@@ -1667,7 +1667,7 @@ def manage_game_table(table: GameTable):
                                 "round_code": table.round_code,
                                 "result": table.result,
                             },
-                            broadcast=True,
+                            
                         )
 
                     print(
