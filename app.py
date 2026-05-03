@@ -1064,21 +1064,15 @@ class GameTable:
         # predictable schedule:
                 # predictable schedule (roulette uses 60-minute rounds)
                 # predictable schedule (roulette uses 60-minute rounds)
+               # predictable schedule (roulette uses different duration & no-bet window)
         round_duration = ROULETTE_ROUND_SECONDS if game_type == "roulette" else ROUND_SECONDS
-        # no bet allowed in last 60 sec for roulette, 15 sec for other games
         no_bet_window = 60 if game_type == "roulette" else 15
 
-        if game_type == "roulette":
-            # For roulette, start from current time (no floor bucketing) to avoid drift
-            base = datetime.utcnow()
-        else:
-            # Other games keep your original floored schedule
-            base = floor_to_period(datetime.utcnow(), round_duration)
-
+        base = floor_to_period(datetime.utcnow(), round_duration)
         self.start_time = base + timedelta(seconds=initial_delay)
         self.end_time = self.start_time + timedelta(seconds=round_duration)
         self.betting_close_time = self.end_time - timedelta(seconds=no_bet_window)
-
+        
         self.round_code = make_round_code(self.game_type, self.start_time, self.table_number)
 
         self.bets = []
@@ -1618,32 +1612,9 @@ def manage_game_table(table: GameTable):
                     print(f"{table.game_type} Table {table.table_number}: Betting closed")
 
                 # ROULETTE: wheel spin start at 15 seconds remaining
-                if (
-                    table.game_type == "roulette"
-                    and not table.is_finished
-                    and table.result is None
-                    and len(table.bets) > 0
-                    and table.get_time_remaining() <= 15
-                    and table.get_time_remaining() > 2
-                    and not getattr(table, "_spin_emitted", False)
-                ):
-                    table._spin_emitted = True
-                    socketio.emit(
-                        "roulette_spin_start",
-                        {
-                            "game_type": table.game_type,
-                            "table_number": table.table_number,
-                            "round_code": table.round_code,
-                            "time_remaining": table.get_time_remaining(),
-                        },
-                        
-                    )
-                    print(
-                        f"{table.game_type} Table {table.table_number}: "
-                        f"Wheel spin started at {table.get_time_remaining()}s remaining"
-                    )
-
+               
                 # PRE-SELECT RESULT at <= 2 seconds remaining (for UI animation)
+                                # PRE-SELECT RESULT at <= 2 seconds remaining (for consistent result)
                 if (
                     (not table.is_finished)
                     and (table.result is None)
@@ -1657,23 +1628,11 @@ def manage_game_table(table: GameTable):
                     else:
                         table.result = table.calculate_result()
 
-                    # Emit result for roulette as soon as it is pre-selected
-                    if table.game_type == "roulette":
-                        socketio.emit(
-                            "roulette_result",
-                            {
-                                "game_type": table.game_type,
-                                "table_number": table.table_number,
-                                "round_code": table.round_code,
-                                "result": table.result,
-                            },
-                            
-                        )
-
                     print(
                         f"{table.game_type} Table {table.table_number}: "
                         f"Pre-selected winner at <=2s: {table.result}"
                     )
+                    
                 # Finish game at end_time
                 if now >= table.end_time and not table.is_finished:
                     table.is_finished = True
@@ -1753,6 +1712,7 @@ def manage_game_table(table: GameTable):
                     time.sleep(3)
 
                                         # Reset for new round (predictable)
+                                        # Reset for new round (predictable)
                     table.bets = []
                     table.result = None
                     table.is_betting_closed = False
@@ -1761,14 +1721,8 @@ def manage_game_table(table: GameTable):
                     _round_duration = ROULETTE_ROUND_SECONDS if table.game_type == "roulette" else ROUND_SECONDS
                     _no_bet_window = 60 if table.game_type == "roulette" else 15
 
-                    if table.game_type == "roulette":
-                        # For roulette, start a fresh 60‑minute round from now
-                        table.start_time = datetime.utcnow()
-                    else:
-                        # Other games keep your original floored + staggered schedule
-                        base = floor_to_period(datetime.utcnow(), _round_duration)
-                        table.start_time = base + timedelta(seconds=(table.table_number - 1) * 60)
-
+                    base = floor_to_period(datetime.utcnow(), _round_duration)
+                    table.start_time = base + timedelta(seconds=(table.table_number - 1) * 60)
                     table.end_time = table.start_time + timedelta(seconds=_round_duration)
                     table.betting_close_time = table.end_time - timedelta(seconds=_no_bet_window)
                     table.round_code = make_round_code(table.game_type, table.start_time, table.table_number)
@@ -1776,6 +1730,7 @@ def manage_game_table(table: GameTable):
                     table.last_bot_added_at = None
                     print(f"{table.game_type} Table {table.table_number}: New round started - {table.round_code}")
 
+                
                 time.sleep(1)
 
             except Exception as e:
