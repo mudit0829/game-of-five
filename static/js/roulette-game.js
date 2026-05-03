@@ -1,7 +1,3 @@
-console.log("Roulette script loaded");
-socket?.on && socket.on("roulette_spin_start", (p) => console.log("spin_start", p));
-socket?.on && socket.on("roulette_result", (p) => console.log("result", p));
-socket?.on && socket.on("round_finished", (p) => console.log("round_finished", p));
 // ================== Roulette Wheel (Backend-driven, multi-bet, snake_case API + socket events) ==================
 
 const WHEEL_ORDER = [
