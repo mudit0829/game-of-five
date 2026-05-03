@@ -1078,6 +1078,7 @@ class GameTable:
         self.result = None
         self.is_betting_closed = False
         self.is_finished = False
+        self._spin_emitted = False
 
         # roulette needs 37 unique numbers, other games keep 6
         self.max_players = 37 if self.game_type == "roulette" else 6
