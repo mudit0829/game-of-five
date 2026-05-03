@@ -679,6 +679,7 @@ function initSocket() {
     refreshControls(socketConnected);
   });
 
+  // Generic spin event (for other games / legacy)
   socket.on("spin_started", (payload) => {
     if (!payload || payload.game_type !== GAMETYPE) return;
     if (payload.round_code !== currentRoundCode) return;
@@ -692,12 +693,57 @@ function initSocket() {
     refreshControls(socketConnected);
   });
 
+  // Roulette-only: backend emits 'roulette_spin_start' when 15s–2s remain
+  socket.on("roulette_spin_start", (payload) => {
+    if (!payload || payload.game_type !== GAMETYPE) return;
+    if (payload.round_code && currentRoundCode && payload.round_code !== currentRoundCode) return;
+
+    currentPhase = "spinning";
+    isSpinning = true;
+    setStatus("Wheel spinning...", "ok");
+    startSpinLoop();
+    startFreeSpin();
+    applyLockedStateToChips();
+    refreshControls(socketConnected);
+  });
+
+  // Generic result event (for other games / legacy)
   socket.on("result_declared", (payload) => {
     if (!payload || payload.game_type !== GAMETYPE) return;
     if (payload.round_code !== currentRoundCode) return;
     if (!Number.isFinite(payload.result)) return;
 
     currentPhase = payload.phase || "result";
+    lastDeclaredResult = payload.result;
+    isSpinning = true;
+
+    spinToServerResult(payload.result);
+
+    window.setTimeout(() => {
+      stopSpinLoop();
+      playResultOnce();
+      vibrateOnResult();
+
+      const finalDeg = wheelRotateEl ? getRotationDeg(wheelRotateEl) : 0;
+      const shownNumber = numberAtPointer(finalDeg);
+
+      if (lastResultEl) {
+        lastResultEl.textContent = `Result: ${Number.isFinite(shownNumber) ? shownNumber : payload.result}`;
+      }
+
+      isSpinning = false;
+      applyLockedStateToChips();
+      refreshControls(socketConnected);
+    }, SPIN_DURATION_MS + 80);
+  });
+
+  // Roulette-only: backend emits 'roulette_result' at <= 2s remaining
+  socket.on("roulette_result", (payload) => {
+    if (!payload || payload.game_type !== GAMETYPE) return;
+    if (payload.round_code && currentRoundCode && payload.round_code !== currentRoundCode) return;
+    if (!Number.isFinite(payload.result)) return;
+
+    currentPhase = "result";
     lastDeclaredResult = payload.result;
     isSpinning = true;
 
@@ -796,6 +842,7 @@ function handlePlaceBet() {
   clearSelectedNumbers();
   refreshControls(socketConnected);
 }
+
 function handleSpin() {
   setStatus("Wheel spins automatically in the last 15 seconds.", "ok");
 }
@@ -809,7 +856,6 @@ setStatus("");
 
 fetchBalance();
 updateWalletUI();
-
 
 function derivePhaseFromTable(t) {
   if (!t) return "betting_open";
