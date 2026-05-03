@@ -138,23 +138,23 @@ GAME_CONFIGS = {
         "title": "Parachute Drop",
         "emoji": "ðŸª‚",
     },
-    "roulette": {
+  "roulette": {
     "bet_amount": 200,
     "payout": 4000,
     "name": "Roulette Game",
     "type": "roulette",
     "title": "Roulette Spin",
     "emoji": "🎡",
-    "round_seconds": 600,
-    "bet_close_buffer": 60,
-    "spin_start_buffer": 15,
-    "result_buffer": 2,
+    "round_seconds": 600,       # change to 3600 for production
+    "bet_close_buffer": 20,     # betting closes at 20s remaining
+    "spin_start_buffer": 15,    # wheel spins at 15s remaining
+    "result_buffer": 2,         # result declared at 2s remaining
     "max_players": 37,
-    "max_bets_per_user": 19,
+    "max_bets_per_user": 20,
     "number_min": 0,
-    "number_max": 36,
+    "number_max": 36,           # FIXED: was 37, must be 36
     "allow_bots": True,
-    },
+},
 }
 ALLOWED_CARD_VALUES = {10, 50, 100, 200}
 # ---------------------------------------------------
@@ -1848,23 +1848,21 @@ def manage_game_table(table: GameTable):
                     time.sleep(3)
 
                     # Reset for new round (predictable)
-                    if table.game_type == "roulette":
-                        table.reset_round()
+                    if table.gametype == 'roulette':
+                        table.resetround()
                     else:
-                        table.bets = []
-                        table.result = None
-                        table.is_betting_closed = False
-                        table.is_finished = False
-
-                        base = floor_to_period(datetime.utcnow(), ROUND_SECONDS)
-                        table.start_time = base + timedelta(seconds=(table.table_number - 1) * 60)
-                        table.end_time = table.start_time + timedelta(seconds=ROUND_SECONDS)
-                        table.betting_close_time = table.end_time - timedelta(seconds=15)
-                        table.round_code = make_round_code(table.game_type, table.start_time, table.table_number)
-
-                        table.last_bot_added_at = None
-
-                    print(f"{table.game_type} Table {table.table_number}: New round started - {table.round_code}")
+                       table.bets = []
+                       table.result = None
+                       table.isbettingclosed = False
+                       table.isfinished = False
+                       # Use table's own roundseconds, not global ROUNDSECONDS
+                       base = floortoperiod(datetime.utcnow(), table.roundseconds)
+                       table.starttime = base + timedelta(seconds=(table.tablenumber - 1) * 60)
+                       table.endtime = table.starttime + timedelta(seconds=table.roundseconds)
+                       table.bettingclosetime = table.endtime - timedelta(seconds=table.betclosebuffer)
+                       table.roundcode = makeroundcode(table.gametype, table.starttime, table.tablenumber)
+                       table.lastbotaddedat = None
+                        print(f"{table.gametype} Table {table.tablenumber} New round started - {table.roundcode}")
 
                 time.sleep(1)
 
