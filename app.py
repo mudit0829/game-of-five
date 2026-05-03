@@ -2290,50 +2290,95 @@ def get_game_tables_api(game_type):
             }), 200
 
         serialized_tables = []
+
         for table in tables_list:
             if not table:
                 continue
 
             bets_list = []
-            if table.bets:
+            if getattr(table, "bets", None):
                 for bet in table.bets:
-                    bets_list.append(
-                        {
-                            "user_id": str(bet.get("user_id", "")),
-                            "username": bet.get("username", "Unknown"),
-                            "number": bet.get("number", 0),
-                        }
-                    )
+                    bets_list.append({
+                        "user_id": str(bet.get("user_id", "")),
+                        "username": bet.get("username", "Unknown"),
+                        "number": bet.get("number", 0),
+                    })
+
+            is_betting_closed = bool(
+                getattr(table, "is_betting_closed", getattr(table, "isbettingclosed", False))
+            )
+            is_finished = bool(
+                getattr(table, "is_finished", getattr(table, "isfinished", False))
+            )
+            is_spinning = bool(
+                getattr(table, "is_spinning", getattr(table, "isspinning", False))
+            )
+            is_result_declared = bool(
+                getattr(table, "is_result_declared", getattr(table, "isresultdeclared", False))
+            )
+
+            if hasattr(table, "is_started") and callable(table.is_started):
+                is_started = table.is_started()
+            elif hasattr(table, "isstarted") and callable(table.isstarted):
+                is_started = table.isstarted()
+            else:
+                is_started = False
+
+            if hasattr(table, "get_slots_available") and callable(table.get_slots_available):
+                slots_available = table.get_slots_available()
+            elif hasattr(table, "getslotsavailable") and callable(table.getslotsavailable):
+                slots_available = table.getslotsavailable()
+            else:
+                slots_available = 0
+
+            if hasattr(table, "get_time_remaining") and callable(table.get_time_remaining):
+                time_remaining = table.get_time_remaining()
+            elif hasattr(table, "gettimeremaining") and callable(table.gettimeremaining):
+                time_remaining = table.gettimeremaining()
+            else:
+                time_remaining = 0
 
             table_data = {
-                "table_number": table.table_number,
-                "game_type": table.game_type,
-                "round_code": table.round_code,
+                "table_number": getattr(table, "table_number", getattr(table, "tablenumber", 0)),
+                "game_type": getattr(table, "game_type", getattr(table, "gametype", game_type)),
+                "round_code": getattr(table, "round_code", getattr(table, "roundcode", "")),
                 "players": len(bets_list),
                 "bets": bets_list,
-                "result": table.result,
-                "max_players": table.max_players,
-                "slots_available": table.get_slots_available(),
-                "time_remaining": table.get_time_remaining(),
-                "is_betting_closed": table.is_betting_closed,
-                "is_finished": table.is_finished,
-                "is_started": table.is_started(),
-                "min_bet": table.config.get("bet_amount", 0),
-                "max_bet": table.config.get("payout", 0),
-                "status": "betting_closed" if table.is_betting_closed else "active",
+                "result": getattr(table, "result", None),
+                "max_players": getattr(table, "max_players", getattr(table, "maxplayers", 0)),
+                "slots_available": slots_available,
+                "time_remaining": time_remaining,
+                "is_betting_closed": is_betting_closed,
+                "is_finished": is_finished,
+                "is_started": is_started,
+                "min_bet": getattr(table, "config", {}).get("bet_amount", 0),
+                "max_bet": getattr(table, "config", {}).get("payout", 0),
+
+                # KEEP OLD STATUS FOR FRONTEND BUTTON
+                "status": "betting_closed" if is_betting_closed else "active",
             }
 
             if game_type == "roulette":
-                table_data["is_spinning"] = bool(getattr(table, "is_spinning", False))
-                table_data["is_result_declared"] = bool(getattr(table, "is_result_declared", False))
-                table_data["phase"] = table.get_phase() if hasattr(table, "get_phase") else (
-                    "finished" if getattr(table, "is_finished", False)
-                    else "result" if getattr(table, "is_result_declared", False)
-                    else "spinning" if getattr(table, "is_spinning", False)
-                    else "betting_closed" if getattr(table, "is_betting_closed", False)
-                    else "active"
-                )
-                table_data["status"] = table_data["phase"]
+                if hasattr(table, "get_phase") and callable(table.get_phase):
+                    phase = table.get_phase()
+                elif hasattr(table, "getphase") and callable(table.getphase):
+                    phase = table.getphase()
+                else:
+                    if is_finished:
+                        phase = "finished"
+                    elif is_result_declared:
+                        phase = "result"
+                    elif is_spinning:
+                        phase = "spinning"
+                    elif is_betting_closed:
+                        phase = "bettingclosed"
+                    else:
+                        phase = "active"
+
+                table_data["is_spinning"] = is_spinning
+                table_data["is_result_declared"] = is_result_declared
+                table_data["phase"] = phase
+                # IMPORTANT: do not overwrite table_data["status"]
 
             serialized_tables.append(table_data)
 
@@ -2350,7 +2395,6 @@ def get_game_tables_api(game_type):
             "game_type": game_type,
             "tables": []
         }), 500
-
 @app.route("/api/tables")
 def get_all_tables():
     all_tables = {
