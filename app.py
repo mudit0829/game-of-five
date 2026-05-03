@@ -1862,7 +1862,7 @@ def manage_game_table(table: GameTable):
                        table.bettingclosetime = table.endtime - timedelta(seconds=table.betclosebuffer)
                        table.roundcode = makeroundcode(table.gametype, table.starttime, table.tablenumber)
                        table.lastbotaddedat = None
-                        print(f"{table.gametype} Table {table.tablenumber} New round started - {table.roundcode}")
+                print(f"{table.gametype} Table {table.tablenumber} New round started - {table.roundcode}")
 
                 time.sleep(1)
 
