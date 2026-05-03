@@ -24,7 +24,7 @@ let currentTableNumber = null;
 let currentPhase = "betting_open";
 let currentPlayerCount = 0;
 let currentTotalBets = 0;
-let maxBetsPerUser = 19;
+let maxBetsPerUser = 20;
 let lastDeclaredResult = null;
 
 let lockedNumbers = new Set();
@@ -695,17 +695,17 @@ function initSocket() {
 
   // Roulette-only: backend emits 'roulette_spin_start' when 15s–2s remain
   socket.on("roulette_spin_start", (payload) => {
-    if (!payload || payload.game_type !== GAMETYPE) return;
-    if (payload.round_code && currentRoundCode && payload.round_code !== currentRoundCode) return;
+  if (!payload || payload.game_type !== GAMETYPE) return;
+  // Do NOT filter by round_code here – accept the active roulette spin event
 
-    currentPhase = "spinning";
-    isSpinning = true;
-    setStatus("Wheel spinning...", "ok");
-    startSpinLoop();
-    startFreeSpin();
-    applyLockedStateToChips();
-    refreshControls(socketConnected);
-  });
+  currentPhase = "spinning";
+  isSpinning = true;
+  setStatus("Wheel spinning...", "ok");
+  startSpinLoop();
+  startFreeSpin();
+  applyLockedStateToChips();
+  refreshControls(socketConnected);
+});
 
   // Generic result event (for other games / legacy)
   socket.on("result_declared", (payload) => {
@@ -739,58 +739,59 @@ function initSocket() {
 
   // Roulette-only: backend emits 'roulette_result' at <= 2s remaining
   socket.on("roulette_result", (payload) => {
-    if (!payload || payload.game_type !== GAMETYPE) return;
-    if (payload.round_code && currentRoundCode && payload.round_code !== currentRoundCode) return;
-    if (!Number.isFinite(payload.result)) return;
+  if (!payload || payload.game_type !== GAMETYPE) return;
+  // Do NOT filter by round_code – we want to show the roulette result even if our
+  // currentRoundCode is slightly out of sync with the emitting table
+  if (!Number.isFinite(payload.result)) return;
 
-    currentPhase = "result";
-    lastDeclaredResult = payload.result;
-    isSpinning = true;
+  currentPhase = "result";
+  lastDeclaredResult = payload.result;
+  isSpinning = true;
 
-    spinToServerResult(payload.result);
+  spinToServerResult(payload.result);
 
-    window.setTimeout(() => {
-      stopSpinLoop();
-      playResultOnce();
-      vibrateOnResult();
-
-      const finalDeg = wheelRotateEl ? getRotationDeg(wheelRotateEl) : 0;
-      const shownNumber = numberAtPointer(finalDeg);
-
-      if (lastResultEl) {
-        lastResultEl.textContent = `Result: ${Number.isFinite(shownNumber) ? shownNumber : payload.result}`;
-      }
-
-      isSpinning = false;
-      applyLockedStateToChips();
-      refreshControls(socketConnected);
-    }, SPIN_DURATION_MS + 80);
-  });
-
-  socket.on("round_finished", (payload) => {
-    if (!payload || payload.game_type !== GAMETYPE) return;
-    if (payload.round_code !== currentRoundCode) return;
-
-    currentPhase = "finished";
+  window.setTimeout(() => {
     stopSpinLoop();
-    stopFreeSpin();
-    isSpinning = false;
+    playResultOnce();
+    vibrateOnResult();
 
-    if (Number.isFinite(payload.result)) {
-      lastDeclaredResult = payload.result;
-      if (lastResultEl) lastResultEl.textContent = `Result: ${payload.result}`;
-      playResultOnce();
-      vibrateOnResult();
-      showRoundResultPopup(payload.result);
+    const finalDeg = wheelRotateEl ? getRotationDeg(wheelRotateEl) : 0;
+    const shownNumber = numberAtPointer(finalDeg);
+
+    if (lastResultEl) {
+      lastResultEl.textContent = `Result: ${Number.isFinite(shownNumber) ? shownNumber : payload.result}`;
     }
 
-    clearSelectedNumbers();
+    isSpinning = false;
     applyLockedStateToChips();
     refreshControls(socketConnected);
+  }, SPIN_DURATION_MS + 80);
+});
+  
+  socket.on("round_finished", (payload) => {
+  if (!payload || payload.game_type !== GAMETYPE) return;
+  // Do NOT require payload.round_code === currentRoundCode – accept the finish event
 
-    fetchBalance();
-    fetchRouletteTableState();
-  });
+  currentPhase = "finished";
+  stopSpinLoop();
+  stopFreeSpin();
+  isSpinning = false;
+
+  if (Number.isFinite(payload.result)) {
+    lastDeclaredResult = payload.result;
+    if (lastResultEl) lastResultEl.textContent = `Result: ${payload.result}`;
+    playResultOnce();
+    vibrateOnResult();
+    showRoundResultPopup(payload.result);
+  }
+
+  clearSelectedNumbers();
+  applyLockedStateToChips();
+  refreshControls(socketConnected);
+
+  fetchBalance();
+  fetchRouletteTableState();
+});
 }
 
 // ================= ACTIONS =================
