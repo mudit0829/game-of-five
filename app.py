@@ -806,6 +806,7 @@ user_game_history = {}
 # ---------------------------------------------------
 
 ROUND_SECONDS = 300  # 5 minutes
+ROULETTE_ROUND_SECONDS = 3600  # 60 minutes for roulette game
 
 
 def _floor_epoch(ts: int, period: int) -> int:
