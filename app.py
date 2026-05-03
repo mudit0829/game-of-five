@@ -1063,11 +1063,18 @@ class GameTable:
 
         # predictable schedule:
                 # predictable schedule (roulette uses 60-minute rounds)
+                # predictable schedule (roulette uses 60-minute rounds)
         round_duration = ROULETTE_ROUND_SECONDS if game_type == "roulette" else ROUND_SECONDS
         # no bet allowed in last 60 sec for roulette, 15 sec for other games
         no_bet_window = 60 if game_type == "roulette" else 15
 
-        base = floor_to_period(datetime.utcnow(), round_duration)
+        if game_type == "roulette":
+            # For roulette, start from current time (no floor bucketing) to avoid drift
+            base = datetime.utcnow()
+        else:
+            # Other games keep your original floored schedule
+            base = floor_to_period(datetime.utcnow(), round_duration)
+
         self.start_time = base + timedelta(seconds=initial_delay)
         self.end_time = self.start_time + timedelta(seconds=round_duration)
         self.betting_close_time = self.end_time - timedelta(seconds=no_bet_window)
@@ -1745,7 +1752,6 @@ def manage_game_table(table: GameTable):
 
                     time.sleep(3)
 
-                    # Reset for new round (predictable)
                                         # Reset for new round (predictable)
                     table.bets = []
                     table.result = None
@@ -1755,8 +1761,14 @@ def manage_game_table(table: GameTable):
                     _round_duration = ROULETTE_ROUND_SECONDS if table.game_type == "roulette" else ROUND_SECONDS
                     _no_bet_window = 60 if table.game_type == "roulette" else 15
 
-                    base = floor_to_period(datetime.utcnow(), _round_duration)
-                    table.start_time = base + timedelta(seconds=(table.table_number - 1) * 60)
+                    if table.game_type == "roulette":
+                        # For roulette, start a fresh 60‑minute round from now
+                        table.start_time = datetime.utcnow()
+                    else:
+                        # Other games keep your original floored + staggered schedule
+                        base = floor_to_period(datetime.utcnow(), _round_duration)
+                        table.start_time = base + timedelta(seconds=(table.table_number - 1) * 60)
+
                     table.end_time = table.start_time + timedelta(seconds=_round_duration)
                     table.betting_close_time = table.end_time - timedelta(seconds=_no_bet_window)
                     table.round_code = make_round_code(table.game_type, table.start_time, table.table_number)
