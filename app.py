@@ -145,14 +145,7 @@ GAME_CONFIGS = {
     "type": "roulette",
     "title": "Roulette Spin",
     "emoji": "🎡",
-    "ROULETTE_ROUND_SECONDS": 3600,
-    "bet_close_buffer": 60,
-    "spin_start_buffer": 15,
-    "result_buffer": 2,
-    "number_min": 0,
-    "number_max": 36,
-    "max_bets_per_user": 20,
-},
+    },
 }
 ALLOWED_CARD_VALUES = {10, 50, 100, 200}
 # ---------------------------------------------------
