@@ -799,7 +799,7 @@ user_game_history = {}
 # ---------------------------------------------------
 
 ROUND_SECONDS = 300  # 5 minutes
-ROULETTE_ROUND_SECONDS = 3600  # 60 minutes for roulette game
+ROULETTE_ROUND_SECONDS = 120  # 60 minutes for roulette game
 
 
 def _floor_epoch(ts: int, period: int) -> int:
@@ -1065,7 +1065,7 @@ class GameTable:
                 # predictable schedule (roulette uses 60-minute rounds)
         round_duration = ROULETTE_ROUND_SECONDS if game_type == "roulette" else ROUND_SECONDS
         # no bet allowed in last 60 sec for roulette, 15 sec for other games
-        no_bet_window = 60 if game_type == "roulette" else 15
+        no_bet_window = 20 if game_type == "roulette" else 15
 
         base = floor_to_period(datetime.utcnow(), round_duration)
         self.start_time = base + timedelta(seconds=initial_delay)
