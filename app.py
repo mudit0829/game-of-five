@@ -1061,10 +1061,7 @@ class GameTable:
         self.tablenumber = table_number  # many places use table.tablenumber
         self.maxplayers = None           # will be set after max_players is computed
 
-        # predictable schedule:
-                # predictable schedule (roulette uses 60-minute rounds)
-                # predictable schedule (roulette uses 60-minute rounds)
-               # predictable schedule (roulette uses different duration & no-bet window)
+                      # predictable schedule (roulette uses different duration & no-bet window)
         round_duration = ROULETTE_ROUND_SECONDS if game_type == "roulette" else ROUND_SECONDS
         no_bet_window = 60 if game_type == "roulette" else 15
 
@@ -1711,8 +1708,7 @@ def manage_game_table(table: GameTable):
 
                     time.sleep(3)
 
-                                        # Reset for new round (predictable)
-                                        # Reset for new round (predictable)
+                    # Reset for new round (predictable)
                     table.bets = []
                     table.result = None
                     table.is_betting_closed = False
