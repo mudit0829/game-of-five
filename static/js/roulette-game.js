@@ -179,6 +179,136 @@ window.addEventListener("unhandledrejection", (e) => {
 
 if (headerUsername) headerUsername.textContent = USERNAME || "Player";
 
+// ================= POPUP (Diamond-style, injected by JS) =================
+let resultPopupEl = null;
+let popupTitleEl = null;
+let popupMessageEl = null;
+let popupHomeBtn = null;
+let popupLobbyBtn = null;
+
+function injectPopupStylesOnce() {
+  if (document.getElementById("rouletteResultPopupStyles")) return;
+
+  const style = document.createElement("style");
+  style.id = "rouletteResultPopupStyles";
+  style.textContent = `
+    #resultPopup {
+      position: fixed;
+      inset: 0;
+      display: none;
+      align-items: center;
+      justify-content: center;
+      background: rgba(0,0,0,0.68);
+      z-index: 99999;
+      padding: 16px;
+    }
+    #resultPopup.show {
+      display: flex;
+    }
+    #resultPopup .popup-card {
+      width: min(92vw, 380px);
+      background: linear-gradient(180deg, #1f2937 0%, #111827 100%);
+      color: #fff;
+      border-radius: 20px;
+      padding: 24px 20px 18px;
+      box-shadow: 0 20px 50px rgba(0,0,0,0.45);
+      text-align: center;
+      border: 1px solid rgba(255,255,255,0.08);
+      animation: roulettePopupIn 220ms ease-out;
+    }
+    #resultPopup .popup-title {
+      font-size: 24px;
+      font-weight: 800;
+      margin: 0 0 10px;
+      line-height: 1.2;
+    }
+    #resultPopup .popup-message {
+      font-size: 14px;
+      line-height: 1.55;
+      color: rgba(255,255,255,0.9);
+      margin: 0 0 18px;
+    }
+    #resultPopup .popup-actions {
+      display: flex;
+      gap: 10px;
+      justify-content: center;
+      flex-wrap: wrap;
+    }
+    #resultPopup .popup-btn {
+      min-width: 120px;
+      border: 0;
+      border-radius: 12px;
+      padding: 12px 16px;
+      font-size: 14px;
+      font-weight: 700;
+      cursor: pointer;
+    }
+    #resultPopup .popup-btn.home {
+      background: #374151;
+      color: #fff;
+    }
+    #resultPopup .popup-btn.lobby {
+      background: #f59e0b;
+      color: #111827;
+    }
+    @keyframes roulettePopupIn {
+      from { opacity: 0; transform: translateY(10px) scale(0.96); }
+      to { opacity: 1; transform: translateY(0) scale(1); }
+    }
+  `;
+  document.head.appendChild(style);
+}
+
+function ensureResultPopup() {
+  if (resultPopupEl) return;
+
+  injectPopupStylesOnce();
+
+  resultPopupEl = document.createElement("div");
+  resultPopupEl.id = "resultPopup";
+  resultPopupEl.innerHTML = `
+    <div class="popup-card">
+      <h2 class="popup-title" id="popupTitle">Game Finished</h2>
+      <p class="popup-message" id="popupMessage">This game has ended.</p>
+      <div class="popup-actions">
+        <button type="button" class="popup-btn home" id="popupHomeBtn">Home</button>
+        <button type="button" class="popup-btn lobby" id="popupLobbyBtn">Play Again</button>
+      </div>
+    </div>
+  `;
+
+  document.body.appendChild(resultPopupEl);
+
+  popupTitleEl = resultPopupEl.querySelector("#popupTitle");
+  popupMessageEl = resultPopupEl.querySelector("#popupMessage");
+  popupHomeBtn = resultPopupEl.querySelector("#popupHomeBtn");
+  popupLobbyBtn = resultPopupEl.querySelector("#popupLobbyBtn");
+
+  if (popupHomeBtn) {
+    popupHomeBtn.addEventListener("click", () => {
+      const target =
+        window.__HOME_URL__ ||
+        window.__LOBBY_URL__ ||
+        window.__REDIRECT_AFTER_GAME__ ||
+        "/home";
+      window.location.href = target;
+    });
+  }
+
+  if (popupLobbyBtn) {
+    popupLobbyBtn.addEventListener("click", () => {
+      window.location.href = `/game/${encodeURIComponent(GAMETYPE)}`;
+    });
+  }
+}
+
+function showInlineResultPopup({ title, message }) {
+  ensureResultPopup();
+  if (popupTitleEl) popupTitleEl.textContent = title || "Game Finished";
+  if (popupMessageEl) popupMessageEl.textContent = message || "This game has ended.";
+  if (resultPopupEl) resultPopupEl.classList.add("show");
+}
+
 // ================= HELPERS =================
 function getVal(obj, ...keys) {
   if (!obj) return undefined;
@@ -438,22 +568,11 @@ async function showRoundResultPopup(resultNumber, roundCode = currentRoundCode) 
   const isWin = myBetNumbers.includes(Number(resultNumber));
 
   const title = isWin ? "Congratulations!" : "Hard Luck!";
-  const text = isWin
-    ? `Winning number is ${resultNumber}. You won this round.`
-    : `Winning number is ${resultNumber}. Better luck next round.`;
+  const message = isWin
+    ? `Winning number is ${resultNumber}. You have won the game. Please keep playing to keep your winning chances high.`
+    : `Winning number is ${resultNumber}. You have lost the game. Please keep playing to keep your winning chances high.`;
 
-  if (window.Swal && typeof window.Swal.fire === "function") {
-    await window.Swal.fire({
-      title,
-      text,
-      icon: isWin ? "success" : "error",
-      confirmButtonText: "OK",
-      allowOutsideClick: false,
-      allowEscapeKey: false
-    });
-  } else {
-    alert(`${title}\n${text}`);
-  }
+  showInlineResultPopup({ title, message });
 }
 
 function refreshControls(socketConnected) {
@@ -737,10 +856,6 @@ async function finalizeRoundOnce(resultNumber, roundCode = currentRoundCode) {
   }
 
   await fetchBalance();
-
-  window.setTimeout(() => {
-    goToLobbyAfterRound();
-  }, 400);
 }
 
 // ================= HTTP =================
@@ -1092,6 +1207,7 @@ function handleSpin() {
 // ================= INIT =================
 setupWheelWrapperAndLabels();
 createNumberGrid();
+ensureResultPopup();
 
 clearSelectedNumbers();
 setStatus("");
