@@ -304,6 +304,21 @@ class ForcedWinnerHistory(db.Model):
     status = db.Column(db.String(20), default="active")  # active, cleared, executed
     note = db.Column(db.Text)
 
+class UserWinControl(db.Model):
+    __tablename__ = "user_win_control"
+
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey("user.id"), nullable=False, index=True)
+    game_type = db.Column(db.String(50), nullable=False, index=True)
+    played_rounds = db.Column(db.Integer, default=0, nullable=False)
+    loss_streak = db.Column(db.Integer, default=0, nullable=False)
+    total_wins = db.Column(db.Integer, default=0, nullable=False)
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
+
+    __table_args__ = (
+        db.UniqueConstraint("user_id", "game_type", name="uq_user_win_control_user_game"),
+    )
+
 class Agent(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     name = db.Column(db.String(120), nullable=False)
@@ -529,6 +544,40 @@ def migrate_subadmin_phone_column():
 
     if "phone" not in existing:
         cur.execute(f"ALTER TABLE {table_name} ADD COLUMN phone TEXT")
+
+    conn.commit()
+    conn.close()
+
+def migrate_user_win_control_table():
+    conn = sqlite3.connect(os.path.join(os.path.dirname(__file__), "game.db"))
+    cur = conn.cursor()
+
+    cur.execute("""
+        CREATE TABLE IF NOT EXISTS user_win_control (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id INTEGER NOT NULL,
+            game_type TEXT NOT NULL,
+            played_rounds INTEGER DEFAULT 0 NOT NULL,
+            loss_streak INTEGER DEFAULT 0 NOT NULL,
+            total_wins INTEGER DEFAULT 0 NOT NULL,
+            updated_at DATETIME DEFAULT CURRENT_TIMESTAMP NOT NULL
+        )
+    """)
+
+    cur.execute("""
+        CREATE UNIQUE INDEX IF NOT EXISTS uq_user_win_control_user_game
+        ON user_win_control(user_id, game_type)
+    """)
+
+    cur.execute("""
+        CREATE INDEX IF NOT EXISTS idx_user_win_control_user_id
+        ON user_win_control(user_id)
+    """)
+
+    cur.execute("""
+        CREATE INDEX IF NOT EXISTS idx_user_win_control_game_type
+        ON user_win_control(game_type)
+    """)
 
     conn.commit()
     conn.close()
@@ -794,6 +843,106 @@ def _build_agent_commission_data(agent, from_dt=None, to_dt=None, include_histor
 game_tables = {}
 user_game_history = {}
 
+CONTROL_RULES = {
+    "silver": {"due_after_losses": 6, "target_real_win_rate": 0.16},
+    "gold": {"due_after_losses": 6, "target_real_win_rate": 0.16},
+    "diamond": {"due_after_losses": 6, "target_real_win_rate": 0.16},
+    "platinum": {"due_after_losses": 6, "target_real_win_rate": 0.16},
+    "roulette": {"due_after_losses": 24, "target_real_win_rate": 0.04},
+}
+
+def get_or_create_user_win_control(user_id, game_type):
+    row = UserWinControl.query.filter_by(user_id=int(user_id), game_type=game_type).first()
+    if not row:
+        row = UserWinControl(
+            user_id=int(user_id),
+            game_type=game_type,
+            played_rounds=0,
+            loss_streak=0,
+            total_wins=0,
+        )
+        db.session.add(row)
+        db.session.flush()
+    return row
+
+def choose_controlled_winner_user(table):
+    real_bets = [b for b in (table.bets or []) if not b.get("is_bot")]
+    if not real_bets:
+        return None
+
+    per_user = {}
+    for bet in real_bets:
+        try:
+            uid = int(bet.get("user_id"))
+            num = int(bet.get("number"))
+        except Exception:
+            continue
+        per_user.setdefault(uid, set()).add(num)
+
+    if not per_user:
+        return None
+
+    rule = CONTROL_RULES.get(
+        table.game_type,
+        {"due_after_losses": 6, "target_real_win_rate": 0.16}
+    )
+    due_after_losses = int(rule["due_after_losses"])
+    target_rate = float(rule["target_real_win_rate"])
+
+    due_users = []
+    all_users = []
+
+    for uid, numbers in per_user.items():
+        ctrl = get_or_create_user_win_control(uid, table.game_type)
+        item = {
+            "user_id": uid,
+            "numbers": sorted(numbers),
+            "loss_streak": int(ctrl.loss_streak or 0),
+            "played_rounds": int(ctrl.played_rounds or 0),
+        }
+        all_users.append(item)
+
+        if item["loss_streak"] >= due_after_losses:
+            due_users.append(item)
+
+    if due_users:
+        due_users.sort(key=lambda x: (-x["loss_streak"], x["played_rounds"], x["user_id"]))
+        return due_users[0]
+
+    if all_users and random.random() < target_rate:
+        all_users.sort(key=lambda x: (-x["loss_streak"], x["played_rounds"], x["user_id"]))
+        return all_users[0]
+
+    return None
+
+def update_user_win_control_after_round(table, result_number):
+    real_bets = [b for b in (table.bets or []) if not b.get("is_bot")]
+    if not real_bets:
+        return
+
+    per_user_numbers = {}
+    for bet in real_bets:
+        try:
+            uid = int(bet.get("user_id"))
+            num = int(bet.get("number"))
+        except Exception:
+            continue
+        per_user_numbers.setdefault(uid, set()).add(num)
+
+    if not per_user_numbers:
+        return
+
+    for uid, numbers in per_user_numbers.items():
+        ctrl = get_or_create_user_win_control(uid, table.game_type)
+        ctrl.played_rounds = int(ctrl.played_rounds or 0) + 1
+
+        if int(result_number) in numbers:
+            ctrl.loss_streak = 0
+            ctrl.total_wins = int(ctrl.total_wins or 0) + 1
+        else:
+            ctrl.loss_streak = int(ctrl.loss_streak or 0) + 1
+
+    db.session.commit()
 # ---------------------------------------------------
 # Round scheduling + predictable round_code
 # ---------------------------------------------------
@@ -1175,17 +1324,12 @@ class GameTable:
             self.result = random.choice(self.get_number_range())
             return self.result
 
-        real_numbers = [
-            b.get("number")
-            for b in (self.bets or [])
-            if (not b.get("is_bot")) and b.get("number") is not None
-        ]
+        controlled_user = choose_controlled_winner_user(self)
+        if controlled_user and controlled_user.get("numbers"):
+            self.result = random.choice(controlled_user["numbers"])
+            return self.result
 
-        if real_numbers and random.random() < 0.16:
-            self.result = random.choice(real_numbers)
-        else:
-            self.result = random.choice(bet_numbers)
-
+        self.result = random.choice(bet_numbers)
         return self.result
 
 
@@ -1661,6 +1805,15 @@ def manage_game_table(table: GameTable):
                     result = table.result
                     winners = table.get_winners()
                     print(f"{table.game_type} Table {table.table_number}: Game ended. Winner: {result}")
+
+                    try:
+                        update_user_win_control_after_round(table, result)
+                    except Exception as e:
+                        print("UserWinControl update error:", e)
+                        try:
+                            db.session.rollback()
+                        except Exception:
+                            pass
 
                     # History update (user_game_history)
                     for bet in table.bets:
