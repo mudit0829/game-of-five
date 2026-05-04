@@ -1634,7 +1634,6 @@ def manage_game_table(table: GameTable):
                     and (len(table.bets) > 0)
                     and (table.get_time_remaining() <= 2)
                 ):
-                ):
                     forced = forced_winners.get((table.game_type, table.round_code))
                     if forced is not None:
                         bet_numbers = {b.get("number") for b in (table.bets or [])}
