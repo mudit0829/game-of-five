@@ -1602,21 +1602,38 @@ def manage_game_table(table: GameTable):
                         if table.add_bot_bet():
                             table.last_bot_added_at = now
 
-                # Close betting
                                 # Close betting
                 if now >= table.betting_close_time and not table.is_betting_closed:
                     table.is_betting_closed = True
                     print(f"{table.game_type} Table {table.table_number}: Betting closed")
 
-                # ROULETTE: wheel spin start at 15 seconds remaining
-               
+                # ROULETTE: wheel spin start at 15–2 seconds remaining
+                if (
+                    table.game_type == "roulette"
+                    and not table.is_finished
+                    and table.result is None
+                    and not table._spin_emitted
+                ):
+                    tr = table.get_time_remaining()
+                    if 2 < tr <= 15:
+                        table._spin_emitted = True
+                        socketio.emit(
+                            "roulette_spin_start",
+                            {
+                                "game_type": table.game_type,
+                                "table_number": table.table_number,
+                                "round_code": table.round_code,
+                                "time_remaining": tr,
+                            },
+                        )
+
                 # PRE-SELECT RESULT at <= 2 seconds remaining (for UI animation)
-                                # PRE-SELECT RESULT at <= 2 seconds remaining (for consistent result)
                 if (
                     (not table.is_finished)
                     and (table.result is None)
                     and (len(table.bets) > 0)
                     and (table.get_time_remaining() <= 2)
+                ):
                 ):
                     forced = forced_winners.get((table.game_type, table.round_code))
                     if forced is not None:
@@ -1713,6 +1730,7 @@ def manage_game_table(table: GameTable):
                     table.result = None
                     table.is_betting_closed = False
                     table.is_finished = False
+                    table._spin_emitted = False  # allow spin event next round
 
                     _round_duration = ROULETTE_ROUND_SECONDS if table.game_type == "roulette" else ROUND_SECONDS
                     _no_bet_window = 60 if table.game_type == "roulette" else 15
