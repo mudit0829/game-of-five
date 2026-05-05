@@ -948,7 +948,7 @@ def update_user_win_control_after_round(table, result_number):
 # ---------------------------------------------------
 
 ROUND_SECONDS = 300  # 5 minutes
-ROULETTE_ROUND_SECONDS = 300  # 2 minutes for roulette (testing)
+ROULETTE_ROUND_SECONDS = 3600  # 2 minutes for roulette (testing)
 
 
 def _floor_epoch(ts: int, period: int) -> int:
