@@ -81,24 +81,8 @@ document.addEventListener("DOMContentLoaded", () => {
   console.log("✅ TRANSACTIONS from template:", txns.length, "items", txns);
 
   function formatDate(dateString) {
-    if (!dateString) return "";
-    try {
-      const d = new Date(dateString);
-      if (isNaN(d.getTime())) return dateString;
-      return d.toLocaleString("en-IN", {
-        year: "numeric",
-        month: "short",
-        day: "2-digit",
-        hour: "2-digit",
-        minute: "2-digit",
-        hour12: true,
-      });
-    } catch (e) {
-      console.error("Date format error:", e);
-      return dateString;
-    }
-  }
-
+  return dateString || "";
+}
   function renderTransactions(filter = "all") {
     if (!txnList) return;
 
@@ -166,8 +150,8 @@ document.addEventListener("DOMContentLoaded", () => {
         const formattedAmt = `${sign}₹${amt}`;
 
         const label = String(t.label || t.kind || "Transaction");
-        const gameInfo = String(t.game_title || t.note || "");
-        const balanceAfter = Number(t.balance_after || 0);
+        const gameInfo = String(t.gametitle || t.note || "");
+        const balanceAfter = Number(t.balanceafter || 0);
 
         return `
           <div class="txn-row">
