@@ -58,25 +58,48 @@
 
   <!-- GAME RULES -->
   <section class="game-rules">
-    <h3 class="section-heading">How to Play</h3>
-    <div class="rules-content">
-      <p><strong>Bet Amount:</strong> ₹{{ game.bet_amount }}</p>
-      <p><strong>Winning Prize:</strong> ₹{{ game.payout }}</p>
-      <p><strong>Players per Game:</strong> Up to 6 players</p>
-      <p><strong>Game Duration:</strong> 5 minutes per round</p>
-      
-      <div class="rules-list">
-        <h4>Rules:</h4>
-        <ul>
+  <h3 class="section-heading">How to Play</h3>
+  <div class="rules-content">
+    <p><strong>Bet Amount:</strong> ₹{{ game.bet_amount }}</p>
+    <p><strong>Winning Prize:</strong> ₹{{ game.payout }}</p>
+
+    <p>
+      <strong>Players per Game:</strong>
+      {% if game_type == 'roulette' %}
+        37
+      {% else %}
+        Up to 6 players
+      {% endif %}
+    </p>
+
+    <p>
+      <strong>Game Duration:</strong>
+      {% if game_type == 'roulette' %}
+        60 minutes per round
+      {% else %}
+        5 minutes per round
+      {% endif %}
+    </p>
+    
+    <div class="rules-list">
+      <h4>Rules:</h4>
+      <ul>
+        {% if game_type == 'roulette' %}
+          <li>Select a number (0-36) to bet on</li>
+          <li>You can place up to 20 bets per round</li>
+          <li>Betting closes 60 sec before round ends</li>
+        {% else %}
           <li>Select a number (0-9) to bet on</li>
           <li>You can place up to 3 bets per round</li>
           <li>Betting closes 15 seconds before round ends</li>
-          <li>If your number matches the winning number, you win!</li>
-          <li>Results are announced immediately after round ends</li>
-        </ul>
-      </div>
+        {% endif %}
+
+        <li>If your number matches the winning number, you win!</li>
+        <li>Results are announced immediately after round ends</li>
+      </ul>
     </div>
-  </section>
+  </div>
+</section>
 
   <!-- AVAILABLE TABLES -->
   <section class="tables-section">
