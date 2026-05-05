@@ -3313,7 +3313,7 @@ def profile_page():
             {
                 "kind": t.kind,
                 "amount": t.amount,
-                "datetime": t.datetime.isoformat(),
+                "datetime": fmtist(t.datetime, "%d %b %Y, %I:%M %p") if t.datetime else "",
                 "label": t.label or t.kind.title(),
                 "game_title": t.game_title or "",
                 "note": t.note or "",
