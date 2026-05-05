@@ -844,10 +844,10 @@ game_tables = {}
 user_game_history = {}
 
 CONTROL_RULES = {
-    "silver": {"due_after_losses": 6, "target_real_win_rate": 0.16},
-    "gold": {"due_after_losses": 6, "target_real_win_rate": 0.16},
-    "diamond": {"due_after_losses": 6, "target_real_win_rate": 0.16},
-    "platinum": {"due_after_losses": 6, "target_real_win_rate": 0.16},
+    "silver": {"due_after_losses": 6, "target_real_win_rate": 0.10},
+    "gold": {"due_after_losses": 6, "target_real_win_rate": 0.10},
+    "diamond": {"due_after_losses": 6, "target_real_win_rate": 0.10},
+    "platinum": {"due_after_losses": 6, "target_real_win_rate": 0.10},
     "roulette": {"due_after_losses": 24, "target_real_win_rate": 0.04},
 }
 
