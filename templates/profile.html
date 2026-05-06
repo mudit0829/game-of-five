@@ -9,21 +9,18 @@
 <body>
   <div class="page-root">
 
-    <!-- TOP BAR -->
-   <header class="top-bar">
-  <button class="back-btn" onclick="window.history.back()">
-    ←
-  </button>
-  <div class="top-title">Profile</div>
-  <button
-    class="logout-btn"
-    onclick="window.location.href='{{ url_for('logout') }}'">
-    Logout
-  </button>
-</header>
+    <header class="top-bar">
+      <button class="back-btn" onclick="window.history.back()">
+        ←
+      </button>
+      <div class="top-title">Profile</div>
+      <button
+        class="logout-btn"
+        onclick="window.location.href='{{ url_for('logout') }}'">
+        Logout
+      </button>
+    </header>
 
-
-    <!-- MAIN TABS -->
     <div class="section-tabs">
       <button class="tab active" data-target="profile">Profile</button>
       <button class="tab" data-target="transactions">Coin Transactions</button>
@@ -31,7 +28,6 @@
 
     <main class="content">
 
-      <!-- ========== BASIC PROFILE SECTION ========== -->
       <section class="section-card active-section" id="section-profile">
         <div class="profile-header">
           <div class="avatar-circle">
@@ -39,35 +35,35 @@
               {{ username[0]|upper if username else 'U' }}
             </span>
           </div>
+
           <div class="profile-main">
-            <div class="profile-name">{{ username or 'User' }}</div>
+            <div class="profile-name">{{ displayname or username or 'User' }}</div>
             <div class="profile-id">
-              ID: <span class="mono">{{ session.get('user_id', '—') }}</span>
+              ID: <span class="mono">{{ session.get('userid', '—') }}</span>
             </div>
             <div class="profile-joined">
-              Joined: {{ joined_at or 'Just now' }}
+              Joined: {{ joinedat or 'Just now' }}
             </div>
           </div>
+
           <div class="profile-balance">
             <div class="label">Balance</div>
-            <div class="amount">₹{{ wallet_balance or 0 }}</div>
+            <div class="amount">₹{{ walletbalance or 0 }}</div>
           </div>
         </div>
 
         <form class="profile-form" id="profileForm">
-          <!-- Display name -->
           <div class="form-row">
             <label for="displayName">Display Name</label>
             <input
               id="displayName"
               name="displayName"
               type="text"
-              value="{{ username or '' }}"
+              value="{{ displayname or username or '' }}"
               placeholder="Enter name to show in games"
             >
           </div>
 
-          <!-- Email -->
           <div class="form-row">
             <label for="email">Email (optional)</label>
             <input
@@ -79,7 +75,6 @@
             >
           </div>
 
-          <!-- Phone (now its own full-width row, below email) -->
           <div class="form-row">
             <label for="phone">Phone</label>
             <input
@@ -91,7 +86,6 @@
             >
           </div>
 
-          <!-- Country (now below phone, full-width) -->
           <div class="form-row">
             <label for="country">Country</label>
             <input
@@ -111,10 +105,7 @@
         </form>
       </section>
 
-      <!-- ========== COIN TRANSACTIONS SECTION ========== -->
       <section class="section-card" id="section-transactions">
-
-        <!-- Sub-tabs inside Coin Transactions -->
         <div class="sub-tabs">
           <button class="sub-tab active" data-filter="all">All</button>
           <button class="sub-tab" data-filter="added">Updated/Added</button>
@@ -123,7 +114,6 @@
           <button class="sub-tab" data-filter="balance">Balance</button>
         </div>
 
-        <!-- Summary row -->
         <div class="summary-row">
           <div class="summary-card">
             <div class="label">Total Added</div>
@@ -139,11 +129,10 @@
           </div>
           <div class="summary-card">
             <div class="label">Current Balance</div>
-            <div class="value" id="sumBalance">₹{{ wallet_balance or 0 }}</div>
+            <div class="value" id="sumBalance">₹{{ walletbalance or 0 }}</div>
           </div>
         </div>
 
-        <!-- header row -->
         <div class="txn-header-row">
           <span class="col col-date">Date &amp; Time</span>
           <span class="col col-type">Type</span>
@@ -152,7 +141,6 @@
           <span class="col col-after">Balance</span>
         </div>
 
-        <!-- Transactions list (filtered by JS) -->
         <div id="txnList" class="txn-list">
           <div class="empty-state">
             No transactions yet.<br>
@@ -164,15 +152,12 @@
     </main>
   </div>
 
-  <!-- DATA from backend (safe defaults) -->
- <!-- DATA from backend (safe defaults) -->
-<script>
-  // ✅ ATTACH TO WINDOW so profile.js can access it
-  window.WALLET_BALANCE = {{ wallet_balance or 0 }};
-  window.TRANSACTIONS = {{ (transactions or []) | tojson | safe }};
-  console.log('✅ TRANSACTIONS loaded:', window.TRANSACTIONS.length, 'items');
-</script>
-<script src="{{ url_for('static', filename='js/profile.js') }}"></script>
-
+  <script>
+    window.WALLET_BALANCE = {{ walletbalance or 0 }};
+    window.TRANSACTIONS = {{ (transactions or []) | tojson | safe }};
+    console.log("✅ TRANSACTIONS loaded:", window.TRANSACTIONS.length, "items");
+    console.log("✅ WALLET_BALANCE loaded:", window.WALLET_BALANCE);
+  </script>
+  <script src="{{ url_for('static', filename='js/profile.js') }}"></script>
 </body>
 </html>
