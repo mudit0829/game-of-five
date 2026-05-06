@@ -7,16 +7,17 @@
   <link rel="stylesheet" href="{{ url_for('static', filename='css/profile.css') }}">
 </head>
 <body>
+  {% set profile_name = displayname if displayname is defined and displayname else (username if username is defined and username else 'User') %}
+  {% set joined_text = joinedat if joinedat is defined and joinedat else (joined_at if joined_at is defined and joined_at else 'Just now') %}
+  {% set wallet_amt = walletbalance if walletbalance is defined and walletbalance is not none else (wallet_balance if wallet_balance is defined and wallet_balance is not none else 0) %}
+  {% set txns = transactions if transactions is defined and transactions else [] %}
+
   <div class="page-root">
 
     <header class="top-bar">
-      <button class="back-btn" onclick="window.history.back()">
-        ←
-      </button>
+      <button class="back-btn" onclick="window.history.back()">←</button>
       <div class="top-title">Profile</div>
-      <button
-        class="logout-btn"
-        onclick="window.location.href='{{ url_for('logout') }}'">
+      <button class="logout-btn" onclick="window.location.href='{{ url_for('logout') }}'">
         Logout
       </button>
     </header>
@@ -32,23 +33,26 @@
         <div class="profile-header">
           <div class="avatar-circle">
             <span class="avatar-letter">
-              {{ username[0]|upper if username else 'U' }}
+              {{ profile_name[0]|upper if profile_name else 'U' }}
             </span>
           </div>
 
           <div class="profile-main">
-            <div class="profile-name">{{ displayname or username or 'User' }}</div>
+            <div class="profile-name">{{ profile_name }}</div>
             <div class="profile-id">
-              ID: <span class="mono">{{ session.get('userid', '—') }}</span>
+              ID:
+              <span class="mono">
+                {{ session.get('userid') or session.get('user_id') or '—' }}
+              </span>
             </div>
             <div class="profile-joined">
-              Joined: {{ joinedat or 'Just now' }}
+              Joined: {{ joined_text }}
             </div>
           </div>
 
           <div class="profile-balance">
             <div class="label">Balance</div>
-            <div class="amount">₹{{ walletbalance or 0 }}</div>
+            <div class="amount">₹{{ wallet_amt }}</div>
           </div>
         </div>
 
@@ -59,7 +63,7 @@
               id="displayName"
               name="displayName"
               type="text"
-              value="{{ displayname or username or '' }}"
+              value="{{ profile_name }}"
               placeholder="Enter name to show in games"
             >
           </div>
@@ -129,7 +133,7 @@
           </div>
           <div class="summary-card">
             <div class="label">Current Balance</div>
-            <div class="value" id="sumBalance">₹{{ walletbalance or 0 }}</div>
+            <div class="value" id="sumBalance">₹{{ wallet_amt }}</div>
           </div>
         </div>
 
@@ -153,10 +157,10 @@
   </div>
 
   <script>
-    window.WALLET_BALANCE = {{ walletbalance or 0 }};
-    window.TRANSACTIONS = {{ (transactions or []) | tojson | safe }};
-    console.log("✅ TRANSACTIONS loaded:", window.TRANSACTIONS.length, "items");
-    console.log("✅ WALLET_BALANCE loaded:", window.WALLET_BALANCE);
+    window.WALLET_BALANCE = {{ wallet_amt | tojson }};
+    window.TRANSACTIONS = {{ txns | tojson | safe }};
+    console.log("TRANSACTIONS loaded:", window.TRANSACTIONS);
+    console.log("WALLET_BALANCE loaded:", window.WALLET_BALANCE);
   </script>
   <script src="{{ url_for('static', filename='js/profile.js') }}"></script>
 </body>
