@@ -1,5 +1,5 @@
 document.addEventListener("DOMContentLoaded", () => {
-  // ===== MAIN TABS (Profile / Coin Transactions) =====
+  // ===== MAIN TABS =====
   const tabs = document.querySelectorAll(".section-tabs .tab");
   const sections = {
     profile: document.getElementById("section-profile"),
@@ -63,7 +63,7 @@ document.addEventListener("DOMContentLoaded", () => {
     });
   }
 
-  // ===== COIN TRANSACTIONS =====
+  // ===== TRANSACTIONS =====
   const txnList = document.getElementById("txnList");
   const subTabs = document.querySelectorAll(".sub-tabs .sub-tab");
 
@@ -73,13 +73,10 @@ document.addEventListener("DOMContentLoaded", () => {
   const sumBalanceEl = document.getElementById("sumBalance");
 
   const txns = Array.isArray(window.TRANSACTIONS) ? window.TRANSACTIONS : [];
-  const walletBalanceFromTemplate =
-    typeof window.WALLET_BALANCE !== "undefined"
-      ? Number(window.WALLET_BALANCE || 0)
-      : 0;
+  const walletBalanceFromTemplate = Number(window.WALLET_BALANCE ?? 0) || 0;
 
-  console.log("✅ TRANSACTIONS from template:", txns.length, "items", txns);
-  console.log("✅ WALLET_BALANCE from template:", walletBalanceFromTemplate);
+  console.log("TRANSACTIONS:", txns);
+  console.log("WALLET_BALANCE:", walletBalanceFromTemplate);
 
   function formatDate(dateString) {
     return dateString || "";
@@ -90,8 +87,9 @@ document.addEventListener("DOMContentLoaded", () => {
       txn?.balanceafter ??
       txn?.balance_after ??
       txn?.balanceAfter ??
-      txn?.walletbalance ??
-      txn?.wallet_balance ??
+      txn?.current_balance ??
+      txn?.currentBalance ??
+      txn?.balance ??
       null;
 
     const parsed = Number(raw);
@@ -101,7 +99,7 @@ document.addEventListener("DOMContentLoaded", () => {
   function getLatestBalanceFromTransactions(list) {
     if (!Array.isArray(list) || !list.length) return null;
 
-    for (let i = list.length - 1; i >= 0; i--) {
+    for (let i = 0; i < list.length; i++) {
       const bal = getTxnBalance(list[i]);
       if (bal !== null) return bal;
     }
@@ -111,8 +109,6 @@ document.addEventListener("DOMContentLoaded", () => {
 
   function renderTransactions(filter = "all") {
     if (!txnList) return;
-
-    console.log("🔄 Rendering transactions with filter:", filter, "Total txns:", txns.length);
 
     if (!txns.length) {
       txnList.innerHTML = `
@@ -134,76 +130,48 @@ document.addEventListener("DOMContentLoaded", () => {
     let sumWin = 0;
 
     txns.forEach((t) => {
-      try {
-        const kind = String(t.kind || "").toLowerCase();
-        const amt = Number(t.amount || 0);
+      const kind = String(t.kind || "").toLowerCase();
+      const amt = Number(t.amount || 0);
 
-        if (kind === "added") sumAdded += amt;
-        else if (kind === "bet") sumBet += amt;
-        else if (kind === "win") sumWin += amt;
-      } catch (e) {
-        console.error("Error processing transaction:", t, e);
-      }
+      if (kind === "added") sumAdded += amt;
+      else if (kind === "bet") sumBet += amt;
+      else if (kind === "win") sumWin += amt;
     });
-
-    console.log("📊 Totals - Added:", sumAdded, "Bet:", sumBet, "Win:", sumWin);
 
     const filtered = txns.filter((t) => {
-      try {
-        const kind = String(t.kind || "").toLowerCase();
-        if (filter === "all") return true;
-        if (filter === "balance") return true;
-        return kind === filter;
-      } catch (e) {
-        console.error("Error filtering transaction:", t, e);
-        return false;
-      }
+      const kind = String(t.kind || "").toLowerCase();
+      if (filter === "all") return true;
+      if (filter === "balance") return true;
+      return kind === filter;
     });
 
-    console.log("✅ Filtered transactions:", filtered.length);
-
     const rows = filtered.map((t) => {
-      try {
-        const kind = String(t.kind || "other").toLowerCase();
-        let amountClass = "balance";
+      const kind = String(t.kind || "other").toLowerCase();
 
-        if (kind === "added") amountClass = "added";
-        else if (kind === "bet") amountClass = "bet";
-        else if (kind === "win") amountClass = "win";
+      let amountClass = "balance";
+      if (kind === "added") amountClass = "added";
+      else if (kind === "bet") amountClass = "bet";
+      else if (kind === "win") amountClass = "win";
 
-        const sign = kind === "bet" ? "-" : "+";
-        const amt = Number(t.amount || 0);
-        const formattedAmt = `${sign}₹${amt}`;
+      const sign = kind === "bet" ? "-" : "+";
+      const amt = Number(t.amount || 0);
+      const formattedAmt = `${sign}₹${amt}`;
 
-        const label = String(t.label || t.kind || "Transaction");
-        const gameInfo = String(t.gametitle || t.game_title || t.note || "");
-        const balanceAfter = getTxnBalance(t);
-        const safeBalanceAfter = balanceAfter !== null ? balanceAfter : walletBalanceFromTemplate;
+      const label = String(t.label || t.kind || "Transaction");
+      const gameInfo = String(t.gametitle || t.game_title || t.note || "");
 
-        console.log("TXN DEBUG:", t);
-        console.log("Balance parsed:", safeBalanceAfter);
+      const rowBalance = getTxnBalance(t);
+      const rowBalanceText = rowBalance !== null ? `₹${rowBalance}` : "-";
 
-        return `
-          <div class="txn-row">
-            <div class="txn-date">${formatDate(t.datetime)}</div>
-            <div class="txn-type">${label}</div>
-            <div class="txn-game">${gameInfo}</div>
-            <div class="txn-amount ${amountClass}">${formattedAmt}</div>
-            <div class="txn-after">₹${safeBalanceAfter}</div>
-          </div>
-        `;
-      } catch (e) {
-        console.error("Error rendering transaction row:", t, e);
-        return `
-          <div class="txn-row">
-            <div class="txn-date">Error</div>
-            <div class="txn-type">-</div>
-            <div class="txn-game">-</div>
-            <div class="txn-amount">-</div>
-            <div class="txn-after">-</div>
-          </div>
-        `;
-      }
+      return `
+        <div class="txn-row">
+          <div class="txn-date">${formatDate(t.datetime)}</div>
+          <div class="txn-type">${label}</div>
+          <div class="txn-game">${gameInfo}</div>
+          <div class="txn-amount ${amountClass}">${formattedAmt}</div>
+          <div class="txn-after">${rowBalanceText}</div>
+        </div>
+      `;
     });
 
     txnList.innerHTML = rows.join("");
@@ -216,9 +184,6 @@ document.addEventListener("DOMContentLoaded", () => {
     if (sumBalanceEl) {
       sumBalanceEl.textContent = `₹${latestBalance !== null ? latestBalance : walletBalanceFromTemplate}`;
     }
-
-    console.log("✅ Latest transaction balance:", latestBalance);
-    console.log("✅ Render complete");
   }
 
   subTabs.forEach((tab) => {
