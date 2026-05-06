@@ -11,6 +11,7 @@ const DEG_PER_SLOT = 360 / TOTAL_SLOTS;
 const POINTER_OFFSET_DEG = 0;
 const SPIN_DURATION_MS = 4200;
 const EXTRA_FULL_SPINS = 5;
+const RESULT_AUTO_BACK_MS = 10000;
 
 // ================= STATE =================
 let walletBalance = 0;
@@ -43,8 +44,10 @@ const resultAnimationPromises = new Map();
 
 let redirectScheduled = false;
 let isRoundFinalizing = false;
+let gameFinished = false;
 let tableStateInterval = null;
 let balanceInterval = null;
+let resultAutoBackTimer = null;
 
 // ================= AUDIO + VIBRATION =================
 const BG_AUDIO_SRC = "/static/audio/roulette.mp3";
@@ -86,7 +89,7 @@ function unlockAudioOnce() {
 });
 
 function startSpinLoop() {
-  if (!audioUnlocked) return;
+  if (!audioUnlocked || gameFinished) return;
   try {
     if (spinLoopAudio.paused) {
       spinLoopAudio.currentTime = 0;
@@ -179,7 +182,40 @@ window.addEventListener("unhandledrejection", (e) => {
 
 if (headerUsername) headerUsername.textContent = USERNAME || "Player";
 
-// ================= POPUP (Diamond-style, injected by JS) =================
+// ================= NAV HELPERS =================
+function getHomeUrl() {
+  return (
+    window.__HOME_URL__ ||
+    window.__REDIRECT_AFTER_GAME__ ||
+    "/home"
+  );
+}
+
+function getLobbyUrl() {
+  return (
+    window.__LOBBY_URL__ ||
+    `/game/${encodeURIComponent(GAMETYPE)}`
+  );
+}
+
+function clearResultAutoBackTimer() {
+  if (resultAutoBackTimer) {
+    clearTimeout(resultAutoBackTimer);
+    resultAutoBackTimer = null;
+  }
+}
+
+function goToHome() {
+  clearResultAutoBackTimer();
+  window.location.href = getHomeUrl();
+}
+
+function goToLobbyAfterRound() {
+  clearResultAutoBackTimer();
+  window.location.href = getLobbyUrl();
+}
+
+// ================= POPUP =================
 let resultPopupEl = null;
 let popupTitleEl = null;
 let popupMessageEl = null;
@@ -226,6 +262,12 @@ function injectPopupStylesOnce() {
       font-size: 14px;
       line-height: 1.55;
       color: rgba(255,255,255,0.9);
+      margin: 0 0 10px;
+    }
+    #resultPopup .popup-note {
+      font-size: 12px;
+      line-height: 1.45;
+      color: rgba(255,255,255,0.72);
       margin: 0 0 18px;
     }
     #resultPopup .popup-actions {
@@ -270,9 +312,10 @@ function ensureResultPopup() {
     <div class="popup-card">
       <h2 class="popup-title" id="popupTitle">Game Finished</h2>
       <p class="popup-message" id="popupMessage">This game has ended.</p>
+      <p class="popup-note" id="popupNote">If left inactive, you will be sent to Roulette Lobby automatically.</p>
       <div class="popup-actions">
         <button type="button" class="popup-btn home" id="popupHomeBtn">Home</button>
-        <button type="button" class="popup-btn lobby" id="popupLobbyBtn">Play Again</button>
+        <button type="button" class="popup-btn lobby" id="popupLobbyBtn">Roulette Lobby</button>
       </div>
     </div>
   `;
@@ -285,20 +328,11 @@ function ensureResultPopup() {
   popupLobbyBtn = resultPopupEl.querySelector("#popupLobbyBtn");
 
   if (popupHomeBtn) {
-    popupHomeBtn.addEventListener("click", () => {
-      const target =
-        window.__HOME_URL__ ||
-        window.__LOBBY_URL__ ||
-        window.__REDIRECT_AFTER_GAME__ ||
-        "/home";
-      window.location.href = target;
-    });
+    popupHomeBtn.addEventListener("click", goToHome);
   }
 
   if (popupLobbyBtn) {
-    popupLobbyBtn.addEventListener("click", () => {
-      window.location.href = `/game/${encodeURIComponent(GAMETYPE)}`;
-    });
+    popupLobbyBtn.addEventListener("click", goToLobbyAfterRound);
   }
 }
 
@@ -307,6 +341,11 @@ function showInlineResultPopup({ title, message }) {
   if (popupTitleEl) popupTitleEl.textContent = title || "Game Finished";
   if (popupMessageEl) popupMessageEl.textContent = message || "This game has ended.";
   if (resultPopupEl) resultPopupEl.classList.add("show");
+
+  clearResultAutoBackTimer();
+  resultAutoBackTimer = setTimeout(() => {
+    goToLobbyAfterRound();
+  }, RESULT_AUTO_BACK_MS);
 }
 
 // ================= HELPERS =================
@@ -329,7 +368,7 @@ function toNumOrNull(v) {
 }
 
 function toBool(v) {
-  return v === true || v === 1 || v === "1";
+  return v === true || v === 1 || v === "1" || v === "true";
 }
 
 function normalizeTable(raw) {
@@ -343,8 +382,8 @@ function normalizeTable(raw) {
   const roundCode = getVal(raw, "round_code", "roundcode", "roundCode") || null;
   const result = toNumOrNull(getVal(raw, "result", "winning_number", "winningNumber"));
   const timeRemaining = toIntOrNull(getVal(raw, "time_remaining", "timeremaining", "timeRemaining"));
-  const isBettingClosed = Boolean(getVal(raw, "is_betting_closed", "isbettingclosed")) || false;
-  const isFinished = Boolean(getVal(raw, "is_finished", "isfinished")) || false;
+  const isBettingClosed = toBool(getVal(raw, "is_betting_closed", "isbettingclosed"));
+  const isFinished = toBool(getVal(raw, "is_finished", "isfinished"));
   const isStartedRaw = getVal(raw, "is_started", "isstarted");
   const isStarted = isStartedRaw === undefined ? true : toBool(isStartedRaw);
 
@@ -435,16 +474,6 @@ function derivePhaseFromTable(t) {
   return "betting_open";
 }
 
-function goToLobbyAfterRound() {
-  const target =
-    window.__LOBBY_URL__ ||
-    window.__HOME_URL__ ||
-    window.__REDIRECT_AFTER_GAME__ ||
-    "/home";
-
-  window.location.replace(target);
-}
-
 // ================= UI HELPERS =================
 function setStatus(msg, type = "") {
   if (!statusEl) return;
@@ -518,7 +547,7 @@ function toggleSelectedNumber(n) {
 
 function applyLockedStateToChips() {
   const myBetNumbers = new Set(getMyBetNumbers());
-  const bettingOpen = currentPhase === "betting_open";
+  const bettingOpen = currentPhase === "betting_open" && !gameFinished;
 
   document.querySelectorAll(".num-chip").forEach((chip) => {
     const n = parseInt(chip.dataset.number, 10);
@@ -569,8 +598,8 @@ async function showRoundResultPopup(resultNumber, roundCode = currentRoundCode) 
 
   const title = isWin ? "Congratulations!" : "Hard Luck!";
   const message = isWin
-    ? `Winning number is ${resultNumber}. You have won the game. Please keep playing to keep your winning chances high.`
-    : `Winning number is ${resultNumber}. You have lost the game. Please keep playing to keep your winning chances high.`;
+    ? `Winning number is ${resultNumber}. You have won this game.`
+    : `Winning number is ${resultNumber}. You have lost this game.`;
 
   showInlineResultPopup({ title, message });
 }
@@ -578,11 +607,12 @@ async function showRoundResultPopup(resultNumber, roundCode = currentRoundCode) 
 function refreshControls(socketConnected) {
   const myBetCount = getMyBetNumbers().length;
   const canSelectMore = (myBetCount + selectedNumbers.size) <= maxBetsPerUser;
-  const bettingOpen = currentPhase === "betting_open";
+  const bettingOpen = currentPhase === "betting_open" && !gameFinished;
 
   if (placeBetBtn) {
     placeBetBtn.disabled =
       isSpinning ||
+      gameFinished ||
       !socketConnected ||
       !bettingOpen ||
       selectedNumbers.size === 0 ||
@@ -609,7 +639,7 @@ function createNumberGrid() {
 
     btn.addEventListener("click", () => {
       unlockAudioOnce();
-      if (isSpinning) return;
+      if (isSpinning || gameFinished) return;
 
       const myBetNumbers = new Set(getMyBetNumbers());
 
@@ -719,13 +749,13 @@ function stopFreeSpin() {
 }
 
 function startFreeSpin() {
-  if (!wheelRotateEl || freeSpinActive) return;
+  if (!wheelRotateEl || freeSpinActive || gameFinished) return;
 
   stopFreeSpin();
   freeSpinActive = true;
 
   const step = () => {
-    if (!freeSpinActive) return;
+    if (!freeSpinActive || gameFinished) return;
     lastRotationDeg += 8;
     wheelRotateEl.style.transition = "none";
     wheelRotateEl.style.transform = `rotate(${lastRotationDeg}deg)`;
@@ -736,7 +766,7 @@ function startFreeSpin() {
 }
 
 function startSpinPhase(roundCode = currentRoundCode) {
-  if (!roundCode || redirectScheduled) return;
+  if (!roundCode || redirectScheduled || gameFinished) return;
   if (spinStartedRounds.has(roundCode)) return;
 
   spinStartedRounds.add(roundCode);
@@ -750,7 +780,7 @@ function startSpinPhase(roundCode = currentRoundCode) {
 }
 
 function spinToServerResult(targetNumber, roundCode = currentRoundCode) {
-  if (!wheelRotateEl) return;
+  if (!wheelRotateEl || gameFinished) return;
   if (!roundCode) return;
 
   stopFreeSpin();
@@ -815,14 +845,15 @@ function animateResultOnce(resultNumber, roundCode = currentRoundCode) {
   return promise;
 }
 
-async function finalizeRoundOnce(resultNumber, roundCode = currentRoundCode) {
-  if (!roundCode) return;
-  if (popupShownRounds.has(roundCode)) return;
-
-  popupShownRounds.add(roundCode);
+function stopAllRoundActivity() {
+  gameFinished = true;
   redirectScheduled = true;
   isRoundFinalizing = true;
   currentPhase = "finished";
+
+  stopSpinLoop();
+  stopFreeSpin();
+  isSpinning = false;
 
   if (tableStateInterval) {
     clearInterval(tableStateInterval);
@@ -833,6 +864,14 @@ async function finalizeRoundOnce(resultNumber, roundCode = currentRoundCode) {
     clearInterval(balanceInterval);
     balanceInterval = null;
   }
+}
+
+async function finalizeRoundOnce(resultNumber, roundCode = currentRoundCode) {
+  if (!roundCode) return;
+  if (popupShownRounds.has(roundCode)) return;
+
+  popupShownRounds.add(roundCode);
+  stopAllRoundActivity();
 
   let finalNumber = resultNumber;
 
@@ -856,6 +895,12 @@ async function finalizeRoundOnce(resultNumber, roundCode = currentRoundCode) {
   }
 
   await fetchBalance();
+
+  if (socket) {
+    try {
+      socket.disconnect();
+    } catch (e) {}
+  }
 }
 
 // ================= HTTP =================
@@ -874,7 +919,7 @@ async function fetchBalance() {
 }
 
 function applyTableState(t) {
-  if (!t || redirectScheduled) return;
+  if (!t || redirectScheduled || gameFinished) return;
   if (t.game_type && t.game_type !== GAMETYPE) return;
 
   if (
@@ -959,7 +1004,7 @@ function applyTableState(t) {
 }
 
 async function fetchRouletteTableState() {
-  if (redirectScheduled) return;
+  if (redirectScheduled || gameFinished) return;
 
   try {
     const res = await fetch(`/api/tables/${encodeURIComponent(GAMETYPE)}`, {
@@ -1003,6 +1048,11 @@ function initSocket() {
   });
 
   socket.on("connect", () => {
+    if (gameFinished) {
+      try { socket.disconnect(); } catch (e) {}
+      return;
+    }
+
     socketConnected = true;
     console.log("[Roulette] socket connected:", socket.id);
     setStatus("");
@@ -1016,6 +1066,7 @@ function initSocket() {
   });
 
   socket.on("connect_error", (err) => {
+    if (gameFinished) return;
     socketConnected = false;
     console.error("[Roulette] connect_error:", err);
     setStatus(`Socket error: ${err?.message || err}`, "error");
@@ -1025,21 +1076,21 @@ function initSocket() {
   socket.on("disconnect", (reason) => {
     socketConnected = false;
     console.warn("[Roulette] socket disconnected:", reason);
-    if (!redirectScheduled) {
+    if (!redirectScheduled && !gameFinished) {
       setStatus("Socket disconnected. Refresh page.", "error");
     }
     refreshControls(false);
   });
 
   socket.on("bet_error", (data) => {
-    if (redirectScheduled) return;
+    if (redirectScheduled || gameFinished) return;
     setStatus(data?.message || "Bet rejected.", "error");
     fetchBalance();
     fetchRouletteTableState();
   });
 
   socket.on("bet_success", (data) => {
-    if (redirectScheduled) return;
+    if (redirectScheduled || gameFinished) return;
 
     if (typeof data?.new_balance === "number") {
       walletBalance = data.new_balance;
@@ -1085,7 +1136,7 @@ function initSocket() {
   });
 
   socket.on("update_table", (payload) => {
-    if (redirectScheduled) return;
+    if (redirectScheduled || gameFinished) return;
     const t = normalizeTable(payload);
     if (!t) return;
     if (t.game_type && t.game_type !== GAMETYPE) return;
@@ -1094,7 +1145,7 @@ function initSocket() {
   });
 
   socket.on("spin_started", (payload) => {
-    if (redirectScheduled) return;
+    if (redirectScheduled || gameFinished) return;
     const t = normalizeTable(payload);
     if (!t) return;
     if (t.game_type && t.game_type !== GAMETYPE) return;
@@ -1104,7 +1155,7 @@ function initSocket() {
   });
 
   socket.on("roulette_spin_start", (payload) => {
-    if (redirectScheduled) return;
+    if (redirectScheduled || gameFinished) return;
     const t = normalizeTable(payload);
     if (!t) return;
     if (t.game_type && t.game_type !== GAMETYPE) return;
@@ -1114,7 +1165,7 @@ function initSocket() {
   });
 
   socket.on("result_declared", (payload) => {
-    if (redirectScheduled) return;
+    if (redirectScheduled || gameFinished) return;
     const t = normalizeTable(payload);
     if (!t) return;
     if (t.game_type && t.game_type !== GAMETYPE) return;
@@ -1127,7 +1178,7 @@ function initSocket() {
   });
 
   socket.on("roulette_result", (payload) => {
-    if (redirectScheduled) return;
+    if (redirectScheduled || gameFinished) return;
     const t = normalizeTable(payload);
     if (!t) return;
     if (t.game_type && t.game_type !== GAMETYPE) return;
@@ -1140,6 +1191,7 @@ function initSocket() {
   });
 
   socket.on("round_finished", (payload) => {
+    if (redirectScheduled || gameFinished) return;
     const t = normalizeTable(payload);
     if (!t) return;
     if (t.game_type && t.game_type !== GAMETYPE) return;
@@ -1153,7 +1205,7 @@ function initSocket() {
 // ================= ACTIONS =================
 function handlePlaceBet() {
   unlockAudioOnce();
-  if (isSpinning || redirectScheduled) return;
+  if (isSpinning || redirectScheduled || gameFinished) return;
 
   if (!USER_ID) {
     setStatus("Login missing (user id is null). Logout + login again.", "error");
@@ -1186,6 +1238,8 @@ function handlePlaceBet() {
 
   numbers.forEach((number, index) => {
     setTimeout(() => {
+      if (gameFinished || redirectScheduled || !socketConnected || !socket) return;
+
       socket.emit("place_bet", {
         game_type: GAMETYPE,
         user_id: USER_ID,
