@@ -1,5 +1,3 @@
-// profile.js - FIXED VERSION
-
 document.addEventListener("DOMContentLoaded", () => {
   // ===== MAIN TABS (Profile / Coin Transactions) =====
   const tabs = document.querySelectorAll(".section-tabs .tab");
@@ -87,14 +85,28 @@ document.addEventListener("DOMContentLoaded", () => {
     return dateString || "";
   }
 
+  function getTxnBalance(txn) {
+    const raw =
+      txn?.balanceafter ??
+      txn?.balance_after ??
+      txn?.balanceAfter ??
+      txn?.walletbalance ??
+      txn?.wallet_balance ??
+      null;
+
+    const parsed = Number(raw);
+    return Number.isFinite(parsed) ? parsed : null;
+  }
+
   function getLatestBalanceFromTransactions(list) {
     if (!Array.isArray(list) || !list.length) return null;
 
-    const lastTxn = list[list.length - 1];
-    if (!lastTxn) return null;
+    for (let i = list.length - 1; i >= 0; i--) {
+      const bal = getTxnBalance(list[i]);
+      if (bal !== null) return bal;
+    }
 
-    const bal = Number(lastTxn.balanceafter);
-    return Number.isFinite(bal) ? bal : null;
+    return null;
   }
 
   function renderTransactions(filter = "all") {
@@ -164,8 +176,12 @@ document.addEventListener("DOMContentLoaded", () => {
         const formattedAmt = `${sign}₹${amt}`;
 
         const label = String(t.label || t.kind || "Transaction");
-        const gameInfo = String(t.gametitle || t.note || "");
-        const balanceAfter = Number(t.balanceafter || 0);
+        const gameInfo = String(t.gametitle || t.game_title || t.note || "");
+        const balanceAfter = getTxnBalance(t);
+        const safeBalanceAfter = balanceAfter !== null ? balanceAfter : walletBalanceFromTemplate;
+
+        console.log("TXN DEBUG:", t);
+        console.log("Balance parsed:", safeBalanceAfter);
 
         return `
           <div class="txn-row">
@@ -173,7 +189,7 @@ document.addEventListener("DOMContentLoaded", () => {
             <div class="txn-type">${label}</div>
             <div class="txn-game">${gameInfo}</div>
             <div class="txn-amount ${amountClass}">${formattedAmt}</div>
-            <div class="txn-after">₹${balanceAfter}</div>
+            <div class="txn-after">₹${safeBalanceAfter}</div>
           </div>
         `;
       } catch (e) {
