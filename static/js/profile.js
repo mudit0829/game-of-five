@@ -1,4 +1,4 @@
-// profile.js - FIXED VERSION (NO API NEEDED)
+// profile.js - FIXED VERSION
 
 document.addEventListener("DOMContentLoaded", () => {
   // ===== MAIN TABS (Profile / Coin Transactions) =====
@@ -9,30 +9,27 @@ document.addEventListener("DOMContentLoaded", () => {
   };
 
   function showSection(name) {
-    // hide all sections
-    Object.values(sections).forEach(sec => {
+    Object.values(sections).forEach((sec) => {
       if (!sec) return;
       sec.classList.remove("active-section");
     });
 
-    // show requested section
     if (sections[name]) {
       sections[name].classList.add("active-section");
     }
 
-    // update active tab styling
-    tabs.forEach(tab => {
+    tabs.forEach((tab) => {
       tab.classList.toggle("active", tab.dataset.target === name);
     });
   }
 
-  tabs.forEach(tab => {
+  tabs.forEach((tab) => {
     tab.addEventListener("click", () => {
       showSection(tab.dataset.target);
     });
   });
 
-  showSection("profile"); // default
+  showSection("profile");
 
   // ===== SAVE PROFILE =====
   const saveProfileBtn = document.getElementById("saveProfileBtn");
@@ -41,10 +38,10 @@ document.addEventListener("DOMContentLoaded", () => {
   if (saveProfileBtn && profileStatus) {
     saveProfileBtn.addEventListener("click", async () => {
       const payload = {
-        displayName: document.getElementById("displayName").value || "",
-        email: document.getElementById("email").value || "",
-        country: document.getElementById("country").value || "",
-        phone: document.getElementById("phone").value || "",
+        displayName: document.getElementById("displayName")?.value || "",
+        email: document.getElementById("email")?.value || "",
+        country: document.getElementById("country")?.value || "",
+        phone: document.getElementById("phone")?.value || "",
       };
 
       try {
@@ -53,7 +50,9 @@ document.addEventListener("DOMContentLoaded", () => {
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(payload),
         });
+
         const data = await res.json();
+
         if (data.success) {
           profileStatus.textContent = "Profile saved successfully.";
         } else {
@@ -75,20 +74,34 @@ document.addEventListener("DOMContentLoaded", () => {
   const sumWinEl = document.getElementById("sumWin");
   const sumBalanceEl = document.getElementById("sumBalance");
 
-  // ✅ GET TRANSACTIONS FROM WINDOW (SET BY TEMPLATE)
   const txns = Array.isArray(window.TRANSACTIONS) ? window.TRANSACTIONS : [];
-  
+  const walletBalanceFromTemplate =
+    typeof window.WALLET_BALANCE !== "undefined"
+      ? Number(window.WALLET_BALANCE || 0)
+      : 0;
+
   console.log("✅ TRANSACTIONS from template:", txns.length, "items", txns);
+  console.log("✅ WALLET_BALANCE from template:", walletBalanceFromTemplate);
 
   function formatDate(dateString) {
-  return dateString || "";
-}
+    return dateString || "";
+  }
+
+  function getLatestBalanceFromTransactions(list) {
+    if (!Array.isArray(list) || !list.length) return null;
+
+    const lastTxn = list[list.length - 1];
+    if (!lastTxn) return null;
+
+    const bal = Number(lastTxn.balanceafter);
+    return Number.isFinite(bal) ? bal : null;
+  }
+
   function renderTransactions(filter = "all") {
     if (!txnList) return;
 
     console.log("🔄 Rendering transactions with filter:", filter, "Total txns:", txns.length);
 
-    // no transactions → show empty state
     if (!txns.length) {
       txnList.innerHTML = `
         <div class="empty-state">
@@ -96,21 +109,23 @@ document.addEventListener("DOMContentLoaded", () => {
           Your deposits, bets and winnings will appear here.
         </div>
       `;
+
       if (sumAddedEl) sumAddedEl.textContent = "₹0";
       if (sumBetEl) sumBetEl.textContent = "₹0";
       if (sumWinEl) sumWinEl.textContent = "₹0";
-      if (sumBalanceEl && typeof WALLET_BALANCE !== "undefined") {
-        sumBalanceEl.textContent = `₹${WALLET_BALANCE}`;
-      }
+      if (sumBalanceEl) sumBalanceEl.textContent = `₹${walletBalanceFromTemplate}`;
       return;
     }
 
-    // compute totals
-    let sumAdded = 0, sumBet = 0, sumWin = 0;
-    txns.forEach(t => {
+    let sumAdded = 0;
+    let sumBet = 0;
+    let sumWin = 0;
+
+    txns.forEach((t) => {
       try {
         const kind = String(t.kind || "").toLowerCase();
         const amt = Number(t.amount || 0);
+
         if (kind === "added") sumAdded += amt;
         else if (kind === "bet") sumBet += amt;
         else if (kind === "win") sumWin += amt;
@@ -121,8 +136,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
     console.log("📊 Totals - Added:", sumAdded, "Bet:", sumBet, "Win:", sumWin);
 
-    // apply filter
-    const filtered = txns.filter(t => {
+    const filtered = txns.filter((t) => {
       try {
         const kind = String(t.kind || "").toLowerCase();
         if (filter === "all") return true;
@@ -136,16 +150,16 @@ document.addEventListener("DOMContentLoaded", () => {
 
     console.log("✅ Filtered transactions:", filtered.length);
 
-    // build rows
-    const rows = filtered.map(t => {
+    const rows = filtered.map((t) => {
       try {
         const kind = String(t.kind || "other").toLowerCase();
         let amountClass = "balance";
+
         if (kind === "added") amountClass = "added";
         else if (kind === "bet") amountClass = "bet";
         else if (kind === "win") amountClass = "win";
 
-        const sign = (kind === "bet") ? "-" : "+";
+        const sign = kind === "bet" ? "-" : "+";
         const amt = Number(t.amount || 0);
         const formattedAmt = `${sign}₹${amt}`;
 
@@ -178,28 +192,29 @@ document.addEventListener("DOMContentLoaded", () => {
 
     txnList.innerHTML = rows.join("");
 
-    // update summary cards
     if (sumAddedEl) sumAddedEl.textContent = `₹${sumAdded}`;
     if (sumBetEl) sumBetEl.textContent = `₹${sumBet}`;
     if (sumWinEl) sumWinEl.textContent = `₹${sumWin}`;
-    if (sumBalanceEl && typeof WALLET_BALANCE !== "undefined") {
-      sumBalanceEl.textContent = `₹${WALLET_BALANCE}`;
+
+    const latestBalance = getLatestBalanceFromTransactions(txns);
+    if (sumBalanceEl) {
+      sumBalanceEl.textContent = `₹${latestBalance !== null ? latestBalance : walletBalanceFromTemplate}`;
     }
 
+    console.log("✅ Latest transaction balance:", latestBalance);
     console.log("✅ Render complete");
   }
 
-  subTabs.forEach(tab => {
+  subTabs.forEach((tab) => {
     tab.addEventListener("click", () => {
       const filter = tab.dataset.filter || "all";
 
-      subTabs.forEach(st => st.classList.remove("active"));
+      subTabs.forEach((st) => st.classList.remove("active"));
       tab.classList.add("active");
 
       renderTransactions(filter);
     });
   });
 
-  // Initial render
   renderTransactions("all");
 });
