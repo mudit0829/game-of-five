@@ -3144,7 +3144,7 @@ def api_admin_store_products():
     ])
 
 @app.route("/api/admin/wallet/transfers", methods=["GET"])
-@adminrequired
+@admin_required
 def apiadminwallettransfers():
     rows = WalletTransfer.query.order_by(WalletTransfer.createdat.desc()).limit(500).all()
     out = []
@@ -3164,7 +3164,7 @@ def apiadminwallettransfers():
 
 
 @app.route("/api/admin/wallet/purchase-credits", methods=["GET"])
-@adminrequired
+@admin_required
 def apiadminwalletpurchasecredits():
     rows = StoreTransaction.query.filter_by(kind="external_store_credit").order_by(
         StoreTransaction.createdat.desc()
