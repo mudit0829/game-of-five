@@ -2736,7 +2736,7 @@ def external_store_wallet_balance(userid):
 
 
 @app.route("/api/wallet/summary", methods=["GET"])
-@loginrequired
+@login_required
 def apiwalletsummary():
     user = getcurrentloggedinuser()
     if not user:
@@ -2766,7 +2766,7 @@ def apiwalletsummary():
 
 
 @app.route("/api/wallet/history", methods=["GET"])
-@loginrequired
+@login_required
 def apiwallethistory():
     user = getcurrentloggedinuser()
     if not user:
