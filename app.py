@@ -80,6 +80,8 @@ SUPERADMIN_PASSWORD = "SuperPass@2026"  # âœ… Change this
 APP_TIMEZONE = "Asia/Kolkata"
 IST = ZoneInfo("Asia/Kolkata")
 
+STORE_API_SECRET = os.environ.get("STORE_API_SECRET", "change-this-store-secret-now")
+
 def as_utc(dt: datetime) -> datetime:
     # Treat naive datetimes as UTC (your code uses datetime.utcnow() everywhere)
     if dt is None:
@@ -1161,6 +1163,10 @@ def ensure_store_wallet_for_user(user, starting_balance=0):
         db.session.commit()
     return wallet
 
+
+def verify_store_api_request(req):
+    token = (req.headers.get("X-Store-Secret") or "").strip()
+    return bool(token) and token == STORE_API_SECRET
 
 def get_current_logged_in_user():
     uid = _get_session_user_id()
@@ -2603,6 +2609,222 @@ def api_store_wallet():
         store_balance=int(store_wallet.balance or 0) if store_wallet else 0,
     )
 
+@app.route("/api/external/store/credit-game-wallet", methods=["POST"])
+def external_credit_game_wallet():
+    if not verify_store_api_request(request):
+        return jsonify({"success": False, "message": "Unauthorized"}), 401
+
+    data = request.get_json(silent=True) or {}
+    userid = safeint(data.get("userid"), 0)
+    cardvalue = safeint(data.get("cardvalue"), 0)
+    quantity = safeint(data.get("quantity"), 1)
+    payment_ref = (data.get("payment_ref") or "").strip()
+    note = (data.get("note") or "").strip()
+
+    if userid <= 0:
+        return jsonify({"success": False, "message": "Invalid userid"}), 400
+    if cardvalue not in ALLOWEDCARDVALUES:
+        return jsonify({"success": False, "message": "Invalid card value"}), 400
+    if quantity <= 0:
+        return jsonify({"success": False, "message": "Invalid quantity"}), 400
+    if not payment_ref:
+        return jsonify({"success": False, "message": "payment_ref required"}), 400
+
+    user = User.query.get(userid)
+    if not user or getattr(user, "isadmin", False):
+        return jsonify({"success": False, "message": "User not found"}), 404
+
+    existing_ref = StoreTransaction.query.filter_by(
+        userid=user.id,
+        kind="external_store_credit",
+        reference=payment_ref
+    ).first()
+    if existing_ref:
+        gamewallet = ensurewalletforuser(user, startingbalance=0)
+        storewallet = ensurestorewalletforuser(user, startingbalance=0)
+        return jsonify({
+            "success": True,
+            "message": "Already processed",
+            "userid": user.id,
+            "gamebalance": int(gamewallet.balance or 0) if gamewallet else 0,
+            "storebalance": int(storewallet.balance or 0) if storewallet else 0,
+            "reference": payment_ref
+        })
+
+    totalcoins = cardvalue * quantity
+
+    try:
+        gamewallet = ensurewalletforuser(user, startingbalance=0)
+        storewallet = ensurestorewalletforuser(user, startingbalance=0)
+
+        gamewallet.balance = int(gamewallet.balance or 0) + totalcoins
+
+        gametx = Transaction(
+            userid=user.id,
+            kind="added",
+            amount=totalcoins,
+            balanceafter=int(gamewallet.balance or 0),
+            label="Point Card Added",
+            gametitle="External Store Card",
+            note=note or f"External store purchase {payment_ref}"
+        )
+
+        storeaudit = StoreTransaction(
+            userid=user.id,
+            kind="external_store_credit",
+            amount=totalcoins,
+            balanceafter=int(storewallet.balance or 0),
+            label="External Store Purchase",
+            note=note or f"Credited to game wallet via store order {payment_ref}",
+            reference=payment_ref
+        )
+
+        purchase = PointCardPurchase(
+            userid=user.id,
+            cardvalue=cardvalue,
+            quantity=quantity,
+            totalcoins=totalcoins,
+            paymentstatus="PAID"
+        )
+
+        transfer = WalletTransfer(
+            userid=user.id,
+            direction="STORETOGAME",
+            amount=totalcoins,
+            status="SUCCESS",
+            note=f"External store credit ref {payment_ref}"
+        )
+
+        db.session.add(gametx)
+        db.session.add(storeaudit)
+        db.session.add(purchase)
+        db.session.add(transfer)
+        db.session.commit()
+
+        return jsonify({
+            "success": True,
+            "message": "Game wallet credited successfully",
+            "userid": user.id,
+            "addedcoins": totalcoins,
+            "gamebalance": int(gamewallet.balance or 0),
+            "storebalance": int(storewallet.balance or 0),
+            "reference": payment_ref
+        })
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({"success": False, "message": f"Credit failed: {str(e)}"}), 500
+
+
+@app.route("/api/external/store/wallet-balance/<int:userid>", methods=["GET"])
+def external_store_wallet_balance(userid):
+    if not verify_store_api_request(request):
+        return jsonify({"success": False, "message": "Unauthorized"}), 401
+
+    user = User.query.get(userid)
+    if not user or getattr(user, "isadmin", False):
+        return jsonify({"success": False, "message": "User not found"}), 404
+
+    gamewallet = ensurewalletforuser(user, startingbalance=0)
+    storewallet = ensurestorewalletforuser(user, startingbalance=0)
+
+    return jsonify({
+        "success": True,
+        "userid": user.id,
+        "gamebalance": int(gamewallet.balance or 0) if gamewallet else 0,
+        "storebalance": int(storewallet.balance or 0) if storewallet else 0
+    })
+
+
+@app.route("/api/wallet/summary", methods=["GET"])
+@loginrequired
+def apiwalletsummary():
+    user = getcurrentloggedinuser()
+    if not user:
+        return jsonify({"success": False, "message": "User not found"}), 404
+
+    gamewallet = ensurewalletforuser(user, startingbalance=0)
+    storewallet = ensurestorewalletforuser(user, startingbalance=0)
+
+    recent = WalletTransfer.query.filter_by(userid=user.id).order_by(WalletTransfer.createdat.desc()).limit(10).all()
+
+    return jsonify({
+        "success": True,
+        "gamebalance": int(gamewallet.balance or 0) if gamewallet else 0,
+        "storebalance": int(storewallet.balance or 0) if storewallet else 0,
+        "recent_transfers": [
+            {
+                "id": r.id,
+                "direction": r.direction,
+                "amount": int(r.amount or 0),
+                "status": r.status or "",
+                "note": r.note or "",
+                "createdat": fmtist(r.createdat, "%d %b %Y, %I:%M %p") if r.createdat else ""
+            }
+            for r in recent
+        ]
+    })
+
+
+@app.route("/api/wallet/history", methods=["GET"])
+@loginrequired
+def apiwallethistory():
+    user = getcurrentloggedinuser()
+    if not user:
+        return jsonify({"success": False, "message": "User not found"}), 404
+
+    game_rows = Transaction.query.filter_by(userid=user.id).filter(
+        Transaction.kind.in_(["added", "redeem"])
+    ).order_by(Transaction.datetime.desc()).limit(100).all()
+
+    store_rows = StoreTransaction.query.filter_by(userid=user.id).order_by(
+        StoreTransaction.createdat.desc()
+    ).limit(100).all()
+
+    transfer_rows = WalletTransfer.query.filter_by(userid=user.id).order_by(
+        WalletTransfer.createdat.desc()
+    ).limit(100).all()
+
+    return jsonify({
+        "success": True,
+        "game_transactions": [
+            {
+                "id": t.id,
+                "kind": t.kind,
+                "amount": int(t.amount or 0),
+                "balanceafter": int(t.balanceafter or 0),
+                "label": t.label or "",
+                "gametitle": t.gametitle or "",
+                "note": t.note or "",
+                "datetime": fmtist(t.datetime, "%d %b %Y, %I:%M %p") if t.datetime else ""
+            }
+            for t in game_rows
+        ],
+        "store_transactions": [
+            {
+                "id": s.id,
+                "kind": s.kind,
+                "amount": int(s.amount or 0),
+                "balanceafter": int(s.balanceafter or 0),
+                "label": s.label or "",
+                "note": s.note or "",
+                "reference": s.reference or "",
+                "createdat": fmtist(s.createdat, "%d %b %Y, %I:%M %p") if s.createdat else ""
+            }
+            for s in store_rows
+        ],
+        "transfers": [
+            {
+                "id": w.id,
+                "direction": w.direction,
+                "amount": int(w.amount or 0),
+                "status": w.status or "",
+                "note": w.note or "",
+                "createdat": fmtist(w.createdat, "%d %b %Y, %I:%M %p") if w.createdat else ""
+            }
+            for w in transfer_rows
+        ]
+    })
+
 
 @app.route("/api/store/buy-card", methods=["POST"])
 @login_required
@@ -2673,6 +2895,7 @@ def buy_card():
         return jsonify(success=False, message=f"Buy card failed: {str(e)}"), 500
 
 
+@app.route("/api/wallet/redeem-to-store", methods=["POST"])
 @app.route("/api/store/redeem-from-game", methods=["POST"])
 @login_required
 def redeem_from_game():
@@ -2919,6 +3142,50 @@ def api_admin_store_products():
         }
         for p in products
     ])
+
+@app.route("/api/admin/wallet/transfers", methods=["GET"])
+@adminrequired
+def apiadminwallettransfers():
+    rows = WalletTransfer.query.order_by(WalletTransfer.createdat.desc()).limit(500).all()
+    out = []
+    for r in rows:
+        u = User.query.get(r.userid)
+        out.append({
+            "id": r.id,
+            "userid": r.userid,
+            "username": u.username if u else "Unknown",
+            "direction": r.direction,
+            "amount": int(r.amount or 0),
+            "status": r.status or "",
+            "note": r.note or "",
+            "createdat": fmtist(r.createdat, "%d %b %Y, %I:%M %p") if r.createdat else ""
+        })
+    return jsonify({"success": True, "items": out})
+
+
+@app.route("/api/admin/wallet/purchase-credits", methods=["GET"])
+@adminrequired
+def apiadminwalletpurchasecredits():
+    rows = StoreTransaction.query.filter_by(kind="external_store_credit").order_by(
+        StoreTransaction.createdat.desc()
+    ).limit(500).all()
+
+    out = []
+    for r in rows:
+        u = User.query.get(r.userid)
+        out.append({
+            "id": r.id,
+            "userid": r.userid,
+            "username": u.username if u else "Unknown",
+            "amount": int(r.amount or 0),
+            "balanceafter": int(r.balanceafter or 0),
+            "label": r.label or "",
+            "note": r.note or "",
+            "reference": r.reference or "",
+            "createdat": fmtist(r.createdat, "%d %b %Y, %I:%M %p") if r.createdat else ""
+        })
+
+    return jsonify({"success": True, "items": out})
 
 @app.route("/api/store/addresses", methods=["GET", "POST"])
 @login_required
