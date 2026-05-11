@@ -352,15 +352,17 @@
     .loading { text-align: center; padding: 60px 20px; color: #94a3b8; font-size: 16px; }
     .no-data { text-align: center; padding: 60px 20px; color: #64748b; font-size: 15px; }
 
+    /* ===== MODAL FIX: header always visible, body scrollable ===== */
     .modal {
       display: none !important;
       position: fixed;
       top: 0; left: 0; right: 0; bottom: 0;
-      background: rgba(0,0,0,0.7);
+      background: rgba(0,0,0,0.75);
       z-index: 1000;
-      align-items: center;
+      align-items: flex-start;
       justify-content: center;
       overflow-y: auto;
+      padding: 24px 16px;
     }
     .modal.active { display: flex !important; }
 
@@ -368,16 +370,48 @@
       background: #1e293b;
       border: 2px solid #334155;
       border-radius: 12px;
-      padding: 40px;
+      padding: 0;
       width: 90%;
-      max-width: 650px;
-      box-shadow: 0 20px 60px rgba(0,0,0,0.5);
-      margin: 20px auto;
+      max-width: 680px;
+      max-height: calc(100vh - 48px);
+      box-shadow: 0 20px 60px rgba(0,0,0,0.6);
+      margin: 0 auto;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
     }
 
-    .modal-header { margin-bottom: 25px; }
-    .modal-header h2 { color: #e2e8f0; font-size: 24px; margin: 0; font-weight: bold; }
-    .modal-header p { color: #94a3b8; margin: 8px 0 0 0; }
+    /* Sticky header inside modal */
+    .modal-sticky-header {
+      padding: 22px 28px 18px 28px;
+      border-bottom: 2px solid #334155;
+      background: #1e293b;
+      border-radius: 12px 12px 0 0;
+      flex-shrink: 0;
+    }
+    .modal-sticky-header h2 {
+      color: #e2e8f0;
+      font-size: 22px;
+      margin: 0;
+      font-weight: bold;
+    }
+    .modal-sticky-header p {
+      color: #94a3b8;
+      margin: 6px 0 0 0;
+      font-size: 14px;
+    }
+
+    /* Scrollable body inside modal */
+    .modal-body-scroll {
+      overflow-y: auto;
+      padding: 24px 28px 28px 28px;
+      flex: 1;
+    }
+
+    /* Keep old .modal-header for non-query modals that use simple layout */
+    .modal-header { margin-bottom: 20px; }
+    .modal-header h2 { color: #e2e8f0; font-size: 22px; margin: 0; font-weight: bold; }
+    .modal-header p { color: #94a3b8; margin: 6px 0 0 0; }
 
     .form-group { margin-bottom: 20px; }
 
@@ -469,7 +503,8 @@
         position: relative;
       }
       .main-content { width: 100%; margin-left: 0; }
-      .modal-content { width: 95%; }
+      .modal-content { width: 98%; max-height: calc(100vh - 32px); }
+      .modal { padding: 16px 8px; }
       .details-grid { grid-template-columns: 1fr; }
       .form-row { grid-template-columns: 1fr; }
     }
@@ -490,7 +525,6 @@
         <li><a class="menu-link" data-section="transactions">💰 Transactions</a></li>
         <li><a class="menu-link" data-section="referrals">👨‍👩‍👧‍👦 Referrals</a></li>
         <li><a class="menu-link" data-section="queries">❓ Queries</a></li>
-
         <li><div class="menu-divider"></div></li>
         <li><a class="menu-link" onclick="subadminLogout()" style="color:#ef4444;">🚪 Logout</a></li>
       </ul>
@@ -503,6 +537,8 @@
       </div>
 
       <div class="content-area">
+
+        <!-- DASHBOARD -->
         <div id="dashboard" class="section active">
           <div class="dashboard-grid">
             <div class="stat-card">
@@ -523,32 +559,26 @@
           </div>
         </div>
 
+        <!-- USERS -->
         <div id="users" class="section">
           <div class="section-header">
             <h2 class="section-title">Users</h2>
             <button class="btn-primary" onclick="openCreateUserModal()">➕ Create User</button>
           </div>
-
           <div class="controls">
             <div class="search-box">
               <input type="text" id="searchUsers" placeholder="Search by username or email..." />
               <button onclick="displayUsers()">🔍 Search</button>
             </div>
           </div>
-
           <div id="usersLoading" class="loading">Loading users...</div>
-
           <div id="usersTableContainer" style="display:none;">
             <div class="table-container">
               <table class="data-table">
                 <thead>
                   <tr>
-                    <th>S.No.</th>
-                    <th>User Name</th>
-                    <th>Email</th>
-                    <th>Status</th>
-                    <th>Wallet Balance</th>
-                    <th>Joining</th>
+                    <th>S.No.</th><th>User Name</th><th>Email</th>
+                    <th>Status</th><th>Wallet Balance</th><th>Joining</th>
                   </tr>
                 </thead>
                 <tbody id="usersTableBody"></tbody>
@@ -557,28 +587,21 @@
           </div>
         </div>
 
+        <!-- AGENTS -->
         <div id="agents" class="section">
           <div class="section-header">
             <h2 class="section-title">Agents Management</h2>
             <button class="btn-primary" onclick="openAddAgentModal()">➕ Add Agent</button>
           </div>
-
           <div id="agentsLoading" class="loading">Loading agents...</div>
-
           <div id="agentsTableContainer" style="display:none;">
             <div class="table-container">
               <table class="data-table">
                 <thead>
                   <tr>
-                    <th>S.No.</th>
-                    <th>Agent name</th>
-                    <th>Joining Date</th>
-                    <th>Status</th>
-                    <th>Salary %</th>
-                    <th>Users</th>
-                    <th>Game Played</th>
-                    <th>Total Salary</th>
-                    <th>Actions</th>
+                    <th>S.No.</th><th>Agent name</th><th>Joining Date</th>
+                    <th>Status</th><th>Salary %</th><th>Users</th>
+                    <th>Game Played</th><th>Total Salary</th><th>Actions</th>
                   </tr>
                 </thead>
                 <tbody id="agentsTableBody"></tbody>
@@ -587,32 +610,25 @@
           </div>
         </div>
 
+        <!-- TRANSACTIONS -->
         <div id="transactions" class="section">
           <div class="section-header">
             <h2 class="section-title">Transactions</h2>
           </div>
-
           <div class="controls">
             <div class="search-box">
               <input type="text" id="searchTransactions" placeholder="Search by user or txn..." />
               <button onclick="displayTransactions()">🔍 Search</button>
             </div>
           </div>
-
           <div id="transactionsLoading" class="loading">Loading transactions...</div>
-
           <div id="transactionsTableContainer" style="display:none;">
             <div class="table-container">
               <table class="data-table">
                 <thead>
                   <tr>
-                    <th>Txn ID</th>
-                    <th>User</th>
-                    <th>Type</th>
-                    <th>Amount (₹)</th>
-                    <th>Status</th>
-                    <th>Date/Time</th>
-                    <th>Reference</th>
+                    <th>Txn ID</th><th>User</th><th>Type</th>
+                    <th>Amount (₹)</th><th>Status</th><th>Date/Time</th><th>Reference</th>
                   </tr>
                 </thead>
                 <tbody id="transactionsTableBody"></tbody>
@@ -621,21 +637,19 @@
           </div>
         </div>
 
+        <!-- REFERRALS -->
         <div id="referrals" class="section">
           <div class="section-header">
             <h2 class="section-title">Referrals</h2>
           </div>
-
           <div id="referralsLoading" class="loading">Loading referral data...</div>
           <div id="referralsTableContainer" style="display:none;">
             <div class="table-container">
               <table class="data-table">
                 <thead>
                   <tr>
-                    <th>Agent</th>
-                    <th>Referred Users</th>
-                    <th>Active Users</th>
-                    <th>Total Commission</th>
+                    <th>Agent</th><th>Referred Users</th>
+                    <th>Active Users</th><th>Total Commission</th>
                   </tr>
                 </thead>
                 <tbody id="referralsTableBody"></tbody>
@@ -644,113 +658,116 @@
           </div>
         </div>
 
+        <!-- QUERIES -->
         <div id="queries" class="section">
-  <div class="section-header">
-    <h2 class="section-title">User Queries</h2>
-  </div>
+          <div class="section-header">
+            <h2 class="section-title">User Queries</h2>
+          </div>
+          <div class="controls">
+            <div class="search-box">
+              <input type="text" id="searchQueries" placeholder="Search by ticket id, user id, username, subject..." />
+              <button onclick="displayQueries()">🔍 Search</button>
+            </div>
+          </div>
+          <div id="queriesLoading" class="loading">Loading queries...</div>
+          <div id="queriesTableContainer" style="display:none;">
+            <div class="table-container">
+              <table class="data-table">
+                <thead>
+                  <tr>
+                    <th>ID</th><th>User ID</th><th>Username</th><th>Subject</th>
+                    <th>Status</th><th>Created</th><th>Last Reply</th><th>Action</th>
+                  </tr>
+                </thead>
+                <tbody id="queriesTableBody"></tbody>
+              </table>
+            </div>
+          </div>
+        </div>
 
-  <div class="controls">
-    <div class="search-box">
-      <input type="text" id="searchQueries" placeholder="Search by ticket id, user id, username, subject..." />
-      <button onclick="displayQueries()">🔍 Search</button>
-    </div>
-  </div>
+      </div><!-- end content-area -->
+    </div><!-- end main-content -->
+  </div><!-- end admin-wrapper -->
 
-  <div id="queriesLoading" class="loading">Loading queries...</div>
-  <div id="queriesTableContainer" style="display:none;">
-    <div class="table-container">
-      <table class="data-table">
-        <thead>
-          <tr>
-            <th>ID</th>
-            <th>User ID</th>
-            <th>Username</th>
-            <th>Subject</th>
-            <th>Status</th>
-            <th>Created</th>
-            <th>Last Reply</th>
-            <th>Action</th>
-          </tr>
-        </thead>
-        <tbody id="queriesTableBody"></tbody>
-      </table>
-    </div>
-  </div>
-</div>
-</div>
-</div>
-</div>
-
+  <!-- ===== DETAILS MODAL (Query / Agent Users) — FIXED WITH STICKY HEADER + SCROLL ===== -->
   <div id="detailsModal" class="modal">
     <div class="modal-content">
-      <div class="modal-header">
+      <div class="modal-sticky-header">
         <h2 id="detailsTitle">Details</h2>
       </div>
-      <div id="detailsContent"></div>
-      <div class="modal-footer">
-        <button class="btn-modal btn-cancel" onclick="closeDetailsModal()">Close</button>
+      <div class="modal-body-scroll">
+        <div id="detailsContent"></div>
+        <div class="modal-footer" style="margin-top:16px;">
+          <button class="btn-modal btn-cancel" onclick="closeDetailsModal()">Close</button>
+        </div>
       </div>
     </div>
   </div>
 
+  <!-- ===== CREATE USER MODAL ===== -->
   <div id="createUserModal" class="modal">
     <div class="modal-content">
-      <div class="modal-header">
+      <div class="modal-sticky-header">
         <h2>Create User</h2>
       </div>
-      <form id="createUserForm">
-        <div class="details-grid">
-          <div class="detail-item">
-            <div class="detail-label">Username</div>
-            <input type="text" id="newUsername" style="width:100%;padding:8px;border-radius:6px;border:1px solid #334155;background:#0f172a;color:#e2e8f0;">
+      <div class="modal-body-scroll">
+        <form id="createUserForm">
+          <div class="details-grid">
+            <div class="detail-item">
+              <div class="detail-label">Username</div>
+              <input type="text" id="newUsername" style="width:100%;padding:8px;border-radius:6px;border:1px solid #334155;background:#0f172a;color:#e2e8f0;">
+            </div>
+            <div class="detail-item">
+              <div class="detail-label">Password</div>
+              <input type="password" id="newPassword" style="width:100%;padding:8px;border-radius:6px;border:1px solid #334155;background:#0f172a;color:#e2e8f0;">
+            </div>
           </div>
-          <div class="detail-item">
-            <div class="detail-label">Password</div>
-            <input type="password" id="newPassword" style="width:100%;padding:8px;border-radius:6px;border:1px solid #334155;background:#0f172a;color:#e2e8f0;">
+          <div class="modal-footer">
+            <button type="button" class="btn-modal btn-cancel" onclick="closeCreateUserModal()">Cancel</button>
+            <button type="submit" class="btn-modal btn-save">Create</button>
           </div>
-        </div>
-        <div class="modal-footer">
-          <button type="button" class="btn-modal btn-cancel" onclick="closeCreateUserModal()">Cancel</button>
-          <button type="submit" class="btn-modal btn-save">Create</button>
-        </div>
-      </form>
+        </form>
+      </div>
     </div>
   </div>
 
+  <!-- ===== ADD AGENT MODAL ===== -->
   <div id="addAgentModal" class="modal">
     <div class="modal-content">
-      <div class="modal-header">
+      <div class="modal-sticky-header">
         <h2>Add New Agent</h2>
         <p>Create a new agent account</p>
       </div>
-      <form id="addAgentForm">
-        <div class="form-group">
-          <label>Agent Name</label>
-          <input type="text" id="agentName" placeholder="Enter agent name" required />
-        </div>
-        <div class="form-group">
-          <label>Email</label>
-          <input type="email" id="agentEmail" placeholder="agent@example.com" />
-        </div>
-        <div class="form-row">
+      <div class="modal-body-scroll">
+        <form id="addAgentForm">
           <div class="form-group">
-            <label>Username</label>
-            <input type="text" id="agentUsername" placeholder="agent_username" required />
+            <label>Agent Name</label>
+            <input type="text" id="agentName" placeholder="Enter agent name" required />
           </div>
           <div class="form-group">
-            <label>Password</label>
-            <input type="password" id="agentPassword" placeholder="Password" required />
+            <label>Email</label>
+            <input type="email" id="agentEmail" placeholder="agent@example.com" />
           </div>
-        </div>
-        <div class="form-group">
-          <label>Salary Percentage (%)</label>
-          <input type="number" id="agentSalaryPercent" placeholder="5" min="0" max="100" required />
-        </div>
-        <div class="modal-footer">
-          <button type="submit" class="btn-modal btn-save">Add Agent</button>
-          <button type="button" class="btn-modal btn-cancel" onclick="closeAddAgentModal()">Cancel</button>
-        </div>
-      </form>
+          <div class="form-row">
+            <div class="form-group">
+              <label>Username</label>
+              <input type="text" id="agentUsername" placeholder="agent_username" required />
+            </div>
+            <div class="form-group">
+              <label>Password</label>
+              <input type="password" id="agentPassword" placeholder="Password" required />
+            </div>
+          </div>
+          <div class="form-group">
+            <label>Salary Percentage (%)</label>
+            <input type="number" id="agentSalaryPercent" placeholder="5" min="0" max="100" required />
+          </div>
+          <div class="modal-footer">
+            <button type="submit" class="btn-modal btn-save">Add Agent</button>
+            <button type="button" class="btn-modal btn-cancel" onclick="closeAddAgentModal()">Cancel</button>
+          </div>
+        </form>
+      </div>
     </div>
   </div>
 
@@ -823,7 +840,7 @@
           const section = this.dataset.section;
           switchSection(section);
           document.querySelectorAll('.menu-link').forEach(l => l.classList.remove('active'));
-          this.classList.add('active');          
+          this.classList.add('active');
         });
       });
 
@@ -865,17 +882,15 @@
     }
 
     async function loadStats() {
-  try {
-    const data = await apiGet('/api/subadmin/stats');
-    document.getElementById('totalUsers').textContent = data.total_users ?? data.totalusers ?? 0;
-    document.getElementById('totalAgents').textContent = data.total_agents ?? data.totalagents ?? 0;
-    document.getElementById('activeGames').textContent = data.active_games ?? data.activegames ?? 0;
-  } catch (err) {
-    console.error('Stats error', err);
-  }
-}
-
-
+      try {
+        const data = await apiGet('/api/subadmin/stats');
+        document.getElementById('totalUsers').textContent = data.total_users ?? data.totalusers ?? 0;
+        document.getElementById('totalAgents').textContent = data.total_agents ?? data.totalagents ?? 0;
+        document.getElementById('activeGames').textContent = data.active_games ?? data.activegames ?? 0;
+      } catch (err) {
+        console.error('Stats error', err);
+      }
+    }
 
     async function loadUsers() {
       document.getElementById('usersLoading').style.display = 'block';
@@ -940,10 +955,7 @@
       e.preventDefault();
       const username = document.getElementById('newUsername').value.trim();
       const password = document.getElementById('newPassword').value.trim();
-      if (!username || !password) {
-        alert('Username and password required');
-        return;
-      }
+      if (!username || !password) { alert('Username and password required'); return; }
       try {
         await apiSend('/api/subadmin/users', 'POST', { username, password });
         alert('User created');
@@ -958,7 +970,6 @@
     async function loadAgents() {
       document.getElementById('agentsLoading').style.display = 'block';
       document.getElementById('agentsTableContainer').style.display = 'none';
-
       try {
         const data = await apiGet('/api/subadmin/agents');
         saAgents = Array.isArray(data) ? data : [];
@@ -1027,31 +1038,17 @@
 
     async function submitAddAgent(e) {
       e.preventDefault();
-
       const name = document.getElementById('agentName').value.trim();
       const email = document.getElementById('agentEmail').value.trim();
       const username = document.getElementById('agentUsername').value.trim();
       const password = document.getElementById('agentPassword').value.trim();
       const salarypercent = Number(document.getElementById('agentSalaryPercent').value || 0);
 
-      if (!name || !username || !password) {
-        alert('Name, Username and Password required');
-        return;
-      }
-
-      if (salarypercent < 0 || salarypercent > 100) {
-        alert('Salary percent must be between 0 and 100');
-        return;
-      }
+      if (!name || !username || !password) { alert('Name, Username and Password required'); return; }
+      if (salarypercent < 0 || salarypercent > 100) { alert('Salary percent must be between 0 and 100'); return; }
 
       try {
-        await apiSend('/api/subadmin/agents', 'POST', {
-          name,
-          email,
-          username,
-          password,
-          salarypercent
-        });
+        await apiSend('/api/subadmin/agents', 'POST', { name, email, username, password, salarypercent });
         alert('Agent created');
         closeAddAgentModal();
         loadAgents();
@@ -1091,12 +1088,8 @@
             <table class="data-table">
               <thead>
                 <tr>
-                  <th>S.No.</th>
-                  <th>User Id</th>
-                  <th>User Name</th>
-                  <th>Joining Date</th>
-                  <th>Amount Played</th>
-                  <th>Salary Generated</th>
+                  <th>S.No.</th><th>User Id</th><th>User Name</th>
+                  <th>Joining Date</th><th>Amount Played</th><th>Salary Generated</th>
                 </tr>
               </thead>
               <tbody>${rows}</tbody>
@@ -1104,7 +1097,8 @@
           </div>
         `;
       } catch (err) {
-        document.getElementById('detailsContent').innerHTML = `<div style="color:#ef4444;">Error: ${err.message}</div>`;
+        document.getElementById('detailsContent').innerHTML =
+          `<div style="color:#ef4444;">Error: ${err.message}</div>`;
       }
     }
 
@@ -1160,13 +1154,9 @@
       filtered.forEach(t => {
         const row = document.createElement('tr');
         row.innerHTML = `
-          <td>${t.id}</td>
-          <td>${t.user}</td>
-          <td>${t.kind}</td>
-          <td>${fmtINR(t.amount)}</td>
-          <td>${t.status}</td>
-          <td>${t.datetime}</td>
-          <td>${t.reference}</td>
+          <td>${t.id}</td><td>${t.user}</td><td>${t.kind}</td>
+          <td>${fmtINR(t.amount)}</td><td>${t.status}</td>
+          <td>${t.datetime}</td><td>${t.reference}</td>
         `;
         tbody.appendChild(row);
       });
@@ -1202,241 +1192,223 @@
     }
 
     function esc(x) {
-  return String(x ?? '')
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
-    .replace(/'/g, '&#39;');
-}
+      return String(x ?? '')
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
+    }
 
-function queryBadgeClass(status) {
-  const s = String(status || '').toUpperCase();
-  if (s === 'CLOSED') return 'badge-blocked';
-  if (s === 'RESOLVED' || s === 'IN_PROGRESS' || s === 'WAITING_USER') return 'badge-pending';
-  return 'badge-active';
-}
+    function queryBadgeClass(status) {
+      const s = String(status || '').toUpperCase();
+      if (s === 'CLOSED') return 'badge-blocked';
+      if (s === 'RESOLVED' || s === 'IN_PROGRESS' || s === 'WAITING_USER') return 'badge-pending';
+      return 'badge-active';
+    }
 
-async function loadQueries() {
-  document.getElementById('queriesLoading').style.display = 'block';
-  document.getElementById('queriesTableContainer').style.display = 'none';
+    async function loadQueries() {
+      document.getElementById('queriesLoading').style.display = 'block';
+      document.getElementById('queriesTableContainer').style.display = 'none';
+      const tbody = document.getElementById('queriesTableBody');
+      tbody.innerHTML = '';
+      try {
+        const data = await apiGet('/api/subadmin/tickets');
+        saTickets = Array.isArray(data) ? data : [];
+        displayQueries();
+      } catch (err) {
+        tbody.innerHTML = `<tr><td colspan="8" class="no-data">Error loading queries: ${esc(err.message)}</td></tr>`;
+      }
+      document.getElementById('queriesLoading').style.display = 'none';
+      document.getElementById('queriesTableContainer').style.display = 'block';
+    }
 
-  const tbody = document.getElementById('queriesTableBody');
-  tbody.innerHTML = '';
+    function displayQueries() {
+      const tbody = document.getElementById('queriesTableBody');
+      const search = safeLower(document.getElementById('searchQueries').value || '');
+      tbody.innerHTML = '';
 
-  try {
-    const data = await apiGet('/api/subadmin/tickets');
-    saTickets = Array.isArray(data) ? data : [];
-    displayQueries();
-  } catch (err) {
-    tbody.innerHTML = `<tr><td colspan="8" class="no-data">Error loading queries: ${esc(err.message)}</td></tr>`;
-  }
+      const filtered = saTickets.filter(t => {
+        const hay = [t.id, t.userid, t.username, t.subject, t.status]
+          .map(v => safeLower(v)).join(' ');
+        return !search || hay.includes(search);
+      });
 
-  document.getElementById('queriesLoading').style.display = 'none';
-  document.getElementById('queriesTableContainer').style.display = 'block';
-}
+      if (!filtered.length) {
+        tbody.innerHTML = `<tr><td colspan="8" class="no-data">No queries found</td></tr>`;
+        return;
+      }
 
-function displayQueries() {
-  const tbody = document.getElementById('queriesTableBody');
-  const search = safeLower(document.getElementById('searchQueries').value || '');
-
-  tbody.innerHTML = '';
-
-  const filtered = saTickets.filter(t => {
-    const hay = [
-      t.id,
-      t.userid,
-      t.username,
-      t.subject,
-      t.status
-    ].map(v => safeLower(v)).join(' ');
-    return !search || hay.includes(search);
-  });
-
-  if (!filtered.length) {
-    tbody.innerHTML = `<tr><td colspan="8" class="no-data">No queries found</td></tr>`;
-    return;
-  }
-
-  filtered.forEach(t => {
-    const row = document.createElement('tr');
-    row.innerHTML = `
-  <td>${esc(t.id)}</td>
-  <td>${esc(t.userid ?? t.user_id ?? t.userId ?? '-')}</td>
-  <td>${esc(t.username || '-')}</td>
-  <td>${esc(t.subject || '-')}</td>
-  <td><span class="badge ${queryBadgeClass(t.status)}">${esc(t.status || 'OPEN')}</span></td>
-  <td>${esc(t.createdat || t.created_at || t.updatedat || '-')}</td>
-  <td>${esc(t.lastreplyat || t.last_reply_at || t.updatedat || '-')}</td>
-  <td>
-    <div class="action-buttons">
-      <button class="btn-small btn-view" onclick="showTicketDetails(${Number(t.id)})">View / Update</button>
-    </div>
-  </td>
-`;
-
-    tbody.appendChild(row);
-  });
-}
-
-async function showTicketDetails(ticketId) {
-  document.getElementById('detailsTitle').textContent = `Query #${ticketId}`;
-  document.getElementById('detailsContent').innerHTML = `<div class="loading">Loading query details...</div>`;
-  document.getElementById('detailsModal').classList.add('active');
-
-  try {
-    const t = await apiGet(`/api/subadmin/tickets/${ticketId}`);
-    const isClosed = (t.status || '').toUpperCase() === 'CLOSED';
-
-    const updatesHtml = Array.isArray(t.updates) && t.updates.length
-      ? t.updates.map(u => `
-          <div class="detail-item" style="margin-top:10px;">
-            <div class="detail-label">
-              ${esc(u.actorrole || '')}
-              ${u.actorname ? ' • ' + esc(u.actorname) : ''}
-              ${u.updatetype ? ' • ' + esc(u.updatetype) : ''}
-              ${u.time ? ' • ' + esc(u.time) : ''}
+      filtered.forEach(t => {
+        const row = document.createElement('tr');
+        row.innerHTML = `
+          <td>${esc(t.id)}</td>
+          <td>${esc(t.userid ?? t.user_id ?? t.userId ?? '-')}</td>
+          <td>${esc(t.username || '-')}</td>
+          <td>${esc(t.subject || '-')}</td>
+          <td><span class="badge ${queryBadgeClass(t.status)}">${esc(t.status || 'OPEN')}</span></td>
+          <td>${esc(t.createdat || t.created_at || t.updatedat || '-')}</td>
+          <td>${esc(t.lastreplyat || t.last_reply_at || t.updatedat || '-')}</td>
+          <td>
+            <div class="action-buttons">
+              <button class="btn-small btn-view" onclick="showTicketDetails(${Number(t.id)})">View / Update</button>
             </div>
-            <div style="color:#cbd5e1;font-size:14px;white-space:pre-wrap;">${esc(u.message || '-')}</div>
+          </td>
+        `;
+        tbody.appendChild(row);
+      });
+    }
+
+    async function showTicketDetails(ticketId) {
+      document.getElementById('detailsTitle').textContent = `Query #${ticketId}`;
+      document.getElementById('detailsContent').innerHTML = `<div class="loading">Loading query details...</div>`;
+      document.getElementById('detailsModal').classList.add('active');
+      // scroll modal body to top when re-opening
+      const bodyEl = document.querySelector('#detailsModal .modal-body-scroll');
+      if (bodyEl) bodyEl.scrollTop = 0;
+
+      try {
+        const t = await apiGet(`/api/subadmin/tickets/${ticketId}`);
+        const isClosed = (t.status || '').toUpperCase() === 'CLOSED';
+
+        const updatesHtml = Array.isArray(t.updates) && t.updates.length
+          ? t.updates.map(u => `
+              <div class="detail-item" style="margin-top:10px;">
+                <div class="detail-label">
+                  ${esc(u.actorrole || '')}
+                  ${u.actorname ? ' • ' + esc(u.actorname) : ''}
+                  ${u.updatetype ? ' • ' + esc(u.updatetype) : ''}
+                  ${u.time ? ' • ' + esc(u.time) : ''}
+                </div>
+                <div style="color:#cbd5e1;font-size:14px;white-space:pre-wrap;">${esc(u.message || '-')}</div>
+              </div>
+            `).join('')
+          : `<div class="detail-item" style="margin-top:10px;"><div style="color:#94a3b8;">No updates yet.</div></div>`;
+
+        document.getElementById('detailsContent').innerHTML = `
+          <div class="details-grid">
+            <div class="detail-item">
+              <div class="detail-label">Ticket ID</div>
+              <div class="detail-value">${esc(t.id)}</div>
+            </div>
+            <div class="detail-item">
+              <div class="detail-label">User ID</div>
+              <div class="detail-value">${esc(t.userid ?? t.user_id ?? t.userId ?? '-')}</div>
+            </div>
+            <div class="detail-item">
+              <div class="detail-label">Username</div>
+              <div class="detail-value">${esc(t.username || '-')}</div>
+            </div>
+            <div class="detail-item">
+              <div class="detail-label">Status</div>
+              <div class="detail-value">${esc(t.status || 'OPEN')}</div>
+            </div>
+            <div class="detail-item">
+              <div class="detail-label">Created</div>
+              <div class="detail-value">${esc(t.createdat || t.created_at || t.updatedat || '-')}</div>
+            </div>
+            <div class="detail-item">
+              <div class="detail-label">Last Reply</div>
+              <div class="detail-value">${esc(t.lastreplyat || t.last_reply_at || t.updatedat || '-')}</div>
+            </div>
+            <div class="detail-item">
+              <div class="detail-label">Closed By</div>
+              <div class="detail-value">${esc(t.closedbyname || '-')}</div>
+            </div>
+            <div class="detail-item">
+              <div class="detail-label">Closed At</div>
+              <div class="detail-value">${esc(t.closedat || '-')}</div>
+            </div>
           </div>
-        `).join('')
-      : `<div class="detail-item" style="margin-top:10px;"><div style="color:#94a3b8;">No updates yet.</div></div>`;
 
-    document.getElementById('detailsContent').innerHTML = `
-      <div class="details-grid">
-        <div class="detail-item">
-          <div class="detail-label">Ticket ID</div>
-          <div class="detail-value">${esc(t.id)}</div>
-        </div>
-        <div class="detail-item">
-          <div class="detail-label">User ID</div>
-          <div class="detail-value">${esc(t.userid ?? t.user_id ?? t.userId ?? '-')}</div>
-        </div>
-        <div class="detail-item">
-          <div class="detail-label">Username</div>
-          <div class="detail-value">${esc(t.username || '-')}</div>
-        </div>
-        <div class="detail-item">
-          <div class="detail-label">Status</div>
-          <div class="detail-value">${esc(t.status || 'OPEN')}</div>
-        </div>
-        <div class="detail-item">
-          <div class="detail-label">Created</div>
-          <div class="detail-value">${esc(t.createdat || t.created_at || t.updatedat || '-')}</div>
-        </div>
-        <div class="detail-item">
-          <div class="detail-label">Last Reply</div>
-          <div class="detail-value">${esc(t.lastreplyat || t.last_reply_at || t.updatedat || '-')}</div>
-        </div>
-        <div class="detail-item">
-          <div class="detail-label">Closed By</div>
-          <div class="detail-value">${esc(t.closedbyname || '-')}</div>
-        </div>
-        <div class="detail-item">
-          <div class="detail-label">Closed At</div>
-          <div class="detail-value">${esc(t.closedat || '-')}</div>
-        </div>
-      </div>
+          <div class="detail-item" style="margin-top:10px;">
+            <div class="detail-label">Subject</div>
+            <div class="detail-value" style="font-size:16px;">${esc(t.subject || '-')}</div>
+          </div>
 
-      <div class="detail-item" style="margin-top:10px;">
-        <div class="detail-label">Subject</div>
-        <div class="detail-value" style="font-size:16px;">${esc(t.subject || '-')}</div>
-      </div>
+          <div class="detail-item" style="margin-top:10px;">
+            <div class="detail-label">Category</div>
+            <div style="color:#cbd5e1;font-size:14px;">${esc(t.category || '-')}</div>
+          </div>
 
-      <div class="detail-item" style="margin-top:10px;">
-        <div class="detail-label">Category</div>
-        <div style="color:#cbd5e1;font-size:14px;">${esc(t.category || '-')}</div>
-      </div>
+          <div class="detail-item" style="margin-top:10px;">
+            <div class="detail-label">Message</div>
+            <div style="color:#cbd5e1;font-size:14px;white-space:pre-wrap;">${esc(t.message || '')}</div>
+          </div>
 
-      <div class="detail-item" style="margin-top:10px;">
-        <div class="detail-label">Message</div>
-        <div style="color:#cbd5e1;font-size:14px;white-space:pre-wrap;">${esc(t.message || '')}</div>
-      </div>
+          ${t.attachment_name ? `
+            <div class="detail-item" style="margin-top:10px;">
+              <div class="detail-label">Attachment</div>
+              <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;">
+                <span>${esc(t.attachment_name)}</span>
+                <a href="/api/subadmin/tickets/${t.id}/attachment" target="_blank"
+                   style="padding:8px 12px;background:#2563eb;color:#fff;text-decoration:none;border-radius:8px;">
+                   View Attachment
+                </a>
+              </div>
+            </div>
+          ` : ''}
 
-     ${t.attachment_name ? `
-  <div class="detail-item">
-    <div class="detail-label">Attachment</div>
-    <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;">
-      <span>${esc(t.attachment_name)}</span>
-      <a href="/api/subadmin/tickets/${t.id}/attachment" target="_blank"
-         style="padding:8px 12px;background:#2563eb;color:#fff;text-decoration:none;border-radius:8px;">
-         View Attachment
-      </a>
-    </div>
-  </div>
-` : ''}
+          <div class="detail-item" style="margin-top:10px;">
+            <div class="detail-label">Update Status</div>
+            <select id="ticketStatusSelect" style="width:100%;padding:12px;border-radius:8px;border:2px solid #334155;background:#0f172a;color:#e2e8f0;">
+              <option value="OPEN" ${t.status === 'OPEN' ? 'selected' : ''}>OPEN</option>
+              <option value="IN_PROGRESS" ${t.status === 'IN_PROGRESS' ? 'selected' : ''}>IN PROGRESS</option>
+              <option value="WAITING_USER" ${t.status === 'WAITING_USER' ? 'selected' : ''}>WAITING USER</option>
+              <option value="RESOLVED" ${t.status === 'RESOLVED' ? 'selected' : ''}>RESOLVED</option>
+            </select>
+          </div>
 
-      <div class="detail-item" style="margin-top:10px;">
-          <div class="detail-label">Update Status</div>
-        <select id="ticketStatusSelect" style="width:100%;padding:12px;border-radius:8px;border:2px solid #334155;background:#0f172a;color:#e2e8f0;">
-            <option value="OPEN" ${t.status === 'OPEN' ? 'selected' : ''}>OPEN</option>
-            <option value="IN_PROGRESS" ${t.status === 'IN_PROGRESS' ? 'selected' : ''}>IN PROGRESS</option>
-            <option value="WAITING_USER" ${t.status === 'WAITING_USER' ? 'selected' : ''}>WAITING USER</option>
-            <option value="RESOLVED" ${t.status === 'RESOLVED' ? 'selected' : ''}>RESOLVED</option>
-        </select>
-     </div>
+          <div class="detail-item" style="margin-top:10px;">
+            <div class="detail-label">Reply / Action Note</div>
+            <textarea id="ticketReplyText"
+              ${isClosed ? 'disabled' : ''}
+              style="width:100%;min-height:120px;padding:12px;border-radius:8px;border:2px solid #334155;background:#0f172a;color:#e2e8f0;"
+              placeholder="${isClosed ? 'Closed ticket - view only' : 'Write update for user...'}"></textarea>
+          </div>
 
+          ${isClosed ? `
+            <div class="detail-item" style="margin-top:10px;border-color:#ef4444;">
+              <div class="detail-label">Notice</div>
+              <div style="color:#fca5a5;font-size:14px;">This ticket is closed. No further updates are allowed.</div>
+            </div>
+          ` : `
+            <div class="modal-footer" style="padding:0;margin-top:16px;justify-content:flex-start;">
+              <button class="btn-modal btn-save" onclick="submitTicketUpdate(${Number(ticketId)})">Save Update</button>
+            </div>
+          `}
 
-      <div class="detail-item" style="margin-top:10px;">
-        <div class="detail-label">Reply / Action Note</div>
-         <textarea id="ticketReplyText"
-           ${isClosed ? 'disabled' : ''}
-          style="width:100%;min-height:120px;padding:12px;border-radius:8px;border:2px solid #334155;background:#0f172a;color:#e2e8f0;"
-            placeholder="${isClosed ? 'Closed ticket - view only' : 'Write update for user...'}"></textarea>
-      </div>
+          <div style="margin-top:20px;">
+            <div class="detail-label">Timeline</div>
+            ${updatesHtml}
+          </div>
+        `;
+      } catch (err) {
+        document.getElementById('detailsContent').innerHTML =
+          `<div style="color:#ef4444;">Error: ${esc(err.message)}</div>`;
+      }
+    }
 
+    async function submitTicketUpdate(ticketId) {
+      const status = (document.getElementById('ticketStatusSelect')?.value || '').trim();
+      const message = (document.getElementById('ticketReplyText')?.value || '').trim();
 
-     ${isClosed ? `
-  <div class="detail-item" style="margin-top:10px;border-color:#ef4444;">
-    <div class="detail-label">Notice</div>
-    <div style="color:#fca5a5;font-size:14px;">This ticket is closed. No further updates are allowed.</div>
-  </div>
-` : `
-  <div class="modal-footer" style="padding:0;margin-top:16px;justify-content:flex-start;">
-    <button class="btn-modal btn-save" onclick="submitTicketUpdate(${Number(ticketId)})">Save Update</button>
-  </div>
-`}
+      if (!message && !status) { alert('Reply or status required'); return; }
+      if (status === 'CLOSED') { alert('Only admin can close ticket'); return; }
 
-
-      <div style="margin-top:20px;">
-        <div class="detail-label">Timeline</div>
-        ${updatesHtml}
-      </div>
-    `;
-  } catch (err) {
-    document.getElementById('detailsContent').innerHTML =
-      `<div style="color:#ef4444;">Error: ${esc(err.message)}</div>`;
-  }
-}
-
-async function submitTicketUpdate(ticketId) {
-  const status = (document.getElementById('ticketStatusSelect')?.value || '').trim();
-  const message = (document.getElementById('ticketReplyText')?.value || '').trim();
-
-  if (!message && !status) {
-    alert('Reply or status required');
-    return;
-  }
-
-  if (status === 'CLOSED') {
-    alert('Only admin can close ticket');
-    return;
-  }
-
-  try {
-    await apiSend(`/api/subadmin/tickets/${ticketId}/reply`, 'POST', {
-      status: status,
-      message: message,
-      isinternal: false
-    });
-
-    alert('Ticket updated successfully');
-    await loadQueries();
-    await showTicketDetails(ticketId);
-  } catch (err) {
-    alert('Error: ' + err.message);
-  }
-}
+      try {
+        await apiSend(`/api/subadmin/tickets/${ticketId}/reply`, 'POST', {
+          status: status,
+          message: message,
+          isinternal: false
+        });
+        alert('Ticket updated successfully');
+        await loadQueries();
+        await showTicketDetails(ticketId);
+      } catch (err) {
+        alert('Error: ' + err.message);
+      }
+    }
 
     function closeDetailsModal() {
       document.getElementById('detailsModal').classList.remove('active');
