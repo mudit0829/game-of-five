@@ -1657,18 +1657,6 @@ function queryBadgeClass(status) {
 }
 
     // Sub-Admin Modal Functions (ADD THIS)
-function openAddSubAdminModal() {
-  document.getElementById('addSubAdminModal').classList.add('active');
-  document.getElementById('addSubAdminForm').reset();
-  document.getElementById('editSubAdminId').value = '';
-}
-
-function closeAddSubAdminModal() {
-  document.getElementById('addSubAdminModal').classList.remove('active');
-}
-
-document.getElementById('addSubAdminForm')?.addEventListener('submit', submitAddSubAdmin);
-document.getElementById('searchSubAdmins')?.addEventListener('keyup', displaySubAdmins);
 
    // ------------------------ Sub-Admins ------------------------
 let allSubAdmins = [];
@@ -3003,13 +2991,7 @@ async function viewGameDetails(roundCode) {
     // Queries
     // ---------------------------------
 
-    function queryBadgeClass(status) {
-  const s = String(status || '').toUpperCase();
-  if (s === 'CLOSED') return 'badge-blocked';
-  if (s === 'RESOLVED' || s === 'INPROGRESS' || s === 'WAITINGUSER') return 'badge-pending';
-  return 'badge-active';
-}
-
+  
 async function loadQueries() {
   document.getElementById('queriesLoading').style.display = 'block';
   document.getElementById('queriesTableContainer').style.display = 'none';
@@ -3026,6 +3008,46 @@ async function loadQueries() {
   }
 }
 
+function displayQueries() {
+  const q = safeLower(document.getElementById('searchQueries')?.value || '');
+  const tbody = document.getElementById('queriesTableBody');
+  if (!tbody) return;
+
+  const filtered = allTickets.filter(t =>
+    safeLower(t.id).includes(q) ||
+    safeLower(t.userid).includes(q) ||
+    safeLower(t.username).includes(q) ||
+    safeLower(t.subject).includes(q)
+  );
+
+  tbody.innerHTML = '';
+
+  if (!filtered.length) {
+    tbody.innerHTML = `<tr><td colspan="8" class="no-data">No queries found</td></tr>`;
+    return;
+  }
+
+  filtered.forEach(t => {
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+      <td>${t.id}</td>
+      <td>${t.userid}</td>
+      <td>${t.username}</td>
+      <td>${t.subject}</td>
+      <td><span class="badge ${queryBadgeClass(t.status)}">${t.status}</span></td>
+      <td>${t.createdat}</td>
+      <td>${t.lastreplyat}</td>
+      <td>
+        <div class="action-buttons">
+          <button class="btn-small btn-view" onclick="showTicketDetails(${t.id})">View</button>
+        </div>
+      </td>
+    `;
+    tbody.appendChild(tr);
+  });
+}
+
+    
 
 function displayQueries() {
   const q = safeLower(document.getElementById('searchQueries')?.value || '');
@@ -3066,6 +3088,53 @@ function displayQueries() {
   });
 }
 
+function showTicketDetails(ticketId) {
+  const t = allTickets.find(x => String(x.id) === String(ticketId));
+  if (!t) return alert('Ticket not found');
+
+  let updatesHtml = '';
+  if (t.updates && t.updates.length) {
+    updatesHtml = t.updates.map(u => `
+      <div style="background:#0f172a; border:1px solid #334155; border-radius:8px; padding:12px; margin-bottom:10px;">
+        <div style="display:flex; justify-content:space-between; margin-bottom:6px;">
+          <span style="color:#10b981; font-weight:600;">${u.actorname || u.actorrole}</span>
+          <span style="color:#64748b; font-size:12px;">${u.time}</span>
+        </div>
+        ${u.oldstatus && u.newstatus ? `<div style="color:#f59e0b; font-size:12px; margin-bottom:4px;">Status: ${u.oldstatus} → ${u.newstatus}</div>` : ''}
+        <div style="color:#cbd5e1;">${u.message}</div>
+        ${u.isinternal ? `<div style="color:#64748b; font-size:11px; margin-top:4px;">[Internal Note]</div>` : ''}
+      </div>
+    `).join('');
+  } else {
+    updatesHtml = `<div class="no-data">No replies yet</div>`;
+  }
+
+  const attachBtn = t.attachmentname
+    ? `<button class="btn-small btn-view" onclick="openAdminTicketAttachment(${t.id})">📎 ${t.attachmentname}</button>`
+    : '';
+
+  document.getElementById('detailsTitle').textContent = `Ticket #${t.id}`;
+  document.getElementById('detailsSubtitle').textContent = t.subject;
+  document.getElementById('detailsContent').innerHTML = `
+    <div class="details-grid" style="margin-bottom:20px;">
+      <div class="detail-item"><div class="detail-label">User</div><div class="detail-value">${t.username}</div></div>
+      <div class="detail-item"><div class="detail-label">Status</div><div class="detail-value"><span class="badge ${queryBadgeClass(t.status)}">${t.status}</span></div></div>
+      <div class="detail-item"><div class="detail-label">Created</div><div class="detail-value">${t.createdat}</div></div>
+      <div class="detail-item"><div class="detail-label">Last Reply</div><div class="detail-value">${t.lastreplyat}</div></div>
+    </div>
+    <div style="background:#0f172a; border:1px solid #334155; border-radius:8px; padding:15px; margin-bottom:20px;">
+      <div style="color:#94a3b8; font-size:12px; margin-bottom:8px; text-transform:uppercase;">Original Message</div>
+      <div style="color:#e2e8f0;">${t.message}</div>
+      ${attachBtn ? `<div style="margin-top:10px;">${attachBtn}</div>` : ''}
+    </div>
+    <div style="color:#94a3b8; font-size:13px; text-transform:uppercase; margin-bottom:10px;">Replies / Updates</div>
+    ${updatesHtml}
+  `;
+  document.getElementById('detailsModal').classList.add('active');
+}
+
+    
+    
 async function showTicketDetails(ticketId) {
   try {
     const t = await apiGet(`/api/admin/tickets/${ticketId}`);
