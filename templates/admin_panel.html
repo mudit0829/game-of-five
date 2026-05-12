@@ -372,27 +372,33 @@
 
     /* MODAL */
     .modal {
-      display: none !important;
-      position: fixed;
-      top: 0; left: 0; right: 0; bottom: 0;
-      background: rgba(0,0,0,0.7);
-      z-index: 1000;
-      align-items: center;
-      justify-content: center;
-      overflow-y: auto;
-    }
-    .modal.active { display: flex !important; }
+  display: none !important;
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.7);
+  z-index: 1000;
+  align-items: flex-start;
+  justify-content: center;
+  overflow-y: auto;
+  padding: 20px;
+}
 
-    .modal-content {
-      background: #1e293b;
-      border: 2px solid #334155;
-      border-radius: 12px;
-      padding: 40px;
-      width: 90%;
-      max-width: 650px;
-      box-shadow: 0 20px 60px rgba(0,0,0,0.5);
-      margin: 20px auto;
-    }
+.modal.active {
+  display: flex !important;
+}
+
+.modal-content {
+  background: #1e293b;
+  border: 2px solid #334155;
+  border-radius: 12px;
+  padding: 24px;
+  width: 100%;
+  max-width: 650px;
+  max-height: calc(100vh - 40px);
+  overflow-y: auto;
+  box-shadow: 0 20px 60px rgba(0,0,0,0.5);
+  margin: 0 auto;
+}
 
     .modal-header { margin-bottom: 25px; }
     .modal-header h2 { color: #e2e8f0; font-size: 24px; margin: 0; font-weight: bold; }
@@ -454,6 +460,33 @@
 
     .btn-cancel { background: #334155; color: #cbd5e1; }
     .btn-cancel:hover { background: #475569; }
+
+    #detailsModal .modal-content {
+  display: flex;
+  flex-direction: column;
+}
+
+#detailsModal .modal-header {
+  position: sticky;
+  top: 0;
+  background: #1e293b;
+  z-index: 2;
+  padding-bottom: 12px;
+}
+
+#detailsModal #detailsContent {
+  flex: 1;
+  overflow-y: auto;
+  min-height: 0;
+}
+
+#detailsModal .modal-footer {
+  position: sticky;
+  bottom: 0;
+  background: #1e293b;
+  padding-top: 16px;
+  margin-top: 16px;
+}
 
     /* DETAILS */
     .details-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom: 20px; }
