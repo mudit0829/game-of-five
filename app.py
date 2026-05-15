@@ -2764,18 +2764,24 @@ def external_credit_game_wallet():
         return jsonify({"success": False, "message": "Unauthorized"}), 401
 
     data = request.get_json(silent=True) or {}
+
     userid = safeint(data.get("userid"), 0)
     cardvalue = safeint(data.get("cardvalue"), 0)
     quantity = safeint(data.get("quantity"), 1)
     payment_ref = (data.get("paymentref") or data.get("payment_ref") or "").strip()
     note = (data.get("note") or "").strip()
 
+    allowed_values = globals().get("ALLOWEDCARDVALUES") or globals().get("ALLOWED_CARD_VALUES") or [10, 50, 100, 200, 250]
+
     if userid <= 0:
         return jsonify({"success": False, "message": "Invalid userid"}), 400
-    if cardvalue not in ALLOWEDCARDVALUES:
+
+    if cardvalue not in allowed_values:
         return jsonify({"success": False, "message": "Invalid card value"}), 400
+
     if quantity <= 0:
         return jsonify({"success": False, "message": "Invalid quantity"}), 400
+
     if not payment_ref:
         return jsonify({"success": False, "message": "payment_ref required"}), 400
 
@@ -2785,26 +2791,35 @@ def external_credit_game_wallet():
 
     existing_ref = StoreTransaction.query.filter_by(
         userid=user.id,
-        kind="external_store_credit",
+        kind="externalstorecredit",
         reference=payment_ref
     ).first()
+
     if existing_ref:
-        gamewallet = ensurewalletforuser(user, starting_balance=0)
-        storewallet = ensurestorewalletforuser(user, starting_balance=0)
+        gamewallet = ensurewalletforuser(user, startingbalance=0)
+        storewallet = ensurestorewalletforuser(user, startingbalance=0)
+
         return jsonify({
             "success": True,
             "message": "Already processed",
             "userid": user.id,
             "gamebalance": int(gamewallet.balance or 0) if gamewallet else 0,
             "storebalance": int(storewallet.balance or 0) if storewallet else 0,
-            "reference": payment_ref
-        })
+            "reference": payment_ref,
+            "totalcoins": cardvalue * quantity
+        }), 200
 
     totalcoins = cardvalue * quantity
 
     try:
-        gamewallet = ensurewalletforuser(user, starting_balance=0)
-        storewallet = ensurestorewalletforuser(user, starting_balance=0)
+        gamewallet = ensurewalletforuser(user, startingbalance=0)
+        storewallet = ensurestorewalletforuser(user, startingbalance=0)
+
+        if not gamewallet:
+            return jsonify({"success": False, "message": "Game wallet not found"}), 500
+
+        if not storewallet:
+            return jsonify({"success": False, "message": "Store wallet not found"}), 500
 
         gamewallet.balance = int(gamewallet.balance or 0) + totalcoins
 
@@ -2820,7 +2835,7 @@ def external_credit_game_wallet():
 
         storeaudit = StoreTransaction(
             userid=user.id,
-            kind="external_store_credit",
+            kind="externalstorecredit",
             amount=totalcoins,
             balanceafter=int(storewallet.balance or 0),
             label="External Store Purchase",
@@ -2858,10 +2873,12 @@ def external_credit_game_wallet():
             "gamebalance": int(gamewallet.balance or 0),
             "storebalance": int(storewallet.balance or 0),
             "reference": payment_ref
-        })
+        }), 200
+
     except Exception as e:
         db.session.rollback()
         return jsonify({"success": False, "message": f"Credit failed: {str(e)}"}), 500
+        
 
 
 @app.route("/api/external/store/wallet-balance/<int:userid>", methods=["GET"])
