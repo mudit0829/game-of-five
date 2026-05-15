@@ -2614,6 +2614,31 @@ def api_store_wallet():
         store_balance=int(store_wallet.balance or 0) if store_wallet else 0,
     )
 
+
+def ensurewalletforuser(user, startingbalance=0):
+    if not user:
+        return None
+
+    wallet = Wallet.query.filter_by(userid=user.id).first()
+    if not wallet:
+        wallet = Wallet(userid=user.id, balance=int(startingbalance or 0))
+        db.session.add(wallet)
+        db.session.commit()
+    return wallet
+
+
+def ensurestorewalletforuser(user, startingbalance=0):
+    if not user:
+        return None
+
+    wallet = StoreWallet.query.filter_by(userid=user.id).first()
+    if not wallet:
+        wallet = StoreWallet(userid=user.id, balance=int(startingbalance or 0))
+        db.session.add(wallet)
+        db.session.commit()
+    return wallet
+
+
 # ---------------------------------------------------
 # EXTERNAL STORE AUTH APIs
 # ---------------------------------------------------
