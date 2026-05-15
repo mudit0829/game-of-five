@@ -2609,6 +2609,86 @@ def api_store_wallet():
         store_balance=int(store_wallet.balance or 0) if store_wallet else 0,
     )
 
+# ---------------------------------------------------
+# EXTERNAL STORE AUTH APIs
+# ---------------------------------------------------
+@app.route("/api/store-auth/register", methods=["POST"])
+def store_auth_register():
+    if not verifystoreapirequest(request):
+        return jsonify({"success": False, "message": "Unauthorized"}), 401
+
+    data = request.get_json(silent=True) or {}
+    username = (data.get("username") or "").strip()
+    password = data.get("password") or ""
+
+    if not username or not password:
+        return jsonify({"success": False, "message": "Username and password required"}), 400
+
+    if not isvalidusername(username):
+        return jsonify({
+            "success": False,
+            "message": "Username cannot contain spaces. Use only letters, numbers, and underscore."
+        }), 400
+
+    if len(password) < 6:
+        return jsonify({"success": False, "message": "Password must be at least 6 characters"}), 400
+
+    existing = User.query.filter_by(username=username).first()
+    if existing:
+        return jsonify({"success": False, "message": "Username already exists"}), 400
+
+    try:
+        user = User(username=username, display_name=username)
+        user.set_password(password)
+        db.session.add(user)
+        db.session.commit()
+
+        ensurewalletforuser(user, startingbalance=0)
+        ensurestorewalletforuser(user, startingbalance=0)
+
+        return jsonify({
+            "success": True,
+            "message": "Registered successfully",
+            "userid": user.id,
+            "username": user.username
+        })
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({"success": False, "message": f"Registration failed: {str(e)}"}), 500
+
+
+@app.route("/api/store-auth/login", methods=["POST"])
+def store_auth_login():
+    if not verifystoreapirequest(request):
+        return jsonify({"success": False, "message": "Unauthorized"}), 401
+
+    data = request.get_json(silent=True) or {}
+    username = (data.get("username") or "").strip()
+    password = data.get("password") or ""
+
+    if not username or not password:
+        return jsonify({"success": False, "message": "Username and password required"}), 400
+
+    user = User.query.filter_by(username=username).first()
+    if not user or not user.check_password(password):
+        return jsonify({"success": False, "message": "Invalid username or password"}), 401
+
+    if getattr(user, "isblocked", False):
+        return jsonify({
+            "success": False,
+            "message": f"Your account is blocked. Reason: {getattr(user, 'blockreason', '') or 'No reason provided'}"
+        }), 403
+
+    ensurewalletforuser(user, startingbalance=0)
+    ensurestorewalletforuser(user, startingbalance=0)
+
+    return jsonify({
+        "success": True,
+        "message": "Login successful",
+        "userid": user.id,
+        "username": user.username
+    })
+
 @app.route("/api/external/store/credit-game-wallet", methods=["POST"])
 def external_credit_game_wallet():
     if not verify_store_api_request(request):
