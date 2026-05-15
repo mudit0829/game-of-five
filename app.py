@@ -2767,7 +2767,7 @@ def external_credit_game_wallet():
     userid = safeint(data.get("userid"), 0)
     cardvalue = safeint(data.get("cardvalue"), 0)
     quantity = safeint(data.get("quantity"), 1)
-    payment_ref = (data.get("payment_ref") or "").strip()
+    payment_ref = (data.get("paymentref") or data.get("payment_ref") or "").strip()
     note = (data.get("note") or "").strip()
 
     if userid <= 0:
