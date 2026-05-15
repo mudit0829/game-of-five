@@ -2615,7 +2615,14 @@ def api_store_wallet():
 @app.route("/api/store-auth/register", methods=["POST"])
 def store_auth_register():
     try:
-        if not verifystoreapirequest(request):
+        auth_ok = False
+
+        if "verify_store_api_request" in globals():
+            auth_ok = verify_store_api_request(request)
+        elif "verifystoreapirequest" in globals():
+            auth_ok = verifystoreapirequest(request)
+
+        if not auth_ok:
             return jsonify({"success": False, "message": "Unauthorized"}), 401
 
         data = request.get_json(silent=True) or {}
@@ -2645,7 +2652,10 @@ def store_auth_register():
         elif hasattr(user, "display_name"):
             user.display_name = username
 
-        user.setpassword(password) if hasattr(user, "setpassword") else user.set_password(password)
+        if hasattr(user, "setpassword"):
+            user.setpassword(password)
+        else:
+            user.set_password(password)
 
         db.session.add(user)
         db.session.commit()
@@ -2667,11 +2677,17 @@ def store_auth_register():
             "message": f"store_auth_register error: {str(e)}"
         }), 500
 
-
 @app.route("/api/store-auth/login", methods=["POST"])
 def store_auth_login():
     try:
-        if not verifystoreapirequest(request):
+        auth_ok = False
+
+        if "verify_store_api_request" in globals():
+            auth_ok = verify_store_api_request(request)
+        elif "verifystoreapirequest" in globals():
+            auth_ok = verifystoreapirequest(request)
+
+        if not auth_ok:
             return jsonify({"success": False, "message": "Unauthorized"}), 401
 
         data = request.get_json(silent=True) or {}
@@ -2710,6 +2726,8 @@ def store_auth_login():
             "success": False,
             "message": f"store_auth_login error: {str(e)}"
         }), 500
+
+
 @app.route("/api/external/store/credit-game-wallet", methods=["POST"])
 def external_credit_game_wallet():
     if not verify_store_api_request(request):
