@@ -150,6 +150,7 @@ GAME_CONFIGS = {
     },
 }
 ALLOWED_CARD_VALUES = {10, 50, 100, 200, 250}
+ALLOWEDCARDVALUES = ALLOWED_CARD_VALUES
 # ---------------------------------------------------
 # SQLAlchemy Models
 # ---------------------------------------------------
