@@ -2881,15 +2881,24 @@ def external_credit_game_wallet():
 
         gamewallet.balance = int(gamewallet.balance or 0) + totalcoins
 
-        gametx = Transaction(
-            userid=user.id,
-            kind="added",
-            amount=totalcoins,
-            balanceafter=int(gamewallet.balance or 0),
-            label="Point Card Added",
-            gametitle="External Store Card",
-            note=note or f"External store purchase {payment_ref}"
-        )
+        
+        tx_kwargs = {
+            "kind": "added",
+            "amount": totalcoins,
+            "balanceafter": int(gamewallet.balance or 0),
+            "label": "Point Card Added",
+            "gametitle": "External Store Card",
+            "note": note or f"External store purchase {paymentref}"
+        }
+
+        if hasattr(Transaction, "userid"):
+            tx_kwargs["userid"] = user.id
+        elif hasattr(Transaction, "user_id"):
+            tx_kwargs["user_id"] = user.id
+        else:
+            raise Exception("Transaction model has neither 'userid' nor 'user_id'")
+
+        gametx = Transaction(**tx_kwargs)
 
         storeaudit = StoreTransaction(
             user_id=user.id,
