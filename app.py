@@ -2618,24 +2618,57 @@ def api_store_wallet():
 def ensurewalletforuser(user, startingbalance=0):
     if not user:
         return None
+    if getattr(user, "isadmin", False):
+        return None
 
-    wallet = Wallet.query.filter_by(userid=user.id).first()
+    if hasattr(user, "wallet") and user.wallet:
+        return user.wallet
+
+    wallet = None
+
+    if hasattr(Wallet, "userid"):
+        wallet = Wallet.query.filter_by(userid=user.id).first()
+    elif hasattr(Wallet, "user_id"):
+        wallet = Wallet.query.filter_by(user_id=user.id).first()
+
     if not wallet:
-        wallet = Wallet(userid=user.id, balance=int(startingbalance or 0))
+        if hasattr(Wallet, "userid"):
+            wallet = Wallet(userid=user.id, balance=int(startingbalance or 0))
+        elif hasattr(Wallet, "user_id"):
+            wallet = Wallet(user_id=user.id, balance=int(startingbalance or 0))
+        else:
+            raise Exception("Wallet model has neither 'userid' nor 'user_id'")
+
         db.session.add(wallet)
         db.session.commit()
+
     return wallet
 
 
 def ensurestorewalletforuser(user, startingbalance=0):
     if not user:
         return None
+    if getattr(user, "isadmin", False):
+        return None
 
-    wallet = StoreWallet.query.filter_by(userid=user.id).first()
+    wallet = None
+
+    if hasattr(StoreWallet, "userid"):
+        wallet = StoreWallet.query.filter_by(userid=user.id).first()
+    elif hasattr(StoreWallet, "user_id"):
+        wallet = StoreWallet.query.filter_by(user_id=user.id).first()
+
     if not wallet:
-        wallet = StoreWallet(userid=user.id, balance=int(startingbalance or 0))
+        if hasattr(StoreWallet, "userid"):
+            wallet = StoreWallet(userid=user.id, balance=int(startingbalance or 0))
+        elif hasattr(StoreWallet, "user_id"):
+            wallet = StoreWallet(user_id=user.id, balance=int(startingbalance or 0))
+        else:
+            raise Exception("StoreWallet model has neither 'userid' nor 'user_id'")
+
         db.session.add(wallet)
         db.session.commit()
+
     return wallet
 
 
