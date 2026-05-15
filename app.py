@@ -977,7 +977,6 @@ def make_round_code(game_type: str, start_time: datetime, table_number: int) -> 
 # COMPATIBILITY ALIASES FOR STORE / EXTERNAL API ROUTES
 # ---------------------------------------------------
 safeint = _safe_int
-ensurewalletforuser = ensure_wallet_for_user
 ensurestorewalletforuser = ensure_store_wallet_for_user
 verifystoreapirequest = verify_store_api_request
 getcurrentloggedinuser = get_current_logged_in_user
