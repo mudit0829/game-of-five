@@ -2632,7 +2632,15 @@ def store_auth_register():
         if not username or not password:
             return jsonify({"success": False, "message": "Username and password required"}), 400
 
-        if not isvalidusername(username):
+        is_valid = True
+        if "is_valid_username" in globals():
+            is_valid = is_valid_username(username)
+        elif "isvalidusername" in globals():
+            is_valid = isvalidusername(username)
+        else:
+            is_valid = (" " not in username and len(username.strip()) > 0)
+
+        if not is_valid:
             return jsonify({
                 "success": False,
                 "message": "Username cannot contain spaces. Use only letters, numbers, and underscore."
@@ -2660,8 +2668,15 @@ def store_auth_register():
         db.session.add(user)
         db.session.commit()
 
-        ensurewalletforuser(user, startingbalance=0)
-        ensurestorewalletforuser(user, startingbalance=0)
+        if "ensurewalletforuser" in globals():
+            ensurewalletforuser(user, startingbalance=0)
+        elif "ensure_wallet_for_user" in globals():
+            ensure_wallet_for_user(user, startingbalance=0)
+
+        if "ensurestorewalletforuser" in globals():
+            ensurestorewalletforuser(user, startingbalance=0)
+        elif "ensure_store_wallet_for_user" in globals():
+            ensure_store_wallet_for_user(user, startingbalance=0)
 
         return jsonify({
             "success": True,
@@ -2701,7 +2716,11 @@ def store_auth_login():
         if not user:
             return jsonify({"success": False, "message": "Invalid username or password"}), 401
 
-        ok = user.checkpassword(password) if hasattr(user, "checkpassword") else user.check_password(password)
+        if hasattr(user, "checkpassword"):
+            ok = user.checkpassword(password)
+        else:
+            ok = user.check_password(password)
+
         if not ok:
             return jsonify({"success": False, "message": "Invalid username or password"}), 401
 
@@ -2711,8 +2730,15 @@ def store_auth_login():
                 "message": f"Your account is blocked. Reason: {getattr(user, 'blockreason', '') or 'No reason provided'}"
             }), 403
 
-        ensurewalletforuser(user, startingbalance=0)
-        ensurestorewalletforuser(user, startingbalance=0)
+        if "ensurewalletforuser" in globals():
+            ensurewalletforuser(user, startingbalance=0)
+        elif "ensure_wallet_for_user" in globals():
+            ensure_wallet_for_user(user, startingbalance=0)
+
+        if "ensurestorewalletforuser" in globals():
+            ensurestorewalletforuser(user, startingbalance=0)
+        elif "ensure_store_wallet_for_user" in globals():
+            ensure_store_wallet_for_user(user, startingbalance=0)
 
         return jsonify({
             "success": True,
@@ -2726,7 +2752,6 @@ def store_auth_login():
             "success": False,
             "message": f"store_auth_login error: {str(e)}"
         }), 500
-
 
 @app.route("/api/external/store/credit-game-wallet", methods=["POST"])
 def external_credit_game_wallet():
