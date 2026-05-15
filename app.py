@@ -2790,8 +2790,8 @@ def external_credit_game_wallet():
         return jsonify({"success": False, "message": "User not found"}), 404
 
     existing_ref = StoreTransaction.query.filter_by(
-        userid=user.id,
-        kind="externalstorecredit",
+        user_id=user.id,
+        kind="external_store_credit",
         reference=payment_ref
     ).first()
 
@@ -2834,10 +2834,10 @@ def external_credit_game_wallet():
         )
 
         storeaudit = StoreTransaction(
-            userid=user.id,
-            kind="externalstorecredit",
+            user_id=user.id,
+            kind="external_store_credit",
             amount=totalcoins,
-            balanceafter=int(storewallet.balance or 0),
+            balance_after=int(storewallet.balance or 0),
             label="External Store Purchase",
             note=note or f"Credited to game wallet via store order {payment_ref}",
             reference=payment_ref
