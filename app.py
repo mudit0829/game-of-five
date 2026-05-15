@@ -1724,7 +1724,7 @@ def manage_game_table(table: GameTable):
             print("DEBUG history_commit_ok:", table.round_code, flush=True)
 
         except Exception as e_hist:
-            print("History save error:", ehist, "round_code=", table.round_code, flush=True)
+            print("History save error:", e_hist, "round_code=", table.round_code, flush=True)
             try:
                 db.session.rollback()
             except Exception:
@@ -2133,28 +2133,29 @@ def sa_rounds():
     out = []
 
     for game_type in GAME_CONFIGS.keys():
-        for table_number in range(1, 7):
-            table_offset = (table_number - 1) * 60
-            current_time = floor_to_period(slot_start, ROUND_SECONDS) + timedelta(seconds=table_offset)
+    game_round_seconds = ROULETTE_ROUND_SECONDS if game_type == "roulette" else ROUND_SECONDS
+    for table_number in range(1, 7):
+        table_offset = (table_number - 1) * 60
+        current_time = floor_to_period(slot_start, game_round_seconds) + timedelta(seconds=table_offset)
 
-            while current_time < slot_end:
-                if current_time > cutoff_time:
-                    minutes_until = int((current_time - now).total_seconds() / 60)
-                    round_code = make_round_code(game_type, current_time, table_number)
-                    forced_number = forced_winners.get((game_type, round_code))
+        while current_time < slot_end:
+            if current_time > cutoff_time:
+                minutes_until = int((current_time - now).total_seconds() / 60)
+                round_code = make_round_code(game_type, current_time, table_number)
+                forced_number = forced_winners.get((game_type, round_code))
 
-                    out.append({
-                        "game_type": game_type,
-                        "game_name": GAME_CONFIGS[game_type]["name"],
-                        "table_number": table_number,
-                        "round_code": round_code,
-                        "start_time": fmt_ist(current_time, "%Y-%m-%d %H:%M:%S"),
-                        "minutes_until_start": minutes_until,
-                        "forced_number": forced_number,
-                        "can_force": True
-                    })
+                out.append({
+                    "game_type": game_type,
+                    "game_name": GAME_CONFIGS[game_type]["name"],
+                    "table_number": table_number,
+                    "round_code": round_code,
+                    "start_time": fmt_ist(current_time, "%Y-%m-%d %H:%M:%S"),
+                    "minutes_until_start": minutes_until,
+                    "forced_number": forced_number,
+                    "can_force": True
+                })
 
-                current_time += timedelta(seconds=ROUND_SECONDS)
+            current_time += timedelta(seconds=game_round_seconds)
 
     out.sort(key=lambda x: x["start_time"])
     return jsonify({"rounds": out, "total": len(out)})
@@ -2615,14 +2616,7 @@ def api_store_wallet():
 @app.route("/api/store-auth/register", methods=["POST"])
 def store_auth_register():
     try:
-        auth_ok = False
-
-        if "verify_store_api_request" in globals():
-            auth_ok = verify_store_api_request(request)
-        elif "verifystoreapirequest" in globals():
-            auth_ok = verifystoreapirequest(request)
-
-        if not auth_ok:
+        if not verify_store_api_request(request):
             return jsonify({"success": False, "message": "Unauthorized"}), 401
 
         data = request.get_json(silent=True) or {}
@@ -2632,15 +2626,7 @@ def store_auth_register():
         if not username or not password:
             return jsonify({"success": False, "message": "Username and password required"}), 400
 
-        is_valid = True
-        if "is_valid_username" in globals():
-            is_valid = is_valid_username(username)
-        elif "isvalidusername" in globals():
-            is_valid = isvalidusername(username)
-        else:
-            is_valid = (" " not in username and len(username.strip()) > 0)
-
-        if not is_valid:
+        if not is_valid_username(username):
             return jsonify({
                 "success": False,
                 "message": "Username cannot contain spaces. Use only letters, numbers, and underscore."
@@ -2653,30 +2639,14 @@ def store_auth_register():
         if existing:
             return jsonify({"success": False, "message": "Username already exists"}), 400
 
-        user = User(username=username)
-
-        if hasattr(user, "displayname"):
-            user.displayname = username
-        elif hasattr(user, "display_name"):
-            user.display_name = username
-
-        if hasattr(user, "setpassword"):
-            user.setpassword(password)
-        else:
-            user.set_password(password)
+        user = User(username=username, display_name=username)
+        user.set_password(password)
 
         db.session.add(user)
         db.session.commit()
 
-        if "ensurewalletforuser" in globals():
-            ensurewalletforuser(user, startingbalance=0)
-        elif "ensure_wallet_for_user" in globals():
-            ensure_wallet_for_user(user, startingbalance=0)
-
-        if "ensurestorewalletforuser" in globals():
-            ensurestorewalletforuser(user, startingbalance=0)
-        elif "ensure_store_wallet_for_user" in globals():
-            ensure_store_wallet_for_user(user, startingbalance=0)
+        ensure_wallet_for_user(user, starting_balance=0)
+        ensure_store_wallet_for_user(user, starting_balance=0)
 
         return jsonify({
             "success": True,
@@ -2692,17 +2662,11 @@ def store_auth_register():
             "message": f"store_auth_register error: {str(e)}"
         }), 500
 
+
 @app.route("/api/store-auth/login", methods=["POST"])
 def store_auth_login():
     try:
-        auth_ok = False
-
-        if "verify_store_api_request" in globals():
-            auth_ok = verify_store_api_request(request)
-        elif "verifystoreapirequest" in globals():
-            auth_ok = verifystoreapirequest(request)
-
-        if not auth_ok:
+        if not verify_store_api_request(request):
             return jsonify({"success": False, "message": "Unauthorized"}), 401
 
         data = request.get_json(silent=True) or {}
@@ -2713,32 +2677,17 @@ def store_auth_login():
             return jsonify({"success": False, "message": "Username and password required"}), 400
 
         user = User.query.filter_by(username=username).first()
-        if not user:
+        if not user or not user.check_password(password):
             return jsonify({"success": False, "message": "Invalid username or password"}), 401
 
-        if hasattr(user, "checkpassword"):
-            ok = user.checkpassword(password)
-        else:
-            ok = user.check_password(password)
-
-        if not ok:
-            return jsonify({"success": False, "message": "Invalid username or password"}), 401
-
-        if getattr(user, "isblocked", False):
+        if user.is_blocked:
             return jsonify({
                 "success": False,
-                "message": f"Your account is blocked. Reason: {getattr(user, 'blockreason', '') or 'No reason provided'}"
+                "message": f"Your account is blocked. Reason: {user.block_reason or 'No reason provided'}"
             }), 403
 
-        if "ensurewalletforuser" in globals():
-            ensurewalletforuser(user, startingbalance=0)
-        elif "ensure_wallet_for_user" in globals():
-            ensure_wallet_for_user(user, startingbalance=0)
-
-        if "ensurestorewalletforuser" in globals():
-            ensurestorewalletforuser(user, startingbalance=0)
-        elif "ensure_store_wallet_for_user" in globals():
-            ensure_store_wallet_for_user(user, startingbalance=0)
+        ensure_wallet_for_user(user, starting_balance=0)
+        ensure_store_wallet_for_user(user, starting_balance=0)
 
         return jsonify({
             "success": True,
@@ -2753,94 +2702,94 @@ def store_auth_login():
             "message": f"store_auth_login error: {str(e)}"
         }), 500
 
+
 @app.route("/api/external/store/credit-game-wallet", methods=["POST"])
 def external_credit_game_wallet():
     if not verify_store_api_request(request):
         return jsonify({"success": False, "message": "Unauthorized"}), 401
 
     data = request.get_json(silent=True) or {}
-    userid = safeint(data.get("userid"), 0)
-    cardvalue = safeint(data.get("cardvalue"), 0)
-    quantity = safeint(data.get("quantity"), 1)
+    user_id = _safe_int(data.get("userid"), 0)
+    card_value = _safe_int(data.get("cardvalue"), 0)
+    quantity = _safe_int(data.get("quantity"), 1)
     payment_ref = (data.get("payment_ref") or "").strip()
     note = (data.get("note") or "").strip()
 
-    if userid <= 0:
+    if user_id <= 0:
         return jsonify({"success": False, "message": "Invalid userid"}), 400
-    if cardvalue not in ALLOWEDCARDVALUES:
+    if card_value not in ALLOWED_CARD_VALUES:
         return jsonify({"success": False, "message": "Invalid card value"}), 400
     if quantity <= 0:
         return jsonify({"success": False, "message": "Invalid quantity"}), 400
     if not payment_ref:
         return jsonify({"success": False, "message": "payment_ref required"}), 400
 
-    user = User.query.get(userid)
-    if not user or getattr(user, "isadmin", False):
+    user = User.query.get(user_id)
+    if not user or user.is_admin:
         return jsonify({"success": False, "message": "User not found"}), 404
 
     existing_ref = StoreTransaction.query.filter_by(
-        userid=user.id,
+        user_id=user.id,
         kind="external_store_credit",
         reference=payment_ref
     ).first()
+
+    game_wallet = ensure_wallet_for_user(user, starting_balance=0)
+    store_wallet = ensure_store_wallet_for_user(user, starting_balance=0)
+
     if existing_ref:
-        gamewallet = ensurewalletforuser(user, startingbalance=0)
-        storewallet = ensurestorewalletforuser(user, startingbalance=0)
         return jsonify({
             "success": True,
             "message": "Already processed",
             "userid": user.id,
-            "gamebalance": int(gamewallet.balance or 0) if gamewallet else 0,
-            "storebalance": int(storewallet.balance or 0) if storewallet else 0,
+            "gamebalance": int(game_wallet.balance or 0) if game_wallet else 0,
+            "storebalance": int(store_wallet.balance or 0) if store_wallet else 0,
             "reference": payment_ref
         })
 
-    totalcoins = cardvalue * quantity
+    total_coins = card_value * quantity
 
     try:
-        gamewallet = ensurewalletforuser(user, startingbalance=0)
-        storewallet = ensurestorewalletforuser(user, startingbalance=0)
+        game_wallet.balance = int(game_wallet.balance or 0) + total_coins
 
-        gamewallet.balance = int(gamewallet.balance or 0) + totalcoins
-
-        gametx = Transaction(
-            userid=user.id,
+        game_tx = Transaction(
+            user_id=user.id,
             kind="added",
-            amount=totalcoins,
-            balanceafter=int(gamewallet.balance or 0),
+            amount=total_coins,
+            balance_after=int(game_wallet.balance or 0),
             label="Point Card Added",
-            gametitle="External Store Card",
+            game_title="External Store Card",
             note=note or f"External store purchase {payment_ref}"
         )
 
-        storeaudit = StoreTransaction(
-            userid=user.id,
+        store_audit = StoreTransaction(
+            user_id=user.id,
             kind="external_store_credit",
-            amount=totalcoins,
-            balanceafter=int(storewallet.balance or 0),
+            amount=total_coins,
+            balance_after=int(store_wallet.balance or 0),
             label="External Store Purchase",
             note=note or f"Credited to game wallet via store order {payment_ref}",
             reference=payment_ref
         )
 
         purchase = PointCardPurchase(
-            userid=user.id,
-            cardvalue=cardvalue,
+            user_id=user.id,
+            card_value=card_value,
             quantity=quantity,
-            totalcoins=totalcoins,
-            paymentstatus="PAID"
+            total_coins=total_coins,
+            payment_status="PAID"
         )
 
         transfer = WalletTransfer(
-            userid=user.id,
+            user_id=user.id,
             direction="STORETOGAME",
-            amount=totalcoins,
+            amount=total_coins,
             status="SUCCESS",
             note=f"External store credit ref {payment_ref}"
         )
 
-        db.session.add(gametx)
-        db.session.add(storeaudit)
+        db.session.add(game_tx)
+        db.session.add(store_audit)
         db.session.add(purchase)
         db.session.add(transfer)
         db.session.commit()
@@ -2849,15 +2798,15 @@ def external_credit_game_wallet():
             "success": True,
             "message": "Game wallet credited successfully",
             "userid": user.id,
-            "addedcoins": totalcoins,
-            "gamebalance": int(gamewallet.balance or 0),
-            "storebalance": int(storewallet.balance or 0),
+            "addedcoins": total_coins,
+            "gamebalance": int(game_wallet.balance or 0),
+            "storebalance": int(store_wallet.balance or 0),
             "reference": payment_ref
         })
+
     except Exception as e:
         db.session.rollback()
         return jsonify({"success": False, "message": f"Credit failed: {str(e)}"}), 500
-
 
 @app.route("/api/external/store/wallet-balance/<int:userid>", methods=["GET"])
 def external_store_wallet_balance(userid):
@@ -2868,8 +2817,8 @@ def external_store_wallet_balance(userid):
     if not user or getattr(user, "isadmin", False):
         return jsonify({"success": False, "message": "User not found"}), 404
 
-    gamewallet = ensurewalletforuser(user, startingbalance=0)
-    storewallet = ensurestorewalletforuser(user, startingbalance=0)
+    gamewallet = ensurewalletforuser(user, starting_balance=0)
+    storewallet = ensurestorewalletforuser(user, starting_balance=0)
 
     return jsonify({
         "success": True,
@@ -2882,12 +2831,12 @@ def external_store_wallet_balance(userid):
 @app.route("/api/wallet/summary", methods=["GET"])
 @login_required
 def apiwalletsummary():
-    user = getcurrentloggedinuser()
+    user = get_current_logged_in_user()
     if not user:
         return jsonify({"success": False, "message": "User not found"}), 404
 
-    gamewallet = ensurewalletforuser(user, startingbalance=0)
-    storewallet = ensurestorewalletforuser(user, startingbalance=0)
+    gamewallet = ensurewalletforuser(user, starting_balance=0)
+    storewallet = ensurestorewalletforuser(user, starting_balance=0)
 
     recent = WalletTransfer.query.filter_by(userid=user.id).order_by(WalletTransfer.createdat.desc()).limit(10).all()
 
@@ -2902,7 +2851,7 @@ def apiwalletsummary():
                 "amount": int(r.amount or 0),
                 "status": r.status or "",
                 "note": r.note or "",
-                "createdat": fmtist(r.createdat, "%d %b %Y, %I:%M %p") if r.createdat else ""
+                "createdat": fmt_ist(r.createdat, "%d %b %Y, %I:%M %p") if r.createdat else ""
             }
             for r in recent
         ]
@@ -2939,7 +2888,7 @@ def apiwallethistory():
                 "label": t.label or "",
                 "gametitle": t.gametitle or "",
                 "note": t.note or "",
-                "datetime": fmtist(t.datetime, "%d %b %Y, %I:%M %p") if t.datetime else ""
+                "datetime": fmt_ist(t.datetime, "%d %b %Y, %I:%M %p") if t.datetime else ""
             }
             for t in game_rows
         ],
@@ -2952,7 +2901,7 @@ def apiwallethistory():
                 "label": s.label or "",
                 "note": s.note or "",
                 "reference": s.reference or "",
-                "createdat": fmtist(s.createdat, "%d %b %Y, %I:%M %p") if s.createdat else ""
+                "createdat": fmt_ist(s.createdat, "%d %b %Y, %I:%M %p") if s.createdat else ""
             }
             for s in store_rows
         ],
@@ -2963,7 +2912,7 @@ def apiwallethistory():
                 "amount": int(w.amount or 0),
                 "status": w.status or "",
                 "note": w.note or "",
-                "createdat": fmtist(w.createdat, "%d %b %Y, %I:%M %p") if w.createdat else ""
+                "createdat": fmt_ist(w.createdat, "%d %b %Y, %I:%M %p") if w.createdat else ""
             }
             for w in transfer_rows
         ]
@@ -3290,19 +3239,19 @@ def api_admin_store_products():
 @app.route("/api/admin/wallet/transfers", methods=["GET"])
 @admin_required
 def apiadminwallettransfers():
-    rows = WalletTransfer.query.order_by(WalletTransfer.createdat.desc()).limit(500).all()
+    rows = WalletTransfer.query.order_by(WalletTransfer.created_at.desc()).limit(500).all()
     out = []
     for r in rows:
-        u = User.query.get(r.userid)
+        u = User.query.get(r.user_id)
         out.append({
             "id": r.id,
-            "userid": r.userid,
+            "userid": r.user_id,
             "username": u.username if u else "Unknown",
             "direction": r.direction,
             "amount": int(r.amount or 0),
             "status": r.status or "",
             "note": r.note or "",
-            "createdat": fmtist(r.createdat, "%d %b %Y, %I:%M %p") if r.createdat else ""
+            "createdat": fmt_ist(r.created_at, "%d %b %Y, %I:%M %p") if r.created_at else ""
         })
     return jsonify({"success": True, "items": out})
 
@@ -3310,23 +3259,27 @@ def apiadminwallettransfers():
 @app.route("/api/admin/wallet/purchase-credits", methods=["GET"])
 @admin_required
 def apiadminwalletpurchasecredits():
-    rows = StoreTransaction.query.filter_by(kind="external_store_credit").order_by(
-        StoreTransaction.createdat.desc()
-    ).limit(500).all()
+    rows = (
+        StoreTransaction.query
+        .filter_by(kind="external_store_credit")
+        .order_by(StoreTransaction.created_at.desc())
+        .limit(500)
+        .all()
+    )
 
     out = []
     for r in rows:
-        u = User.query.get(r.userid)
+        u = User.query.get(r.user_id)
         out.append({
             "id": r.id,
-            "userid": r.userid,
+            "userid": r.user_id,
             "username": u.username if u else "Unknown",
             "amount": int(r.amount or 0),
-            "balanceafter": int(r.balanceafter or 0),
+            "balanceafter": int(r.balance_after or 0),
             "label": r.label or "",
             "note": r.note or "",
             "reference": r.reference or "",
-            "createdat": fmtist(r.createdat, "%d %b %Y, %I:%M %p") if r.createdat else ""
+            "createdat": fmt_ist(r.created_at, "%d %b %Y, %I:%M %p") if r.created_at else ""
         })
 
     return jsonify({"success": True, "items": out})
@@ -4296,7 +4249,7 @@ def _get_game_tables_store():
     return globals().get("game_tables") or globals().get("gametables") or {}
 
 def _fmt_ist(dt, fmt="%Y-%m-%d %H:%M"):
-    f = globals().get("fmt_ist") or globals().get("fmtist")
+    f = globals().get("fmt_ist") or globals().get("fmt_ist")
     return f(dt, fmt) if f else (dt.strftime(fmt) if dt else "")
 
 def _ensure_wallet(user):
@@ -4714,7 +4667,7 @@ def _pick_val(obj, *names):
     return None
 
 def _fmt_ist_safe(dt, fmt="%Y-%m-%d %H:%M"):
-    f = globals().get("fmt_ist") or globals().get("fmtist")
+    f = globals().get("fmt_ist") or globals().get("fmt_ist")
     return f(dt, fmt) if (f and dt) else ("-" if not dt else dt.strftime(fmt))
 
 @app.route("/api/admin/games/history", methods=["GET"])
