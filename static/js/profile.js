@@ -131,17 +131,22 @@ document.addEventListener("DOMContentLoaded", () => {
 
     txns.forEach((t) => {
       const kind = String(t.kind || "").toLowerCase();
-      const amt = Number(t.amount || 0);
+      const amt = Math.abs(Number(t.amount || 0));
 
       if (kind === "added") sumAdded += amt;
-      else if (kind === "bet") sumBet += amt;
+      else if (kind === "bet" || kind === "redeem") sumBet += amt;
       else if (kind === "win") sumWin += amt;
     });
 
     const filtered = txns.filter((t) => {
       const kind = String(t.kind || "").toLowerCase();
+
       if (filter === "all") return true;
+      if (filter === "added") return kind === "added";
+      if (filter === "bet") return kind === "bet" || kind === "redeem";
+      if (filter === "win") return kind === "win";
       if (filter === "balance") return true;
+
       return kind === filter;
     });
 
@@ -150,11 +155,12 @@ document.addEventListener("DOMContentLoaded", () => {
 
       let amountClass = "balance";
       if (kind === "added") amountClass = "added";
-      else if (kind === "bet") amountClass = "bet";
+      else if (kind === "bet" || kind === "redeem") amountClass = "bet";
       else if (kind === "win") amountClass = "win";
 
-      const sign = kind === "bet" ? "-" : "+";
-      const amt = Number(t.amount || 0);
+      const isNegative = kind === "bet" || kind === "redeem";
+      const sign = isNegative ? "-" : "+";
+      const amt = Math.abs(Number(t.amount || 0));
       const formattedAmt = `${sign}₹${amt}`;
 
       const label = String(t.label || t.kind || "Transaction");
