@@ -2731,16 +2731,15 @@ def store_auth_register():
         db.session.add(user)
         db.session.commit()
 
-        if "ensurewalletforuser" in globals():
-            ensurewalletforuser(user, starting_balance=0)
-        elif "ensure_wallet_for_user" in globals():
+        if "ensure_wallet_for_user" in globals():
             ensure_wallet_for_user(user, starting_balance=0)
+        elif "ensurewalletforuser" in globals():
+            ensurewalletforuser(user, startingbalance=0)
 
-        if "ensurestorewalletforuser" in globals():
-            ensurestorewalletforuser(user, starting_balance=0)
-        elif "ensure_store_wallet_for_user" in globals():
+        if "ensure_store_wallet_for_user" in globals():
             ensure_store_wallet_for_user(user, starting_balance=0)
-
+        elif "ensurestorewalletforuser" in globals():
+            ensurestorewalletforuser(user, startingbalance=0)
         return jsonify({
             "success": True,
             "message": "Registered successfully",
@@ -2793,15 +2792,15 @@ def store_auth_login():
                 "message": f"Your account is blocked. Reason: {getattr(user, 'blockreason', '') or 'No reason provided'}"
             }), 403
 
-        if "ensurewalletforuser" in globals():
-            ensurewalletforuser(user, starting_balance=0)
-        elif "ensure_wallet_for_user" in globals():
+        if "ensure_wallet_for_user" in globals():
             ensure_wallet_for_user(user, starting_balance=0)
+        elif "ensurewalletforuser" in globals():
+            ensurewalletforuser(user, startingbalance=0)
 
-        if "ensurestorewalletforuser" in globals():
-            ensurestorewalletforuser(user, starting_balance=0)
-        elif "ensure_store_wallet_for_user" in globals():
+        if "ensure_store_wallet_for_user" in globals():
             ensure_store_wallet_for_user(user, starting_balance=0)
+        elif "ensurestorewalletforuser" in globals():
+            ensurestorewalletforuser(user, startingbalance=0)
 
         return jsonify({
             "success": True,
