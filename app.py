@@ -2881,24 +2881,34 @@ def external_credit_game_wallet():
 
         gamewallet.balance = int(gamewallet.balance or 0) + totalcoins
 
-        
-        tx_kwargs = {
-            "kind": "added",
-            "amount": totalcoins,
-            "balanceafter": int(gamewallet.balance or 0),
-            "label": "Point Card Added",
-            "gametitle": "External Store Card",
-            "note": note or f"External store purchase {paymentref}"
-        }
+        txkwargs = dict(
+            kind='added',
+            amount=totalcoins,
+            label='Point Card Added',
+            gametitle='External Store Card',
+            note=note or f'External store purchase {paymentref}'
+        )
 
-        if hasattr(Transaction, "userid"):
-            tx_kwargs["userid"] = user.id
-        elif hasattr(Transaction, "user_id"):
-            tx_kwargs["user_id"] = user.id
+        if hasattr(Transaction, 'userid'):
+            txkwargs['userid'] = user.id
+        elif hasattr(Transaction, 'user_id'):
+            txkwargs['user_id'] = user.id
         else:
-            raise Exception("Transaction model has neither 'userid' nor 'user_id'")
+            raise Exception('Transaction model has neither userid nor user_id')
 
-        gametx = Transaction(**tx_kwargs)
+        if hasattr(Transaction, 'balanceafter'):
+            txkwargs['balanceafter'] = int(gamewallet.balance or 0)
+        elif hasattr(Transaction, 'balance_after'):
+            txkwargs['balance_after'] = int(gamewallet.balance or 0)
+
+        if hasattr(Transaction, 'datetime'):
+            txkwargs['datetime'] = datetime.utcnow()
+        elif hasattr(Transaction, 'createdat'):
+            txkwargs['createdat'] = datetime.utcnow()
+        elif hasattr(Transaction, 'created_at'):
+            txkwargs['created_at'] = datetime.utcnow()
+
+        gametx = Transaction(**txkwargs)
 
         storeaudit = StoreTransaction(
             user_id=user.id,
