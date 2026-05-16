@@ -2881,13 +2881,7 @@ def external_credit_game_wallet():
 
         gamewallet.balance = int(gamewallet.balance or 0) + totalcoins
 
-        txkwargs = dict(
-            kind='added',
-            amount=totalcoins,
-            label='Point Card Added',
-            gametitle='External Store Card',
-            note=note or f'External store purchase {paymentref}'
-        )
+        txkwargs = {}
 
         if hasattr(Transaction, 'userid'):
             txkwargs['userid'] = user.id
@@ -2896,10 +2890,27 @@ def external_credit_game_wallet():
         else:
             raise Exception('Transaction model has neither userid nor user_id')
 
+        if hasattr(Transaction, 'kind'):
+            txkwargs['kind'] = 'added'
+
+        if hasattr(Transaction, 'amount'):
+            txkwargs['amount'] = totalcoins
+
         if hasattr(Transaction, 'balanceafter'):
             txkwargs['balanceafter'] = int(gamewallet.balance or 0)
         elif hasattr(Transaction, 'balance_after'):
             txkwargs['balance_after'] = int(gamewallet.balance or 0)
+
+        if hasattr(Transaction, 'label'):
+            txkwargs['label'] = 'Point Card Added'
+
+        if hasattr(Transaction, 'gametitle'):
+            txkwargs['gametitle'] = 'External Store Card'
+        elif hasattr(Transaction, 'game_title'):
+            txkwargs['game_title'] = 'External Store Card'
+
+        if hasattr(Transaction, 'note'):
+            txkwargs['note'] = note or f'External store purchase {paymentref}'
 
         if hasattr(Transaction, 'datetime'):
             txkwargs['datetime'] = datetime.utcnow()
