@@ -5635,28 +5635,36 @@ def admin_get_transactions():
                 })
 
         # Also include wallet transactions saved in DB
-    db_rows = Transaction.query.order_by(Transaction.datetime.desc()).limit(1000).all()
+     try:
+        db_rows = Transaction.query.order_by(Transaction.datetime.desc()).limit(1000).all()
+    except Exception:
+        db_rows = []
 
     for t in db_rows:
-        user = User.query.get(t.userid)
-        username = getattr(user, "username", None) if user else f"user_{t.userid}"
+        try:
+            user = User.query.get(t.userid)
+            username = getattr(user, "username", None) if user else f"user_{t.userid}"
 
-        out.append({
-            "id": t.id,
-            "userid": t.userid,
-            "user_id": t.userid,
-            "username": username,
-            "type": (t.kind or "").upper(),
-            "gametype": "",
-            "game_type": "",
-            "gametitle": t.gametitle or t.label or "-",
-            "game_title": t.gametitle or t.label or "-",
-            "roundcode": "",
-            "round_code": "",
-            "amount": int(t.amount or 0),
-            "status": "SUCCESS",
-            "datetime": _fmt_ist(t.datetime, "%Y-%m-%d %H:%M") if t.datetime else "",
-        })
+            out.append({
+                "id": t.id,
+                "userid": t.userid,
+                "user_id": t.userid,
+                "username": username,
+                "type": str(t.kind or "").upper(),
+                "gametype": "",
+                "game_type": "",
+                "gametitle": t.gametitle or t.label or "-",
+                "game_title": t.gametitle or t.label or "-",
+                "roundcode": "",
+                "round_code": "",
+                "amount": int(t.amount or 0),
+                "status": "SUCCESS",
+                "datetime": fmtist(t.datetime, "%Y-%m-%d %H:%M") if t.datetime else "",
+                "reference": t.label or t.gametitle or t.note or "-",
+            })
+        except Exception:
+            continue
+
     return jsonify(out)
 
 @app.route('/api/admin/subadmins', methods=['GET', 'POST'])
