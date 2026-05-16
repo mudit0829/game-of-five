@@ -5575,67 +5575,79 @@ def admin_reports():
 @app.route("/api/admin/transactions", methods=["GET"])
 @admin_required
 def admin_get_transactions():
-    # Keep this compatible with your current admin_panel.html expectations:
-    # it builds txns from user history and emits BET + WIN records. [file:106][file:105]
-    store = _get_user_history_store()
     out = []
 
+    # 1) Existing game history based BET/WIN rows
+    try:
+        store = _get_user_history_store() or {}
+    except Exception:
+        store = {}
+
     for uid, bets in store.items():
-        user = User.query.get(uid)
-        username = getattr(user, "username", None) if user else f"user_{uid}"
+        try:
+            user = User.query.get(uid)
+            username = getattr(user, "username", None) if user else f"user_{uid}"
+        except Exception:
+            username = f"user_{uid}"
 
         for rec in (bets or []):
-            gametype = rec.get("gametype") or rec.get("game_type") or "-"
-            roundcode = rec.get("roundcode") or rec.get("round_code") or "-"
+            try:
+                gametype = rec.get("gametype") or rec.get("game_type") or "-"
+                roundcode = rec.get("roundcode") or rec.get("round_code") or "-"
 
-            cfg = (globals().get("GAME_CONFIGS") or globals().get("GAMECONFIGS") or {}).get(gametype, {})
-            game_title = cfg.get("name") or cfg.get("name", gametype)
+                cfg = (globals().get("GAME_CONFIGS") or globals().get("GAMECONFIGS") or {}).get(gametype, {})
+                game_title = cfg.get("name") or gametype
 
-            bet_amt = rec.get("betamount") or rec.get("bet_amount") or cfg.get("bet_amount") or cfg.get("betamount") or 0
-            bt = rec.get("bettime") or rec.get("bet_time") or datetime.utcnow()
-            dt_str = _fmt_ist(bt, "%Y-%m-%d %H:%M") if isinstance(bt, datetime) else str(bt)
-
-            out.append({
-                "userid": uid,
-                "user_id": uid,
-                "username": username,
-                "type": "BET",
-                "gametype": gametype,
-                "game_type": gametype,
-                "gametitle": game_title,
-                "game_title": game_title,
-                "roundcode": roundcode,
-                "round_code": roundcode,
-                "amount": int(bet_amt or 0),
-                "status": (rec.get("status") or "PENDING").upper(),
-                "datetime": dt_str,
-            })
-
-            # win record if resolved+win
-            is_resolved = bool(rec.get("isresolved", False) or rec.get("is_resolved", False))
-            is_win = bool(rec.get("win", False)) or (str(rec.get("status", "")).lower() == "win")
-            if is_resolved and is_win:
-                win_dt = rec.get("datetime") or rec.get("date_time") or dt_str
-                payout = cfg.get("payout") or cfg.get("payout", 0)
+                bet_amt = rec.get("betamount") or rec.get("bet_amount") or cfg.get("bet_amount") or cfg.get("betamount") or 0
+                bt = rec.get("bettime") or rec.get("bet_time") or datetime.utcnow()
+                dt_str = fmtist(bt, "%Y-%m-%d %H:%M") if isinstance(bt, datetime) else str(bt)
 
                 out.append({
+                    "id": f"BET-{uid}-{roundcode}",
                     "userid": uid,
                     "user_id": uid,
                     "username": username,
-                    "type": "WIN",
+                    "type": "BET",
                     "gametype": gametype,
                     "game_type": gametype,
                     "gametitle": game_title,
                     "game_title": game_title,
                     "roundcode": roundcode,
                     "round_code": roundcode,
-                    "amount": int(payout or 0),
-                    "status": "WIN",
-                    "datetime": win_dt,
+                    "amount": int(bet_amt or 0),
+                    "status": str(rec.get("status") or "PENDING").upper(),
+                    "datetime": dt_str,
+                    "reference": roundcode,
                 })
 
-        # Also include wallet transactions saved in DB
-     try:
+                is_resolved = bool(rec.get("isresolved", False) or rec.get("is_resolved", False))
+                is_win = bool(rec.get("win", False)) or (str(rec.get("status", "")).lower() == "win")
+                if is_resolved and is_win:
+                    win_dt = rec.get("datetime") or rec.get("date_time") or dt_str
+                    payout = cfg.get("payout") or 0
+
+                    out.append({
+                        "id": f"WIN-{uid}-{roundcode}",
+                        "userid": uid,
+                        "user_id": uid,
+                        "username": username,
+                        "type": "WIN",
+                        "gametype": gametype,
+                        "game_type": gametype,
+                        "gametitle": game_title,
+                        "game_title": game_title,
+                        "roundcode": roundcode,
+                        "round_code": roundcode,
+                        "amount": int(payout or 0),
+                        "status": "WIN",
+                        "datetime": win_dt,
+                        "reference": roundcode,
+                    })
+            except Exception:
+                continue
+
+    # 2) Wallet / DB transactions
+    try:
         db_rows = Transaction.query.order_by(Transaction.datetime.desc()).limit(1000).all()
     except Exception:
         db_rows = []
