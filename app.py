@@ -3176,6 +3176,9 @@ def redeem_from_game():
         game_wallet = ensure_wallet_for_user(user, starting_balance=0)
         store_wallet = ensure_store_wallet_for_user(user, starting_balance=0)
 
+        if not game_wallet or not store_wallet:
+            return jsonify(success=False, message="Wallet not available"), 400
+
         if int(game_wallet.balance or 0) < amount:
             return jsonify(success=False, message="Insufficient game balance"), 400
 
