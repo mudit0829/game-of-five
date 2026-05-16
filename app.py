@@ -5575,8 +5575,7 @@ def admin_reports():
 @app.route("/api/admin/transactions", methods=["GET"])
 @admin_required
 def admin_get_transactions():
-    # Keep this compatible with your current admin_panel.html expectations:
-    # it builds txns from user history and emits BET + WIN records. [file:106][file:105]
+    # Keep old working game-history based output
     store = _get_user_history_store()
     out = []
 
@@ -5611,7 +5610,6 @@ def admin_get_transactions():
                 "datetime": dt_str,
             })
 
-            # win record if resolved+win
             is_resolved = bool(rec.get("isresolved", False) or rec.get("is_resolved", False))
             is_win = bool(rec.get("win", False)) or (str(rec.get("status", "")).lower() == "win")
             if is_resolved and is_win:
@@ -5634,6 +5632,84 @@ def admin_get_transactions():
                     "datetime": win_dt,
                 })
 
+    # Add ecommerce / store transactions without breaking old output
+    try:
+        store_rows = StoreTransaction.query.order_by(StoreTransaction.createdat.desc).limit(1000).all()
+
+        for s in store_rows:
+            user = User.query.get(s.userid)
+            username = getattr(user, "username", None) if user else f"user_{s.userid}"
+
+            kind = str(s.kind or "").lower().strip()
+            tx_type = "STORE"
+
+            if kind == "productpurchase":
+                tx_type = "STORE_PURCHASE"
+            elif kind == "externalstorecredit":
+                tx_type = "STORE_CREDIT"
+            elif kind == "gametostore":
+                tx_type = "GAME_TO_STORE"
+            elif kind == "storetogame":
+                tx_type = "STORE_TO_GAME"
+            elif kind:
+                tx_type = kind.upper()
+
+            out.append({
+                "userid": s.userid,
+                "user_id": s.userid,
+                "username": username,
+                "type": tx_type,
+                "gametype": "STORE",
+                "game_type": "STORE",
+                "gametitle": s.label or "Store Transaction",
+                "game_title": s.label or "Store Transaction",
+                "roundcode": s.reference or f"STORE-{s.id}",
+                "round_code": s.reference or f"STORE-{s.id}",
+                "amount": int(s.amount or 0),
+                "status": "DONE",
+                "datetime": _fmt_ist(s.createdat, "%Y-%m-%d %H:%M") if s.createdat else "-",
+                "reference": s.reference or "",
+                "note": s.note or "",
+                "kind": s.kind or "",
+            })
+    except Exception as e:
+        print("admin transactions store_rows error:", e)
+
+    try:
+        transfer_rows = WalletTransfer.query.order_by(WalletTransfer.createdat.desc).limit(1000).all()
+
+        for w in transfer_rows:
+            user = User.query.get(w.userid)
+            username = getattr(user, "username", None) if user else f"user_{w.userid}"
+
+            direction = str(w.direction or "").upper().strip()
+            tx_type = direction if direction else "WALLET_TRANSFER"
+
+            out.append({
+                "userid": w.userid,
+                "user_id": w.userid,
+                "username": username,
+                "type": tx_type,
+                "gametype": "WALLET",
+                "game_type": "WALLET",
+                "gametitle": "Wallet Transfer",
+                "game_title": "Wallet Transfer",
+                "roundcode": f"TRANSFER-{w.id}",
+                "round_code": f"TRANSFER-{w.id}",
+                "amount": int(w.amount or 0),
+                "status": (w.status or "SUCCESS").upper(),
+                "datetime": _fmt_ist(w.createdat, "%Y-%m-%d %H:%M") if w.createdat else "-",
+                "reference": "",
+                "note": w.note or "",
+                "kind": direction,
+            })
+    except Exception as e:
+        print("admin transactions wallet transfer error:", e)
+
+    def _sort_key(x):
+        return str(x.get("datetime") or "")
+
+    out.sort(key=_sort_key, reverse=True)
     return jsonify(out)
 
 @app.route('/api/admin/subadmins', methods=['GET', 'POST'])
