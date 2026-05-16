@@ -3008,20 +3008,29 @@ def apiwalletsummary():
     gamewallet = ensurewalletforuser(user, starting_balance=0)
     storewallet = ensurestorewalletforuser(user, starting_balance=0)
 
-    recent = WalletTransfer.query.filter_by(userid=user.id).order_by(WalletTransfer.createdat.desc()).limit(10).all()
+    wt_user_col = _model_col(WalletTransfer, "userid", "user_id")
+    wt_created_col = _model_col(WalletTransfer, "createdat", "created_at")
+
+    q = WalletTransfer.query
+    if wt_user_col is not None:
+        q = q.filter(wt_user_col == user.id)
+    if wt_created_col is not None:
+        q = q.order_by(wt_created_col.desc())
+
+    recent = q.limit(10).all()
 
     return jsonify({
         "success": True,
-        "gamebalance": int(gamewallet.balance or 0) if gamewallet else 0,
-        "storebalance": int(storewallet.balance or 0) if storewallet else 0,
+        "gamebalance": int(_obj_val(gamewallet, "balance", default=0) or 0) if gamewallet else 0,
+        "storebalance": int(_obj_val(storewallet, "balance", default=0) or 0) if storewallet else 0,
         "recent_transfers": [
             {
                 "id": r.id,
-                "direction": r.direction,
-                "amount": int(r.amount or 0),
-                "status": r.status or "",
-                "note": r.note or "",
-                "createdat": fmtist(r.createdat, "%d %b %Y, %I:%M %p") if r.createdat else ""
+                "direction": _obj_val(r, "direction", default="") or "",
+                "amount": int(_obj_val(r, "amount", default=0) or 0),
+                "status": _obj_val(r, "status", default="") or "",
+                "note": _obj_val(r, "note", default="") or "",
+                "createdat": fmtist(_obj_val(r, "createdat", "created_at"), "%d %b %Y, %I:%M %p") if _obj_val(r, "createdat", "created_at") else ""
             }
             for r in recent
         ]
@@ -3035,54 +3044,82 @@ def apiwallethistory():
     if not user:
         return jsonify({"success": False, "message": "User not found"}), 404
 
-    game_rows = Transaction.query.filter_by(userid=user.id).filter(
-        Transaction.kind.in_(["added", "redeem"])
-    ).order_by(Transaction.datetime.desc()).limit(100).all()
+    tx_user_col = _model_col(Transaction, "userid", "user_id")
+    tx_dt_col = _model_col(Transaction, "datetime", "created_at")
 
-    store_rows = StoreTransaction.query.filter_by(userid=user.id).order_by(
-        StoreTransaction.createdat.desc()
-    ).limit(100).all()
+    st_user_col = _model_col(StoreTransaction, "userid", "user_id")
+    st_created_col = _model_col(StoreTransaction, "createdat", "created_at")
 
-    transfer_rows = WalletTransfer.query.filter_by(userid=user.id).order_by(
-        WalletTransfer.createdat.desc()
-    ).limit(100).all()
+    wt_user_col = _model_col(WalletTransfer, "userid", "user_id")
+    wt_created_col = _model_col(WalletTransfer, "createdat", "created_at")
+
+    game_query = Transaction.query
+    if tx_user_col is not None:
+        game_query = game_query.filter(tx_user_col == user.id)
+    game_rows = (
+        game_query
+        .filter(Transaction.kind.in_(["added", "redeem"]))
+        .order_by(tx_dt_col.desc() if tx_dt_col is not None else Transaction.id.desc())
+        .limit(100)
+        .all()
+    )
+
+    store_query = StoreTransaction.query
+    if st_user_col is not None:
+        store_query = store_query.filter(st_user_col == user.id)
+    store_rows = (
+        store_query
+        .order_by(st_created_col.desc() if st_created_col is not None else StoreTransaction.id.desc())
+        .limit(100)
+        .all()
+    )
+
+    transfer_query = WalletTransfer.query
+    if wt_user_col is not None:
+        transfer_query = transfer_query.filter(wt_user_col == user.id)
+    transfer_rows = (
+        transfer_query
+        .order_by(wt_created_col.desc() if wt_created_col is not None else WalletTransfer.id.desc())
+        .limit(100)
+        .all()
+    )
 
     return jsonify({
         "success": True,
         "game_transactions": [
             {
                 "id": t.id,
-                "kind": t.kind,
-                "amount": int(t.amount or 0),
-                "balanceafter": int(t.balanceafter or 0),
-                "label": t.label or "",
-                "gametitle": t.gametitle or "",
-                "note": t.note or "",
-                "datetime": fmtist(t.datetime, "%d %b %Y, %I:%M %p") if t.datetime else ""
+                "kind": _obj_val(t, "kind", default="") or "",
+                "amount": int(_obj_val(t, "amount", default=0) or 0),
+                "balanceafter": int(_obj_val(t, "balanceafter", "balance_after", default=0) or 0),
+                "label": _obj_val(t, "label", default="") or "",
+                "gametitle": _obj_val(t, "gametitle", "game_title", default="") or "",
+                "note": _obj_val(t, "note", default="") or "",
+                "datetime": fmtist(_obj_val(t, "datetime", "created_at"), "%d %b %Y, %I:%M %p") if _obj_val(t, "datetime", "created_at") else ""
             }
             for t in game_rows
         ],
         "store_transactions": [
             {
                 "id": s.id,
-                "kind": s.kind,
-                "amount": int(s.amount or 0),
-                "balanceafter": int(s.balanceafter or 0),
-                "label": s.label or "",
-                "note": s.note or "",
-                "reference": s.reference or "",
-                "createdat": fmtist(s.createdat, "%d %b %Y, %I:%M %p") if s.createdat else ""
+                "kind": _obj_val(s, "kind", default="") or "",
+                "amount": int(_obj_val(s, "amount", default=0) or 0),
+                "balanceafter": int(_obj_val(s, "balanceafter", "balance_after", default=0) or 0),
+                "label": _obj_val(s, "label", default="") or "",
+                "note": _obj_val(s, "note", default="") or "",
+                "reference": _obj_val(s, "reference", default="") or "",
+                "createdat": fmtist(_obj_val(s, "createdat", "created_at"), "%d %b %Y, %I:%M %p") if _obj_val(s, "createdat", "created_at") else ""
             }
             for s in store_rows
         ],
         "transfers": [
             {
                 "id": w.id,
-                "direction": w.direction,
-                "amount": int(w.amount or 0),
-                "status": w.status or "",
-                "note": w.note or "",
-                "createdat": fmtist(w.createdat, "%d %b %Y, %I:%M %p") if w.createdat else ""
+                "direction": _obj_val(w, "direction", default="") or "",
+                "amount": int(_obj_val(w, "amount", default=0) or 0),
+                "status": _obj_val(w, "status", default="") or "",
+                "note": _obj_val(w, "note", default="") or "",
+                "createdat": fmtist(_obj_val(w, "createdat", "created_at"), "%d %b %Y, %I:%M %p") if _obj_val(w, "createdat", "created_at") else ""
             }
             for w in transfer_rows
         ]
