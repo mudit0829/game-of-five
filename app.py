@@ -2818,18 +2818,29 @@ def store_auth_login():
 
 @app.route("/api/external/store/credit-game-wallet", methods=["POST"])
 def external_credit_game_wallet():
+    def model_kwargs(Model, **kwargs):
+        cols = set(Model.__table__.columns.keys())
+        return {k: v for k, v in kwargs.items() if k in cols}
+
+    def utcnow_naive():
+        return datetime.now(timezone.utc).replace(tzinfo=None)
+
     if not verify_store_api_request(request):
         return jsonify({"success": False, "message": "Unauthorized"}), 401
 
     data = request.get_json(silent=True) or {}
 
-    userid = safeint(data.get("userid"), 0)
-    cardvalue = safeint(data.get("cardvalue"), 0)
+    userid = safeint(data.get("userid") or data.get("user_id"), 0)
+    cardvalue = safeint(data.get("cardvalue") or data.get("card_value"), 0)
     quantity = safeint(data.get("quantity"), 1)
     payment_ref = (data.get("paymentref") or data.get("payment_ref") or "").strip()
     note = (data.get("note") or "").strip()
 
-    allowed_values = globals().get("ALLOWEDCARDVALUES") or globals().get("ALLOWED_CARD_VALUES") or [10, 50, 100, 200, 250]
+    allowed_values = (
+        globals().get("ALLOWEDCARDVALUES")
+        or globals().get("ALLOWED_CARD_VALUES")
+        or [10, 50, 100, 200, 250]
+    )
 
     if userid <= 0:
         return jsonify({"success": False, "message": "Invalid userid"}), 400
@@ -2843,14 +2854,18 @@ def external_credit_game_wallet():
     if not payment_ref:
         return jsonify({"success": False, "message": "payment_ref required"}), 400
 
-    user = User.query.get(userid)
+    user = db.session.get(User, userid)
     if not user or getattr(user, "isadmin", False):
         return jsonify({"success": False, "message": "User not found"}), 404
 
     existing_ref = StoreTransaction.query.filter_by(
-        user_id=user.id,
-        kind="external_store_credit",
-        reference=payment_ref
+        **model_kwargs(
+            StoreTransaction,
+            userid=user.id,
+            user_id=user.id,
+            kind="externalstorecredit",
+            reference=payment_ref
+        )
     ).first()
 
     if existing_ref:
@@ -2880,72 +2895,66 @@ def external_credit_game_wallet():
             return jsonify({"success": False, "message": "Store wallet not found"}), 500
 
         gamewallet.balance = int(gamewallet.balance or 0) + totalcoins
+        now_utc = utcnow_naive()
 
-        txkwargs = {}
-
-        if hasattr(Transaction, 'userid'):
-            txkwargs['userid'] = user.id
-        elif hasattr(Transaction, 'user_id'):
-            txkwargs['user_id'] = user.id
-        else:
-            raise Exception('Transaction model has neither userid nor user_id')
-
-        if hasattr(Transaction, 'kind'):
-            txkwargs['kind'] = 'added'
-
-        if hasattr(Transaction, 'amount'):
-            txkwargs['amount'] = totalcoins
-
-        if hasattr(Transaction, 'balanceafter'):
-            txkwargs['balanceafter'] = int(gamewallet.balance or 0)
-        elif hasattr(Transaction, 'balance_after'):
-            txkwargs['balance_after'] = int(gamewallet.balance or 0)
-
-        if hasattr(Transaction, 'label'):
-            txkwargs['label'] = 'Point Card Added'
-
-        if hasattr(Transaction, 'gametitle'):
-            txkwargs['gametitle'] = 'External Store Card'
-        elif hasattr(Transaction, 'game_title'):
-            txkwargs['game_title'] = 'External Store Card'
-
-        if hasattr(Transaction, 'note'):
-            txkwargs['note'] = note or f'External store purchase {paymentref}'
-
-        if hasattr(Transaction, 'datetime'):
-            txkwargs['datetime'] = datetime.utcnow()
-        elif hasattr(Transaction, 'createdat'):
-            txkwargs['createdat'] = datetime.utcnow()
-        elif hasattr(Transaction, 'created_at'):
-            txkwargs['created_at'] = datetime.utcnow()
-
-        gametx = Transaction(**txkwargs)
-
-        storeaudit = StoreTransaction(
+        gametx = Transaction(**model_kwargs(
+            Transaction,
+            userid=user.id,
             user_id=user.id,
-            kind="external_store_credit",
+            kind="added",
             amount=totalcoins,
+            balanceafter=int(gamewallet.balance or 0),
+            balance_after=int(gamewallet.balance or 0),
+            label="Point Card Added",
+            gametitle="External Store Card",
+            game_title="External Store Card",
+            note=note or f"External store purchase {payment_ref}",
+            datetime=now_utc,
+            createdat=now_utc,
+            created_at=now_utc
+        ))
+
+        storeaudit = StoreTransaction(**model_kwargs(
+            StoreTransaction,
+            userid=user.id,
+            user_id=user.id,
+            kind="externalstorecredit",
+            amount=totalcoins,
+            balanceafter=int(storewallet.balance or 0),
             balance_after=int(storewallet.balance or 0),
             label="External Store Purchase",
             note=note or f"Credited to game wallet via store order {payment_ref}",
-            reference=payment_ref
-        )
+            reference=payment_ref,
+            createdat=now_utc,
+            created_at=now_utc
+        ))
 
-        purchase = PointCardPurchase(
+        purchase = PointCardPurchase(**model_kwargs(
+            PointCardPurchase,
             userid=user.id,
+            user_id=user.id,
             cardvalue=cardvalue,
+            card_value=cardvalue,
             quantity=quantity,
             totalcoins=totalcoins,
-            paymentstatus="PAID"
-        )
+            total_coins=totalcoins,
+            paymentstatus="PAID",
+            payment_status="PAID",
+            createdat=now_utc,
+            created_at=now_utc
+        ))
 
-        transfer = WalletTransfer(
+        transfer = WalletTransfer(**model_kwargs(
+            WalletTransfer,
             userid=user.id,
+            user_id=user.id,
             direction="STORETOGAME",
             amount=totalcoins,
             status="SUCCESS",
-            note=f"External store credit ref {payment_ref}"
-        )
+            note=f"External store credit ref {payment_ref}",
+            createdat=now_utc,
+            created_at=now_utc
+        ))
 
         db.session.add(gametx)
         db.session.add(storeaudit)
