@@ -2996,6 +2996,85 @@ def external_store_wallet_balance(userid):
         "storebalance": int(storewallet.balance or 0) if storewallet else 0
     })
 
+@app.route('/api/external/store/wallet-history/<int:userid>', methods=['GET'])
+def external_store_wallet_history(userid):
+    if not verify_store_api_request(request):
+        return jsonify({"success": False, "message": "Unauthorized"}), 401
+
+    user = User.query.get(userid)
+    if not user or getattr(user, "is_admin", False):
+        return jsonify({"success": False, "message": "User not found"}), 404
+
+    gamewallet = ensurewalletforuser(user, startingbalance=0)
+    storewallet = ensurestorewalletforuser(user, startingbalance=0)
+
+    game_rows = (
+        Transaction.query
+        .filter_by(userid=user.id)
+        .order_by(Transaction.id.desc())
+        .limit(100)
+        .all()
+    )
+
+    store_rows = (
+        StoreTransaction.query
+        .filter_by(userid=user.id)
+        .order_by(StoreTransaction.id.desc())
+        .limit(100)
+        .all()
+    )
+
+    transfer_rows = (
+        WalletTransfer.query
+        .filter_by(userid=user.id)
+        .order_by(WalletTransfer.id.desc())
+        .limit(100)
+        .all()
+    )
+
+    return jsonify({
+        "success": True,
+        "userid": user.id,
+        "gamebalance": int(gamewallet.balance or 0) if gamewallet else 0,
+        "storebalance": int(storewallet.balance or 0) if storewallet else 0,
+        "gametransactions": [
+            {
+                "id": t.id,
+                "kind": t.kind or "",
+                "amount": int(t.amount or 0),
+                "balanceafter": int(t.balanceafter or 0),
+                "label": t.label or "",
+                "gametitle": getattr(t, "gametitle", "") or "",
+                "note": t.note or "",
+                "datetime": fmtist(getattr(t, "datetime", None), "%d %b %Y, %I:%M %p") if getattr(t, "datetime", None) else ""
+            }
+            for t in game_rows
+        ],
+        "storetransactions": [
+            {
+                "id": s.id,
+                "kind": s.kind or "",
+                "amount": int(s.amount or 0),
+                "balanceafter": int(s.balanceafter or 0),
+                "label": s.label or "",
+                "note": s.note or "",
+                "reference": s.reference or "",
+                "createdat": fmtist(getattr(s, "createdat", None), "%d %b %Y, %I:%M %p") if getattr(s, "createdat", None) else ""
+            }
+            for s in store_rows
+        ],
+        "transfers": [
+            {
+                "id": w.id,
+                "direction": w.direction or "",
+                "amount": int(w.amount or 0),
+                "status": w.status or "",
+                "note": w.note or "",
+                "createdat": fmtist(getattr(w, "createdat", None), "%d %b %Y, %I:%M %p") if getattr(w, "createdat", None) else ""
+            }
+            for w in transfer_rows
+        ]
+    }), 200
 
 @app.route("/api/wallet/summary", methods=["GET"])
 @login_required
