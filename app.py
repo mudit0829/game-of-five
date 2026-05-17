@@ -3010,7 +3010,7 @@ def external_store_wallet_history(userid):
 
     game_rows = (
         Transaction.query
-        .filter_by(userid=user.id)
+        .filter_by(user_id=user.id)
         .order_by(Transaction.id.desc())
         .limit(100)
         .all()
