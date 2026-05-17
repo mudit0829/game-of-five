@@ -3008,29 +3008,29 @@ def external_store_wallet_history(userid):
     gamewallet = ensurewalletforuser(user, starting_balance=0)
     storewallet = ensurestorewalletforuser(user, starting_balance=0)
 
-    game_rows = (
-        Transaction.query
-        .filter_by(user_id=user.id)
-        .order_by(Transaction.id.desc())
-        .limit(100)
-        .all()
-    )
+    tx_user_col = getattr(Transaction, "user_id", None) or getattr(Transaction, "userid", None)
+    tx_dt_col = getattr(Transaction, "datetime", None) or getattr(Transaction, "createdat", None)
 
-    store_rows = (
-        StoreTransaction.query
-        .filter_by(userid=user.id)
-        .order_by(StoreTransaction.id.desc())
-        .limit(100)
-        .all()
-    )
+    st_user_col = getattr(StoreTransaction, "user_id", None) or getattr(StoreTransaction, "userid", None)
+    st_dt_col = getattr(StoreTransaction, "createdat", None)
 
-    transfer_rows = (
-        WalletTransfer.query
-        .filter_by(userid=user.id)
-        .order_by(WalletTransfer.id.desc())
-        .limit(100)
-        .all()
-    )
+    wt_user_col = getattr(WalletTransfer, "user_id", None) or getattr(WalletTransfer, "userid", None)
+    wt_dt_col = getattr(WalletTransfer, "createdat", None)
+
+    game_query = Transaction.query
+    if tx_user_col is not None:
+        game_query = game_query.filter(tx_user_col == user.id)
+    game_rows = game_query.order_by(tx_dt_col.desc() if tx_dt_col is not None else Transaction.id.desc()).limit(100).all()
+
+    store_query = StoreTransaction.query
+    if st_user_col is not None:
+        store_query = store_query.filter(st_user_col == user.id)
+    store_rows = store_query.order_by(st_dt_col.desc() if st_dt_col is not None else StoreTransaction.id.desc()).limit(100).all()
+
+    transfer_query = WalletTransfer.query
+    if wt_user_col is not None:
+        transfer_query = transfer_query.filter(wt_user_col == user.id)
+    transfer_rows = transfer_query.order_by(wt_dt_col.desc() if wt_dt_col is not None else WalletTransfer.id.desc()).limit(100).all()
 
     return jsonify({
         "success": True,
@@ -3040,25 +3040,26 @@ def external_store_wallet_history(userid):
         "gametransactions": [
             {
                 "id": t.id,
-                "kind": t.kind or "",
-                "amount": int(t.amount or 0),
-                "balanceafter": int(t.balanceafter or 0),
-                "label": t.label or "",
+                "kind": getattr(t, "kind", "") or "",
+                "amount": int(getattr(t, "amount", 0) or 0),
+                "balanceafter": int(getattr(t, "balanceafter", 0) or 0),
+                "label": getattr(t, "label", "") or "",
                 "gametitle": getattr(t, "gametitle", "") or "",
-                "note": t.note or "",
-                "datetime": fmtist(getattr(t, "datetime", None), "%d %b %Y, %I:%M %p") if getattr(t, "datetime", None) else ""
+                "note": getattr(t, "note", "") or "",
+                "datetime": fmtist(getattr(t, "datetime", None) or getattr(t, "createdat", None), "%d %b %Y, %I:%M %p")
+                if (getattr(t, "datetime", None) or getattr(t, "createdat", None)) else ""
             }
             for t in game_rows
         ],
         "storetransactions": [
             {
                 "id": s.id,
-                "kind": s.kind or "",
-                "amount": int(s.amount or 0),
-                "balanceafter": int(s.balanceafter or 0),
-                "label": s.label or "",
-                "note": s.note or "",
-                "reference": s.reference or "",
+                "kind": getattr(s, "kind", "") or "",
+                "amount": int(getattr(s, "amount", 0) or 0),
+                "balanceafter": int(getattr(s, "balanceafter", 0) or 0),
+                "label": getattr(s, "label", "") or "",
+                "note": getattr(s, "note", "") or "",
+                "reference": getattr(s, "reference", "") or "",
                 "createdat": fmtist(getattr(s, "createdat", None), "%d %b %Y, %I:%M %p") if getattr(s, "createdat", None) else ""
             }
             for s in store_rows
@@ -3066,10 +3067,10 @@ def external_store_wallet_history(userid):
         "transfers": [
             {
                 "id": w.id,
-                "direction": w.direction or "",
-                "amount": int(w.amount or 0),
-                "status": w.status or "",
-                "note": w.note or "",
+                "direction": getattr(w, "direction", "") or "",
+                "amount": int(getattr(w, "amount", 0) or 0),
+                "status": getattr(w, "status", "") or "",
+                "note": getattr(w, "note", "") or "",
                 "createdat": fmtist(getattr(w, "createdat", None), "%d %b %Y, %I:%M %p") if getattr(w, "createdat", None) else ""
             }
             for w in transfer_rows
