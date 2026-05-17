@@ -3005,8 +3005,8 @@ def external_store_wallet_history(userid):
     if not user or getattr(user, "isadmin", False):
         return jsonify({"success": False, "message": "User not found"}), 404
 
-    gamewallet = ensurewalletforuser(user, startingbalance=0)
-    storewallet = ensurestorewalletforuser(user, startingbalance=0)
+    gamewallet = ensurewalletforuser(user, starting_balance=0)
+    storewallet = ensurestorewalletforuser(user, starting_balance=0)
 
     game_rows = (
         Transaction.query
