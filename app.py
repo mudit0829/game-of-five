@@ -3076,7 +3076,8 @@ def external_store_wallet_history(userid):
             for w in transfer_rows
         ]
     }), 200
-
+    
+@app.route("/api/walletsummary", methods=["GET"])
 @app.route("/api/wallet/summary", methods=["GET"])
 @login_required
 def apiwalletsummary():
@@ -3116,6 +3117,7 @@ def apiwalletsummary():
     })
 
 
+@app.route("/api/wallethistory", methods=["GET"])
 @app.route("/api/wallet/history", methods=["GET"])
 @login_required
 def apiwallethistory():
@@ -3204,7 +3206,7 @@ def apiwallethistory():
         ]
     })
 
-
+@app.route("/api/storebuy-card", methods=["POST"])
 @app.route("/api/store/buy-card", methods=["POST"])
 @login_required
 def buy_card():
@@ -3273,7 +3275,8 @@ def buy_card():
         db.session.rollback()
         return jsonify(success=False, message=f"Buy card failed: {str(e)}"), 500
 
-
+@app.route("/api/storeredeem-from-game", methods=["POST"])
+@app.route("/api/walletredeem-to-store", methods=["POST"])
 @app.route("/api/wallet/redeem-to-store", methods=["POST"])
 @app.route("/api/store/redeem-from-game", methods=["POST"])
 @login_required
