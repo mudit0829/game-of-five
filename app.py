@@ -3002,7 +3002,7 @@ def external_store_wallet_history(userid):
         return jsonify({"success": False, "message": "Unauthorized"}), 401
 
     user = User.query.get(userid)
-    if not user or getattr(user, "is_admin", False):
+    if not user or getattr(user, "isadmin", False):
         return jsonify({"success": False, "message": "User not found"}), 404
 
     gamewallet = ensurewalletforuser(user, startingbalance=0)
